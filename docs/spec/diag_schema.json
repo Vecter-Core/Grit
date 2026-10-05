@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grit.invalid/schema/diagnostics/1",
+  "title": "Grit diagnostics report (schema_version 1)",
+  "description": "QUY TẮC TƯƠNG THÍCH (Giang duyệt 2026-10-05): cùng schema_version chỉ được THÊM trường; đổi tên/xoá/đổi kiểu một trường thì TĂNG schema_version. Bộ tiêu thụ phải bỏ qua trường lạ. | Đầu ra JSON của `gritc check --json`. Thứ tự khoá và thứ tự diagnostics là xác định (D9, D19): diagnostics sắp theo (tệp, offset bắt đầu, offset kết thúc, mã, thông điệp). | Trạng thái: schema v1 ĐÃ DUYỆT; các trường đánh dấu [tạm] vẫn tuân theo quy tắc trên.",
+  "type": "object",
+  "required": ["schema_version", "tool", "diagnostics", "summary"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tool": { "type": "string", "description": "Luôn là \"gritc\"." },
+    "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } },
+    "summary": {
+      "type": "object",
+      "required": ["errors", "warnings", "notes", "truncated", "exit_code"],
+      "properties": {
+        "errors": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 },
+        "notes": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "integer", "minimum": 0, "description": "Số diagnostics bị cắt do giới hạn số lượng (D19). ICE không bao giờ bị cắt." },
+        "exit_code": { "enum": [0, 1, 2], "description": "D17: 0 = qua (có thể kèm VÀNG), 1 = có ĐỎ, 2 = ICE. Tính theo cờ deny-yellow của lần chạy." }
+      }
+    }
+  },
+  "$defs": {
+    "position": {
+      "type": "object",
+      "required": ["offset", "line", "col"],
+      "properties": {
+        "offset": { "type": "integer", "minimum": 0, "description": "Byte offset trong tệp UTF-8 (chính xác tuyệt đối; LSP đổi sang UTF-16 từ nguồn)." },
+        "line": { "type": ["integer", "null"], "minimum": 1, "description": "Dòng 1-based; null nếu offset ngoài tệp, giữa ký tự, hoặc không biết tệp." },
+        "col": { "type": ["integer", "null"], "minimum": 1, "description": "Cột 1-based tính theo Unicode scalar value; null như trên." }
+      }
+    },
+    "span": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "$ref": "#/$defs/position" },
+        "end": { "$ref": "#/$defs/position", "description": "Loại trừ (nửa mở). Span rỗng: start == end." }
+      }
+    },
+    "label": {
+      "type": "object",
+      "required": ["file", "span", "message"],
+      "properties": {
+        "file": { "type": "string" },
+        "span": { "$ref": "#/$defs/span" },
+        "message": { "type": "string" }
+      }
+    },
+    "edit": {
+      "type": "object",
+      "required": ["file", "span", "replacement"],
+      "properties": {
+        "file": { "type": "string" },
+        "span": { "$ref": "#/$defs/span" },
+        "replacement": { "type": "string", "description": "Chuỗi thay thế; rỗng = xoá; span rỗng = chèn." }
+      }
+    },
+    "suggestion": {
+      "type": "object",
+      "required": ["message", "applicability", "edits"],
+      "properties": {
+        "message": { "type": "string" },
+        "applicability": {
+          "enum": ["machine-applicable", "maybe-incorrect"],
+          "description": "machine-applicable: có thể áp dụng tự động. maybe-incorrect: chỉ gợi ý, KHÔNG tự áp dụng (fail-closed)."
+        },
+        "edits": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/edit" },
+          "description": "Áp dụng nguyên tử: tất cả hoặc không gì cả. Không chồng nhau."
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["code", "level", "message", "file", "span", "span_label", "labels", "notes", "suggestions"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^(E[0-9]{4}|S[0-9]{3}|N[0-9]{4})$", "description": "D16. E = ĐỎ, S = VÀNG, N = GHI CHÚ; E99xx = ICE." },
+        "level": { "enum": ["error", "warn", "note"], "description": "Suy ra từ tiền tố của code (không thể mâu thuẫn). error = ĐỎ, warn = VÀNG, note = GHI CHÚ." },
+        "message": { "type": "string" },
+        "file": { "type": "string" },
+        "span": { "$ref": "#/$defs/span" },
+        "span_label": { "type": ["string", "null"], "description": "Nhãn gắn vào span chính." },
+        "labels": { "type": "array", "items": { "$ref": "#/$defs/label" }, "description": "Nhãn phụ (vd 'đã move ở đây'). [tạm: có thể trỏ sang tệp khác từ M3]" },
+        "notes": { "type": "array", "items": { "type": "string" } },
+        "suggestions": { "type": "array", "items": { "$ref": "#/$defs/suggestion" } }
+      }
+    }
+  }
+}

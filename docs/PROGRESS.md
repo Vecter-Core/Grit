@@ -71,3 +71,17 @@ Cập nhật: 2026-10-05.
 - **"Mọi ký tự cấm có test fail":** đã có E1201–E1204; danh sách vô hình là hữu hạn (xem KNOWN_LIMITATIONS).
 - **Chờ Giang:** chốt tên token; xác nhận cách hiểu D15 trong ADR-009 (zero-width cấm cả trong chuỗi/comment); duyệt trước khi sang phần tiếp theo của M1.
 - **Rủi ro mới:** homoglyph thuần một bảng chữ chưa phát hiện; `cargo-fuzz` Windows cần PATH tới ASan DLL (đã ghi ADR-009).
+
+## M2 — Parser + AST + Diagnostics — **ĐANG LÀM: bước 1 (gt-diag) xong, chờ Giang duyệt schema trước khi sang gt-ast**
+Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
+
+### Bước 1: gt-diag (có thật)
+- Crate `gt-diag` (thêm vào workspace): `Code`/`Level` (D16), `Diagnostic` + `Label` + `Suggestion`/`Edit`/`Applicability`, `apply_edits` (nguyên tử, từ chối chồng/ngoài tệp/giữa ký tự), `render_human` (rustc-style, màu tuỳ chọn), `Diagnostics`/`Report` (sắp xếp tất định, bỏ trùng, giới hạn, ICE không bị cắt, exit 0/1/2, `--deny-yellow`), `Report::to_json` (schema v1).
+- **TDD:** test viết trước, đỏ (unresolved imports), rồi cài đặt. 32 test xanh: mã/mức, bộ mã khớp `docs/spec/error_codes.md`, bộ gom, exit code, edit, 12 golden render (span rỗng, EOF, nhiều dòng, span dài bị cắt `...`, CRLF/tab, nhãn phụ, ghi chú, gợi ý, ngoài tệp), JSON (mọi mức, span rỗng/nhiều dòng/ngoài tệp, tệp lạ, escape ký tự điều khiển/U+2028/emoji, cắt bớt, khoá phát ra == `properties` của schema, kiểm theo schema bằng bộ validator tối thiểu).
+- **Đột biến:** 10 đột biến thủ công; 2 sống sót ở lần đầu (escape U+2028, span kết thúc đầu dòng) → thêm test, nay cả 10 bị bắt.
+- **Cổng:** workspace 58 test xanh; fmt, clippy `-D warnings` (bắt 2 lỗi style thật, đã sửa), audit sạch (17 crate); `check_expectations.py` OK.
+- **Schema:** `docs/spec/diag_schema.json` (draft 2020-12), version 1, quy tắc tương thích ghi trong schema; quyết định và 4 điểm lệch so với đặc tả ban đầu ở ADR-011.
+
+### Chưa làm
+- gt-ast, gt-parser; chuyển `LexError` → `Diagnostic` (làm ở gt-parser); `gritc explain`.
+- `serde_json` chỉ là dev-dependency của gt-diag (không vào TCB sản phẩm).

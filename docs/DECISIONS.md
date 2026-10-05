@@ -74,3 +74,17 @@
   5. Tên biến thể Rust (`TokenKind::KwMut`, `LoopSym`, `Walrus`…) đổi theo cho khớp.
 - **Hệ quả:** ADR-002…ADR-009 còn nhắc tên tạm cũ (`MUT`, `KEYWORD_IN`…) — giữ nguyên làm lịch sử; tên đúng nằm ở đây và ở `token.rs`.
 - **Xác nhận (Giang):** giữ `LOOP_SYM` và `PROOF_SYM`, bỏ `KW_LOOP`/`KW_PROOF` trùng. Nguyên tắc chung: **canonical Unicode và alias ASCII của cùng một ký hiệu luôn ra đúng một token duy nhất; không có token riêng cho từng dạng bề mặt.**
+
+## ADR-011 — gt-diag: thiết kế diagnostics và schema JSON v1 (M2) — ĐÃ DUYỆT (Giang, 2026-10-05)
+- **Quyết định:** `Diagnostic { code, level, message, file, span, span_label, labels, notes, suggestions }`; `Level` = `Error`(ĐỎ)/`Warn`(VÀNG)/`Note`(GHI CHÚ) **suy ra từ tiền tố mã** (D16) nên không thể mâu thuẫn; `Suggestion { message, applicability, edits }` với edit áp dụng nguyên tử; bộ gom `Diagnostics` sắp xếp tất định, bỏ trùng, giới hạn số lượng (ICE không bao giờ bị cắt), phán quyết exit 0/1/2 (D17) và `--deny-yellow`. JSON viết tay (khoá cố định, tất định), kiểm bằng `serde_json` chỉ ở **dev-dependency**; schema ở `docs/spec/diag_schema.json`.
+- **Lệch khỏi đặc tả ban đầu của Giang (lý do kỹ thuật):**
+  1. `suggestions: Vec<Edit>` → `Vec<Suggestion>` (mỗi gợi ý = message + nhiều edit nguyên tử + `applicability`). Một bản sửa thường cần nhiều edit đi cùng nhau, và AI/LSP cần biết gợi ý nào được phép tự áp dụng (fail-closed: `maybe-incorrect` không bao giờ tự áp dụng).
+  2. Thêm `labels` (nhãn phụ) và `notes`. Borrow checker (E04xx) cần "đã move ở đây / dùng ở đây" — nếu thiếu, thêm sau là đổi schema.
+  3. `level` không phải trường độc lập mà suy ra từ code (vẫn có trong JSON cho bên tiêu thụ).
+  4. "Màu" chỉ là tuỳ chọn `RenderOptions.color` (mặc định tắt) vì output tất định (D9); bật màu chỉ thêm mã ANSI, bỏ ANSI ra thì y hệt bản thuần (có test).
+- **Về "schema ổn định ngay từ đầu":** chưa có AST/parser nên chưa thể đảm bảo tuyệt đối. Quy tắc tương thích ghi trong schema: cùng `schema_version` chỉ được THÊM trường (bên tiêu thụ bỏ qua trường lạ); đổi tên/xoá/đổi kiểu = tăng version. Các điểm còn có thể đổi trước khi đóng băng: nhãn/edit nhiều tệp (M3), cách biểu diễn vị trí cho LSP (hiện: offset byte + dòng/cột theo Unicode scalar; LSP đổi sang UTF-16 từ nguồn).
+- **Không làm (YAGNI):** tiêu đề/giải thích mã lỗi trong registry (để `gritc explain` ở M-sau), chuyển `LexError` → `Diagnostic` (thuộc `gt-parser`, nơi lexer và diag gặp nhau).
+- **QUY TẮC TƯƠNG THÍCH SCHEMA (đã duyệt, nguyên văn):** cùng `schema_version` chỉ được **thêm** trường; đổi tên/xoá/đổi kiểu một trường thì **tăng version**. Bên tiêu thụ (LSP M13, giao thức AI 8.E) phải bỏ qua trường lạ. Giang xác nhận "ổn định tuyệt đối" là hứa quá; quy tắc trên thay thế.
+- **Đã duyệt cả bốn điểm lệch:** `Suggestion` có `applicability`, `labels`/`notes`, `level` suy từ tiền tố mã, màu tắt mặc định.
+- **Adapter `LexError → Diagnostic`:** đặt ở `gt-parser`. Khi có consumer thứ hai cần lỗi lexer mà không qua parser thì chuyển adapter ra chỗ dùng chung, kèm ADR.
+- **Thứ tự tất định (D19):** sắp theo (tệp, offset bắt đầu, offset kết thúc, mã, thông điệp) — chặt hơn yêu cầu (tệp, offset bắt đầu, mã) để các lỗi cùng vị trí/mã cũng có thứ tự cố định; có test hoán vị mọi thứ tự đầu vào.
