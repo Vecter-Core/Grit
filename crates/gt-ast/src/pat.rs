@@ -11,15 +11,6 @@ pub struct Pattern {
     pub kind: PatternKind,
 }
 
-/// Literal trong pattern, có thể âm (`-1`).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PatLit {
-    pub id: NodeId,
-    pub span: Span,
-    pub negative: bool,
-    pub lit: Lit,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FieldPat {
     pub id: NodeId,
@@ -36,11 +27,12 @@ pub enum PatternKind {
     Rest,
     /// Gán tên (hoặc variant không đối số — giải tên ở M3).
     Binding(Ident),
-    Lit(PatLit),
+    /// Literal, có thể âm (`Lit::negative`).
+    Lit(Lit),
     /// `a..b`, `a..=b`, `a..`, `..b`
     Range {
-        start: Option<PatLit>,
-        end: Option<PatLit>,
+        start: Option<Lit>,
+        end: Option<Lit>,
         inclusive: bool,
     },
     Variant {
@@ -55,4 +47,4 @@ pub enum PatternKind {
     Tuple(Vec<Pattern>),
 }
 
-impl_node!(Pattern, PatLit, FieldPat);
+impl_node!(Pattern, FieldPat);

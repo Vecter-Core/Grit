@@ -52,10 +52,12 @@ pub struct Expr {
 }
 
 /// Literal; số/chuỗi/ký tự giữ văn bản nguồn nguyên văn (hậu tố nằm trong đó).
+/// `negative`: dấu `-` ngay trước literal số đã được gấp vào (ví dụ `-128i8`); luôn `false` với bool/chuỗi/ký tự.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lit {
     pub id: NodeId,
     pub span: Span,
+    pub negative: bool,
     pub kind: LitKind,
 }
 

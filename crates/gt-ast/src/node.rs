@@ -1,6 +1,10 @@
 //! NodeId và trait `Node`. Mọi "node" của cây có `id` (NodeId) và `span`.
 use gt_span::Span;
 
+/// Độ sâu cây tối đa — NGUỒN DUY NHẤT của giới hạn (semantics §26). Parser từ chối chương trình sâu hơn (E0102); mọi pass
+/// đệ quy trên AST được phép giả định cây không sâu hơn hằng này và PHẢI chạy qua `gt_stack::run_with_big_stack`.
+pub const MAX_DEPTH: u32 = 256;
+
 /// Định danh node: cấp **tuần tự từ 0, không lỗ** bởi parser theo thứ tự dựng tất định (D9).
 /// Duy nhất trong một tệp; các pass sau gắn bảng kết quả bằng `Vec<T>` chỉ mục `index()`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

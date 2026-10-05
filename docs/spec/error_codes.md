@@ -6,7 +6,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 
 | Mã | Ý nghĩa | Milestone | Test mẫu (M0) |
 |---|---|---|---|
-| E0101 | Token bất ngờ / thiếu dấu / từ khoá cứng hoặc ký hiệu dành riêng (`self`, `Self`, `in`, `μ`, `\extern`, `\where`; comment khối `/* */`; `=` đứng riêng) dùng sai chỗ | M2 | E0101_missing_brace, E0101_mu_as_ident, E0101_star_dangling, E0101_self_as_var, E0101_self_as_var_ascii, E0101_extern_reserved, E0101_where_reserved, E0101_block_comment, E0101_compound_assign, E0101_char_multi, E0101_doc_comment_dangling, E0101_selftype_as_var, E0101_in_as_var |
+| E0101 | Token bất ngờ / thiếu dấu / từ khoá cứng hoặc ký hiệu dành riêng (`self`, `Self`, `in`, `μ`, `\extern`, `\where`; comment khối `/* */`; `=` đứng riêng) dùng sai chỗ | M2 | E0101_missing_brace, E0101_mu_as_ident, E0101_star_dangling, E0101_self_as_var, E0101_self_as_var_ascii, E0101_extern_reserved, E0101_where_reserved, E0101_block_comment, E0101_compound_assign, E0101_char_multi, E0101_doc_comment_dangling, E0101_selftype_as_var, E0101_in_as_var, E0101_place_not_assignable, E0101_struct_in_contract, E0101_struct_in_loop_variant |
 | E0102 | Lồng nhau quá sâu (> `MAX_DEPTH` = 256 mức, tính cả độ dài chuỗi toán tử/postfix) hoặc cây quá lớn. ĐỎ, không phải ICE. Gợi ý sửa: tách biểu thức con ra biến phụ bằng `≔` | M2 | E0102_too_deep |
 | E0201 | Tên chưa định nghĩa | M3 | E0201_undefined_name |
 | E0202 | Định nghĩa trùng | M3 | E0202_duplicate_def |

@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: struct literal trần trong hợp đồng ⊳ trước khối bị từ chối (Q15a); phải bọc ngoặc
+ƒ f() → bool ! ∅ ⊳ P { x: 1 } { true }

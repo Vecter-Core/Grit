@@ -28,7 +28,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "gt-parser"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-lexer",
+ "gt-span",
+ "gt-stack",
+]
+
+[[package]]
 name = "gt-span"
+version = "0.1.0"
+
+[[package]]
+name = "gt-stack"
 version = "0.1.0"
 
 [[package]]

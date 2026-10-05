@@ -53,3 +53,12 @@
 
 ## gt-fmt: dòng trống (Giang duyệt 2026-10-05)
 - Grit muốn **đúng một dạng chuẩn**: gt-fmt tự quy định dòng trống — **một dòng trống giữa hai item cấp cao nhất liền kề, không dòng trống thừa** (không dòng trống đầu/cuối tệp, không hai dòng trống liên tiếp). Dòng trống người dùng viết không được bảo toàn (không nằm trong AST).
+
+## gt-parser (ADR-014)
+- **Mọi pass đệ quy trên AST PHẢI chạy qua `gt_stack::run_with_big_stack`** (ADR-015; `MAX_DEPTH` chỉ bảo đảm cây không sâu hơn 256, không bảo đảm stack của luồng gọi). Types/borrowck/effects/… (M4+) chưa tồn tại nên chưa có gì để vi phạm; mỗi pass mới phải có test độ sâu tương tự `depth_law`.
+- Khôi phục lỗi chỉ ở mức câu lệnh / item / nhánh match: lỗi trong danh sách tham số, đối số, trường vẫn làm mất cả câu lệnh/item chứa nó (một lỗi, bỏ cả câu lệnh).
+- Sau lỗi `E0102` (quá sâu) parser dừng hẳn: không báo thêm lỗi nào ở phần còn lại của tệp.
+- Biểu thức phẳng quá 256 toán hạng/postfix bị từ chối (`E0102`) — hệ quả của Q15e.
+- AST không có node lỗi: chỉ dùng AST khi không có ĐỎ (fail-closed).
+- Parser đang theo các đề xuất Q15a/b/c/h/i chưa được Giang duyệt (OPEN_QUESTIONS); nếu bị bác, phải sửa parser và các mẫu liên quan.
+- Số mức lồng tối đa theo từng loại khác nhau (127 cho khối `{ }`/`⎇`/`⟳`/`⚠`, 253–255 cho biểu thức/kiểu/pattern) vì mỗi loại tốn độ sâu khác nhau cho mỗi mức; giới hạn chung vẫn là 256.

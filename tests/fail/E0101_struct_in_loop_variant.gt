@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: struct literal trần sau ↓ trước khối của vòng lặp bị từ chối (Q15a)
+ƒ f(c: bool) ! ∅ { ⟳ c ↓ P { x: 1 } { } }

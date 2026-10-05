@@ -1,0 +1,17 @@
+[package]
+name = "gt-parser"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Grit: parser (recursive descent + Pratt) với khôi phục lỗi"
+
+[dependencies]
+gt-span = { path = "../gt-span" }
+gt-lexer = { path = "../gt-lexer" }
+gt-ast = { path = "../gt-ast" }
+gt-diag = { path = "../gt-diag" }
+gt-stack = { path = "../gt-stack" }
+
+[lints]
+workspace = true

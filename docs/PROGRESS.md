@@ -72,7 +72,7 @@ Cập nhật: 2026-10-05.
 - **Chờ Giang:** chốt tên token; xác nhận cách hiểu D15 trong ADR-009 (zero-width cấm cả trong chuỗi/comment); duyệt trước khi sang phần tiếp theo của M1.
 - **Rủi ro mới:** homoglyph thuần một bảng chữ chưa phát hiện; `cargo-fuzz` Windows cần PATH tới ASan DLL (đã ghi ADR-009).
 
-## M2 — Parser + AST + Diagnostics — **ĐANG LÀM: gt-diag (commit `599452e`) và gt-ast xong; dừng chờ Giang duyệt trước gt-parser**
+## M2 — Parser + AST + Diagnostics — **gt-diag (`599452e`), gt-ast (`9505469`), gt-parser xong; dừng chờ Giang duyệt trước gt-fmt**
 Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
 
 ### Bước 1: gt-diag (có thật)
@@ -98,3 +98,23 @@ Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
 
 ### Chưa làm
 - gt-parser (khôi phục lỗi ở `;`/`}`; adapter `LexError → Diagnostic` ở đây), gt-fmt, test round-trip alias↔canonical ở mức AST.
+
+### Bước A (đột biến) — xong
+- **gt-ast:** cargo-mutants (11 mutant: 7 bị bắt, 4 không biên dịch được) + 6 đột biến tay vào macro `impl_node`/`NodeIdGen`/`NodeId`: **6/6 bị bắt**. (Lần đầu một số kết quả không đáng tin vì lỗi liên kết `LNK1104`; script đột biến nay thử lại và chỉ tính "bị bắt" khi có test thật đỏ.)
+- **Trivia (lexer):** 9 đột biến; **1 sống sót lần đầu** (span chứa cả ký tự CR cuối dòng của CRLF) → thêm test `crlf_comment_span_excludes_cr`; nay 9/9 bị bắt.
+
+### Bước D: gt-parser (có thật)
+- Crate `gt-parser` (recursive descent + Pratt): items, generics, effects, hợp đồng, kiểu, pattern, khối/câu lệnh, loops (while/for-in/vô hạn), match, unsafe, lượng từ; so sánh **không kết hợp**; `expr_ns`; `-` gấp vào literal (ADR-014); adapter `LexError → Diagnostic`; token `UNKNOWN` báo im lặng (lexer đã báo).
+- **Khôi phục lỗi từ đầu:** đồng bộ ở `;`/`}` (câu lệnh), `,`/`}` (nhánh match), `}` đóng/từ khoá item (item); mỗi vòng có chốt tiến-lên. **Giới hạn độ sâu 256** gồm cả chuỗi phẳng, vượt → ĐỎ `E0102` (mã mới + `tests/fail/E0102_too_deep.gt`), không tràn stack.
+- **Lỗi thật phát hiện khi test:** 256 mức vẫn tràn stack 2 MB ở bản debug (~9 frame/mức) → parser chạy trong luồng stack 64 MiB + bắt panic thành ICE `E9901` (ADR-014).
+- **TDD:** test viết trước (đỏ vì chưa có API). 5 file test, 43 test: biểu thức (độ ưu tiên, kết hợp, âm, range, postfix, struct literal), câu lệnh/loop/match/pattern, item/kiểu, khôi phục lỗi + độ sâu + **30 000 chuỗi token ngẫu nhiên (công việc ≤ 300×độ dài, không ICE)** + cắt cụt chương trình ở mọi byte, và corpus.
+- **Corpus bằng parser thật:** **30/30 file `pass` parse không lỗi** (sau khi chấp nhận Q15h cho mẫu 14); `warn` sạch; mọi file `fail` thuộc lexer/parser (E0101, E0102, E12xx — 17 file) ra **đúng mã**; 30 file `fail` thuộc milestone sau **parse được, không báo thay**; `01_add.gt` ≡ `11_ascii_alias.gt` và 3 cặp viết tay cho cùng AST (so sánh sau khi che span).
+- **Đột biến parser:** 18 đột biến (độ ưu tiên, kết hợp, so sánh, literal âm, semi, đích gán, for-in, struct literal, cast, self-param, độ sâu chuỗi, lỗi dây chuyền, recovery, pattern, raw ptr…): 16 bị bắt ngay; 1 sống sót thật (token rác sau item hỏng bị nuốt) → thêm test, nay bị bắt; 1 tương đương hành vi (không tiêu thụ `;` khi khôi phục: chốt tiến-lên + im lặng-lỗi-cùng-vị-trí cho cùng kết quả).
+- **Fuzz parser:** `crates/gt-parser/fuzz` (không ICE, span hợp lệ, công việc tuyến tính, tất định). Mới chạy **90 giây: 29 759 lượt, sạch** (chậm ~330 lượt/s vì luồng + parse hai lần); chưa có phiên dài.
+- **Cổng:** workspace 115 test xanh; fmt, clippy `-D warnings`, `cargo audit` sạch; `check_expectations.py` OK (86 file).
+
+### Chỗ grammar mơ hồ/thiếu phát hiện (OPEN_QUESTIONS Q15a–i) — parser theo đề xuất, chờ Giang duyệt
+`expr_ns` thiếu ở hợp đồng/`↓`/`⋈`/`⊢`; `self` không là biểu thức; `∈`/`⇒` chưa có độ ưu tiên/kết hợp; luật khối-biểu-thức cuối khối; độ sâu cho chuỗi phẳng; E0307 không thuộc parser; literal âm; **không có chỗ khai báo biến thể `↓` cho đệ quy**; đích gán hẹp hơn nhu cầu.
+
+### Chưa làm
+- gt-fmt (chờ duyệt). Chạy lại fuzz lexer 6×10 sau thay đổi trivia: đang chạy (xem báo cáo). Phiên fuzz parser dài.

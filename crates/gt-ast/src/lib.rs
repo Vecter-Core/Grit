@@ -13,6 +13,6 @@ mod ty;
 
 pub use expr::*;
 pub use item::*;
-pub use node::{Node, NodeId, NodeIdGen};
+pub use node::{MAX_DEPTH, Node, NodeId, NodeIdGen};
 pub use pat::*;
 pub use ty::*;

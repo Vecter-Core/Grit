@@ -1,0 +1,23 @@
+# Harness fuzz cho gt-parser (M2). Crate riêng, KHÔNG thuộc workspace chính (cần nightly + cargo-fuzz).
+# Ngoại lệ forbid(unsafe_code): macro `fuzz_target!` của libfuzzer-sys sinh mã unsafe; harness không được phát hành (ADR-009).
+[package]
+name = "gt-parser-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+gt-parser = { path = ".." }
+
+[workspace]
+
+[[bin]]
+name = "parse"
+path = "fuzz_targets/parse.rs"
+test = false
+doc = false
+bench = false

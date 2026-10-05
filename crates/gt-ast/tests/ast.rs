@@ -65,6 +65,7 @@ impl B {
         Lit {
             id: self.id(),
             span: Self::sp(),
+            negative: false,
             kind,
         }
     }
@@ -415,11 +416,10 @@ fn every_grammar_construct_is_representable() {
     assert_eq!(stmt_names.len(), 6);
 
     // ----- PatternKind (8) -----
-    let pl = |b: &mut B, neg: bool, v: &str| PatLit {
-        id: b.id(),
-        span: Span::new(0, 0),
-        negative: neg,
-        lit: b.lit(LitKind::Int(v.into())),
+    let pl = |b: &mut B, neg: bool, v: &str| {
+        let mut l = b.lit(LitKind::Int(v.into()));
+        l.negative = neg;
+        l
     };
     let pat_kinds = [
         PatternKind::Wildcard,

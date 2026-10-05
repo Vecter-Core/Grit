@@ -5,3 +5,5 @@ crates/*/fuzz/target
 crates/*/fuzz/corpus
 crates/*/fuzz/artifacts
 crates/*/fuzz/logs
+mutants.out
+mutants.out.old

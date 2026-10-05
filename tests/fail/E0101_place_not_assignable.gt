@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: đích của ← phải là biến/trường/chỉ số/* — g().x không phải vị trí (Q15i)
+ƒ f() ! ∅ { g().x ← 1; }

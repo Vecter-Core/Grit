@@ -25,6 +25,8 @@ pub enum SegmentKind {
     Name(String),
     /// `Self` đứng đầu đường dẫn (`Self { … }`, `Self::f`).
     SelfType,
+    /// `self` dùng như biểu thức (`self.w`) — grammar chưa nêu, xem OPEN_QUESTIONS Q15.
+    SelfValue,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -188,6 +190,8 @@ pub struct Effect {
 pub enum ContractKind {
     Pre,
     Post,
+    /// `↓ biểu_thức` trong chữ ký hàm: biến thể của đệ quy (D12). Grammar chưa nêu — OPEN_QUESTIONS Q15h.
+    Variant,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
