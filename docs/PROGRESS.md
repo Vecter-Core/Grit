@@ -72,7 +72,7 @@ Cập nhật: 2026-10-05.
 - **Chờ Giang:** chốt tên token; xác nhận cách hiểu D15 trong ADR-009 (zero-width cấm cả trong chuỗi/comment); duyệt trước khi sang phần tiếp theo của M1.
 - **Rủi ro mới:** homoglyph thuần một bảng chữ chưa phát hiện; `cargo-fuzz` Windows cần PATH tới ASan DLL (đã ghi ADR-009).
 
-## M2 — Parser + AST + Diagnostics — **gt-diag (`599452e`), gt-ast (`9505469`), gt-parser xong; dừng chờ Giang duyệt trước gt-fmt**
+## M2 — Parser + AST + Diagnostics — **gt-diag (`599452e`), gt-ast (`9505469`), gt-parser (`aad181d`), gt-fmt xong (chưa commit); dừng chờ Giang duyệt (E1301, Q16), chưa sang M3**
 Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
 
 ### Bước 1: gt-diag (có thật)
@@ -87,7 +87,7 @@ Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
 - `serde_json` chỉ là dev-dependency của gt-diag (không vào TCB sản phẩm).
 
 ### Bước 1b: sửa M1 — comment `//` thành trivia (ADR-012)
-- **Kiểm tra theo yêu cầu:** gt-lexer M1 **bỏ hẳn** `//` (không phát gì) → `gritc fmt` sẽ xoá comment. Đã sửa: `LexOutput.trivia` (văn bản nguyên văn, span, `own_line`), doc comment `///` vẫn là token. Test mới `trivia.rs` (viết trước, đỏ; 4 test) gồm bất biến "mọi dòng có `//` trong corpus cho đúng một mục". Fuzz target + test độ bền kiểm cả trivia (92 815 lượt, sạch; **chưa chạy lại 6×10 phút** sau thay đổi này).
+- **Kiểm tra theo yêu cầu:** gt-lexer M1 **bỏ hẳn** `//` (không phát gì) → gt-fmt (thư viện) sẽ xoá comment. Đã sửa: `LexOutput.trivia` (văn bản nguyên văn, span, `own_line`), doc comment `///` vẫn là token. Test mới `trivia.rs` (viết trước, đỏ; 4 test) gồm bất biến "mọi dòng có `//` trong corpus cho đúng một mục". Fuzz target + test độ bền kiểm cả trivia (92 815 lượt, sạch; **chưa chạy lại 6×10 phút** sau thay đổi này).
 - Quy tắc gt-fmt gắn comment và nguyên tắc "không gắn được thì từ chối, không xoá" ghi ở KNOWN_LIMITATIONS; test fmt viết khi tới lượt gt-fmt.
 
 ### Bước 2: gt-ast (có thật)
@@ -110,11 +110,20 @@ Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
 - **TDD:** test viết trước (đỏ vì chưa có API). 5 file test, 43 test: biểu thức (độ ưu tiên, kết hợp, âm, range, postfix, struct literal), câu lệnh/loop/match/pattern, item/kiểu, khôi phục lỗi + độ sâu + **30 000 chuỗi token ngẫu nhiên (công việc ≤ 300×độ dài, không ICE)** + cắt cụt chương trình ở mọi byte, và corpus.
 - **Corpus bằng parser thật:** **30/30 file `pass` parse không lỗi** (sau khi chấp nhận Q15h cho mẫu 14); `warn` sạch; mọi file `fail` thuộc lexer/parser (E0101, E0102, E12xx — 17 file) ra **đúng mã**; 30 file `fail` thuộc milestone sau **parse được, không báo thay**; `01_add.gt` ≡ `11_ascii_alias.gt` và 3 cặp viết tay cho cùng AST (so sánh sau khi che span).
 - **Đột biến parser:** 18 đột biến (độ ưu tiên, kết hợp, so sánh, literal âm, semi, đích gán, for-in, struct literal, cast, self-param, độ sâu chuỗi, lỗi dây chuyền, recovery, pattern, raw ptr…): 16 bị bắt ngay; 1 sống sót thật (token rác sau item hỏng bị nuốt) → thêm test, nay bị bắt; 1 tương đương hành vi (không tiêu thụ `;` khi khôi phục: chốt tiến-lên + im lặng-lỗi-cùng-vị-trí cho cùng kết quả).
-- **Fuzz parser:** `crates/gt-parser/fuzz` (không ICE, span hợp lệ, công việc tuyến tính, tất định). Mới chạy **90 giây: 29 759 lượt, sạch** (chậm ~330 lượt/s vì luồng + parse hai lần); chưa có phiên dài.
+- **Fuzz parser:** `crates/gt-parser/fuzz` (không ICE `E9901`, luôn kết thúc nhờ `-timeout`, span chẩn đoán hợp lệ, công việc tuyến tính, tất định; hạt giống từ `tests/`). **6 phiên × 10 phút: 0/6 phiên lỗi, 0 artifact crash, tổng 276 703 lượt** (64 811 / 48 926 / 40 814 / 44 504 / 43 778 / 33 870; số lượt giảm ở các phiên sau vì chạy song song với đột biến gt-fmt). Log: `crates/gt-parser/fuzz/logs/summary.log`.
 - **Cổng:** workspace 115 test xanh; fmt, clippy `-D warnings`, `cargo audit` sạch; `check_expectations.py` OK (86 file).
 
 ### Chỗ grammar mơ hồ/thiếu phát hiện (OPEN_QUESTIONS Q15a–i) — parser theo đề xuất, chờ Giang duyệt
 `expr_ns` thiếu ở hợp đồng/`↓`/`⋈`/`⊢`; `self` không là biểu thức; `∈`/`⇒` chưa có độ ưu tiên/kết hợp; luật khối-biểu-thức cuối khối; độ sâu cho chuỗi phẳng; E0307 không thuộc parser; literal âm; **không có chỗ khai báo biến thể `↓` cho đệ quy**; đích gán hẹp hơn nhu cầu.
 
+### gt-fmt (có thật; chưa commit) — thư viện, KHÔNG phải lệnh `gritc fmt` (M9, crates/TASK.md)
+- Crate `gt-fmt`: `gt_fmt::format(file, source)`; in lại từ AST, một dạng chuẩn canonical, tự thêm/bỏ ngoặc theo độ ưu tiên + `expr_ns`; comment lấy từ bảng trivia và gắn lại, **không gắn được → từ chối `E1301`** (không xoá/dời). ADR-016.
+- **Test (viết trước):** 37 test gt-fmt: bố cục golden; bảng ngoặc; **thước đo parser** `parens_oracle` (mọi biểu thức con × mọi ngữ cảnh: ngoặc thừa phải bỏ, ngoặc cần phải giữ đúng số lượng); `expr_ns` ở mọi vị trí (⎇ ⌥ ⟳ ↓ ⋈ ⊢, hợp đồng chữ ký và trait) + đặt lại trong ngoặc/`[]`/đối số; `¬(a ∧ b)`, `(a + b) * c`, `(*p).x ← 1`, `(a,)`, `V()`; round-trip `parse(fmt(parse(x))) == parse(x)` + idempotent + alias=canonical + giữ comment trên **toàn corpus pass** (31 file) và 6000 biểu thức ngẫu nhiên; comment: đặt đúng chỗ, từ chối đúng, **chèn comment sau từng token của corpus → không bao giờ mất/đổi comment, chỉ giữ hoặc E1301** (giữ 365 / từ chối 1603).
+- **Lỗi thật phát hiện khi test:** `a as i64 < 1` in ra không đọc lại được (`T <` là generic) → bọc ngoặc vế trái kết thúc bằng kiểu.
+- **Đột biến gt-fmt (tay, ~90 đột biến; cargo-mutants không dùng cho crate này):** printer ngoặc/ưu tiên/kết hợp/`ns`/bố cục: 65 đột biến → **62 bị bắt, 3 tương đương hành vi** (postfix=11, range=0 trong `prec` — không có vị trí nào đòi `min` ≥ 11 hoặc = 1; nhánh Range của `ends_with_type` là mã chết → đã xoá). Bộ máy comment: 18 đột biến + 4 → **tất cả bị bắt**. **Sống sót thật, mỗi cái đã có test mới:** 22 đột biến ngoặc ở vòng đầu (bảng kiểm tay quá thưa) → test `parens_oracle` + `expr_ns`; `finish()`/chốt chống báo lỗi đôi/biên khoảng của `Comments` (không chạm tới từ API công khai) → 7 unit test trong `comments.rs`; comment dính liền cuối node (`}// c`) → test mới; biên `start >= prev_end` → test mới. (Lần chạy đầu của script bị hỏng vì mã hoá console và backslash trong heredoc; kết quả chỉ tính từ lần chạy hợp lệ.)
+- **Cổng cuối:** `cargo test --workspace` **165 test xanh** (gt-fmt 37: 7 unit + 10 comments + 11 golden + 3 oracle + 6 roundtrip); `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`, `cargo audit` sạch; `check_expectations.py` OK (92 file, 47 mã).
+- **Phát hiện kỹ thuật cần Giang quyết:** (1) `E1301` là mã mới (Q16a). (2) Quy tắc gắn comment quá hẹp so với cách người viết dùng contract/tham số/đối số (Q16b, KNOWN_LIMITATIONS). (3) `x as T < y` là điểm vụng của grammar (generic args), fmt chỉ giải quanh.
+- **Đính chính của Giang:** `gritc fmt` chưa tồn tại ở M2 (gt-driver M9); đã đổi mọi chỗ ở M2 thành "gt-fmt (thư viện)", ghi vào crates/TASK.md. Không tạo binary tạm.
+
 ### Chưa làm
-- gt-fmt (chờ duyệt). Chạy lại fuzz lexer 6×10 sau thay đổi trivia: đang chạy (xem báo cáo). Phiên fuzz parser dài.
+- Commit gt-fmt (chờ lệnh). M3 chưa bắt đầu. Chờ Giang: Q16a/Q16b. Còn lại từ trước: `FileId` cho M3, mọi pass đệ quy mới phải dùng `gt-stack`.

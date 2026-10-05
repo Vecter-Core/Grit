@@ -1,0 +1,4 @@
+// expect: fail E1301
+// note: comment giữa biểu thức: gt-fmt từ chối định dạng (không xoá/dời comment); phần còn lại của compiler vẫn nhận chương trình này
+ƒ f() → i32 ! ∅ { 1 + // giữa hai toán hạng
+  2 }

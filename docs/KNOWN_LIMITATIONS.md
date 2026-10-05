@@ -45,6 +45,7 @@
 - **Bất biến kiểm bằng test khi viết gt-fmt:** `fmt(x)` giữ nguyên **số comment và nội dung từng comment**; `fmt(fmt(x)) == fmt(x)`.
 - Dòng trống giữa các node không nằm trong AST nên gt-fmt chưa bảo toàn (sẽ chuẩn hoá về tối đa một dòng trống); ghi nhận để Giang xem lại.
 - `///` (doc comment) là token `DOC_COMMENT` gắn vào node AST nên được gt-fmt giữ theo node.
+- gt-fmt ở M2 là **thư viện** (`gt_fmt::format`); chưa có lệnh `gritc fmt` — binary `gritc` (gt-driver) chỉ có từ M9, và chỉ ở đó gt-fmt mới được nối thành lệnh.
 
 ## gt-ast (ADR-013)
 - **`NodeId` không ổn định qua chỉnh sửa:** ổn định cho cùng một nguồn (cấp tuần tự tất định), nhưng sửa nguồn rồi parse lại sẽ cấp lại. LSP tăng dần (M13) phải ánh xạ lại bảng kết quả theo span, không giữ NodeId cũ.
@@ -62,3 +63,10 @@
 - AST không có node lỗi: chỉ dùng AST khi không có ĐỎ (fail-closed).
 - Parser đang theo các đề xuất Q15a/b/c/h/i chưa được Giang duyệt (OPEN_QUESTIONS); nếu bị bác, phải sửa parser và các mẫu liên quan.
 - Số mức lồng tối đa theo từng loại khác nhau (127 cho khối `{ }`/`⎇`/`⟳`/`⚠`, 253–255 cho biểu thức/kiểu/pattern) vì mỗi loại tốn độ sâu khác nhau cho mỗi mức; giới hạn chung vẫn là 256.
+
+## gt-fmt: giới hạn đã biết (M2, ADR-016)
+- **Comment ở nhiều vị trí tự nhiên bị TỪ CHỐI (E1301), không bị xoá/dời:** sau dòng contract, giữa các contract, sau tham số, trong đối số nhiều dòng, trong generics, trước `⇝`, và mọi vị trí giữa biểu thức/chữ ký. Đo: chèn comment sau từng token của corpus `pass` → giữ 365, từ chối 1603. Test khoá: `known_limitation_comments_in_signature_parts_and_call_args_are_refused`. Chờ Giang quyết mở rộng (OPEN_QUESTIONS Q16b).
+- **Một dạng chuẩn duy nhất, không bảo toàn bố cục người viết:** xuống dòng/thụt lề/khoảng trắng bị chuẩn hoá; ngoặc thừa bị bỏ, ngoặc cần thiết được thêm (theo độ ưu tiên của parser); `INLINE_MAX = 60` ký tự quyết định khối một dòng hay nhiều dòng; không ngắt dòng giữa các toán tử của một biểu thức dài (chỉ khối/match/danh sách mới nhiều dòng).
+- **Từ chối khi nguồn có bất kỳ chẩn đoán nào của parser** (fail-closed): gt-fmt không định dạng tệp hỏng và không có chế độ "cố gắng".
+- **`x as T < y`:** vì `T <` được đọc là tham số kiểu, vế trái của `<` kết thúc bằng kiểu phải được bọc ngoặc (`(x as T) < y`). Đây là điểm vụng của grammar (không phải của fmt); nếu muốn bỏ, cần quy tắc ở cấp ngôn ngữ (ADR).
+- **gt-fmt chỉ là thư viện** (`gt_fmt::format`); lệnh `gritc fmt` có từ M9 (gt-driver).

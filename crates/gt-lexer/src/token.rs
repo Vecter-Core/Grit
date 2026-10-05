@@ -9,7 +9,7 @@ pub struct Token {
     pub span: Span,
 }
 
-/// Loại trivia (văn bản không thuộc cú pháp nhưng PHẢI được giữ để `gritc fmt` không xoá).
+/// Loại trivia (văn bản không thuộc cú pháp nhưng PHẢI được giữ để gt-fmt (thư viện) không xoá).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TriviaKind {
     /// `// …` (kể cả `////…`). Doc comment `///` KHÔNG phải trivia: nó là token `DOC_COMMENT`.

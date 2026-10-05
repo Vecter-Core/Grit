@@ -18,6 +18,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gt-fmt"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-lexer",
+ "gt-parser",
+ "gt-span",
+ "gt-stack",
+]
+
+[[package]]
 name = "gt-lexer"
 version = "0.1.0"
 dependencies = [

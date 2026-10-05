@@ -75,6 +75,7 @@ dependencies = [
  "gt-diag",
  "gt-lexer",
  "gt-span",
+ "gt-stack",
 ]
 
 [[package]]
@@ -87,6 +88,10 @@ dependencies = [
 
 [[package]]
 name = "gt-span"
+version = "0.1.0"
+
+[[package]]
+name = "gt-stack"
 version = "0.1.0"
 
 [[package]]
