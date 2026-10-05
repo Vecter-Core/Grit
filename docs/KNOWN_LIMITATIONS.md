@@ -35,3 +35,21 @@
 - Fuzz lexer: 6 phiên × 10 phút sạch; chưa có phiên liên tục ≥1 giờ (ASan Windows) và chưa đạt ≥24 giờ tích luỹ của cổng chuyển giai đoạn.
 - **leak_check** (`crates/gt-lexer/tests/leak_check.rs`) đo bộ nhớ qua tiến trình con/`/proc` vì crate cấm `unsafe` (không gọi được `GetProcessMemoryInfo`): Windows dùng PowerShell (`PrivateMemorySize64`), Linux `/proc/self/status` (VmRSS), macOS `ps`. Môi trường khác, hoặc máy không có PowerShell/`ps`, **không đo được → test FAIL** (fail-closed). Không có phương án đếm allocation vì cần `unsafe impl GlobalAlloc`. Test chạy ~12–25 s (1 triệu lần lex) và không bị `#[ignore]`.
 - **Fuzz trên Windows:** ASan hết bộ nhớ nội bộ khi quarantine mặc định 256 MB (đã gặp ở lần chạy 1 giờ). `tools/fuzz_lexer.sh` đặt `ASAN_OPTIONS=quarantine_size_mb=8` và chạy nhiều phiên ngắn, giữ corpus. Cần nightly, `cargo-fuzz`, và `clang_rt.asan_dynamic-x86_64.dll` trong PATH.
+
+## gt-fmt và comment (ADR-012) — quy tắc gắn comment, ghi trước khi viết gt-fmt
+- Comment `//` nằm trong bảng trivia của lexer, **không** nằm trong AST. gt-fmt ghép lại theo span:
+  1. Comment đứng một mình trên dòng (`own_line`) gắn vào **item/câu lệnh kế tiếp** (in ngay phía trên, giữ thụt lề của node đó).
+  2. Comment cuối dòng gắn vào **câu lệnh/item đứng trước trên cùng dòng** (in cùng dòng, sau một dấu cách).
+  3. Comment `own_line` không có node kế tiếp (ngay trước `}` hoặc cuối tệp): gắn như "comment cuối khối/tệp" của node bao ngoài.
+  4. Comment nằm GIỮA một biểu thức/chữ ký (vd giữa hai đối số, giữa `ƒ` và `{`): chưa có quy tắc gắn → **gt-fmt từ chối định dạng tệp đó (báo lỗi), không xoá và không di chuyển comment**.
+- **Bất biến kiểm bằng test khi viết gt-fmt:** `fmt(x)` giữ nguyên **số comment và nội dung từng comment**; `fmt(fmt(x)) == fmt(x)`.
+- Dòng trống giữa các node không nằm trong AST nên gt-fmt chưa bảo toàn (sẽ chuẩn hoá về tối đa một dòng trống); ghi nhận để Giang xem lại.
+- `///` (doc comment) là token `DOC_COMMENT` gắn vào node AST nên được gt-fmt giữ theo node.
+
+## gt-ast (ADR-013)
+- **`NodeId` không ổn định qua chỉnh sửa:** ổn định cho cùng một nguồn (cấp tuần tự tất định), nhưng sửa nguồn rồi parse lại sẽ cấp lại. LSP tăng dần (M13) phải ánh xạ lại bảng kết quả theo span, không giữ NodeId cũ.
+- **`NodeId` chỉ duy nhất trong một tệp:** M3 (nhiều tệp/module) cần khoá `(FileId, NodeId)`; `gt-span` chưa có `FileId`.
+- Ngoặc nhóm không vào AST; số literal giữ văn bản nguyên (giá trị/phạm vi kiểm ở tầng sau).
+
+## gt-fmt: dòng trống (Giang duyệt 2026-10-05)
+- Grit muốn **đúng một dạng chuẩn**: gt-fmt tự quy định dòng trống — **một dòng trống giữa hai item cấp cao nhất liền kề, không dòng trống thừa** (không dòng trống đầu/cuối tệp, không hai dòng trống liên tiếp). Dòng trống người dùng viết không được bảo toàn (không nằm trong AST).

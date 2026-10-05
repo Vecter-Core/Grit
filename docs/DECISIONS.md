@@ -88,3 +88,22 @@
 - **Đã duyệt cả bốn điểm lệch:** `Suggestion` có `applicability`, `labels`/`notes`, `level` suy từ tiền tố mã, màu tắt mặc định.
 - **Adapter `LexError → Diagnostic`:** đặt ở `gt-parser`. Khi có consumer thứ hai cần lỗi lexer mà không qua parser thì chuyển adapter ra chỗ dùng chung, kèm ADR.
 - **Thứ tự tất định (D19):** sắp theo (tệp, offset bắt đầu, offset kết thúc, mã, thông điệp) — chặt hơn yêu cầu (tệp, offset bắt đầu, mã) để các lỗi cùng vị trí/mã cũng có thứ tự cố định; có test hoán vị mọi thứ tự đầu vào.
+
+## ADR-012 — Comment `//` là trivia, không bị lexer bỏ (M1 sửa, M2)
+- **Bối cảnh:** plan nói lexer "bỏ qua" `//` và không đưa vào AST. Nhưng `gritc fmt` (M2) in lại từ AST sẽ **xoá mọi comment của người dùng**. Kiểm tra gt-lexer M1: `//` bị bỏ hẳn (`self.pos = line_end`, không phát gì) — đúng như Giang lo.
+- **Quyết định:** lexer giữ comment trong **bảng riêng** `LexOutput.trivia: Vec<Trivia { kind: LineComment, text (nguyên văn gồm `//`, không CR/LF), span, own_line }>`, theo thứ tự nguồn. Doc comment `///` vẫn là token `DOC_COMMENT` (gắn vào node AST).
+- **Lệch nhẹ so với đề nghị ("phát LINE_COMMENT trong luồng token"):** dùng bảng riêng thay vì token nội tuyến. Lý do: (1) parser không phải lọc comment ở mọi vị trí (một comment chen giữa biểu thức sẽ làm mọi production phải biết bỏ qua); (2) `tests/lexer/*.tokens` và mọi test token không đổi; (3) thông tin vẫn đầy đủ vì có span, gt-fmt ghép lại theo vị trí. Nếu sau này cần token nội tuyến (vd LSP semantic tokens) thì dựng từ hai nguồn là được.
+- **`own_line`:** lexer tính sẵn "đứng một mình trên dòng" (chỉ có khoảng trắng phía trước) vs "cuối dòng", vì đó là thông tin gt-fmt cần và lexer có sẵn rẻ.
+- **Quy tắc gắn comment của gt-fmt (chi tiết ở KNOWN_LIMITATIONS):** comment `own_line` gắn vào item/câu lệnh KẾ TIẾP; comment cuối dòng gắn vào câu lệnh/item đứng TRƯỚC trên cùng dòng. **Nguyên tắc chặn cứng: nếu gt-fmt không gắn được một comment thì nó TỪ CHỐI định dạng (báo lỗi), không bao giờ xoá comment.**
+- **Test:** `crates/gt-lexer/tests/trivia.rs` (viết trước, đỏ, rồi xanh): nguyên văn, `own_line`, `////`, CRLF, cuối tệp không xuống dòng, `//` trong chuỗi không phải comment, `///` không phải trivia, thứ tự/không chồng token, và **mọi dòng có `//` trong corpus cho đúng một mục (trivia hoặc DOC_COMMENT)**. Fuzz target và test độ bền kiểm cả trivia.
+
+## ADR-013 — gt-ast: cây Box + NodeId dày đặc (M2)
+- **Bối cảnh:** AST chỉ định nghĩa kiểu, mỗi node cần `Span` và `NodeId` ổn định để các pass sau (types, borrowck, effects) gắn bảng kết quả theo `NodeId`.
+- **Phương án:** (A) cây `Box` + `NodeId` là trường thường; (B) arena `Vec<Node>` với `NodeId` là chỉ số.
+  - (A): khớp mẫu và viết parser đệ quy/Pratt tự nhiên; `Debug`/`Eq`/`Clone` derive cấu trúc, so sánh hai AST (round-trip alias↔canonical) là `==`; không có handle treo/arena sai. Nhược: con trỏ rải rác, không có liên kết cha sẵn (pass nào cần thì dựng bảng cha theo NodeId).
+  - (B): bộ nhớ liền, bảng cha/phụ rẻ. Nhược: mọi truy cập đi qua arena (`ast.expr(id)`), khớp mẫu dài dòng, rủi ro dùng NodeId của arena khác; lợi ích không đáng vì M5 hạ xuống HIR/MIR (CFG, place) — đó mới là nơi cần cấu trúc phẳng.
+- **Chọn (A).** `NodeId(u32)` cấp **tuần tự từ 0, không lỗ** bởi `NodeIdGen` của parser, theo thứ tự dựng node tất định (D9): cùng nguồn → cùng cây → cùng NodeId. Bảng kết quả của pass sau dùng `Vec<T>` chỉ mục `NodeId::index()`. `NodeIdGen::next` trả `Option` (hết u32 → `None`, không panic, không tràn lặng lẽ).
+- **Giới hạn đã biết:** NodeId duy nhất **trong một tệp** và ổn định cho cùng nguồn, **không** ổn định qua chỉnh sửa (LSP tăng dần M13 phải parse lại và ánh xạ lại; cần `(FileId, NodeId)` từ M3 khi nhiều tệp).
+- **AST không biết dạng bề mặt:** `gt-ast` chỉ phụ thuộc `gt-span` (không có `gt-lexer`), không có kiểu token/alias; test khoá điều này (đọc `Cargo.toml` và mã nguồn). Số literal giữ văn bản nguyên văn (suffix nằm trong đó).
+- **Quy ước "node":** struct có `id` + `span` (Item, Type, Expr, Stmt, Pattern, Block, Param, Generics, …). Doc comment và attribute là node con của `Item`/`FieldDef`/`Variant`/thành viên trait-impl. Enum nhỏ không phải node (`Visibility`, `BinaryOp`, `PrimType`…).
+- **Không có `Paren`:** dấu ngoặc nhóm không vào AST (độc lập bề mặt; gt-fmt dựng lại ngoặc theo độ ưu tiên). Tuple 1 phần tử `(a,)` phân biệt bằng `ExprKind::Tuple` có đúng một phần tử.

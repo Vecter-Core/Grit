@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "gt-ast"
+version = "0.1.0"
+dependencies = [
+ "gt-span",
+]
+
+[[package]]
 name = "gt-diag"
 version = "0.1.0"
 dependencies = [

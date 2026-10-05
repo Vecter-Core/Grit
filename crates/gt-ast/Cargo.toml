@@ -1,0 +1,13 @@
+[package]
+name = "gt-ast"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Grit: kiểu node AST (chỉ dữ liệu, không logic)"
+
+[dependencies]
+gt-span = { path = "../gt-span" }
+
+[lints]
+workspace = true

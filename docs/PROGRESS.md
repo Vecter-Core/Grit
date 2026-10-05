@@ -72,7 +72,7 @@ Cập nhật: 2026-10-05.
 - **Chờ Giang:** chốt tên token; xác nhận cách hiểu D15 trong ADR-009 (zero-width cấm cả trong chuỗi/comment); duyệt trước khi sang phần tiếp theo của M1.
 - **Rủi ro mới:** homoglyph thuần một bảng chữ chưa phát hiện; `cargo-fuzz` Windows cần PATH tới ASan DLL (đã ghi ADR-009).
 
-## M2 — Parser + AST + Diagnostics — **ĐANG LÀM: bước 1 (gt-diag) xong, chờ Giang duyệt schema trước khi sang gt-ast**
+## M2 — Parser + AST + Diagnostics — **ĐANG LÀM: gt-diag (commit `599452e`) và gt-ast xong; dừng chờ Giang duyệt trước gt-parser**
 Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
 
 ### Bước 1: gt-diag (có thật)
@@ -85,3 +85,16 @@ Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
 ### Chưa làm
 - gt-ast, gt-parser; chuyển `LexError` → `Diagnostic` (làm ở gt-parser); `gritc explain`.
 - `serde_json` chỉ là dev-dependency của gt-diag (không vào TCB sản phẩm).
+
+### Bước 1b: sửa M1 — comment `//` thành trivia (ADR-012)
+- **Kiểm tra theo yêu cầu:** gt-lexer M1 **bỏ hẳn** `//` (không phát gì) → `gritc fmt` sẽ xoá comment. Đã sửa: `LexOutput.trivia` (văn bản nguyên văn, span, `own_line`), doc comment `///` vẫn là token. Test mới `trivia.rs` (viết trước, đỏ; 4 test) gồm bất biến "mọi dòng có `//` trong corpus cho đúng một mục". Fuzz target + test độ bền kiểm cả trivia (92 815 lượt, sạch; **chưa chạy lại 6×10 phút** sau thay đổi này).
+- Quy tắc gt-fmt gắn comment và nguyên tắc "không gắn được thì từ chối, không xoá" ghi ở KNOWN_LIMITATIONS; test fmt viết khi tới lượt gt-fmt.
+
+### Bước 2: gt-ast (có thật)
+- Crate `gt-ast` (chỉ phụ thuộc `gt-span`): `NodeId` (u32 dày đặc từ 0) + `NodeIdGen` (hết u32 → `None`), trait `Node {id, span}`, kiểu cho Item/Type/Expr/Stmt/Pattern/Block/Param/Generics/Effects/Contract/… theo `grammar.ebnf`; doc comment + attribute là node con; không có `Paren`; literal giữ văn bản nguyên.
+- ADR-013 (trade-off Box vs arena, viết **trước** khi code): chọn cây Box + NodeId tuần tự tất định.
+- 6 test (viết trước, đỏ): NodeId/overflow, cây dựng tay có id duy nhất+dày, docs/attrs là một phần của node, **mọi biến thể grammar dựng được và khớp mẫu vét cạn** (10 ItemKind, 10 TypeKind, 6 StmtKind, 8 PatternKind, 19 ExprKind, 3 LoopKind), contract/effects/generics/thành viên trait-impl, và test khoá "AST không biết dạng bề mặt" (chỉ phụ thuộc gt-span, mã nguồn không nhắc token/alias).
+- **Cổng:** workspace 70 test xanh (gt-ast 6, gt-lexer 24, gt-diag 34, gt-span 6); fmt, clippy `-D warnings`, `check_expectations.py` OK.
+
+### Chưa làm
+- gt-parser (khôi phục lỗi ở `;`/`}`; adapter `LexError → Diagnostic` ở đây), gt-fmt, test round-trip alias↔canonical ở mức AST.

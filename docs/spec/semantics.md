@@ -147,7 +147,7 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 - **Range:** `1..2` lex thành `INT DOTDOT INT` (không phải float). `..=` là `DOTDOTEQ`.
 - **Chỉ số tuple:** sau token `.`, lexer đọc **chỉ chữ số thập phân** thành `INT_LIT` (không bao giờ float) ⇒ `t.0.1` = `t . 0 . 1`. Test: `tests/lexer/tuple_index.*`.
 - **Chuỗi:** UTF-8, không xuống dòng thô (không có chuỗi nhiều dòng — Phase 2/chưa có), không nội suy; escape `\n \r \t \0 \\ \' \" \u{hex}`; escape lạ → E0101.
-- **Comment:** `//` → bỏ qua; `///` → `DOC_COMMENT` giữ lại, gắn vào node kế tiếp; `/*`/`*/` → **E0101** (Phase 1). `///` ngay trước `}` hoặc hết file
+- **Comment:** `//` → **không vào luồng token và không vào AST, nhưng được giữ trong bảng trivia `LexOutput.trivia`** (văn bản nguyên văn + span + `own_line`) để `gt-fmt` gắn lại, không xoá comment của người dùng (ADR-012); `///` → `DOC_COMMENT` giữ lại, gắn vào node kế tiếp; `/*`/`*/` → **E0101** (Phase 1). `///` ngay trước `}` hoặc hết file
   (không có node để gắn) → E0101. `////…` (≥4 dấu `/`) là `//` thường. Văn bản `DOC_COMMENT` bỏ đúng một khoảng trắng đầu (nếu có).
   Test: `tests/pass/22_comments.gt`, `tests/lexer/comments.*`, `tests/fail/E0101_block_comment.gt`, `tests/fail/E0101_doc_comment_dangling.gt`.
 - Không có `+= -= …`: `x += 1` lex thành `x`, `+`, `=` và `=` đứng riêng là E0101. Test: `tests/fail/E0101_compound_assign.gt`.
@@ -204,3 +204,9 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 - **Token `UNKNOWN`:** mọi ký tự/đoạn không hợp lệ (ký tự lạ, `=` đứng riêng, alias `\…` không tồn tại, `/*`, `*/`, literal số/chuỗi/char hỏng, `µ`) phát đúng **một** token `UNKNOWN`
   phủ đoạn đó, kèm một `LexError` — để parser (M2) có điểm neo khôi phục lỗi. Chuỗi hợp lệ không bao giờ chứa `UNKNOWN`. Ký tự bị cấm ở prescan (bidi/vô hình/điều khiển)
   chỉ báo lỗi, không phát token (coi như khoảng trắng).
+
+## 25. gt-fmt — dạng chuẩn (Giang duyệt 2026-10-05)
+- Một dạng chuẩn duy nhất: `gritc fmt` in canonical Unicode; hai bề mặt (canonical/ASCII) của cùng chương trình cho **cùng đầu ra**.
+- **Dòng trống:** một dòng trống giữa hai item cấp cao nhất liền kề; không dòng trống thừa; dòng trống người dùng không được bảo toàn.
+- **Comment:** `//` giữ nguyên số lượng và nội dung từng comment (bảng trivia của lexer, ADR-012); `own_line` gắn vào node kế tiếp, comment cuối dòng gắn vào node trước. **Không gắn được (vd comment giữa biểu thức/chữ ký) → gt-fmt từ chối định dạng với Diagnostic, không xoá và không dời comment.** `///` đi theo node.
+- AST không có ngoặc nhóm nên printer thêm ngoặc theo độ ưu tiên và theo luật `expr_ns` (struct literal trần trong điều kiện `⎇ ⌥ ⟳` phải bọc ngoặc).
