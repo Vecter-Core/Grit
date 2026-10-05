@@ -1,0 +1,5 @@
+// expect: pass
+≡ Id ≔ u32;
+□ LIMIT: u32 ≔ 100;
+■ GREETING: &str ≔ "hi";
+ƒ clamp(x: Id) → Id ! ∅ ⊳ x <= LIMIT { x }

@@ -1,0 +1,17 @@
+# Dòng 2 của lifetime_vs_char.gt. 'x' (có dấu đóng) = CHAR; 'a (không dấu đóng) = LIFETIME (semantics §15). Giá trị CHAR là văn bản nguồn giữa hai dấu '.
+IDENT(f)
+LT
+LIFETIME(a)
+COMMA
+LIFETIME(b)
+GT
+LPAREN
+CHAR(x)
+COMMA
+CHAR(\n)
+COMMA
+CHAR(\')
+COMMA
+CHAR(é)
+RPAREN
+LIFETIME(abc)

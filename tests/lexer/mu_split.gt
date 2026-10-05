@@ -1,0 +1,2 @@
+// expect: lexer
+ƒ f() → i32 ! ∅ { μs ≔ 1; μ t ≔ 2; aμb }

@@ -1,0 +1,16 @@
+// expect: pass
+// note: for-in trên range hữu hạn: termination tự suy, không cần ↓ (semantics §21). N0601 cho phép cộng s + ...
+ƒ sum_to(n: u32) → u64 ! ∅ {
+  μs ≔ 0u64;
+  ⟳ i in 0..n {
+    s ← s + (i as u64);
+  }
+  s
+}
+ƒ incl(n: u32) → u32 ! ∅ {
+  μc ≔ 0u32;
+  ⟳ i in 0..=n ↓ n - c {
+    c ← c +% 1;
+  }
+  c
+}

@@ -1,2 +1,2 @@
 // expect: fail E0301
-ƒ f() → i32 ! ∅ { ⊤ }
+ƒ f() → i32 ! ∅ { true }

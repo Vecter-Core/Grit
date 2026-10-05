@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: cùng ý với E0101_self_as_var nhưng dùng alias ASCII ":=" (phải cho cùng phán quyết)
+\fn f() -> i32 ! \nil { self := 1; self }

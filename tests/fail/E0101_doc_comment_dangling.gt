@@ -1,0 +1,6 @@
+// expect: fail E0101
+// note: "///" không có node kế tiếp để gắn vào
+ƒ f() → i32 ! ∅ {
+  1
+  /// không có gì để gắn
+}

@@ -1,0 +1,3 @@
+// expect: fail E0701
+// note: vòng vô hạn ⟳ { } cần hiệu ứng div (D12); hàm khai báo ! ∅
+ƒ f() → () ! ∅ { ⟳ { } }

@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: "\extern" được lexer nhận ra nhưng Phase 1 không có production dùng nó (D14)
+\extern f() -> i32 ! \nil ;

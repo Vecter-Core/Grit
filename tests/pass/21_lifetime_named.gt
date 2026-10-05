@@ -1,0 +1,4 @@
+// expect: pass
+// note: 'a là lifetime (ASCII-only); 'a' là literal ký tự — phân biệt ở lexer (semantics §15)
+ƒ pick<'a>(x: &'a i32, y: &'a i32) → &'a i32 ! ∅ { ⎇ *x >= *y { x } ⇝ { y } }
+ƒ letter() → char ! ∅ { 'a' }

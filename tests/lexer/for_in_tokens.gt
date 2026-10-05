@@ -1,0 +1,2 @@
+// expect: lexer
+⟳ x in xs ↓ n - 1 { index }

@@ -1,0 +1,13 @@
+# Cả file comments.gt. "//" (dòng 1 và "// tail") bị bỏ; "///" giữ lại thành DOC_COMMENT (văn bản bỏ một khoảng trắng đầu). Tên token tạm (M1 chốt).
+DOC_COMMENT(doc one)
+FN
+IDENT(f)
+LPAREN
+RPAREN
+ARROW
+IDENT(i32)
+BANG
+EMPTYSET
+LBRACE
+INT(1)
+RBRACE

@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: không có += (chủ ý): dùng x ← x + 1. "=" đứng riêng không phải token hợp lệ
+ƒ f() → i32 ! ∅ { μx ≔ 1; x += 1; x }

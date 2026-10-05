@@ -15,7 +15,7 @@ SYMS = [
     ("⊢", r"\proof"), ("⎇", r"\if"), ("⇝", r"\else"), ("⌥", r"\match"), ("↦", "=>"),
     ("⏎", r"\ret"), ("▢", r"\struct"), ("⊔", r"\enum"), ("▦", r"\mod"), ("⇲", r"\use"),
     ("◈", r"\pub"), ("⊏", r"\trait"), ("⊐", r"\impl"), ("⊠", r"\break"), ("⊡", r"\cont"),
-    ("⊤", "true"), ("⊥", "false"),
+    ("≡", r"\type"), ("□", r"\const"), ("■", r"\static"),
 ]
 ALIAS = dict(SYMS)
 

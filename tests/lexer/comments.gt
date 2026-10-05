@@ -1,0 +1,3 @@
+// expect: lexer
+/// doc one
+ƒ f() → i32 ! ∅ { 1 } // tail

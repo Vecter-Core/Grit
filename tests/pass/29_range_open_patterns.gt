@@ -1,0 +1,12 @@
+// expect: pass
+// note: range mở a.. ..b .. (Q14): làm chỉ số slice và trong pattern; "(a, ..)" là rest pattern
+ƒ bucket(n: i32) → i32 ! ∅ {
+  ⌥ n { ..0 ↦ 0, 0..=9 ↦ 1, 10.. ↦ 2 }
+}
+ƒ head(t: (i32, i32, i32)) → i32 ! ∅ { ⌥ t { (a, ..) ↦ a } }
+ƒ parts(xs: &[i32]) → i32 ! ∅ {
+  a ≔ &xs[1..];
+  b ≔ &xs[..2];
+  c ≔ &xs[..];
+  0
+}

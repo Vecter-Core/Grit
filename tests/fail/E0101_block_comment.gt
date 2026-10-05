@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: comment nhiều dòng /* */ CẤM ở Phase 1 (dành riêng cho Phase 2)
+ƒ f() → i32 ! ∅ { /* c */ 1 }

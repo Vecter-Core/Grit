@@ -1,0 +1,3 @@
+// expect: fail E0307
+// note: "x;" là câu lệnh, khối trả () — hàm trả i32 mà không có ⏎ → E0307 (Q8)
+ƒ f(x: i32) → i32 ! ∅ { x; }

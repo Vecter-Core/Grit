@@ -1,0 +1,25 @@
+# Token kỳ vọng của mu_split.gt cho dòng 2 (bỏ qua comment dòng 1). Mỗi token một dòng: KIND hoặc KIND(giá trị).
+# Quy tắc Q5: mọi "μ" là MUT, không bao giờ nằm trong IDENT. Lexer chưa tồn tại (M1) — file này là đặc tả để M1 kiểm.
+FN
+IDENT(f)
+LPAREN
+RPAREN
+ARROW
+IDENT(i32)
+BANG
+EMPTYSET
+LBRACE
+MUT
+IDENT(s)
+ASSIGN_LET
+INT(1)
+SEMI
+MUT
+IDENT(t)
+ASSIGN_LET
+INT(2)
+SEMI
+IDENT(a)
+MUT
+IDENT(b)
+RBRACE

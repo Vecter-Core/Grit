@@ -1,0 +1,17 @@
+// expect: pass
+// note: mọi dạng literal của grammar §Lexical; -128i8 hợp lệ vì dấu - được gấp vào literal trước khi kiểm phạm vi
+ƒ lits() → i64 ! ∅ {
+  a ≔ 1_000_000i64;
+  b ≔ 0xFFu8;
+  c ≔ 0o17u8;
+  d ≔ 0b1010_0101u8;
+  e ≔ -128i8;
+  f ≔ 2.5e-3f64;
+  g ≔ 1e3;
+  h ≔ 1f32;
+  i ≔ 'x';
+  j ≔ "tab\there";
+  k ≔ 1..2;
+  m ≔ 1..=2;
+  a
+}

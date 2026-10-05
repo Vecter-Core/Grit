@@ -1,6 +1,6 @@
 // expect: fail E0205
 ƒ f() → i32 ! ∅ {
   x ≔ 1;
-  ⎇ ⊤ { x ≔ 2; }
+  ⎇ true { x ≔ 2; }
   x
 }

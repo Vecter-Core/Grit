@@ -1,0 +1,2 @@
+// expect: lexer
+ƒ f(p: &i32) → i32 ! ∅ { *p * *p }

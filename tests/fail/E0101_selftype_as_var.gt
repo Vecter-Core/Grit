@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: "Self" (viết hoa) cũng là từ khoá cứng, không dùng làm tên biến (semantics §13)
+ƒ f() → i32 ! ∅ { Self ≔ 1; Self }

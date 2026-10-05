@@ -1,0 +1,20 @@
+# Dòng 2 của quote_ctx.gt. 'a' (đóng ngay sau 1 ký tự) = CHAR; 'a không đóng = LIFETIME (semantics §15).
+FN
+IDENT(f)
+LT
+LIFETIME(a)
+GT
+LPAREN
+IDENT(x)
+COLON
+AMP
+LIFETIME(a)
+IDENT(i32)
+RPAREN
+ARROW
+IDENT(char)
+BANG
+EMPTYSET
+LBRACE
+CHAR(a)
+RBRACE

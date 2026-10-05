@@ -1,0 +1,3 @@
+// expect: fail E0301
+// note: range mở "1.." chỉ có nghĩa làm chỉ số slice / pattern; độc lập = chưa có ngữ nghĩa (Q14, chờ iterator Phase 2)
+ƒ f() → i32 ! ∅ { r ≔ 1..; 0 }

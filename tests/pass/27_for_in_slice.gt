@@ -1,0 +1,15 @@
+// expect: pass
+// note: for-in trên slice cho phần tử kiểu &T (semantics §21); không cần ↓
+ƒ total(xs: &[i64]) → i64 ! ∅ {
+  μs ≔ 0;
+  ⟳ x in xs {
+    s ← s +% *x;
+  }
+  s
+}
+ƒ first_pos(xs: &[i32]) → i32 ! ∅ {
+  ⟳ x in xs {
+    ⎇ *x > 0 { ⏎ *x; }
+  }
+  0
+}

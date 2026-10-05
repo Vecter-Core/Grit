@@ -1,0 +1,13 @@
+// expect: pass
+// note: tuple (A, B), unit (), 1-tuple (A,), array [T; N], slice [T] sau &, range a..b / a..=b
+ƒ pair() → (i32, bool) ! ∅ { (1, true) }
+ƒ unit() → () ! ∅ { () }
+ƒ one() → (i32,) ! ∅ { (7,) }
+ƒ first(t: (i32, i32)) → i32 ! ∅ { t.0 }
+ƒ nest(t: ((i32, i32), i32)) → i32 ! ∅ { t.0.1 }
+ƒ arr() → i32 ! ∅ { a ≔ [1, 2, 3]; z ≔ [0; 4]; a[0] +% z[3] }
+ƒ head(xs: &[i32]) → &[i32] ! ∅ { &xs[0..2] }
+ƒ incl(xs: &[i32]) → &[i32] ! ∅ { &xs[0..=1] }
+ƒ tail(xs: &[i32]) → &[i32] ! ∅ { &xs[1..] }
+ƒ upto(xs: &[i32]) → &[i32] ! ∅ { &xs[..2] }
+ƒ whole(xs: &[i32]) → &[i32] ! ∅ { &xs[..] }

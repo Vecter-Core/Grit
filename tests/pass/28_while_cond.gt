@@ -1,0 +1,16 @@
+// expect: pass
+// note: while = ⟳ cond { }; termination suy từ cond + bước hằng (i > 0, i ← i - 1). ↓ tuỳ chọn, nếu có thì được xác minh
+ƒ count_down(n: u32) → u32 ! ∅ {
+  μi ≔ n;
+  ⟳ i > 0 {
+    i ← i - 1;
+  }
+  i
+}
+ƒ with_variant(n: u32) → u32 ! ∅ {
+  μi ≔ 0;
+  ⟳ i < n ↓ n - i {
+    i ← i + 1;
+  }
+  i
+}

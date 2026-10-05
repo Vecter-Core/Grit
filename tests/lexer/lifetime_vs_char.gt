@@ -1,0 +1,2 @@
+// expect: lexer
+f<'a, 'b>('x', '\n', '\'', 'é') 'abc

@@ -1,71 +1,125 @@
-(* Grit grammar — M0 DRAFT (chờ Giang duyệt). EBNF: { } lặp 0+, [ ] tuỳ chọn, | chọn, ( ) nhóm.
+(* Grit grammar — M0 FINAL (Q1–Q14 đã đóng). EBNF: { } lặp 0+, [ ] tuỳ chọn, | chọn, ( ) nhóm.
    Mọi terminal viết dạng canonical; mỗi cái có ASCII alias 1–1 trong docs/spec/symbols.md.
-   Lexer quy alias -> canonical TRƯỚC khi parser chạy, nên grammar chỉ nói canonical. *)
+   Lexer quy alias -> canonical TRƯỚC khi parser chạy, nên grammar chỉ nói canonical.
+   Không còn điểm mở ở M0. *)
 
-(* ---------- Lexical ---------- *)
-ident      = XID_START { XID_CONTINUE } ;          (* trừ từ khoá/ký hiệu; NFC; không trộn bảng chữ (D15) *)
-region     = "@" ident ;                           (* lifetime/region có tên, vd @r *)
-int_lit    = dec | "0x" hex | "0b" bin , [ int_suffix ] ;   (* "_" được phép làm dấu tách *)
-int_suffix = "i8"|"i16"|"i32"|"i64"|"isize"|"u8"|"u16"|"u32"|"u64"|"usize" ;
-float_lit  = dec "." dec [ exp ] , [ "f32" | "f64" ] ;
-str_lit    = '"' { char | escape } '"' ;           (* UTF-8; cấm bidi/zero-width trần *)
-char_lit   = "'" ( char | escape ) "'" ;
-comment    = "//" { any_but_newline } | "/*" { any } "*/" ;   (* "/*" lồng nhau được *)
+(* ================= Lexical ================= *)
+ident      = XID_START { XID_CONTINUE } ;          (* trừ từ khoá cứng + ký hiệu; NFC; không trộn bảng chữ (D15) *)
+keyword    = "self" | "Self" | "as" | "for" | "in" | "true" | "false" ;   (* từ khoá cứng ASCII, phân biệt hoa/thường, KHÔNG làm tên *)
+reserved   = "\extern" | "\where" ;                 (* ASCII-only; token KEYWORD_EXTERN / KEYWORD_WHERE; lexer nhận ra để không
+                                                       làm tên, Phase 1 KHÔNG production nào dùng => E0101 (D14; Phase 2) *)
+region     = "'" ident ;                            (* lifetime/region có tên, vd 'a — CHỈ ASCII. Phân biệt với char_lit: semantics §15 *)
 
-(* ---------- Chương trình & item ---------- *)
+(* --- số --- *)
+dec_int    = digit { digit | "_" } ;                (* "_" chỉ giữa các chữ số: 1_000_000; không đứng đầu, không đứng cuối *)
+int_lit    = ( dec_int | "0x" hex_digit { hex_digit | "_" } | "0o" oct_digit { oct_digit | "_" }
+             | "0b" bin_digit { bin_digit | "_" } ) [ int_suffix ] ;
+int_suffix = "i8"|"i16"|"i32"|"i64"|"i128"|"isize"|"u8"|"u16"|"u32"|"u64"|"u128"|"usize" ;
+float_lit  = dec_int "." dec_int [ exp ] [ float_suffix ] | dec_int exp [ float_suffix ] | dec_int float_suffix ;
+exp        = ( "e" | "E" ) [ "+" | "-" ] dec_int ;
+float_suffix = "f32" | "f64" ;
+                                                    (* "1..2" = INT DOTDOT INT (float cần chữ số sau "."); sau token "." lexer đọc
+                                                       CHỈ chữ số thập phân thành INT => "t.0.1" = t . 0 . 1 (semantics §19) *)
+(* --- chuỗi/ký tự --- *)
+str_lit    = '"' { str_char | escape } '"' ;        (* UTF-8; KHÔNG chứa xuống dòng thô (không có chuỗi nhiều dòng); cấm bidi/zero-width trần *)
+char_lit   = "'" ( char | escape ) "'" ;            (* đúng một codepoint *)
+escape     = "\" ( "n" | "r" | "t" | "0" | "\" | "'" | '"' | "u{" hex_digit { hex_digit } "}" ) ;
+
+(* --- comment (ASCII-only) --- *)
+line_comment = "//" { any_but_newline } ;           (* lexer BỎ QUA, không vào AST. "////..." (>=4 dấu /) cũng là line_comment *)
+doc_comment  = "///" { any_but_newline } ;          (* token DOC_COMMENT, GIỮ LẠI, gắn vào node kế tiếp (item/field/variant/fn_sig) *)
+                                                    (* "/*" và "*/" CẤM ở Phase 1 => E0101 (dành riêng cho Phase 2) *)
+
+(* ================= Item ================= *)
 program    = { item } ;
-item       = [ "◈" ] ( fn_item | struct_item | enum_item | trait_item | impl_item | mod_item | use_item ) ;
+item       = { doc_comment } { attribute } [ "◈" ]
+             ( fn_item | struct_item | enum_item | trait_item | impl_item | mod_item | use_item
+             | type_item | const_item | static_item ) ;
+attribute  = "#" ident [ "(" attr_arg { "," attr_arg } ")" ] ;   (* plan §5: #allow(S101, "lý do"); Phase 1 chỉ "allow" (M9) *)
+attr_arg   = ident | str_lit ;
 use_item   = "⇲" path [ "::" "{" ident { "," ident } "}" ] ";" ;
-path       = ident { "::" ident } ;
+path       = ( ident | "Self" ) { "::" ident } ;      (* "Self { … }", "Self::f" hợp lệ trong ⊏/⊐ *)
 mod_item   = "▦" ident "{" { item } "}" ;
+type_item  = "≡" ident [ generics ] "≔" type ";" ;
+const_item = "□" ident ":" type "≔" const_expr ";" ;
+static_item= "■" ident ":" type "≔" const_expr ";" ;     (* static BẤT BIẾN; không có "■ μ" ở Phase 1 (D11, đã xác nhận) *)
 
 fn_item    = "ƒ" ident [ generics ] "(" [ params ] ")" [ "→" type ] effects { contract } block ;
 generics   = "<" gparam { "," gparam } ">" ;
-gparam     = ident [ ":" path { "+" path } ] | region ;
+gparam     = ident [ ":" path { "+" path } ] | region ;  (* ràng buộc trait INLINE (Q7 đã duyệt); không có where-clause *)
 params     = ( self_param | param ) { "," param } ;
-self_param = "self" | "&" "self" | "&!" "self" ;   (* chỉ trong trait/impl *)
+self_param = "self" | "&" "self" | "&!" "self" ;         (* chỉ trong trait/impl *)
 param      = [ "μ" ] ident ":" type ;
 effects    = "!" ( "∅" | "{" [ effect { "," effect } ] "}" ) ;   (* BẮT BUỘC (D10) *)
-effect     = ident [ "(" ident ")" ] ;             (* io | mem | st | div | ffi | lock(L) *)
-contract   = "⊳" expr | "⊲" expr ;                 (* pre/post; Phase 1: ⊲ chỉ kiểm lúc chạy *)
+effect     = ident [ "(" ident ")" ] ;                   (* io | mem | st | div | ffi | lock(L) *)
+contract   = "⊳" expr | "⊲" expr ;
 
 struct_item = "▢" ident [ generics ] "{" [ field { "," field } [ "," ] ] "}" ;
-field       = [ "◈" ] ident ":" type ;
+field       = { doc_comment } [ "◈" ] ident ":" type ;
 enum_item   = "⊔" ident [ generics ] "{" variant { "," variant } [ "," ] "}" ;
-variant     = ident [ "(" type { "," type } ")" ] ;
-trait_item  = "⊏" ident [ generics ] "{" { fn_sig } "}" ;     (* static dispatch, KHÔNG dyn *)
+variant     = { doc_comment } ident [ "(" type { "," type } ")" ] ;
+trait_item  = "⊏" ident [ generics ] "{" { { doc_comment } fn_sig } "}" ;   (* static dispatch, KHÔNG dyn *)
 fn_sig      = "ƒ" ident [ generics ] "(" [ params ] ")" [ "→" type ] effects { contract } ";" ;
-impl_item   = "⊐" [ generics ] [ path "for" ] type "{" { fn_item } "}" ;
+impl_item   = "⊐" [ generics ] [ path "for" ] type "{" { { doc_comment } fn_item } "}" ;
 
-(* ---------- Kiểu ---------- *)
-type       = prim | path [ "<" type { "," type } ">" ]      (* Option<T>, Secret<T>, Cap<Fs>, Arena... *)
+(* ================= Kiểu ================= *)
+type       = prim | "Self" | path [ "<" type { "," type } ">" ]     (* Option<T>, Secret<T>, Cap<Fs>, Arena... *)
            | "&" [ region ] type | "&!" [ region ] type
-           | "[" type ";" const_expr "]" | "&" "[" type "]"
-           | "(" [ type { "," type } ] ")" ;
-prim       = "i8"|"i16"|"i32"|"i64"|"isize"|"u8"|"u16"|"u32"|"u64"|"usize"|"f32"|"f64"|"bool"|"char"|"str" ;
+           | "[" type ";" const_expr "]"                            (* array [T; N] *)
+           | "[" type "]"                                           (* slice [T]: chưa biết kích thước, CHỈ hợp lệ sau & / &! (M4) *)
+           | "(" ")" | "(" type ")" | "(" type "," [ type { "," type } [ "," ] ] ")"   (* unit, nhóm, tuple (A, B), 1-tuple (A,) *)
+           | "*" ( "□" | "μ" ) type                                 (* Q13 đã duyệt: con trỏ thô *□ T / *μ T (ASCII *\const T / *\mut T); ngoài ⚠ => E1001 *)
+           | "ƒ" "(" [ type { "," type } ] ")" [ "→" type ] effects ;   (* Q12 đã duyệt: kiểu hàm tĩnh, không bắt biến; cho spawn(f, arg) *)
+prim       = "i8"|"i16"|"i32"|"i64"|"i128"|"isize"|"u8"|"u16"|"u32"|"u64"|"u128"|"usize"|"f32"|"f64"|"bool"|"char"|"str"
+           | "!" ;                                                  (* Q12: kiểu never (không bao giờ trả về), gán được cho mọi kiểu. Chỉ ở vị trí kiểu: "→ !" rồi "! ∅" (semantics §22) *)
 
-(* ---------- Câu lệnh & biểu thức ---------- *)
-block      = "{" { stmt } [ expr ] "}" ;           (* biểu thức cuối không ";" = giá trị khối *)
-stmt       = let_stmt | assign_stmt | expr ";" | "⏎" [ expr ] ";" | "⊠" ";" | "⊡" ";" ;
-let_stmt   = [ "μ" ] ident [ ":" type ] "≔" expr ";" ;
-assign_stmt= place "←" expr ";" ;
-place      = [ "*" ] ident { "." ident | "[" expr "]" } ;
+(* ================= Câu lệnh & biểu thức ================= *)
+block      = "{" { stmt } [ expr ] "}" ;            (* biểu thức cuối KHÔNG ";" = giá trị khối; có ";" = câu lệnh, khối trả () (Q8) *)
+stmt       = let_stmt | assign_stmt | expr ";" | block_stmt | "⏎" [ expr ] ";" | "⊠" ";" | "⊡" ";" ;
+block_stmt = if_expr | match_expr | loop_expr | unsafe_expr ;   (* ở vị trí câu lệnh kết thúc tại "}" — KHÔNG cần ";" (Q8 đã duyệt) *)
+let_stmt   = [ "μ" ] ident [ ":" type ] "≔" expr ";" ;  (* Phase 1: chỉ binding một tên; chưa destructure ở let *)
+assign_stmt= place "←" expr ";" ;                       (* KHÔNG có += -= ... (chủ ý, KNOWN_LIMITATIONS) *)
+place      = [ "*" ] ident { "." ( ident | dec_int ) | "[" expr "]" } ;
 
-expr       = if_expr | match_expr | loop_expr | unsafe_expr | binary ;
-if_expr    = "⎇" expr block [ "⇝" ( block | if_expr ) ] ;
-match_expr = "⌥" expr "{" arm { "," arm } [ "," ] "}" ;      (* phải đầy đủ (D6) *)
+expr       = if_expr | match_expr | loop_expr | unsafe_expr | range ;
+expr_ns    = expr, nhưng KHÔNG cho struct_lit ở mức ngoài cùng (phải bọc "(…)") ;   (* dùng cho điều kiện/đối tượng match; tránh "⎇ p { … }" mơ hồ *)
+if_expr    = "⎇" expr_ns block [ "⇝" ( block | if_expr ) ] ;
+match_expr = "⌥" expr_ns "{" arm { "," arm } [ "," ] "}" ;   (* phải đầy đủ (D6) *)
 arm        = pattern "↦" ( expr | block ) ;
-pattern    = "_" | ident | literal | path [ "(" pattern { "," pattern } ")" ] | "(" pattern { "," pattern } ")" ;
-loop_expr  = "⟳" [ expr ] [ "↓" expr ] { "⋈" expr } block ;  (* không có cond = vô hạn, cần hiệu ứng div (D12) *)
-unsafe_expr= "⚠" { "⊢" expr } block ;               (* Phase 1: cú pháp + đường Obligation; người dùng gần như luôn ĐỎ E10xx *)
+loop_expr  = "⟳" [ expr_ns ] [ "↓" expr ] { "⋈" expr } block                  (* không cond = vô hạn (cần div, D12); có cond = while (Q11) *)
+           | "⟳" ident "in" expr_ns [ "↓" expr ] { "⋈" expr } block ;        (* for-in (Q10). Phân biệt với while bằng nhìn trước 2 token: ident rồi "in" *)
+unsafe_expr= "⚠" { "⊢" expr } block ;
 
-(* độ ưu tiên giảm dần: unary > as > * / % > + - (+% +^ +?) > so sánh > ∧ > ∨ > ⇒ (chỉ hợp đồng) *)
-binary     = unary { binop unary } ;
+pattern    = "_"                                                 (* wildcard *)
+           | ident                                               (* gán tên (hoặc variant không đối số — M3 phân giải) *)
+           | pat_lit | str_lit | char_lit | "true" | "false"
+           | pat_lit ".." pat_lit | pat_lit "..=" pat_lit        (* range pattern đóng: 0..10 (không gồm 10), 0..=9 *)
+           | pat_lit ".." | ".." pat_lit                         (* range mở (Q14): 10.. = từ 10 trở lên; ..0 = dưới 0 (không gồm 0) *)
+           | path "(" [ pat_list ] ")"                           (* enum variant có đối số: Some(v), Shape::Circle(r) *)
+           | path "{" [ field_pat { "," field_pat } [ "," ] ] "}"   (* struct / struct-variant destructure *)
+           | "(" ")" | "(" pattern ")" | "(" pattern "," [ pat_list ] ")" ;   (* tuple *)
+pat_lit    = [ "-" ] ( int_lit | float_lit ) | char_lit ;
+pat_list   = pat_elem { "," pat_elem } [ "," ] ;
+pat_elem   = pattern | ".." ;                                    (* ".." đơn lẻ = rest, bỏ qua phần còn lại; tối đa một lần mỗi danh sách (Q14) *)
+field_pat  = ident [ ":" pattern ] | ".." ;                      (* "x" = "x: x"; ".." = rest, phải đứng cuối *)
+
+(* độ ưu tiên giảm dần: postfix > unary > as > (* / % *% *^ *?) > (+ - +% -% +^ -^ +? -?) > so sánh (không kết hợp)
+   > ∧ > ∨ > ⇒ (chỉ hợp đồng) > range (.. ..=). So sánh không kết hợp: "a < b < c" là lỗi cú pháp. *)
+range      = binary [ ".." [ binary ] | "..=" binary ] | ".." [ binary ] ;
+             (* a..b không gồm b; a..=b gồm b; a.. (đến hết); ..b (từ đầu, không gồm b); .. (toàn bộ). Q14.
+                Dạng mở CHỈ có nghĩa làm chỉ số slice (xs[1..], xs[..2], xs[..]) và trong pattern; đứng độc lập = chưa có ngữ nghĩa (E0301, KNOWN_LIMITATIONS) *)
+binary     = cast { binop cast } ;
 binop      = "+"|"-"|"*"|"/"|"%"|"+%"|"-%"|"*%"|"+^"|"-^"|"*^"|"+?"|"-?"|"*?"
            | "=="|"≠"|"<"|">"|"≤"|"≥"|"∧"|"∨"|"⇒"|"∈" ;
-unary      = ( "¬" | "-" | "*" | "&" | "&!" ) unary          (* "*" = giải tham chiếu *) | postfix ;
-postfix    = primary { "(" [ expr { "," expr } ] ")" | "." ident | "[" expr "]" | "as" type } ;
-primary    = literal | ident | path | "(" [ expr { "," expr } ] ")" | block
-           | "∀" ident "∈" expr "." expr | "∃" ident "∈" expr "." expr ;  (* lượng từ chỉ trong hợp đồng *)
-literal    = int_lit | float_lit | str_lit | char_lit | "⊤" | "⊥" ;
-const_expr = int_lit | path ;
+cast       = unary { "as" type } ;
+unary      = ( "¬" | "-" | "*" | "&" | "&!" ) unary | postfix ;
+             (* "*" ở đầu toán hạng = deref (prefix); "*" sau một toán hạng đầy đủ = nhân (infix). Lexer chỉ phát STAR (semantics §14) *)
+postfix    = primary { "(" [ expr { "," expr } ] ")" | "." ident | "." dec_int | "[" expr "]" } ;   (* gọi, field, tuple index t.0, index/slice *)
+primary    = literal | path | struct_lit | array_lit | block
+           | "(" ")" | "(" expr ")" | "(" expr "," [ expr { "," expr } [ "," ] ] ")"     (* unit, nhóm, tuple (a, b), 1-tuple (a,) *)
+           | ( "∀" | "∃" ) ident "∈" expr ":" expr ;      (* lượng từ chỉ trong hợp đồng; dấu ":" (đổi từ "." vì "0..n." mơ hồ với range/field) *)
+struct_lit = path "{" [ field_init { "," field_init } [ "," ] ] "}" ;   (* Point { x: 1, y: 2 } *)
+field_init = ident ":" expr ;
+array_lit  = "[" [ expr { "," expr } [ "," ] ] "]" | "[" expr ";" const_expr "]" ;   (* [1, 2, 3] ; [0; 8] *)
+literal    = int_lit | float_lit | str_lit | char_lit | "true" | "false" ;
+const_expr = expr ;                                 (* cú pháp = expr; "tính được lúc biên dịch" do M4 kiểm, không phải grammar *)

@@ -1,0 +1,8 @@
+// expect: pass
+// note: nhánh gọi core::abort có kiểu ! (never) nên hợp nhất với nhánh kia; abort mang hiệu ứng div (semantics §17, §22)
+ƒ get(o: Option<i32>) → i32 ! {div} {
+  ⌥ o {
+    Some(v) ↦ v,
+    None ↦ core::abort("none"),
+  }
+}

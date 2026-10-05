@@ -1,0 +1,7 @@
+// expect: pass
+// note: "*" đầu toán hạng = deref (prefix); "*" sau toán hạng = nhân (infix). Cùng một token STAR (semantics §14).
+// note: N0601 (nhân i32 không chứng minh được tràn)
+ƒ mix(p: &i32, q: &i32) → i32 ! ∅ { *p * *q +% *p }
+ƒ scale(r: &!i32) → () ! ∅ {
+  *r ← *r * 2;
+}

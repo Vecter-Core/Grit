@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: "in" là từ khoá cứng (for-in), không dùng làm tên biến (semantics §13)
+ƒ f() → i32 ! ∅ { in ≔ 1; in }

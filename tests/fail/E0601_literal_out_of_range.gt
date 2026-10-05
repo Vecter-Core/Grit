@@ -1,0 +1,3 @@
+// expect: fail E0601
+// note: 128 không vừa i8 (khác -128i8 ở pass/23_literals)
+ƒ f() → i8 ! ∅ { 128i8 }

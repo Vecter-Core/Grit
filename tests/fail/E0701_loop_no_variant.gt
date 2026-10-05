@@ -1,2 +1,4 @@
 // expect: fail E0701
-ƒ f() → () ! ∅ { μi ≔ 0; ⟳ i < 10 { i ← i +% 1; } }
+// note: không suy ra được biến thể từ cond+thân (bước đi do next() quyết định) và không có ↓ → E0701 (semantics §21)
+ƒ next(i: u32) → u32 ! ∅ { i }
+ƒ f(n: u32) → () ! ∅ { μi ≔ 0; ⟳ i < n { i ← next(i); } }

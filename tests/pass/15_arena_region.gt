@@ -1,5 +1,5 @@
 // expect: pass
-ƒ in_arena<@r>(a: &@r Arena) → i32 ! {mem} {
+ƒ in_arena<'r>(a: &'r Arena) → i32 ! {mem} {
   p ≔ a.alloc(41);
   *p +% 1
 }

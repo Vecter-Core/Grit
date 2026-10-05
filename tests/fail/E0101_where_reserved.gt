@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: "\where" được lexer nhận ra (KEYWORD_WHERE) nhưng Phase 1 không có production dùng nó; ràng buộc viết inline <T: Copy> (Q7)
+ƒ f<T>() → i32 ! ∅ \where T: Copy { 1 }

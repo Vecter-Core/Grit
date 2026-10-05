@@ -1,0 +1,2 @@
+// expect: fail E0101
+ƒ f(a: i32) → i32 ! ∅ { a * }

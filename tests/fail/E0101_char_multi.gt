@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: 'ab' không phải char hợp lệ: lexer đọc LIFETIME(ab) rồi gặp ' lẻ (semantics §15)
+ƒ f() → char ! ∅ { 'ab' }

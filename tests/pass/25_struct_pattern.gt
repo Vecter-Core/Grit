@@ -1,0 +1,15 @@
+// expect: pass
+// note: struct literal, field access, enum pattern + destructure + wildcard, Self, struct literal trong điều kiện phải bọc ngoặc
+▢ Point { x: i32, y: i32 }
+⊔ Shape { Dot(Point), Pair(i32, i32), Empty }
+ƒ make() → Point ! ∅ { Point { x: 1, y: 2 } }
+ƒ origin_x() → bool ! ∅ { ⎇ (Point { x: 0, y: 0 }).x == 0 { true } ⇝ { false } }
+ƒ norm(s: Shape) → i32 ! ∅ {
+  ⌥ s {
+    Shape::Dot(Point { x, y: _ }) ↦ x,
+    Shape::Pair(a, _) ↦ a,
+    Shape::Empty ↦ 0,
+  }
+}
+ƒ swap(t: (i32, i32)) → (i32, i32) ! ∅ { ⌥ t { (a, b) ↦ (b, a) } }
+⊐ Point { ƒ new() → Self ! ∅ { Self { x: 0, y: 0 } } }

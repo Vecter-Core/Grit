@@ -1,0 +1,11 @@
+// expect: pass
+// note: "//" lexer bỏ qua; "///" giữ lại thành DOC_COMMENT gắn vào node kế tiếp (symbols.md §Comment)
+/// Cộng hai số nhỏ. Doc comment này gắn vào ƒ add2.
+ƒ add2(a: i32, b: i32) → i32 ! ∅ ⊳ a >= 0 ∧ a <= 100 ∧ b >= 0 ∧ b <= 100 { a + b } // comment cuối dòng
+//// bốn dấu gạch chéo vẫn chỉ là comment thường
+/// Điểm trong mặt phẳng.
+▢ P {
+  /// hoành độ
+  x: i32,
+  y: i32,
+}
