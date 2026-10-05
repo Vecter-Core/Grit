@@ -1,0 +1,6 @@
+// expect: fail E0201
+// note: module con không thấy tên của module chứa nó
+ƒ g() ! ∅ { }
+▦ m {
+  ƒ h() ! ∅ { g(); }
+}

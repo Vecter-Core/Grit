@@ -149,3 +149,83 @@ impl SourceFile {
         Some(raw.strip_suffix('\r').unwrap_or(raw))
     }
 }
+
+/// Định danh một tệp trong một chương trình nhiều tệp (ADR-017a). Do `SourceMap` cấp: **hạng của tên tệp trong danh sách đã
+/// sắp xếp**, nên KHÔNG phụ thuộc thứ tự đưa tệp vào.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct FileId(u32);
+
+impl FileId {
+    #[must_use]
+    pub fn new(raw: u32) -> FileId {
+        FileId(raw)
+    }
+
+    #[must_use]
+    pub fn raw(self) -> u32 {
+        self.0
+    }
+
+    #[must_use]
+    pub fn index(self) -> usize {
+        self.0 as usize
+    }
+}
+
+/// Lỗi dựng `SourceMap`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SourceMapError {
+    /// Hai tệp cùng tên.
+    DuplicateName(String),
+}
+
+/// Tập tệp của một chương trình, đánh `FileId` theo thứ tự tên (tất định, độc lập thứ tự nhập).
+#[derive(Clone, Debug)]
+pub struct SourceMap {
+    files: Vec<SourceFile>,
+}
+
+impl SourceMap {
+    /// Dựng bản đồ; sắp theo tên (so sánh byte). Tên trùng → lỗi.
+    pub fn new(mut files: Vec<SourceFile>) -> Result<SourceMap, SourceMapError> {
+        files.sort_by(|a, b| a.name().cmp(b.name()));
+        for w in files.windows(2) {
+            if w[0].name() == w[1].name() {
+                return Err(SourceMapError::DuplicateName(w[0].name().to_string()));
+            }
+        }
+        Ok(SourceMap { files })
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.files.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.files.is_empty()
+    }
+
+    #[must_use]
+    pub fn get(&self, id: FileId) -> Option<&SourceFile> {
+        self.files.get(id.index())
+    }
+
+    #[must_use]
+    pub fn id_of(&self, name: &str) -> Option<FileId> {
+        self.files
+            .binary_search_by(|f| f.name().cmp(name))
+            .ok()
+            .and_then(|i| u32::try_from(i).ok())
+            .map(FileId::new)
+    }
+
+    /// Duyệt theo `FileId` tăng dần (= theo tên).
+    pub fn iter(&self) -> impl Iterator<Item = (FileId, &SourceFile)> {
+        self.files
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (FileId::new(u32::try_from(i).unwrap_or(u32::MAX)), f))
+    }
+}

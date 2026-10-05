@@ -1,0 +1,10 @@
+# E0201_self_outside_impl: 1 chẩn đoán
+
+## [1] human
+error[E0201]: `Self` chỉ dùng được bên trong `⊏` hoặc `⊐`
+ --> main.gt:3:9
+  |
+3 | ƒ f() → Self ! ∅ { }
+  |         ^^^^
+## [1] json
+{"code":"E0201","level":"error","message":"`Self` chỉ dùng được bên trong `⊏` hoặc `⊐`","file":"main.gt","span":{"start":{"offset":73,"line":3,"col":9},"end":{"offset":77,"line":3,"col":13}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

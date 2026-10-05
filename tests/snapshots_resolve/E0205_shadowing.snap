@@ -1,0 +1,12 @@
+# E0205_shadowing: 1 chẩn đoán
+
+## [1] human
+error[E0205]: biến `x` che khuất biến cục bộ/tham số cùng tên (D7: cấm shadowing)
+ --> main.gt:4:12
+  |
+3 |   x ≔ 1;
+  |   - bị che khuất ở đây
+4 |   ⎇ true { x ≔ 2; }
+  |            ^ tên mới
+## [1] json
+{"code":"E0205","level":"error","message":"biến `x` che khuất biến cục bộ/tham số cùng tên (D7: cấm shadowing)","file":"main.gt","span":{"start":{"offset":69,"line":4,"col":12},"end":{"offset":70,"line":4,"col":13}},"span_label":"tên mới","labels":[{"file":"main.gt","span":{"start":{"offset":47,"line":3,"col":3},"end":{"offset":48,"line":3,"col":4}},"message":"bị che khuất ở đây"}],"notes":[],"suggestions":[]}

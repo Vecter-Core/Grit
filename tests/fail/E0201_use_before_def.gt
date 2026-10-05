@@ -1,0 +1,7 @@
+// expect: fail E0201
+// note: dùng biến trước khi khai báo trong cùng khối
+ƒ f() → i32 ! ∅ {
+  y ≔ x;
+  x ≔ 1;
+  y
+}

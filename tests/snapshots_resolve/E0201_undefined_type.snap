@@ -1,0 +1,10 @@
+# E0201_undefined_type: 1 chẩn đoán
+
+## [1] human
+error[E0201]: tên `Missing` chưa được định nghĩa
+ --> main.gt:3:8
+  |
+3 | ƒ f(x: Missing) ! ∅ { }
+  |        ^^^^^^^ không tìm thấy trong phạm vi này
+## [1] json
+{"code":"E0201","level":"error","message":"tên `Missing` chưa được định nghĩa","file":"main.gt","span":{"start":{"offset":83,"line":3,"col":8},"end":{"offset":90,"line":3,"col":15}},"span_label":"không tìm thấy trong phạm vi này","labels":[],"notes":[],"suggestions":[]}

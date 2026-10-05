@@ -1,0 +1,12 @@
+# E0205_shadow_loop_var: 1 chẩn đoán
+
+## [1] human
+error[E0205]: biến vòng lặp `i` che khuất biến cục bộ/tham số cùng tên (D7: cấm shadowing)
+ --> main.gt:5:5
+  |
+4 |   i ≔ 0;
+  |   - bị che khuất ở đây
+5 |   ⟳ i in 0..3 { }
+  |     ^ tên mới
+## [1] json
+{"code":"E0205","level":"error","message":"biến vòng lặp `i` che khuất biến cục bộ/tham số cùng tên (D7: cấm shadowing)","file":"main.gt","span":{"start":{"offset":100,"line":5,"col":5},"end":{"offset":101,"line":5,"col":6}},"span_label":"tên mới","labels":[{"file":"main.gt","span":{"start":{"offset":85,"line":4,"col":3},"end":{"offset":86,"line":4,"col":4}},"message":"bị che khuất ở đây"}],"notes":[],"suggestions":[]}

@@ -1,0 +1,10 @@
+# E0201_import_missing: 1 chẩn đoán
+
+## [1] human
+error[E0201]: `a` không có thành viên `g`
+ --> b.gt:1:10
+  |
+1 | ⇲ a::{f, g};
+  |          ^ không tìm thấy
+## [1] json
+{"code":"E0201","level":"error","message":"`a` không có thành viên `g`","file":"b.gt","span":{"start":{"offset":11,"line":1,"col":10},"end":{"offset":12,"line":1,"col":11}},"span_label":"không tìm thấy","labels":[],"notes":[],"suggestions":[]}

@@ -102,9 +102,79 @@ fn edit_line(file: &SourceFile, e: &Edit) -> String {
     )
 }
 
-/// Xuất một chẩn đoán ở dạng người đọc.
+/// Xuất một chẩn đoán ở dạng người đọc (một tệp: nhãn ở tệp khác chỉ liệt kê dạng văn bản). Xem `render_human_files`.
 #[must_use]
 pub fn render_human(d: &Diagnostic, file: &SourceFile, opts: &RenderOptions) -> String {
+    render_human_files(d, &[file], opts)
+}
+
+/// Vẽ các dòng nguồn của MỘT tệp (gutter rộng `w`).
+fn snippet_lines(
+    out: &mut String,
+    file: &SourceFile,
+    placed: &[Placed],
+    w: usize,
+    lc: &str,
+    opts: &RenderOptions,
+) {
+    let gutter = " ".repeat(w);
+    out.push_str(&format!("{gutter} |\n"));
+    let mut last_printed: Option<u32> = None;
+    for p in placed {
+        let marker = if p.primary { '^' } else { '-' };
+        let mcolor = if p.primary { lc } else { SECONDARY };
+        let span_lines = p.end_line - p.start_line + 1;
+        let lines: Vec<Option<u32>> = if span_lines > 4 {
+            vec![
+                Some(p.start_line),
+                Some(p.start_line + 1),
+                None,
+                Some(p.end_line),
+            ]
+        } else {
+            (p.start_line..=p.end_line).map(Some).collect()
+        };
+        for item in lines {
+            let Some(n) = item else {
+                out.push_str("...\n");
+                last_printed = None;
+                continue;
+            };
+            if last_printed != Some(n) {
+                if last_printed.is_some_and(|prev| n > prev + 1) {
+                    out.push_str("...\n");
+                }
+                out.push_str(&format!("{n:>w$} | {}\n", display_line(file, n), w = w));
+                last_printed = Some(n);
+            }
+            let len = display_line(file, n).chars().count() as u32;
+            let (from, to) = if p.start_line == p.end_line {
+                (p.start_col, p.end_col)
+            } else if n == p.start_line {
+                (p.start_col, len + 1)
+            } else if n == p.end_line {
+                (1, p.end_col)
+            } else {
+                (1, len + 1)
+            };
+            let count = to.saturating_sub(from).max(1) as usize;
+            let carets: String = std::iter::repeat_n(marker, count).collect();
+            let mut row = format!("{gutter} | {}", " ".repeat((from - 1) as usize));
+            row.push_str(&paint(opts, mcolor, &carets));
+            if n == p.end_line && !p.text.is_empty() {
+                row.push(' ');
+                row.push_str(&p.text);
+            }
+            out.push_str(&row);
+            out.push('\n');
+        }
+    }
+}
+
+/// Xuất một chẩn đoán dạng người đọc với NHIỀU tệp (ADR-017a): đoạn mã của tệp chẩn đoán trước (`-->`), rồi mỗi tệp khác có
+/// nhãn trỏ tới được vẽ thành khối riêng (`:::`). Nhãn ở tệp không có trong `files` chỉ liệt kê dạng văn bản.
+#[must_use]
+pub fn render_human_files(d: &Diagnostic, files: &[&SourceFile], opts: &RenderOptions) -> String {
     let lc = level_color(d.level);
     let mut out = String::new();
     out.push_str(&paint(
@@ -114,34 +184,47 @@ pub fn render_human(d: &Diagnostic, file: &SourceFile, opts: &RenderOptions) -> 
     ));
     out.push_str(&format!(": {}\n", d.message));
 
-    // gom nhãn vẽ được; nhãn ở tệp khác (hoặc ngoài tệp) chỉ liệt kê dạng văn bản
-    let mut placed: Vec<Placed> = Vec::new();
+    let find = |name: &str| files.iter().copied().find(|f| f.name() == name);
+    // khối theo tệp: tệp của chẩn đoán trước, rồi các tệp khác theo thứ tự xuất hiện của nhãn
+    let mut blocks: Vec<(&SourceFile, Vec<Placed>)> = Vec::new();
     let mut loose: Vec<String> = Vec::new();
-    let primary_placed = if d.file == file.name() {
-        place(file, d.span, true, d.span_label.as_deref().unwrap_or(""))
-    } else {
-        None
-    };
-    if let Some(p) = primary_placed {
-        placed.push(p);
+    let mut primary_placed = false;
+    if let Some(f) = find(&d.file) {
+        let mut v = Vec::new();
+        if let Some(p) = place(f, d.span, true, d.span_label.as_deref().unwrap_or("")) {
+            v.push(p);
+            primary_placed = true;
+        }
+        blocks.push((f, v));
     }
     for l in &d.labels {
-        match (l.file == file.name())
-            .then(|| place(file, l.span, false, &l.message))
-            .flatten()
-        {
-            Some(p) => placed.push(p),
+        let placed =
+            find(&l.file).and_then(|f| place(f, l.span, false, &l.message).map(|p| (f, p)));
+        match placed {
+            Some((f, p)) => match blocks.iter_mut().find(|(bf, _)| bf.name() == f.name()) {
+                Some((_, v)) => v.push(p),
+                None => blocks.push((f, vec![p])),
+            },
             None => loose.push(format!("label: {} ({})", l.message, l.file)),
         }
     }
-    placed.sort_by_key(|p| (p.start_line, p.start_col, p.end_line, p.end_col, !p.primary));
-
-    let max_line = placed.iter().map(|p| p.end_line).max().unwrap_or(1);
+    for (_, v) in &mut blocks {
+        v.sort_by_key(|p| (p.start_line, p.start_col, p.end_line, p.end_col, !p.primary));
+    }
+    let max_line = blocks
+        .iter()
+        .flat_map(|(_, v)| v.iter().map(|p| p.end_line))
+        .max()
+        .unwrap_or(1);
     let w = digits(max_line);
     let gutter = " ".repeat(w);
 
-    // dòng vị trí
-    match placed.iter().find(|p| p.primary) {
+    // dòng vị trí của chẩn đoán
+    let primary = blocks
+        .iter()
+        .flat_map(|(_, v)| v.iter())
+        .find(|p| p.primary && primary_placed);
+    match primary {
         Some(p) => out.push_str(&format!(
             "{gutter}--> {}:{}:{}\n",
             d.file, p.start_line, p.start_col
@@ -152,58 +235,20 @@ pub fn render_human(d: &Diagnostic, file: &SourceFile, opts: &RenderOptions) -> 
         )),
     }
 
-    if !placed.is_empty() {
-        out.push_str(&format!("{gutter} |\n"));
-        let mut last_printed: Option<u32> = None;
-        for p in &placed {
-            let marker = if p.primary { '^' } else { '-' };
-            let mcolor = if p.primary { lc } else { SECONDARY };
-            let span_lines = p.end_line - p.start_line + 1;
-            let lines: Vec<Option<u32>> = if span_lines > 4 {
-                vec![
-                    Some(p.start_line),
-                    Some(p.start_line + 1),
-                    None,
-                    Some(p.end_line),
-                ]
-            } else {
-                (p.start_line..=p.end_line).map(Some).collect()
-            };
-            for item in lines {
-                let Some(n) = item else {
-                    out.push_str("...\n");
-                    last_printed = None;
-                    continue;
-                };
-                if last_printed != Some(n) {
-                    if last_printed.is_some_and(|prev| n > prev + 1) {
-                        out.push_str("...\n");
-                    }
-                    out.push_str(&format!("{n:>w$} | {}\n", display_line(file, n), w = w));
-                    last_printed = Some(n);
-                }
-                let len = display_line(file, n).chars().count() as u32;
-                let (from, to) = if p.start_line == p.end_line {
-                    (p.start_col, p.end_col)
-                } else if n == p.start_line {
-                    (p.start_col, len + 1)
-                } else if n == p.end_line {
-                    (1, p.end_col)
-                } else {
-                    (1, len + 1)
-                };
-                let count = to.saturating_sub(from).max(1) as usize;
-                let carets: String = std::iter::repeat_n(marker, count).collect();
-                let mut row = format!("{gutter} | {}", " ".repeat((from - 1) as usize));
-                row.push_str(&paint(opts, mcolor, &carets));
-                if n == p.end_line && !p.text.is_empty() {
-                    row.push(' ');
-                    row.push_str(&p.text);
-                }
-                out.push_str(&row);
-                out.push('\n');
-            }
+    for (f, placed) in &blocks {
+        let Some(first) = placed.first() else {
+            continue;
+        };
+        // khối của tệp chẩn đoán đã có dòng `-->`; các tệp khác có dòng `:::` riêng
+        if f.name() != d.file {
+            out.push_str(&format!(
+                "{gutter}::: {}:{}:{}\n",
+                f.name(),
+                first.start_line,
+                first.start_col
+            ));
         }
+        snippet_lines(&mut out, f, placed, w, lc, opts);
     }
     for l in &loose {
         out.push_str(&format!("{gutter} = {l}\n"));
@@ -219,7 +264,22 @@ pub fn render_human(d: &Diagnostic, file: &SourceFile, opts: &RenderOptions) -> 
         ));
         let indent = " ".repeat(w + " = help: ".len());
         for e in &s.edits {
-            out.push_str(&format!("{indent}{}\n", edit_line(file, e)));
+            let target = find(&e.file).or(if files.len() == 1 {
+                files.first().copied()
+            } else {
+                None
+            });
+            let line = match target {
+                Some(f) => edit_line(f, e),
+                None => format!(
+                    "- (tệp `{}`, span {}..{}) -> `{}`",
+                    e.file,
+                    e.span.start,
+                    e.span.end,
+                    escape_inline(&e.replacement)
+                ),
+            };
+            out.push_str(&format!("{indent}{line}\n"));
         }
     }
     out

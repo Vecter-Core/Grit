@@ -1,0 +1,11 @@
+# E0202_duplicate_param: 1 chẩn đoán
+
+## [1] human
+error[E0202]: tham số `a` được khai báo nhiều lần
+ --> main.gt:3:13
+  |
+3 | ƒ f(a: i32, a: i32) ! ∅ { }
+  |     - khai báo đầu tiên
+  |             ^ khai báo lặp
+## [1] json
+{"code":"E0202","level":"error","message":"tham số `a` được khai báo nhiều lần","file":"main.gt","span":{"start":{"offset":71,"line":3,"col":13},"end":{"offset":72,"line":3,"col":14}},"span_label":"khai báo lặp","labels":[{"file":"main.gt","span":{"start":{"offset":63,"line":3,"col":5},"end":{"offset":64,"line":3,"col":6}},"message":"khai báo đầu tiên"}],"notes":[],"suggestions":[]}

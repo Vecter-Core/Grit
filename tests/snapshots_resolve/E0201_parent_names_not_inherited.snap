@@ -1,0 +1,10 @@
+# E0201_parent_names_not_inherited: 1 chẩn đoán
+
+## [1] human
+error[E0201]: tên `g` chưa được định nghĩa
+ --> main.gt:5:15
+  |
+5 |   ƒ h() ! ∅ { g(); }
+  |               ^ không tìm thấy trong phạm vi này
+## [1] json
+{"code":"E0201","level":"error","message":"tên `g` chưa được định nghĩa","file":"main.gt","span":{"start":{"offset":127,"line":5,"col":15},"end":{"offset":128,"line":5,"col":16}},"span_label":"không tìm thấy trong phạm vi này","labels":[],"notes":[],"suggestions":[]}

@@ -1,0 +1,10 @@
+# E0201_undefined_name: 1 chẩn đoán
+
+## [1] human
+error[E0201]: tên `y` chưa được định nghĩa
+ --> main.gt:2:19
+  |
+2 | ƒ f() → i32 ! ∅ { y }
+  |                   ^ không tìm thấy trong phạm vi này
+## [1] json
+{"code":"E0201","level":"error","message":"tên `y` chưa được định nghĩa","file":"main.gt","span":{"start":{"offset":45,"line":2,"col":19},"end":{"offset":46,"line":2,"col":20}},"span_label":"không tìm thấy trong phạm vi này","labels":[],"notes":[],"suggestions":[]}

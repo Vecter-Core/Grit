@@ -1,0 +1,6 @@
+// expect: fail E0205
+// note: biến vòng lặp che biến ngoài
+ƒ f() ! ∅ {
+  i ≔ 0;
+  ⟳ i in 0..3 { }
+}

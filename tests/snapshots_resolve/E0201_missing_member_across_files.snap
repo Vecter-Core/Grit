@@ -1,0 +1,10 @@
+# E0201_missing_member_across_files: 1 chẩn đoán
+
+## [1] human
+error[E0201]: `a` không có thành viên `nope`
+ --> b.gt:1:16
+  |
+1 | ƒ g() ! ∅ { a::nope(); }
+  |                ^^^^ không tìm thấy
+## [1] json
+{"code":"E0201","level":"error","message":"`a` không có thành viên `nope`","file":"b.gt","span":{"start":{"offset":18,"line":1,"col":16},"end":{"offset":22,"line":1,"col":20}},"span_label":"không tìm thấy","labels":[],"notes":[],"suggestions":[]}

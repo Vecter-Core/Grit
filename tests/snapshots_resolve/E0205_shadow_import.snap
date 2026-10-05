@@ -1,0 +1,12 @@
+# E0205_shadow_import: 1 chẩn đoán
+
+## [1] human
+error[E0205]: biến `g` che khuất tên cấp module (item, nhập hoặc prelude) cùng tên (D7: cấm shadowing)
+ --> b.gt:2:13
+  |
+1 | ⇲ a::g;
+  |   ---- bị che khuất ở đây
+2 | ƒ f() ! ∅ { g ≔ 1; }
+  |             ^ tên mới
+## [1] json
+{"code":"E0205","level":"error","message":"biến `g` che khuất tên cấp module (item, nhập hoặc prelude) cùng tên (D7: cấm shadowing)","file":"b.gt","span":{"start":{"offset":25,"line":2,"col":13},"end":{"offset":26,"line":2,"col":14}},"span_label":"tên mới","labels":[{"file":"b.gt","span":{"start":{"offset":4,"line":1,"col":3},"end":{"offset":8,"line":1,"col":7}},"message":"bị che khuất ở đây"}],"notes":[],"suggestions":[]}

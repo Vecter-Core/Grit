@@ -1,0 +1,4 @@
+// expect: fail E0202
+// note: hàm và struct cùng tên trong một module (một không gian tên)
+▢ P { x: i32 }
+ƒ P() ! ∅ { }

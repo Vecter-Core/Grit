@@ -1,0 +1,12 @@
+# E0202_fn_vs_struct: 1 chẩn đoán
+
+## [1] human
+error[E0202]: tên `P` được định nghĩa 2 lần trong module `main`
+ --> main.gt:3:3
+  |
+3 | ▢ P { x: i32 }
+  |   ^ một trong 2 định nghĩa của `P`
+4 | ƒ P() ! ∅ { }
+  |   - định nghĩa khác của `P`
+## [1] json
+{"code":"E0202","level":"error","message":"tên `P` được định nghĩa 2 lần trong module `main`","file":"main.gt","span":{"start":{"offset":106,"line":3,"col":3},"end":{"offset":107,"line":3,"col":4}},"span_label":"một trong 2 định nghĩa của `P`","labels":[{"file":"main.gt","span":{"start":{"offset":122,"line":4,"col":3},"end":{"offset":123,"line":4,"col":4}},"message":"định nghĩa khác của `P`"}],"notes":[],"suggestions":[]}

@@ -1,0 +1,14 @@
+# E0204_cycle_via_imports: 1 chẩn đoán
+
+## [1] human
+error[E0204]: các module `a`, `b` phụ thuộc lẫn nhau (vòng phụ thuộc module)
+ --> a.gt:1:3
+  |
+1 | ⇲ b::fb;
+  |   ^^^^^ tham chiếu tạo vòng
+ ::: b.gt:1:3
+  |
+1 | ⇲ a::fa;
+  |   ----- `b` phụ thuộc `a`
+## [1] json
+{"code":"E0204","level":"error","message":"các module `a`, `b` phụ thuộc lẫn nhau (vòng phụ thuộc module)","file":"a.gt","span":{"start":{"offset":4,"line":1,"col":3},"end":{"offset":9,"line":1,"col":8}},"span_label":"tham chiếu tạo vòng","labels":[{"file":"b.gt","span":{"start":{"offset":4,"line":1,"col":3},"end":{"offset":9,"line":1,"col":8}},"message":"`b` phụ thuộc `a`"}],"notes":[],"suggestions":[]}

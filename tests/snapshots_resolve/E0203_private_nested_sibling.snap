@@ -1,0 +1,13 @@
+# E0203_private_nested_sibling: 1 chẩn đoán
+
+## [1] human
+error[E0203]: `s` là private trong module `main::m` (thiếu `◈`)
+ --> main.gt:5:14
+  |
+3 | ▦ m { ƒ s() ! ∅ { } }
+  |         - định nghĩa ở đây, thiếu `◈`
+...
+5 |   ⇲ main::m::s;
+  |              ^ private
+## [1] json
+{"code":"E0203","level":"error","message":"`s` là private trong module `main::m` (thiếu `◈`)","file":"main.gt","span":{"start":{"offset":133,"line":5,"col":14},"end":{"offset":134,"line":5,"col":15}},"span_label":"private","labels":[{"file":"main.gt","span":{"start":{"offset":94,"line":3,"col":9},"end":{"offset":95,"line":3,"col":10}},"message":"định nghĩa ở đây, thiếu `◈`"}],"notes":[],"suggestions":[]}

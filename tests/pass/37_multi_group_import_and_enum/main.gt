@@ -1,0 +1,2 @@
+⇲ shapes::{Shape, area};
+ƒ run() → i32 ! ∅ { area(Shape::Circle(2)) }

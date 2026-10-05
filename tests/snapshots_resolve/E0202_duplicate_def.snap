@@ -1,0 +1,12 @@
+# E0202_duplicate_def: 1 chẩn đoán
+
+## [1] human
+error[E0202]: tên `f` được định nghĩa 2 lần trong module `main`
+ --> main.gt:2:3
+  |
+2 | ƒ f() → i32 ! ∅ { 1 }
+  |   ^ một trong 2 định nghĩa của `f`
+3 | ƒ f() → i32 ! ∅ { 2 }
+  |   - định nghĩa khác của `f`
+## [1] json
+{"code":"E0202","level":"error","message":"tên `f` được định nghĩa 2 lần trong module `main`","file":"main.gt","span":{"start":{"offset":25,"line":2,"col":3},"end":{"offset":26,"line":2,"col":4}},"span_label":"một trong 2 định nghĩa của `f`","labels":[{"file":"main.gt","span":{"start":{"offset":52,"line":3,"col":3},"end":{"offset":53,"line":3,"col":4}},"message":"định nghĩa khác của `f`"}],"notes":[],"suggestions":[]}

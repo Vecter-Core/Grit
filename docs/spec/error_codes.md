@@ -8,11 +8,11 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 |---|---|---|---|
 | E0101 | Token bất ngờ / thiếu dấu / từ khoá cứng hoặc ký hiệu dành riêng (`self`, `Self`, `in`, `μ`, `\extern`, `\where`; comment khối `/* */`; `=` đứng riêng; `x as T < y` thiếu ngoặc, có gợi ý machine-applicable — Q16c) dùng sai chỗ | M2 | E0101_missing_brace, E0101_cast_then_less_than, E0101_mu_as_ident, E0101_star_dangling, E0101_self_as_var, E0101_self_as_var_ascii, E0101_extern_reserved, E0101_where_reserved, E0101_block_comment, E0101_compound_assign, E0101_char_multi, E0101_doc_comment_dangling, E0101_selftype_as_var, E0101_in_as_var, E0101_place_not_assignable, E0101_struct_in_contract, E0101_struct_in_loop_variant |
 | E0102 | Lồng nhau quá sâu (> `MAX_DEPTH` = 256 mức, tính cả độ dài chuỗi toán tử/postfix) hoặc cây quá lớn. ĐỎ, không phải ICE. Gợi ý sửa: tách biểu thức con ra biến phụ bằng `≔` | M2 | E0102_too_deep, E0102_too_deep_blocks, E0102_too_deep_types |
-| E0201 | Tên chưa định nghĩa | M3 | E0201_undefined_name |
-| E0202 | Định nghĩa trùng | M3 | E0202_duplicate_def |
-| E0203 | Truy cập item private | M3 | E0203_private_item |
-| E0204 | Vòng phụ thuộc module | M3 | — |
-| E0205 | Shadowing (D7) | M4 | E0205_shadowing |
+| E0201 | Tên chưa định nghĩa | M3 | E0201_import_missing, E0201_missing_member_across_files, E0201_parent_names_not_inherited, E0201_self_outside_impl, E0201_undefined_name, E0201_undefined_type, E0201_use_before_def |
+| E0202 | Định nghĩa trùng | M3 | E0202_duplicate_def, E0202_duplicate_param, E0202_duplicate_variant, E0202_fn_vs_struct, E0202_import_clash |
+| E0203 | Truy cập item private | M3 | E0203_private_across_files, E0203_private_import, E0203_private_item, E0203_private_module_member, E0203_private_nested_sibling |
+| E0204 | Vòng phụ thuộc module | M3 | E0204_cycle_via_imports, E0204_three_files_cycle, E0204_two_files_cycle |
+| E0205 | Shadowing (D7) | M3 | E0205_shadow_import, E0205_shadow_loop_var, E0205_shadow_param, E0205_shadow_prelude, E0205_shadowing |
 | E0301 | Sai kiểu / biểu thức chưa có ngữ nghĩa ở Phase 1 (vd range mở độc lập) | M4 | E0301_type_mismatch, E0301_open_range_standalone |
 | E0302 | Ép kiểu ngầm số (D1) | M4 | E0302_implicit_cast |
 | E0303 | `==` trên số thực (D4) | M4 | E0303_float_eq |

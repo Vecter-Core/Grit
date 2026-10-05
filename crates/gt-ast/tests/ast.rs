@@ -1,6 +1,6 @@
 //! gt-ast (M2): kiểu node, NodeId, tính độc lập bề mặt. Viết TRƯỚC khi có cài đặt (TDD).
 use gt_ast::*;
-use gt_span::Span;
+use gt_span::{FileId, Span};
 
 struct B {
     g: NodeIdGen,
@@ -10,7 +10,7 @@ struct B {
 impl B {
     fn new() -> B {
         B {
-            g: NodeIdGen::new(),
+            g: NodeIdGen::new(FileId::new(0)),
             ids: Vec::new(),
         }
     }
@@ -157,18 +157,34 @@ fn assert_node<T: Node>(n: &T) -> (NodeId, Span) {
 
 #[test]
 fn node_id_gen_is_dense_sequential_and_overflow_safe() {
-    let mut g = NodeIdGen::new();
+    let mut g = NodeIdGen::new(FileId::new(3));
     let ids: Vec<u32> = (0..5).map(|_| g.next_id().expect("id").raw()).collect();
     assert_eq!(ids, [0, 1, 2, 3, 4]);
     assert_eq!(g.count(), 5);
-    assert_eq!(NodeId::new(7).index(), 7);
+    assert_eq!(NodeId::new(FileId::new(0), 7).index(), 7);
     // hết u32: trả None, không panic, không tràn lặng lẽ
-    let mut edge = NodeIdGen::starting_at(u32::MAX);
-    assert_eq!(edge.next_id(), Some(NodeId::new(u32::MAX)));
+    let mut edge = NodeIdGen::starting_at(FileId::new(0), u32::MAX);
+    assert_eq!(edge.next_id(), Some(NodeId::new(FileId::new(0), u32::MAX)));
     assert_eq!(edge.next_id(), None);
     assert_eq!(edge.next_id(), None);
-    // NodeId có thứ tự và hash
-    assert!(NodeId::new(1) < NodeId::new(2));
+    // NodeId có thứ tự (tệp trước, rồi chỉ số) và hash
+    assert!(NodeId::new(FileId::new(0), 1) < NodeId::new(FileId::new(0), 2));
+    assert!(NodeId::new(FileId::new(0), 99) < NodeId::new(FileId::new(1), 0));
+}
+
+/// ADR-017a: NodeId mang FileId → hai node cùng chỉ số ở hai tệp khác nhau là hai khoá khác nhau.
+#[test]
+fn node_ids_of_different_files_never_collide() {
+    let mut g0 = NodeIdGen::new(FileId::new(0));
+    let mut g1 = NodeIdGen::new(FileId::new(1));
+    let (a, b) = (g0.next_id().expect("id"), g1.next_id().expect("id"));
+    assert_eq!(a.raw(), b.raw(), "cùng chỉ số trong tệp");
+    assert_ne!(a, b, "nhưng khác khoá toàn cục");
+    assert_eq!(a.file(), FileId::new(0));
+    assert_eq!(b.file(), FileId::new(1));
+    let mut set = std::collections::HashSet::new();
+    assert!(set.insert(a));
+    assert!(set.insert(b));
 }
 
 #[test]

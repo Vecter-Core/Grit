@@ -1,0 +1,3 @@
+// expect: fail E0202
+// note: biến thể enum trùng tên
+⊔ E { A, B, A }

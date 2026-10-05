@@ -1,0 +1,14 @@
+# E0203_private_module_member: 1 chẩn đoán
+
+## [1] human
+error[E0203]: `m` là private trong module `a` (thiếu `◈`)
+ --> b.gt:1:16
+  |
+1 | ƒ g() ! ∅ { a::m::f(); }
+  |                ^ private
+ ::: a.gt:1:3
+  |
+1 | ▦ m { ◈ ƒ f() ! ∅ { } }
+  |   - định nghĩa ở đây, thiếu `◈`
+## [1] json
+{"code":"E0203","level":"error","message":"`m` là private trong module `a` (thiếu `◈`)","file":"b.gt","span":{"start":{"offset":18,"line":1,"col":16},"end":{"offset":19,"line":1,"col":17}},"span_label":"private","labels":[{"file":"a.gt","span":{"start":{"offset":4,"line":1,"col":3},"end":{"offset":5,"line":1,"col":4}},"message":"định nghĩa ở đây, thiếu `◈`"}],"notes":[],"suggestions":[]}

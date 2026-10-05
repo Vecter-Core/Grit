@@ -1,0 +1,2 @@
+expect: fail E0204
+note: a và b dùng lẫn nhau: vòng phụ thuộc module

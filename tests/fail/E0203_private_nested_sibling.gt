@@ -1,0 +1,6 @@
+// expect: fail E0203
+// note: module anh em không thấy item private của nhau
+▦ m { ƒ s() ! ∅ { } }
+▦ n {
+  ⇲ main::m::s;
+}

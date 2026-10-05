@@ -67,3 +67,14 @@
 - **Từ chối khi nguồn có bất kỳ chẩn đoán nào của parser** (fail-closed): gt-fmt không định dạng tệp hỏng và không có chế độ "cố gắng".
 - **`x as T < y`:** quy tắc NGÔN NGỮ (như Rust, `semantics.md`), không phải workaround của fmt: `T <` mở tham số kiểu; parser báo lỗi kèm gợi ý máy áp dụng được bọc `(x as T)`; fmt in `(x as T) < y`.
 - **gt-fmt chỉ là thư viện** (`gt_fmt::format`); lệnh `gritc fmt` có từ M9 (gt-driver).
+
+## gt-resolve (M3, ADR-017)
+- **Chưa kiểm ở M3 (đẩy sang M4+, KHÔNG có nghĩa là đã đúng):** `Kiểu::tên` với `tên` không phải biến thể (mục kết hợp trong `⊐`/`⊏`; M3 chỉ ghi `Res::Assoc`), tên trường và truy cập trường private, phương thức, struct literal có trường lạ/thiếu, tên hiệu ứng (`io`, `lock(L)`), attribute, lifetime `'a`, kiểu của tên (hàm dùng ở vị trí kiểu…). Hệ quả: một chương trình dùng `E::tenSai` hay `x.truongSai` qua được M3 và PHẢI bị M4 chặn.
+- **Pattern chỉ có ident**: gõ nhầm tên biến thể (`Nonee`) lặng lẽ thành binding mới; bắt phần lớn bởi match-vét-cạn (M5). Biến thể là tên trong không gian tên của module chứa enum (OPEN_QUESTIONS Q19): hai enum cùng module không được có biến thể trùng tên (E0202).
+- **Tên module-tệp thấy được ở mọi tệp** và bị D7 bảo vệ (biến cục bộ không được trùng tên một tệp); module `▦` lồng không thấy tên của module cha (phải dùng đường dẫn tuyệt đối `tệp::…`). Không có `super`/`self::`/đổi tên khi nhập/glob.
+- **E0204** theo định nghĩa cạnh của ADR-017 mục 6: cha→con và con→cha cùng tồn tại không phải vòng; vòng giữa tệp/anh em/lên cấp mới bị chặn.
+- **Độc lập thứ tự (tính chất bắt buộc của plan):** xáo thứ tự TỆP cho kết quả giống từng byte; xáo thứ tự ITEM trong tệp giữ nguyên dạng chuẩn và tập chẩn đoán logic nhưng offset (và thứ tự D19 theo offset) đổi theo văn bản — không thể khác (D19 sắp theo offset).
+- **Prelude là đầu vào:** fixture trong test; lib/core thật ở M12. Các hàm corpus cần (`root_fs`, `raw_read`, `core::abort`, kiểu `Cap/Fs/Secret/Arena`) hiện chỉ có trong fixture của test, không có trong sản phẩm.
+- **`result` trong `⊲`** là đề xuất chưa duyệt (Q18).
+- **Thông báo lỗi:** dòng nguồn rất dài (vd mẫu E0102_too_deep_*) bị vẽ nguyên dòng trong dạng người đọc (chưa cắt/ghi chú cột). Một số thông báo parser còn thô: `self ≔ …` báo "mong đợi `;` hoặc `}`" thay vì nói `self` là từ khoá; struct literal trần trong hợp đồng báo "mong đợi kiểu, gặp số". Snapshot khoá hiện trạng để mọi cải thiện là thay đổi có chủ đích.
+- **Hạ tầng test (Windows):** build/test/fuzz có thể hỏng ngẫu nhiên khi máy hết commit bộ nhớ (os error 1455, `only metadata stub found`, ASan `error code: 1455`) — không phải lỗi mã; chạy lại với `CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0` hoặc khi máy rảnh. Các artifact fuzz do nguyên nhân này đã được kiểm lại (chạy lại sạch) và giữ ở `crates/gt-parser/tests/fuzz_regressions/`.

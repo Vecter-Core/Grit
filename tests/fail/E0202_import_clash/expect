@@ -1,0 +1,2 @@
+expect: fail E0202
+note: tên nhập trùng item cùng module

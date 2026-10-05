@@ -1,0 +1,6 @@
+// expect: fail E0205
+// note: biến che tham số
+ƒ f(x: i32) → i32 ! ∅ {
+  x ≔ 2;
+  x
+}

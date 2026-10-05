@@ -1,0 +1,2 @@
+expect: fail E0203
+note: hàm private của a dùng từ b

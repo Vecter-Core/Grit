@@ -1,0 +1,3 @@
+// expect: fail E0201
+// note: `Self` chỉ có trong ⊏/⊐
+ƒ f() → Self ! ∅ { }

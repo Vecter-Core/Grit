@@ -51,6 +51,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gt-resolve"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-lexer",
+ "gt-parser",
+ "gt-span",
+ "gt-stack",
+]
+
+[[package]]
 name = "gt-span"
 version = "0.1.0"
 

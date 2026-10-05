@@ -25,6 +25,13 @@ UNICODE_EXEMPT = {
     "E1204_not_nfc.gt": (False, False, True),
 }
 
+IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+CASE_EXPECT_RE = re.compile(r"^expect: (pass|fail E\d{4}|warn S\d{3})\s*$")
+# Mã đã triển khai ở milestone đã đóng: PHẢI có docs/errors/<mã>.md với >=3 test fail + >=3 test pass (plan §0.5).
+# Mở rộng dần theo milestone (M3: E01xx và E02xx).
+DOC_REQUIRED = ["E0101", "E0102", "E0201", "E0202", "E0203", "E0204", "E0205"]
+DOC_LINE_RE = re.compile(r"^- (fail|pass): (\S+)\s*$")
+
 errors = []
 
 
@@ -56,6 +63,118 @@ def gt_files():
         for name in sorted(os.listdir(d)):
             if name.endswith(".gt"):
                 yield kind, name, os.path.join(d, name)
+
+
+def case_dirs():
+    """Ca nhiều tệp (ADR-017b): thư mục `tests/{pass,fail,warn}/<ca>/` có các `.gt` và một tệp `expect`."""
+    for kind in ("pass", "fail", "warn"):
+        d = os.path.join(TESTS, kind)
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            if os.path.isdir(os.path.join(d, name)):
+                yield kind, name, os.path.join(d, name)
+
+
+def check_case_dir(kind, name, path, codes):
+    """Trả về số tệp .gt đã kiểm."""
+    rel = f"tests/{kind}/{name}/"
+    exp_path = os.path.join(path, "expect")
+    if not os.path.isfile(exp_path):
+        err(f"{rel}: thiếu tệp 'expect'")
+        return 0
+    with open(exp_path, encoding="utf-8") as f:
+        lines = [ln for ln in f.read().split("\n") if ln.strip()]
+    exp_lines = [ln for ln in lines if ln.startswith("expect:")]
+    others = [ln for ln in lines if not ln.startswith("expect:") and not ln.startswith("note:")]
+    if len(exp_lines) != 1 or others:
+        err(f"{rel}expect: cần đúng 1 dòng 'expect:' (và tuỳ chọn dòng 'note:'), không có dòng khác")
+        return 0
+    m = CASE_EXPECT_RE.match(exp_lines[0])
+    if not m:
+        err(f"{rel}expect: sai định dạng: {exp_lines[0]!r}")
+        return 0
+    exp = m.group(1)
+    word = exp.split()[0]
+    if word != DIR_KIND[kind]:
+        err(f"{rel}: expect '{word}' nhưng nằm trong thư mục '{kind}'")
+    if word in ("fail", "warn"):
+        code = exp.split()[1]
+        if code not in codes:
+            err(f"{rel}: mã {code} không có trong docs/spec/error_codes.md")
+        if not name.startswith(code + "_"):
+            err(f"{rel}: tên thư mục phải bắt đầu bằng '{code}_'")
+    gts = sorted(n for n in os.listdir(path) if n.endswith(".gt"))
+    extra = sorted(n for n in os.listdir(path) if not n.endswith(".gt") and n != "expect")
+    if extra:
+        err(f"{rel}: tệp lạ {extra} (chỉ cho phép *.gt và expect)")
+    if len(gts) < 2:
+        err(f"{rel}: ca nhiều tệp cần >=2 tệp .gt, có {len(gts)}")
+    folded = {}
+    for g in gts:
+        stem = g[:-3]
+        if not IDENT_RE.match(stem):
+            err(f"{rel}{g}: tên tệp (tên module) phải là ident hợp lệ")
+        if stem.casefold() in folded:
+            err(f"{rel}: '{g}' trùng '{folded[stem.casefold()]}' khi bỏ phân biệt hoa/thường")
+        folded[stem.casefold()] = g
+        try:
+            with open(os.path.join(path, g), "rb") as f:
+                text = f.read().decode("utf-8")
+        except UnicodeDecodeError:
+            err(f"{rel}{g}: không phải UTF-8 hợp lệ")
+            continue
+        if any(ln.startswith("// expect:") for ln in text.split("\n")):
+            err(f"{rel}{g}: tệp trong ca nhiều tệp không được có dòng '// expect:' (kỳ vọng nằm ở tệp 'expect')")
+        check_unicode(g, text, rel + g)
+    return len(gts)
+
+
+def read_expect_of(ref):
+    """Kỳ vọng của một tham chiếu test (đường dẫn tương đối `tests/`): tệp .gt hoặc thư mục ca. None nếu không có."""
+    base = os.path.join(TESTS, *ref.split("/"))
+    if os.path.isdir(base):
+        f = os.path.join(base, "expect")
+        if not os.path.isfile(f):
+            return None
+        with open(f, encoding="utf-8") as fh:
+            for ln in fh.read().split("\n"):
+                if ln.startswith("expect:"):
+                    return ln[len("expect:"):].strip()
+        return None
+    if os.path.isfile(base + ".gt"):
+        with open(base + ".gt", encoding="utf-8") as fh:
+            first = fh.readline().strip()
+        if first.startswith("// expect:"):
+            return first[len("// expect:"):].strip()
+    return None
+
+
+def check_error_docs():
+    """docs/errors/<mã>.md cho các mã đã triển khai: có tệp, >=3 `- fail:` và >=3 `- pass:`, mọi tham chiếu tồn tại và đúng kỳ vọng."""
+    for code in DOC_REQUIRED:
+        path = os.path.join(ROOT, "docs", "errors", code + ".md")
+        rel = f"docs/errors/{code}.md"
+        if not os.path.isfile(path):
+            err(f"{rel}: thiếu tài liệu mã lỗi")
+            continue
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().split("\n")
+        found = {"fail": [], "pass": []}
+        for ln in lines:
+            m = DOC_LINE_RE.match(ln)
+            if m:
+                found[m.group(1)].append(m.group(2))
+        for kind in ("fail", "pass"):
+            if len(found[kind]) < 3:
+                err(f"{rel}: cần >=3 dòng '- {kind}: <tham chiếu>' (plan §0.5), có {len(found[kind])}")
+            for ref in found[kind]:
+                exp = read_expect_of(ref)
+                want = f"fail {code}" if kind == "fail" else "pass"
+                if exp is None:
+                    err(f"{rel}: tham chiếu '{ref}' không tồn tại hoặc thiếu dòng expect")
+                elif exp != want:
+                    err(f"{rel}: '{ref}' có expect '{exp}', cần '{want}'")
 
 
 def check_unicode(name, text, rel):
@@ -128,6 +247,14 @@ def main():
                 if not body:
                     err(f"{rel}: file .tokens rỗng")
         check_unicode(name, text, rel)
+
+    multi_files = 0
+    for kind, name, path in case_dirs():
+        seen_files[kind].add(name)
+        total += 0
+        multi_files += check_case_dir(kind, name, path, codes)
+    total += multi_files
+    check_error_docs()
 
     # mỗi mục tham chiếu trong bảng mã lỗi phải trỏ tới file có thật; mỗi mã đó khớp tiền tố
     cited = set()

@@ -317,3 +317,66 @@ error[E0101]: m
 ";
     assert_eq!(render_human(&d, &f, &plain()), expected);
 }
+
+// ---------- nhiều tệp (ADR-017a) ----------
+
+fn named(name: &str, text: &str) -> SourceFile {
+    SourceFile::new(name, text.to_string()).expect("nhỏ")
+}
+
+fn cross_file() -> (Diagnostic, SourceFile, SourceFile) {
+    let b = named("b.gt", "ƒ g() ! ∅ { a::secret(); }\n");
+    let a = named("a.gt", "ƒ secret() ! ∅ { }\n");
+    let u = b.text().find("secret").expect("secret") as u32;
+    let d0 = a.text().find("secret").expect("secret") as u32;
+    let d = Diagnostic::new(
+        Code::parse("E0203").expect("mã"),
+        "b.gt",
+        Span::new(u, u + 6),
+        "`secret` là private",
+    )
+    .with_span_label("private")
+    .with_label("a.gt", Span::new(d0, d0 + 6), "định nghĩa ở đây")
+    .with_suggestion(Suggestion::new(
+        "thêm `◈` trước định nghĩa",
+        Applicability::MaybeIncorrect,
+        vec![Edit {
+            file: "a.gt".to_string(),
+            span: Span::new(0, 0),
+            replacement: "◈ ".to_string(),
+        }],
+    ));
+    (d, b, a)
+}
+
+#[test]
+fn a_label_in_another_file_is_drawn_as_its_own_snippet_block() {
+    let (d, b, a) = cross_file();
+    let out = gt_diag::render_human_files(&d, &[&b, &a], &plain());
+    assert_eq!(
+        out,
+        "error[E0203]: `secret` là private\n --> b.gt:1:16\n  |\n1 | ƒ g() ! ∅ { a::secret(); }\n  |                ^^^^^^ private\n ::: a.gt:1:3\n  |\n1 | ƒ secret() ! ∅ { }\n  |   ------ định nghĩa ở đây\n  = help: thêm `◈` trước định nghĩa (maybe-incorrect)\n          - 1:1-1:1: `` -> `◈ `\n"
+    );
+}
+
+#[test]
+fn a_label_in_a_file_that_is_not_provided_is_listed_as_text_not_dropped() {
+    let (d, b, _a) = cross_file();
+    let out = gt_diag::render_human_files(&d, &[&b], &plain());
+    assert!(out.contains("= label: định nghĩa ở đây (a.gt)"), "{out}");
+    assert!(
+        out.contains("a.gt"),
+        "edit ở tệp thiếu vẫn được nhắc: {out}"
+    );
+    assert!(!out.contains(":::"));
+}
+
+#[test]
+fn single_file_rendering_is_unchanged_by_the_multi_file_renderer() {
+    let f = file("ƒ f( { 1 }\n");
+    let d = diag("E0101", 4, 5, "mong đợi `)`");
+    assert_eq!(
+        render_human(&d, &f, &plain()),
+        gt_diag::render_human_files(&d, &[&f], &plain())
+    );
+}

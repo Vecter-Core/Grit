@@ -1,0 +1,2 @@
+expect: fail E0204
+note: vòng chỉ do ⇲ (không có lời gọi nào)

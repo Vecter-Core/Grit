@@ -1,0 +1,18 @@
+# E0204_three_files_cycle: 1 chẩn đoán
+
+## [1] human
+error[E0204]: các module `a`, `b`, `c` phụ thuộc lẫn nhau (vòng phụ thuộc module)
+ --> a.gt:1:16
+  |
+1 | ◈ ƒ fa() ! ∅ { b::fb(); }
+  |                ^^^^^ tham chiếu tạo vòng
+ ::: b.gt:1:16
+  |
+1 | ◈ ƒ fb() ! ∅ { c::fc(); }
+  |                ----- `b` phụ thuộc `c`
+ ::: c.gt:1:16
+  |
+1 | ◈ ƒ fc() ! ∅ { a::fa(); }
+  |                ----- `c` phụ thuộc `a`
+## [1] json
+{"code":"E0204","level":"error","message":"các module `a`, `b`, `c` phụ thuộc lẫn nhau (vòng phụ thuộc module)","file":"a.gt","span":{"start":{"offset":20,"line":1,"col":16},"end":{"offset":25,"line":1,"col":21}},"span_label":"tham chiếu tạo vòng","labels":[{"file":"b.gt","span":{"start":{"offset":20,"line":1,"col":16},"end":{"offset":25,"line":1,"col":21}},"message":"`b` phụ thuộc `c`"},{"file":"c.gt","span":{"start":{"offset":20,"line":1,"col":16},"end":{"offset":25,"line":1,"col":21}},"message":"`c` phụ thuộc `a`"}],"notes":[],"suggestions":[]}

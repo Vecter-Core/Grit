@@ -72,7 +72,7 @@ Cập nhật: 2026-10-05.
 - **Chờ Giang:** chốt tên token; xác nhận cách hiểu D15 trong ADR-009 (zero-width cấm cả trong chuỗi/comment); duyệt trước khi sang phần tiếp theo của M1.
 - **Rủi ro mới:** homoglyph thuần một bảng chữ chưa phát hiện; `cargo-fuzz` Windows cần PATH tới ASan DLL (đã ghi ADR-009).
 
-## M2 — Parser + AST + Diagnostics — **gt-diag (`599452e`), gt-ast (`9505469`), gt-parser (`aad181d`), gt-fmt xong (chưa commit); dừng chờ Giang duyệt (E1301, Q16), chưa sang M3**
+## M2 — Parser + AST + Diagnostics — **HOÀN THÀNH** (commits `599452e`, `9505469`, `aad181d`, `1d8e79a` M2d, `d370890` M2e, `745c258` M2f; Giang duyệt Q15, Q16a/b/c)
 Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
 
 ### Bước 1: gt-diag (có thật)
@@ -116,14 +116,50 @@ Cập nhật: 2026-10-05. M1 đã commit `4c3c054`.
 ### Chỗ grammar mơ hồ/thiếu phát hiện (OPEN_QUESTIONS Q15a–i) — parser theo đề xuất, chờ Giang duyệt
 `expr_ns` thiếu ở hợp đồng/`↓`/`⋈`/`⊢`; `self` không là biểu thức; `∈`/`⇒` chưa có độ ưu tiên/kết hợp; luật khối-biểu-thức cuối khối; độ sâu cho chuỗi phẳng; E0307 không thuộc parser; literal âm; **không có chỗ khai báo biến thể `↓` cho đệ quy**; đích gán hẹp hơn nhu cầu.
 
-### gt-fmt (có thật; chưa commit) — thư viện, KHÔNG phải lệnh `gritc fmt` (M9, crates/TASK.md)
-- Crate `gt-fmt`: `gt_fmt::format(file, source)`; in lại từ AST, một dạng chuẩn canonical, tự thêm/bỏ ngoặc theo độ ưu tiên + `expr_ns`; comment lấy từ bảng trivia và gắn lại, **không gắn được → từ chối `E1301`** (không xoá/dời). ADR-016.
-- **Test (viết trước):** 37 test gt-fmt: bố cục golden; bảng ngoặc; **thước đo parser** `parens_oracle` (mọi biểu thức con × mọi ngữ cảnh: ngoặc thừa phải bỏ, ngoặc cần phải giữ đúng số lượng); `expr_ns` ở mọi vị trí (⎇ ⌥ ⟳ ↓ ⋈ ⊢, hợp đồng chữ ký và trait) + đặt lại trong ngoặc/`[]`/đối số; `¬(a ∧ b)`, `(a + b) * c`, `(*p).x ← 1`, `(a,)`, `V()`; round-trip `parse(fmt(parse(x))) == parse(x)` + idempotent + alias=canonical + giữ comment trên **toàn corpus pass** (31 file) và 6000 biểu thức ngẫu nhiên; comment: đặt đúng chỗ, từ chối đúng, **chèn comment sau từng token của corpus → không bao giờ mất/đổi comment, chỉ giữ hoặc E1301** (giữ 365 / từ chối 1603).
-- **Lỗi thật phát hiện khi test:** `a as i64 < 1` in ra không đọc lại được (`T <` là generic) → bọc ngoặc vế trái kết thúc bằng kiểu.
-- **Đột biến gt-fmt (tay, ~90 đột biến; cargo-mutants không dùng cho crate này):** printer ngoặc/ưu tiên/kết hợp/`ns`/bố cục: 65 đột biến → **62 bị bắt, 3 tương đương hành vi** (postfix=11, range=0 trong `prec` — không có vị trí nào đòi `min` ≥ 11 hoặc = 1; nhánh Range của `ends_with_type` là mã chết → đã xoá). Bộ máy comment: 18 đột biến + 4 → **tất cả bị bắt**. **Sống sót thật, mỗi cái đã có test mới:** 22 đột biến ngoặc ở vòng đầu (bảng kiểm tay quá thưa) → test `parens_oracle` + `expr_ns`; `finish()`/chốt chống báo lỗi đôi/biên khoảng của `Comments` (không chạm tới từ API công khai) → 7 unit test trong `comments.rs`; comment dính liền cuối node (`}// c`) → test mới; biên `start >= prev_end` → test mới. (Lần chạy đầu của script bị hỏng vì mã hoá console và backslash trong heredoc; kết quả chỉ tính từ lần chạy hợp lệ.)
-- **Cổng cuối:** `cargo test --workspace` **165 test xanh** (gt-fmt 37: 7 unit + 10 comments + 11 golden + 3 oracle + 6 roundtrip); `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`, `cargo audit` sạch; `check_expectations.py` OK (92 file, 47 mã).
-- **Phát hiện kỹ thuật cần Giang quyết:** (1) `E1301` là mã mới (Q16a). (2) Quy tắc gắn comment quá hẹp so với cách người viết dùng contract/tham số/đối số (Q16b, KNOWN_LIMITATIONS). (3) `x as T < y` là điểm vụng của grammar (generic args), fmt chỉ giải quanh.
-- **Đính chính của Giang:** `gritc fmt` chưa tồn tại ở M2 (gt-driver M9); đã đổi mọi chỗ ở M2 thành "gt-fmt (thư viện)", ghi vào crates/TASK.md. Không tạo binary tạm.
+### gt-fmt (có thật; M2d `1d8e79a` + M2e `d370890`) — thư viện, KHÔNG phải lệnh `gritc fmt` (M9, crates/TASK.md)
+- `gt_fmt::format(file, source)`: in lại từ AST, một dạng chuẩn canonical, tự thêm/bỏ ngoặc theo độ ưu tiên + `expr_ns`. **Comment đặt theo cơ chế TOKEN tổng quát (Q16b, ADR-016 v2):** in văn bản cơ sở không comment, căn token (chỉ `( ) , ;` được khác), comment dòng riêng → token kế tiếp, cuối dòng → token liền trước, ép xuống dòng sau comment cuối dòng, rồi xác minh (token + dãy comment) — `E1301` chỉ còn là phương án cuối.
+- **Nghiệm thu Q16b (test thường trực):** chèn `// zz` sau MỖI token của 33 file corpus ở hai dạng (cuối dòng / dòng riêng): **hơn 3 000 ca, 0 ca bị từ chối**; số/nội dung/thứ tự comment giữ nguyên, `fmt` idempotent, AST giữ nguyên. Thay test `known_limitation_…` cũ.
+- **Đột biến:** printer (ngoặc/ưu tiên/`ns`/bố cục) 65 đột biến → 62 bị bắt + 3 tương đương (mã chết đã xoá); bộ máy comment cũ 22 đột biến + `attach.rs` mới 28 đột biến → mọi đột biến không-tương-đương bị bắt (sống sót thật đều có test mới: biên khoảng, `finish`, token đóng `)` `]`, `(` khớp). Đột biến nào tương đương hành vi hoặc mã chết đã bị xoá khỏi mã.
+- Thay đổi bố cục chuẩn (trước/sau) ghi ở ADR-016: comment sau `{` cách hai khoảng trắng; danh sách bị ngắt tại comment cuối dòng (bậc thang +2).
 
-### Chưa làm
-- Commit gt-fmt (chờ lệnh). M3 chưa bắt đầu. Chờ Giang: Q16a/Q16b. Còn lại từ trước: `FileId` cho M3, mọi pass đệ quy mới phải dùng `gt-stack`.
+### M2f (`745c258`): E13xx, `x as T < y` (Q16a, Q16c)
+- D16 có "E13xx định dạng (gt-fmt)". `x as T < y` là quy tắc ngôn ngữ (`semantics.md` §25b): parser phát một E0101 tại `<` kèm gợi ý `machine-applicable` bọc `(x as T)` (chỉ khi phần sau `<` parse được thành biểu thức, nên gợi ý không bao giờ sai); test fail, test hình dạng gợi ý, test áp dụng gợi ý, test các dạng hợp lệ.
+
+### Cổng hoàn thành M2 (plan §6.2) — kết quả thật
+- **Parse đúng toàn bộ mẫu hợp lệ:** 37/37 file `pass` (33 đơn + 4 ca nhiều tệp) parse không lỗi (`gt-parser` test `corpus`); mọi mẫu `fail` của lexer/parser ra đúng mã.
+- **`fmt(parse(x))` idempotent:** `roundtrip` trên cả corpus + 6000 biểu thức ngẫu nhiên; mọi ca chèn comment (3 000+) idempotent; `parens_oracle` (parser làm thước đo).
+- **Fuzz parser sạch:** 6 phiên × 10 phút SAU thay đổi Q16c (parser có gợi ý bọc ngoặc), máy rảnh: **0/6 phiên lỗi, 0 artifact crash, tổng 877 830 lượt** (157 828 / 151 945 / 142 769 / 140 682 / 141 838 / 142 768). Log: `crates/gt-parser/fuzz/logs/summary.log`. Các lần chạy ngắn trước đó (3×5 phút) có 2 phiên chết vì HẾT COMMIT BỘ NHỚ hệ thống (ASan `error code: 1455`, trùng lúc build song song); artifact chạy lại dưới đúng harness đều sạch và được giữ làm test hồi quy `crates/gt-parser/tests/fuzz_regressions/`; log fuzz nằm cục bộ (thư mục `fuzz/logs` bị `.gitignore`).
+- **Snapshot test thông báo lỗi (tiêu chí plan mà trước đây CHƯA có — đã thêm):** `crates/gt-parser/tests/snapshots.rs` khoá từng byte (người-đọc + JSON) của 22 file fail lexer/parser (`tests/snapshots/*.snap`); `crates/gt-resolve/tests/snapshots.rs` làm tương tự cho 25 ca E02xx nhiều tệp (`tests/snapshots_resolve/`). Không tự cập nhật ngầm (`GRIT_UPDATE_SNAPSHOTS=1` có chủ đích).
+- `check_expectations.py` OK (138 file `.gt`, 47 mã, 76 tham chiếu; kiểm cả ca nhiều tệp và `docs/errors/`); `cargo clippy --workspace --all-targets -D warnings`, `cargo fmt --check`, `cargo audit` sạch; **233 test xanh**.
+- **Hạn chế còn lại của M2:** xem `KNOWN_LIMITATIONS.md` (gt-parser, gt-fmt, thông báo lỗi parser còn thô ở vài ca, dòng nguồn dài vẽ nguyên dòng).
+
+## M3 — Giải tên & module — **XONG phần code/test; chờ Giang duyệt ADR-017 (Q17, Q18, Q19)**
+Cập nhật: 2026-10-06.
+
+### Quyết định (ADR-017, viết TRƯỚC khi code)
+- (a) `NodeId = (FileId, u32)`; `FileId` = hạng của tên tệp trong danh sách đã sắp (độc lập thứ tự nhập). Đã sửa `gt-span` (`FileId`, `SourceMap`), `gt-ast` (`NodeId{file,index}`, `NodeIdGen::new(file)`), `gt-parser` (`parse_file`, `parse` mặc định FileId 0). **Schema JSON không cần đổi** (`label`/`edit` đã có `file` từ v1) → không tăng `schema_version`; thay vào đó đã KIỂM: test JSON nhãn/edit sang tệp khác (line/col theo tệp của nhãn; tệp thiếu → null, không crash) và `render_human_files` vẽ nhãn ở tệp khác thành khối `:::` riêng.
+- (b) Test nhiều tệp: một thư mục + tệp `expect` một dòng; ghi ở `tests/README.md`; `check_expectations.py` mở rộng (kiểm `expect`, tên tệp = ident duy nhất, không có `// expect:` trong tệp, tham chiếu thư mục trong bảng mã lỗi). 14 ca mới (10 fail, 4 pass).
+- (c) Prelude: đầu vào tường minh (`Prelude::from_source`), không có tên nào viết cứng trong resolver; fixture trong test; M12 thay bằng lib/core thật.
+- Quy tắc phân giải: module = tệp (không đổi grammar), một không gian tên mỗi module, `⇲` từ gốc (kể cả nhóm), `◈`, E0204 theo định nghĩa cạnh, D7 → E0205 (chuyển milestone M4→M3), pattern ident, `Self`/`self`, `result` trong `⊲`.
+
+### gt-resolve (có thật)
+- Crate `gt-resolve`: `resolve_program(inputs, prelude)` → `ResolveOutput {report, defs, uses, decls, canonical(), canonical_diagnostics()}`; chạy trong luồng stack lớn; chỉ chạy khi mọi tệp parse sạch (fail-closed). DefId theo đường dẫn đủ tên.
+- **Test (TDD, viết trước):** 50 test: `names.rs` 37 (E0201/2/3/4/5 mọi vị trí, thứ tự phạm vi, biến thể, prelude, nhập nhóm/vòng nhập, mọi vị trí con của AST), `corpus.rs` 4 (31+ pass sạch; fail E02xx ra đúng mã và chỉ mã đó; mẫu của milestone sau không bị báo thay; ca nhiều tệp), `order_independence.rs` 3, `robustness.rs` 4, `snapshots.rs` 2.
+- **Tính chất bắt buộc — kết quả không phụ thuộc thứ tự:** 400 chương trình ngẫu nhiên nhiều tệp × 3 lần xáo, hai chiều: xáo TỆP → `canonical()`, tập chẩn đoán và cả danh sách D19 **giống từng byte**; xáo ITEM → `canonical()` và tập chẩn đoán logic giống hệt; thêm kiểm 24/24 hoán vị item cho cùng phán quyết khả kiến. (Phạm vi chính xác ghi ở ADR-017: offset, nên thứ tự D19 theo offset, đổi khi xáo item — D19 sắp theo offset.)
+- **Độ bền (thay fuzz, không bắt buộc ở M3):** 1500 chương trình ngẫu nhiên (kể cả bị phá cú pháp) × 2 lần: không panic/ICE, tất định; cây sâu tối đa hợp lệ không tràn stack.
+- **Lỗi thật phát hiện nhờ test/đột biến:** (1) mẫu `pass` đã duyệt dùng biến thể trần (`Circle(r)`) → quy tắc biến thể-là-tên-module (Q19); (2) **fail-open**: vòng nhập `a::x ↔ b::x` qua im lặng không báo gì → nay E0201 một lần, chọn thành viên nhỏ nhất (độc lập thứ tự); (3) nhánh `Hidden` của enum bị nuốt im lặng → nay báo E0203; (4) mẫu corpus cần hàm `root_fs`, `raw_read` của thư viện chuẩn → thêm vào fixture prelude (không hard-code).
+- **Đột biến gt-resolve (tay, 98 đột biến trên tables/walk/graph/lib):** vòng 1: 70 bị bắt, 27 sống sót, 1 treo; sau test mới + sửa mã, chạy lại các đột biến sống sót: 20/21 bị bắt (kể cả treo tính là bị bắt) và 1 tương đương (đã xoá mã thừa); các đột biến tương đương khác nêu bên dưới. Tương đương/mã chết đã xoá khỏi mã: cạnh tới prelude/gốc (hợp nhất một kiểm), `dedup` kề, kiểm `lexed.errors` thừa, `truncate` generics thừa. Một đột biến cho vòng lặp parent vô hạn → `mut.py` nay có timeout (treo = bị bắt) và in tức thì.
+- **Tài liệu mã lỗi (plan §0.5):** `docs/errors/{E0101,E0102,E0201,E0202,E0203,E0204,E0205}.md`, mỗi mã ≥3 `- fail:` và ≥3 `- pass:` tham chiếu test thật; `check_expectations.py` kiểm tồn tại và đúng kỳ vọng. (E12xx, E1301 chưa làm — ngoài phạm vi nhóm E01xx/E02xx đã giao.)
+- **Cổng:** clippy `-D warnings`, fmt, audit, `check_expectations` sạch; 233 test xanh.
+
+### Chưa làm / chờ duyệt
+- Giang duyệt ADR-017: Q17 (module=tệp, một không gian tên, `⇲` từ gốc, E0204, E0205 che cả item/prelude), Q18 (`result` trong `⊲`), Q19 (biến thể là tên module). Commit M3 chờ lệnh. M4 chưa bắt đầu.
+- Rủi ro: M4 PHẢI kiểm mục kết hợp/trường/phương thức mà M3 chỉ ghi `Res::Assoc`; pattern ident gõ nhầm thành binding (M5 bắt); môi trường Windows hết commit bộ nhớ làm build/fuzz hỏng ngẫu nhiên (KNOWN_LIMITATIONS).
+
+### Kết quả cổng chạy LẠI ngay trước commit M2-close/M3 (2026-10-06; không dùng kết quả cũ)
+- `cargo fmt --all --check`: OK.
+- `cargo clippy --workspace --all-targets -- -D warnings` (sau khi `touch` mọi `lib.rs` để buộc kiểm lại): 0 lỗi, 0 cảnh báo.
+- `cargo audit`: mã thoát 0 (1290 advisory, 22 crate phụ thuộc).
+- `python tools/check_expectations.py`: OK — 138 file `.gt` (fail=74, warn=1, pass=37, lexer=8), 47 mã, 76 tham chiếu test; kiểm cả ca nhiều tệp và `docs/errors/`.
+- `cargo test --workspace --no-fail-fast`: **233 test pass, 0 fail**.
+- Duyệt của Giang 2026-10-06: Q17, Q18, Q19 (ADR-017) — đã quyết.

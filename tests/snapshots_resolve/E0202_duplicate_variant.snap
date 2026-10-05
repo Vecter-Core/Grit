@@ -1,0 +1,11 @@
+# E0202_duplicate_variant: 1 chẩn đoán
+
+## [1] human
+error[E0202]: biến thể `A` được khai báo 2 lần trong enum `main::E`
+ --> main.gt:3:7
+  |
+3 | ⊔ E { A, B, A }
+  |       ^ một trong 2 định nghĩa của `A`
+  |             - định nghĩa khác của `A`
+## [1] json
+{"code":"E0202","level":"error","message":"biến thể `A` được khai báo 2 lần trong enum `main::E`","file":"main.gt","span":{"start":{"offset":69,"line":3,"col":7},"end":{"offset":70,"line":3,"col":8}},"span_label":"một trong 2 định nghĩa của `A`","labels":[{"file":"main.gt","span":{"start":{"offset":75,"line":3,"col":13},"end":{"offset":76,"line":3,"col":14}},"message":"định nghĩa khác của `A`"}],"notes":[],"suggestions":[]}

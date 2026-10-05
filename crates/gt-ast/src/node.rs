@@ -1,48 +1,60 @@
 //! NodeId và trait `Node`. Mọi "node" của cây có `id` (NodeId) và `span`.
-use gt_span::Span;
+use gt_span::{FileId, Span};
 
 /// Độ sâu cây tối đa — NGUỒN DUY NHẤT của giới hạn (semantics §26). Parser từ chối chương trình sâu hơn (E0102); mọi pass
 /// đệ quy trên AST được phép giả định cây không sâu hơn hằng này và PHẢI chạy qua `gt_stack::run_with_big_stack`.
 pub const MAX_DEPTH: u32 = 256;
 
-/// Định danh node: cấp **tuần tự từ 0, không lỗ** bởi parser theo thứ tự dựng tất định (D9).
-/// Duy nhất trong một tệp; các pass sau gắn bảng kết quả bằng `Vec<T>` chỉ mục `index()`.
+/// Định danh node: `(FileId, chỉ số)`. Chỉ số cấp **tuần tự từ 0, không lỗ** trong từng tệp bởi parser theo thứ tự dựng
+/// tất định (D9); `FileId` làm khoá DUY NHẤT toàn chương trình (ADR-017a). Thứ tự: tệp trước, rồi chỉ số.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct NodeId(u32);
+pub struct NodeId {
+    file: FileId,
+    index: u32,
+}
 
 impl NodeId {
     #[must_use]
-    pub fn new(raw: u32) -> NodeId {
-        NodeId(raw)
+    pub fn new(file: FileId, index: u32) -> NodeId {
+        NodeId { file, index }
     }
 
+    #[must_use]
+    pub fn file(self) -> FileId {
+        self.file
+    }
+
+    /// Chỉ số trong tệp (dày từ 0).
     #[must_use]
     pub fn raw(self) -> u32 {
-        self.0
+        self.index
     }
 
+    /// Chỉ số trong tệp dưới dạng `usize` (để chỉ mục `Vec` theo tệp).
     #[must_use]
     pub fn index(self) -> usize {
-        self.0 as usize
+        self.index as usize
     }
 }
 
-/// Bộ cấp NodeId tuần tự. Hết `u32` → `None` (không panic, không tràn lặng lẽ).
+/// Bộ cấp NodeId tuần tự cho MỘT tệp. Hết `u32` → `None` (không panic, không tràn lặng lẽ).
 #[derive(Clone, Debug)]
 pub struct NodeIdGen {
+    file: FileId,
     next: Option<u32>,
     count: u32,
 }
 
 impl NodeIdGen {
     #[must_use]
-    pub fn new() -> NodeIdGen {
-        NodeIdGen::starting_at(0)
+    pub fn new(file: FileId) -> NodeIdGen {
+        NodeIdGen::starting_at(file, 0)
     }
 
     #[must_use]
-    pub fn starting_at(first: u32) -> NodeIdGen {
+    pub fn starting_at(file: FileId, first: u32) -> NodeIdGen {
         NodeIdGen {
+            file,
             next: Some(first),
             count: 0,
         }
@@ -53,7 +65,7 @@ impl NodeIdGen {
         let cur = self.next?;
         self.next = cur.checked_add(1);
         self.count += 1;
-        Some(NodeId(cur))
+        Some(NodeId::new(self.file, cur))
     }
 
     /// Số NodeId đã cấp.
@@ -61,11 +73,11 @@ impl NodeIdGen {
     pub fn count(&self) -> u32 {
         self.count
     }
-}
 
-impl Default for NodeIdGen {
-    fn default() -> Self {
-        NodeIdGen::new()
+    /// Tệp mà bộ cấp này phục vụ.
+    #[must_use]
+    pub fn file(&self) -> FileId {
+        self.file
     }
 }
 

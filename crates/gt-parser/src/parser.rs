@@ -42,13 +42,13 @@ pub(crate) struct Parser {
 }
 
 impl Parser {
-    pub fn new(file: &str, src_len: usize, tokens: Vec<Token>) -> Parser {
+    pub fn new(file_id: gt_span::FileId, file: &str, src_len: usize, tokens: Vec<Token>) -> Parser {
         Parser {
             file: file.to_string(),
             src_len: u32::try_from(src_len).unwrap_or(u32::MAX),
             tokens,
             pos: 0,
-            ids: NodeIdGen::new(),
+            ids: NodeIdGen::new(file_id),
             diags: Vec::new(),
             depth: 0,
             no_struct: false,
@@ -147,7 +147,7 @@ impl Parser {
             Some(id) => id,
             None => {
                 self.depth_error("cây AST quá lớn (hết NodeId)");
-                NodeId::new(u32::MAX)
+                NodeId::new(self.ids.file(), u32::MAX)
             }
         }
     }

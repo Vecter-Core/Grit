@@ -1,0 +1,2 @@
+expect: pass
+note: tệp b gọi hàm ◈ của tệp a bằng đường dẫn tên tệp

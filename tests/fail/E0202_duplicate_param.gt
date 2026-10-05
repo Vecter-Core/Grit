@@ -1,0 +1,3 @@
+// expect: fail E0202
+// note: tham số hàm trùng tên
+ƒ f(a: i32, a: i32) ! ∅ { }

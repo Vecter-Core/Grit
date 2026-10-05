@@ -39,19 +39,25 @@ pub struct ParseOutput {
 /// Chạy trong luồng stack lớn của `gt-stack`; panic nội bộ thành ICE `E9901` (không làm sập tiến trình; ĐỎ/ICE ⇒ không chạy).
 #[must_use]
 pub fn parse(file: &str, source: &str) -> ParseOutput {
-    match gt_stack::run_with_big_stack(|| parse_inner(file, source)) {
+    parse_file(gt_span::FileId::new(0), file, source)
+}
+
+/// Như `parse`, nhưng mọi `NodeId` mang `file_id` (chương trình nhiều tệp — ADR-017a). `FileId` do `gt_span::SourceMap` cấp.
+#[must_use]
+pub fn parse_file(file_id: gt_span::FileId, file: &str, source: &str) -> ParseOutput {
+    match gt_stack::run_with_big_stack(|| parse_inner(file_id, file, source)) {
         Ok(out) => out,
-        Err(e) => ice(file, source, &e.to_string()),
+        Err(e) => ice(file_id, file, source, &e.to_string()),
     }
 }
 
 /// Kết quả khi parser gặp lỗi nội bộ: chương trình rỗng + ICE `E9901`.
-fn ice(file: &str, source: &str, msg: &str) -> ParseOutput {
+fn ice(file_id: gt_span::FileId, file: &str, source: &str, msg: &str) -> ParseOutput {
     use gt_ast::{NodeId, NodeIdGen};
     use gt_diag::{Code, Diagnostic};
     use gt_span::Span;
-    let mut ids = NodeIdGen::new();
-    let id = ids.next_id().unwrap_or_else(|| NodeId::new(0));
+    let mut ids = NodeIdGen::new(file_id);
+    let id = ids.next_id().unwrap_or_else(|| NodeId::new(file_id, 0));
     let len = u32::try_from(source.len()).unwrap_or(u32::MAX);
     let mut bag = Diagnostics::new(DIAGNOSTIC_LIMIT);
     if let Ok(code) = Code::parse("E9901") {
@@ -76,9 +82,9 @@ fn ice(file: &str, source: &str, msg: &str) -> ParseOutput {
     }
 }
 
-fn parse_inner(file: &str, source: &str) -> ParseOutput {
+fn parse_inner(file_id: gt_span::FileId, file: &str, source: &str) -> ParseOutput {
     let lexed = gt_lexer::lex(source);
-    let mut p = parser::Parser::new(file, source.len(), lexed.tokens);
+    let mut p = parser::Parser::new(file_id, file, source.len(), lexed.tokens);
     for e in &lexed.errors {
         if let Some(d) = convert::lex_error(file, e) {
             p.diags.push(d);

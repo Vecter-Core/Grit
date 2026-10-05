@@ -437,3 +437,76 @@ fn json_key_order_is_fixed_and_bytes_are_identical() {
     order(&first, &["start", "end"]);
     order(&first, &["offset", "line", "col"]);
 }
+
+// ---------- ADR-017a: nhãn và edit trỏ sang TỆP KHÁC (schema v1 đã có `file`; không tăng schema_version) ----------
+
+fn two_files() -> (SourceFile, SourceFile) {
+    (
+        SourceFile::new("b.gt", "ƒ g() ! ∅ { a::secret(); }\n".to_string()).expect("nhỏ"),
+        SourceFile::new("a.gt", "ƒ secret() ! ∅ { }\n".to_string()).expect("nhỏ"),
+    )
+}
+
+fn cross_file_diag() -> Diagnostic {
+    // `secret` trong b.gt: ký tự thứ 13.. (byte offset); định nghĩa trong a.gt: "secret" ở byte 3..9 (sau `ƒ ` 2 byte + dấu cách)
+    let (b, a) = two_files();
+    let use_at = b.text().find("secret").expect("secret") as u32;
+    let def_at = a.text().find("secret").expect("secret") as u32;
+    Diagnostic::new(
+        Code::parse("E0203").expect("mã"),
+        "b.gt",
+        Span::new(use_at, use_at + 6),
+        "`secret` là private",
+    )
+    .with_label("a.gt", Span::new(def_at, def_at + 6), "định nghĩa ở đây")
+    .with_suggestion(Suggestion::new(
+        "thêm `◈` trước định nghĩa",
+        Applicability::MaybeIncorrect,
+        vec![Edit {
+            file: "a.gt".to_string(),
+            span: Span::new(0, 0),
+            replacement: "◈ ".to_string(),
+        }],
+    ))
+}
+
+#[test]
+fn labels_and_edits_in_another_file_get_positions_from_their_own_file() {
+    let (b, a) = two_files();
+    let json = {
+        let mut bag = Diagnostics::new(100);
+        bag.push(cross_file_diag());
+        bag.finish().to_json(&[&b, &a], false)
+    };
+    let v = check_schema(&json);
+    let d = &v["diagnostics"][0];
+    assert_eq!(d["file"], "b.gt");
+    // vị trí chính theo b.gt: cột 16 (ký tự), dòng 1
+    assert_eq!(d["span"]["start"]["line"], 1);
+    assert_eq!(d["span"]["start"]["col"], 16);
+    // nhãn ở a.gt: line/col tính theo a.gt (cột 3 — sau `ƒ `), KHÔNG theo b.gt
+    let l = &d["labels"][0];
+    assert_eq!(l["file"], "a.gt");
+    assert_eq!(l["span"]["start"]["line"], 1);
+    assert_eq!(l["span"]["start"]["col"], 3);
+    // edit ở a.gt: chèn ở đầu tệp a.gt
+    let e = &d["suggestions"][0]["edits"][0];
+    assert_eq!(e["file"], "a.gt");
+    assert_eq!(e["span"]["start"]["offset"], 0);
+    assert_eq!(e["span"]["start"]["col"], 1);
+    assert_eq!(v["schema_version"], 1);
+}
+
+#[test]
+fn a_file_missing_from_the_source_list_gives_null_line_and_col_not_a_crash() {
+    let (b, _a) = two_files();
+    let mut bag = Diagnostics::new(100);
+    bag.push(cross_file_diag());
+    let json = bag.finish().to_json(&[&b], false);
+    let v = check_schema(&json);
+    let l = &v["diagnostics"][0]["labels"][0];
+    assert_eq!(l["file"], "a.gt");
+    assert!(l["span"]["start"]["line"].is_null());
+    assert!(l["span"]["start"]["col"].is_null());
+    assert!(l["span"]["start"]["offset"].is_number());
+}

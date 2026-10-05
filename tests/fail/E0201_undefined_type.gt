@@ -1,0 +1,3 @@
+// expect: fail E0201
+// note: kiểu chưa định nghĩa trong chữ ký
+ƒ f(x: Missing) ! ∅ { }

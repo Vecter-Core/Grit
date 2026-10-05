@@ -1,0 +1,2 @@
+◈ ⊔ Shape { Dot, Circle(i32) }
+◈ ƒ area(s: Shape) → i32 ! ∅ { ⌥ s { Shape::Dot ↦ 0, Shape::Circle(r) ↦ r * r } }

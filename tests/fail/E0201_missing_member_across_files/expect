@@ -1,0 +1,2 @@
+expect: fail E0201
+note: a không có hàm nope

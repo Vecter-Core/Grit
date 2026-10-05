@@ -1,0 +1,14 @@
+# E0203_private_import: 1 chẩn đoán
+
+## [1] human
+error[E0203]: `secret` là private trong module `a` (thiếu `◈`)
+ --> b.gt:1:6
+  |
+1 | ⇲ a::secret;
+  |      ^^^^^^ private
+ ::: a.gt:1:3
+  |
+1 | ƒ secret() ! ∅ { }
+  |   ------ định nghĩa ở đây, thiếu `◈`
+## [1] json
+{"code":"E0203","level":"error","message":"`secret` là private trong module `a` (thiếu `◈`)","file":"b.gt","span":{"start":{"offset":7,"line":1,"col":6},"end":{"offset":13,"line":1,"col":12}},"span_label":"private","labels":[{"file":"a.gt","span":{"start":{"offset":3,"line":1,"col":3},"end":{"offset":9,"line":1,"col":9}},"message":"định nghĩa ở đây, thiếu `◈`"}],"notes":[],"suggestions":[]}

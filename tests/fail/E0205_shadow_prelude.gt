@@ -1,0 +1,5 @@
+// expect: fail E0205
+// note: biến cục bộ trùng tên item của prelude
+ƒ f() ! ∅ {
+  Option ≔ 1;
+}

@@ -1,0 +1,10 @@
+# E0201_use_before_def: 1 chẩn đoán
+
+## [1] human
+error[E0201]: tên `x` chưa được định nghĩa
+ --> main.gt:4:7
+  |
+4 |   y ≔ x;
+  |       ^ không tìm thấy trong phạm vi này
+## [1] json
+{"code":"E0201","level":"error","message":"tên `x` chưa được định nghĩa","file":"main.gt","span":{"start":{"offset":117,"line":4,"col":7},"end":{"offset":118,"line":4,"col":8}},"span_label":"không tìm thấy trong phạm vi này","labels":[],"notes":[],"suggestions":[]}

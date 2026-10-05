@@ -1,5 +1,5 @@
 //! Test gt-span (M1) — viết trước khi có cài đặt (TDD).
-use gt_span::{LineCol, SourceFile, Span};
+use gt_span::{FileId, LineCol, SourceFile, SourceMap, SourceMapError, Span};
 
 #[test]
 fn span_basics() {
@@ -68,4 +68,48 @@ fn empty_file_and_name() {
     assert_eq!(f.line_count(), 1);
     assert_eq!(f.line_col(0), Some(LineCol { line: 1, col: 1 }));
     assert_eq!(f.line_text(1), Some(""));
+}
+
+// ---------- FileId / SourceMap (ADR-017a) ----------
+
+fn sf(name: &str, text: &str) -> SourceFile {
+    SourceFile::new(name, text.to_string()).expect("nhỏ")
+}
+
+#[test]
+fn source_map_assigns_file_ids_by_sorted_name_not_by_input_order() {
+    let a = SourceMap::new(vec![sf("b.gt", "2"), sf("a.gt", "1"), sf("c.gt", "3")]).expect("map");
+    let b = SourceMap::new(vec![sf("c.gt", "3"), sf("a.gt", "1"), sf("b.gt", "2")]).expect("map");
+    for m in [&a, &b] {
+        assert_eq!(m.len(), 3);
+        assert_eq!(m.id_of("a.gt"), Some(FileId::new(0)));
+        assert_eq!(m.id_of("b.gt"), Some(FileId::new(1)));
+        assert_eq!(m.id_of("c.gt"), Some(FileId::new(2)));
+        assert_eq!(m.id_of("zzz.gt"), None);
+        assert_eq!(m.get(FileId::new(1)).map(SourceFile::name), Some("b.gt"));
+        assert_eq!(m.get(FileId::new(9)).map(SourceFile::name), None);
+    }
+    let names: Vec<&str> = a.iter().map(|(_, f)| f.name()).collect();
+    assert_eq!(names, ["a.gt", "b.gt", "c.gt"]);
+    let ids: Vec<u32> = a.iter().map(|(id, _)| id.raw()).collect();
+    assert_eq!(ids, [0, 1, 2]);
+}
+
+#[test]
+fn source_map_rejects_duplicate_names_and_handles_empty() {
+    let e = SourceMap::new(vec![sf("a.gt", "1"), sf("a.gt", "2")]).expect_err("trùng");
+    assert_eq!(e, SourceMapError::DuplicateName("a.gt".to_string()));
+    let m = SourceMap::new(vec![]).expect("rỗng hợp lệ");
+    assert!(m.is_empty());
+    assert_eq!(m.len(), 0);
+}
+
+#[test]
+fn file_id_is_ordered_hashable_and_indexes() {
+    assert!(FileId::new(1) < FileId::new(2));
+    assert_eq!(FileId::new(7).index(), 7);
+    assert_eq!(FileId::new(7).raw(), 7);
+    let mut set = std::collections::HashSet::new();
+    set.insert(FileId::new(1));
+    assert!(set.contains(&FileId::new(1)));
 }

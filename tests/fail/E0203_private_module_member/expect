@@ -1,0 +1,2 @@
+expect: fail E0203
+note: module con private của a (thiếu ◈ ở ▦) dù hàm trong đó có ◈
