@@ -1,0 +1,19 @@
+# tests/fail/E0101_block_comment.gt: 2 chẩn đoán
+
+## [1] human
+error[E0101]: '/*' không hợp lệ: comment khối bị cấm ở Phase 1 (chỉ có '//' và '///')
+ --> tests/fail/E0101_block_comment.gt:3:19
+  |
+3 | ƒ f() → i32 ! ∅ { /* c */ 1 }
+  |                   ^^
+## [1] json
+{"code":"E0101","level":"error","message":"'/*' không hợp lệ: comment khối bị cấm ở Phase 1 (chỉ có '//' và '///')","file":"tests/fail/E0101_block_comment.gt","span":{"start":{"offset":127,"line":3,"col":19},"end":{"offset":129,"line":3,"col":21}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [2] human
+error[E0101]: '*/' không hợp lệ: comment khối bị cấm ở Phase 1
+ --> tests/fail/E0101_block_comment.gt:3:24
+  |
+3 | ƒ f() → i32 ! ∅ { /* c */ 1 }
+  |                        ^^
+## [2] json
+{"code":"E0101","level":"error","message":"'*/' không hợp lệ: comment khối bị cấm ở Phase 1","file":"tests/fail/E0101_block_comment.gt","span":{"start":{"offset":132,"line":3,"col":24},"end":{"offset":134,"line":3,"col":26}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

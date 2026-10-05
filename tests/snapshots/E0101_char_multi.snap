@@ -1,0 +1,19 @@
+# tests/fail/E0101_char_multi.gt: 2 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi biểu thức, gặp lifetime `'ab`
+ --> tests/fail/E0101_char_multi.gt:3:20
+  |
+3 | ƒ f() → char ! ∅ { 'ab' }
+  |                    ^^^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp lifetime `'ab`","file":"tests/fail/E0101_char_multi.gt","span":{"start":{"offset":153,"line":3,"col":20},"end":{"offset":156,"line":3,"col":23}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [2] human
+error[E0101]: dấu ' lẻ (không phải char hay lifetime hợp lệ)
+ --> tests/fail/E0101_char_multi.gt:3:23
+  |
+3 | ƒ f() → char ! ∅ { 'ab' }
+  |                       ^
+## [2] json
+{"code":"E0101","level":"error","message":"dấu ' lẻ (không phải char hay lifetime hợp lệ)","file":"tests/fail/E0101_char_multi.gt","span":{"start":{"offset":156,"line":3,"col":23},"end":{"offset":157,"line":3,"col":24}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

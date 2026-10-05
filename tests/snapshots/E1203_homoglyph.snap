@@ -1,0 +1,10 @@
+# tests/fail/E1203_homoglyph.gt: 1 chẩn đoán
+
+## [1] human
+error[E1203]: định danh trộn nhiều bảng chữ (nghi homoglyph)
+ --> tests/fail/E1203_homoglyph.gt:3:19
+  |
+3 | ƒ f() → i32 ! ∅ { xа ≔ 1; xa }
+  |                   ^^
+## [1] json
+{"code":"E1203","level":"error","message":"định danh trộn nhiều bảng chữ (nghi homoglyph)","file":"tests/fail/E1203_homoglyph.gt","span":{"start":{"offset":98,"line":3,"col":19},"end":{"offset":101,"line":3,"col":21}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

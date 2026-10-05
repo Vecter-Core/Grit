@@ -1,0 +1,13 @@
+# tests/fail/E0101_cast_then_less_than.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: `as T <`: `<` sau kiểu mở danh sách tham số kiểu; bọc phép ép kiểu trong ngoặc: `(x as T) < y`
+ --> tests/fail/E0101_cast_then_less_than.gt:3:43
+  |
+3 | ƒ f(x: i32, y: i64) → bool ! ∅ { x as i64 < y }
+  |                                           ^ đọc là tham số kiểu của kiểu đứng trước
+  = help: bọc phép ép kiểu trong ngoặc (machine-applicable)
+          - 3:34-3:34: `` -> `(`
+          - 3:42-3:42: `` -> `)`
+## [1] json
+{"code":"E0101","level":"error","message":"`as T <`: `<` sau kiểu mở danh sách tham số kiểu; bọc phép ép kiểu trong ngoặc: `(x as T) < y`","file":"tests/fail/E0101_cast_then_less_than.gt","span":{"start":{"offset":217,"line":3,"col":43},"end":{"offset":218,"line":3,"col":44}},"span_label":"đọc là tham số kiểu của kiểu đứng trước","labels":[],"notes":[],"suggestions":[{"message":"bọc phép ép kiểu trong ngoặc","applicability":"machine-applicable","edits":[{"file":"tests/fail/E0101_cast_then_less_than.gt","span":{"start":{"offset":208,"line":3,"col":34},"end":{"offset":208,"line":3,"col":34}},"replacement":"("},{"file":"tests/fail/E0101_cast_then_less_than.gt","span":{"start":{"offset":216,"line":3,"col":42},"end":{"offset":216,"line":3,"col":42}},"replacement":")"}]}]}

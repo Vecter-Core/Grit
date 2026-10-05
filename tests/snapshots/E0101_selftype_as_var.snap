@@ -1,0 +1,10 @@
+# tests/fail/E0101_selftype_as_var.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi `;` hoặc `}`, gặp `≔`
+ --> tests/fail/E0101_selftype_as_var.gt:3:24
+  |
+3 | ƒ f() → i32 ! ∅ { Self ≔ 1; Self }
+  |                        ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi `;` hoặc `}`, gặp `≔`","file":"tests/fail/E0101_selftype_as_var.gt","span":{"start":{"offset":155,"line":3,"col":24},"end":{"offset":158,"line":3,"col":25}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

@@ -1,0 +1,10 @@
+# tests/fail/E0101_mu_as_ident.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi tên biến, gặp `≔`
+ --> tests/fail/E0101_mu_as_ident.gt:3:21
+  |
+3 | ƒ f() → i32 ! ∅ { μ ≔ 1; 1 }
+  |                     ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi tên biến, gặp `≔`","file":"tests/fail/E0101_mu_as_ident.gt","span":{"start":{"offset":152,"line":3,"col":21},"end":{"offset":155,"line":3,"col":22}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

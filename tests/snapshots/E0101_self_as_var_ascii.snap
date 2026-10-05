@@ -1,0 +1,10 @@
+# tests/fail/E0101_self_as_var_ascii.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi `;` hoặc `}`, gặp `≔`
+ --> tests/fail/E0101_self_as_var_ascii.gt:3:30
+  |
+3 | \fn f() -> i32 ! \nil { self := 1; self }
+  |                              ^^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi `;` hoặc `}`, gặp `≔`","file":"tests/fail/E0101_self_as_var_ascii.gt","span":{"start":{"offset":156,"line":3,"col":30},"end":{"offset":158,"line":3,"col":32}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

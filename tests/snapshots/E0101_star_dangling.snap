@@ -1,0 +1,10 @@
+# tests/fail/E0101_star_dangling.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi biểu thức, gặp `}`
+ --> tests/fail/E0101_star_dangling.gt:2:29
+  |
+2 | ƒ f(a: i32) → i32 ! ∅ { a * }
+  |                             ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `}`","file":"tests/fail/E0101_star_dangling.gt","span":{"start":{"offset":55,"line":2,"col":29},"end":{"offset":56,"line":2,"col":30}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

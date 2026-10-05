@@ -1,0 +1,10 @@
+# tests/fail/E0101_struct_in_loop_variant.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi kiểu, gặp số `1`
+ --> tests/fail/E0101_struct_in_loop_variant.gt:3:33
+  |
+3 | ƒ f(c: bool) ! ∅ { ⟳ c ↓ P { x: 1 } { } }
+  |                                 ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi kiểu, gặp số `1`","file":"tests/fail/E0101_struct_in_loop_variant.gt","span":{"start":{"offset":158,"line":3,"col":33},"end":{"offset":159,"line":3,"col":34}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

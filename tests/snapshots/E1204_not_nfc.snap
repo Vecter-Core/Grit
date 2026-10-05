@@ -1,0 +1,10 @@
+# tests/fail/E1204_not_nfc.gt: 1 chẩn đoán
+
+## [1] human
+error[E1204]: nguồn không phải NFC (chuẩn hoá Unicode)
+ --> tests/fail/E1204_not_nfc.gt:3:22
+  |
+3 | ƒ f() → i32 ! ∅ { café ≔ 1; 1 }
+  |                      ^
+## [1] json
+{"code":"E1204","level":"error","message":"nguồn không phải NFC (chuẩn hoá Unicode)","file":"tests/fail/E1204_not_nfc.gt","span":{"start":{"offset":102,"line":3,"col":22},"end":{"offset":103,"line":3,"col":23}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

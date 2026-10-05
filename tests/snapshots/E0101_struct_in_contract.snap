@@ -1,0 +1,19 @@
+# tests/fail/E0101_struct_in_contract.gt: 2 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi kiểu, gặp số `1`
+ --> tests/fail/E0101_struct_in_contract.gt:3:27
+  |
+3 | ƒ f() → bool ! ∅ ⊳ P { x: 1 } { true }
+  |                           ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi kiểu, gặp số `1`","file":"tests/fail/E0101_struct_in_contract.gt","span":{"start":{"offset":172,"line":3,"col":27},"end":{"offset":173,"line":3,"col":28}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [2] human
+error[E0101]: mong đợi item (`ƒ`, `▢`, `⊔`, `⊏`, `⊐`, `▦`, `⇲`, `≡`, `□`, `■`), gặp `{`
+ --> tests/fail/E0101_struct_in_contract.gt:3:31
+  |
+3 | ƒ f() → bool ! ∅ ⊳ P { x: 1 } { true }
+  |                               ^
+## [2] json
+{"code":"E0101","level":"error","message":"mong đợi item (`ƒ`, `▢`, `⊔`, `⊏`, `⊐`, `▦`, `⇲`, `≡`, `□`, `■`), gặp `{`","file":"tests/fail/E0101_struct_in_contract.gt","span":{"start":{"offset":176,"line":3,"col":31},"end":{"offset":177,"line":3,"col":32}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

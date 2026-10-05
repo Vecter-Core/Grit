@@ -1,0 +1,10 @@
+# tests/fail/E0101_compound_assign.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: '=' đứng riêng không hợp lệ: gán là '←', so sánh bằng là '=='
+ --> tests/fail/E0101_compound_assign.gt:3:30
+  |
+3 | ƒ f() → i32 ! ∅ { μx ≔ 1; x += 1; x }
+  |                              ^
+## [1] json
+{"code":"E0101","level":"error","message":"'=' đứng riêng không hợp lệ: gán là '←', so sánh bằng là '=='","file":"tests/fail/E0101_compound_assign.gt","span":{"start":{"offset":163,"line":3,"col":30},"end":{"offset":164,"line":3,"col":31}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

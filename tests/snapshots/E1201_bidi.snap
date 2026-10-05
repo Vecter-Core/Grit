@@ -1,0 +1,10 @@
+# tests/fail/E1201_bidi.gt: 1 chẩn đoán
+
+## [1] human
+error[E1201]: ký tự điều khiển bidi bị cấm (Trojan Source)
+ --> tests/fail/E1201_bidi.gt:3:26
+  |
+3 | ƒ f() → i32 ! ∅ { 1 } // ‮ evil
+  |                          ^
+## [1] json
+{"code":"E1201","level":"error","message":"ký tự điều khiển bidi bị cấm (Trojan Source)","file":"tests/fail/E1201_bidi.gt","span":{"start":{"offset":113,"line":3,"col":26},"end":{"offset":116,"line":3,"col":27}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

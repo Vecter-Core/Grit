@@ -1,0 +1,19 @@
+# tests/fail/E0101_in_as_var.gt: 2 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi biểu thức, gặp `in` (từ khoá cứng)
+ --> tests/fail/E0101_in_as_var.gt:3:19
+  |
+3 | ƒ f() → i32 ! ∅ { in ≔ 1; in }
+  |                   ^^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `in` (từ khoá cứng)","file":"tests/fail/E0101_in_as_var.gt","span":{"start":{"offset":138,"line":3,"col":19},"end":{"offset":140,"line":3,"col":21}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [2] human
+error[E0101]: mong đợi biểu thức, gặp `in` (từ khoá cứng)
+ --> tests/fail/E0101_in_as_var.gt:3:27
+  |
+3 | ƒ f() → i32 ! ∅ { in ≔ 1; in }
+  |                           ^^
+## [2] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `in` (từ khoá cứng)","file":"tests/fail/E0101_in_as_var.gt","span":{"start":{"offset":148,"line":3,"col":27},"end":{"offset":150,"line":3,"col":29}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

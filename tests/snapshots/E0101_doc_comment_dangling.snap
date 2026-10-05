@@ -1,0 +1,10 @@
+# tests/fail/E0101_doc_comment_dangling.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi `;` hoặc `}`, gặp doc comment
+ --> tests/fail/E0101_doc_comment_dangling.gt:5:3
+  |
+5 |   /// không có gì để gắn
+  |   ^^^^^^^^^^^^^^^^^^^^^^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi `;` hoặc `}`, gặp doc comment","file":"tests/fail/E0101_doc_comment_dangling.gt","span":{"start":{"offset":111,"line":5,"col":3},"end":{"offset":141,"line":5,"col":25}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

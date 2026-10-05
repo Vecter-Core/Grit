@@ -1,0 +1,10 @@
+# tests/fail/E1202_zero_width.gt: 1 chẩn đoán
+
+## [1] human
+error[E1202]: ký tự vô hình/điều khiển/khoảng trắng lạ bị cấm
+ --> tests/fail/E1202_zero_width.gt:3:21
+  |
+3 | ƒ f() → i32 ! ∅ { ab​ ≔ 1; 1 }
+  |                     ^
+## [1] json
+{"code":"E1202","level":"error","message":"ký tự vô hình/điều khiển/khoảng trắng lạ bị cấm","file":"tests/fail/E1202_zero_width.gt","span":{"start":{"offset":93,"line":3,"col":21},"end":{"offset":96,"line":3,"col":22}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

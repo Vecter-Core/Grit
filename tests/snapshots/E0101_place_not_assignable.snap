@@ -1,0 +1,10 @@
+# tests/fail/E0101_place_not_assignable.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: đích của `←` phải là biến, trường, chỉ số hoặc `*` của chúng
+ --> tests/fail/E0101_place_not_assignable.gt:3:13
+  |
+3 | ƒ f() ! ∅ { g().x ← 1; }
+  |             ^^^^^
+## [1] json
+{"code":"E0101","level":"error","message":"đích của `←` phải là biến, trường, chỉ số hoặc `*` của chúng","file":"tests/fail/E0101_place_not_assignable.gt","span":{"start":{"offset":145,"line":3,"col":13},"end":{"offset":150,"line":3,"col":18}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

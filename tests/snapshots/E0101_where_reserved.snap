@@ -1,0 +1,10 @@
+# tests/fail/E0101_where_reserved.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi `{`, gặp `\where` (từ khoá dành riêng cho Phase 2)
+ --> tests/fail/E0101_where_reserved.gt:3:20
+  |
+3 | ƒ f<T>() → i32 ! ∅ \where T: Copy { 1 }
+  |                    ^^^^^^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi `{`, gặp `\\where` (từ khoá dành riêng cho Phase 2)","file":"tests/fail/E0101_where_reserved.gt","span":{"start":{"offset":195,"line":3,"col":20},"end":{"offset":201,"line":3,"col":26}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
