@@ -5,13 +5,19 @@ use gt_ast::*;
 /// Gợi ý kèm mọi lỗi E0102.
 const DEPTH_HINT: &str =
     "hãy tách biểu thức con ra biến phụ bằng `≔` (hoặc chia nhỏ khối/kiểu/pattern)";
-use gt_diag::{Code, Diagnostic};
+use gt_diag::{Applicability, Code, Diagnostic, Edit, Suggestion};
 use gt_lexer::{Token, TokenKind};
 use gt_span::Span;
 
 /// Lỗi đã được báo (hoặc cố ý im lặng vì lexer đã báo); chỉ dùng để dừng production hiện tại.
 #[derive(Debug)]
 pub(crate) struct Abort;
+
+/// Điểm quay lui (xem `Parser::snapshot`).
+pub(crate) struct Snapshot {
+    pos: usize,
+    diags: usize,
+}
 
 pub(crate) type PResult<T> = Result<T, Abort>;
 
@@ -166,6 +172,87 @@ impl Parser {
             self.push_diag("E0101", span, msg);
         }
         Abort
+    }
+
+    /// Trạng thái để quay lui đúng một lần ở chỗ `x as T <` (Q16c).
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            pos: self.pos,
+            diags: self.diags.len(),
+        }
+    }
+
+    /// Sau khi `parse_type` sau `as` thất bại: nếu kiểu là đường dẫn (có thể sau `&`/`&!`) theo sau bởi `<`, thì đây là quy tắc
+    /// `x as T < y` (Q16c). Thay các chẩn đoán vừa phát bằng MỘT E0101 trỏ vào `<`, kèm gợi ý machine-applicable bọc
+    /// `(x as T)` (hai edit: `(` ở đầu vế trái của phép ép kiểu, `)` ngay sau kiểu). Trả `false` (không đổi gì) nếu không khớp.
+    pub fn explain_cast_lt(&mut self, snap: &Snapshot, lhs_start: u32) -> bool {
+        if self.fatal {
+            return false;
+        }
+        let mut i = snap.pos;
+        while matches!(
+            self.tokens.get(i).map(|t| &t.kind),
+            Some(TokenKind::Borrow | TokenKind::BorrowMut)
+        ) {
+            i += 1;
+        }
+        if !matches!(
+            self.tokens.get(i).map(|t| &t.kind),
+            Some(TokenKind::Ident(_))
+        ) {
+            return false;
+        }
+        i += 1;
+        while matches!(
+            self.tokens.get(i).map(|t| &t.kind),
+            Some(TokenKind::ColonColon)
+        ) && matches!(
+            self.tokens.get(i + 1).map(|t| &t.kind),
+            Some(TokenKind::Ident(_))
+        ) {
+            i += 2;
+        }
+        let (Some(lt), Some(last)) = (self.tokens.get(i), self.tokens.get(i - 1)) else {
+            return false;
+        };
+        if lt.kind != TokenKind::Lt {
+            return false;
+        }
+        let (lt_span, ty_end) = (lt.span, last.span.end);
+        // Thử: gợi ý chỉ "machine-applicable" khi phần sau `<` thật sự parse được thành biểu thức (vế phải của phép so sánh)
+        let (err_pos, err_last) = (self.pos, self.last_error_pos);
+        let saved = self.diags.split_off(snap.diags);
+        self.pos = i + 1;
+        self.last_error_pos = None;
+        let rhs_ok = self.parse_expr().is_ok() && self.diags.len() == snap.diags && !self.fatal;
+        self.diags.truncate(snap.diags);
+        self.pos = err_pos;
+        if !rhs_ok {
+            self.diags.extend(saved);
+            self.last_error_pos = err_last;
+            return false;
+        }
+        if let Ok(code) = Code::parse("E0101") {
+            self.diags.push(
+                Diagnostic::new(
+                    code,
+                    &self.file,
+                    lt_span,
+                    "`as T <`: `<` sau kiểu mở danh sách tham số kiểu; bọc phép ép kiểu trong ngoặc: `(x as T) < y`".to_string(),
+                )
+                .with_span_label("đọc là tham số kiểu của kiểu đứng trước")
+                .with_suggestion(Suggestion::new(
+                    "bọc phép ép kiểu trong ngoặc",
+                    Applicability::MachineApplicable,
+                    vec![
+                        Edit::new(Span::new(lhs_start, lhs_start), "("),
+                        Edit::new(Span::new(ty_end, ty_end), ")"),
+                    ],
+                )),
+            );
+        }
+        self.last_error_pos = Some(self.pos);
+        true
     }
 
     pub fn expected(&mut self, what: &str) -> Abort {

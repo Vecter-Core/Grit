@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: Q16c: `x as T < y` — `<` sau kiểu mở tham số kiểu (như Rust); phải viết `(x as T) < y`. Parser gợi ý machine-applicable.
+ƒ f(x: i32, y: i64) → bool ! ∅ { x as i64 < y }

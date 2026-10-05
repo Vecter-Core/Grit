@@ -211,7 +211,7 @@ Số học: mặc định **kiểm tràn**. Toán tử tường minh: `+%` (qu�
 **Công cụ**
 
 - **D16** Hệ thống mã: `E` + 4 số (ĐỎ), `S` + 3 số (VÀNG, bảo mật), `N` + 4 số (GHI CHÚ).
-  - E01xx cú pháp · E02xx tên/module · E03xx kiểu · E04xx sở hữu/mượn · E05xx đa luồng · E06xx biên/trường hợp biên · E07xx điều kiện dừng · E08xx hiệu ứng/trạng thái · E09xx logic/Obligation · E10xx unsafe/bằng chứng · E11xx IR Guard · E12xx unicode/nguồn · E99xx ICE.
+  - E01xx cú pháp · E02xx tên/module · E03xx kiểu · E04xx sở hữu/mượn · E05xx đa luồng · E06xx biên/trường hợp biên · E07xx điều kiện dừng · E08xx hiệu ứng/trạng thái · E09xx logic/Obligation · E10xx unsafe/bằng chứng · E11xx IR Guard · E12xx unicode/nguồn · E13xx định dạng (gt-fmt) · E99xx ICE.
 - **D17** Exit code: `0` = qua (có thể kèm VÀNG), `1` = có ĐỎ, `2` = ICE. **Cả 1 và 2 đều không sinh binary và không chạy.**
 - **D18** Lệnh gritc: `check`, `build`, `run`, `explain <mã>`, `fmt`, `--json` (schema có version, ổn định). Phase 2 thêm: `prove`, `recheck`, `serve`.
 - **D19** Báo **tất cả** lỗi (có giới hạn số lượng), thứ tự xác định.

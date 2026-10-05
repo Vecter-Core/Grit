@@ -226,7 +226,15 @@ impl Parser {
             chain += 1;
             self.chain_check(chain)?;
             self.bump();
-            let ty = self.parse_type()?;
+            let snap = self.snapshot();
+            let ty = match self.parse_type() {
+                Ok(ty) => ty,
+                Err(abort) => {
+                    // `x as T < y`: quy tắc ngôn ngữ (Q16c) → một chẩn đoán riêng kèm gợi ý bọc ngoặc
+                    self.explain_cast_lt(&snap, start);
+                    return Err(abort);
+                }
+            };
             e = self.mk_expr(
                 start,
                 ExprKind::Cast {

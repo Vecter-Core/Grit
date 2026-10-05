@@ -37,11 +37,7 @@
 - **Fuzz trên Windows:** ASan hết bộ nhớ nội bộ khi quarantine mặc định 256 MB (đã gặp ở lần chạy 1 giờ). `tools/fuzz_lexer.sh` đặt `ASAN_OPTIONS=quarantine_size_mb=8` và chạy nhiều phiên ngắn, giữ corpus. Cần nightly, `cargo-fuzz`, và `clang_rt.asan_dynamic-x86_64.dll` trong PATH.
 
 ## gt-fmt và comment (ADR-012) — quy tắc gắn comment, ghi trước khi viết gt-fmt
-- Comment `//` nằm trong bảng trivia của lexer, **không** nằm trong AST. gt-fmt ghép lại theo span:
-  1. Comment đứng một mình trên dòng (`own_line`) gắn vào **item/câu lệnh kế tiếp** (in ngay phía trên, giữ thụt lề của node đó).
-  2. Comment cuối dòng gắn vào **câu lệnh/item đứng trước trên cùng dòng** (in cùng dòng, sau một dấu cách).
-  3. Comment `own_line` không có node kế tiếp (ngay trước `}` hoặc cuối tệp): gắn như "comment cuối khối/tệp" của node bao ngoài.
-  4. Comment nằm GIỮA một biểu thức/chữ ký (vd giữa hai đối số, giữa `ƒ` và `{`): chưa có quy tắc gắn → **gt-fmt từ chối định dạng tệp đó (báo lỗi), không xoá và không di chuyển comment**.
+- Comment `//` nằm trong bảng trivia của lexer, **không** nằm trong AST. Từ Q16b (ADR-016 v2) gt-fmt gắn **theo token gần nhất**, không theo node: comment dòng riêng → token KẾ TIẾP; comment cuối dòng → token LIỀN TRƯỚC; E1301 chỉ khi bước xác minh thất bại. (Quy tắc theo node 1–4 của v1 đã bị thay thế.)
 - **Bất biến kiểm bằng test khi viết gt-fmt:** `fmt(x)` giữ nguyên **số comment và nội dung từng comment**; `fmt(fmt(x)) == fmt(x)`.
 - Dòng trống giữa các node không nằm trong AST nên gt-fmt chưa bảo toàn (sẽ chuẩn hoá về tối đa một dòng trống); ghi nhận để Giang xem lại.
 - `///` (doc comment) là token `DOC_COMMENT` gắn vào node AST nên được gt-fmt giữ theo node.

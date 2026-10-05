@@ -208,9 +208,13 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 ## 25. gt-fmt — dạng chuẩn (Giang duyệt 2026-10-05)
 - Một dạng chuẩn duy nhất: `gritc fmt` in canonical Unicode; hai bề mặt (canonical/ASCII) của cùng chương trình cho **cùng đầu ra**.
 - **Dòng trống:** một dòng trống giữa hai item cấp cao nhất liền kề; không dòng trống thừa; dòng trống người dùng không được bảo toàn.
-- **Comment:** `//` giữ nguyên số lượng và nội dung từng comment (bảng trivia của lexer, ADR-012); `own_line` gắn vào node kế tiếp, comment cuối dòng gắn vào node trước. **Không gắn được (vd comment giữa biểu thức/chữ ký) → gt-fmt từ chối định dạng với Diagnostic, không xoá và không dời comment.** `///` đi theo node.
+- **Comment (Q16b):** `//` giữ nguyên số lượng, nội dung và thứ tự (bảng trivia, ADR-012). Gắn theo **token gần nhất**: dòng riêng → token kế tiếp, cuối dòng → token liền trước; sau comment cuối dòng ép xuống dòng. E1301 chỉ khi xác minh sau khi chèn thất bại (phương án cuối). Chi tiết và ví dụ trước/sau: ADR-016.
 - AST không có ngoặc nhóm nên printer thêm ngoặc theo độ ưu tiên và theo luật `expr_ns` (struct literal trần trong điều kiện `⎇ ⌥ ⟳` phải bọc ngoặc).
 
+## 25b. `x as T < y` (Q16c, Giang duyệt 2026-10-06) — quy tắc NGÔN NGỮ như Rust
+- Sau `as`, một kiểu đường dẫn theo sau bởi `<` được đọc là **danh sách tham số kiểu** của kiểu đó (`x as Vec<u8>`). Vì vậy `x as i64 < y` KHÔNG phải "so sánh `x as i64` với `y`": nó là lỗi cú pháp (E0101). Phải viết **`(x as i64) < y`**. Các toán tử so sánh khác (`>`, `≤`, `≥`, `==`, `≠`, `∈`) không bị ảnh hưởng.
+- Parser phát MỘT E0101 trỏ vào `<`, kèm gợi ý **`machine-applicable`** gồm hai edit nguyên tử: chèn `(` ở đầu vế trái của chuỗi `as` và `)` ngay sau kiểu (`a + b as i64 < c` → `a + (b as i64) < c`; `x as i32 as i64 < a` → `(x as i32 as i64) < a`). Gợi ý chỉ được phát khi phần sau `<` parse được thành biểu thức (nếu không thì là lỗi tham số kiểu thường, không gợi ý). Mơ hồ vốn có: `x as Vec<i64 ;` trùng chuỗi token với `(x as Vec) < i64;` nên được coi là so sánh.
+- gt-fmt không "giải quanh": nó in `(x as T) < y` vì dạng không ngoặc không còn là chương trình hợp lệ.
 ## 26. Độ sâu, stack và an toàn đệ quy (luật — ADR-014, ADR-015)
 - **`MAX_DEPTH` = 256** nằm đúng MỘT chỗ: hằng `gt_ast::MAX_DEPTH`. Mọi bộ phận (parser và các pass đệ quy sau này) dùng hằng này, không tự đặt giới hạn riêng.
 - **Độ sâu** = số mức lồng nhau của biểu thức, khối, kiểu, pattern, `▦` (tính chung một bộ đếm khi trộn lẫn) **cộng độ dài chuỗi toán tử nhị phân/postfix/`as`** (chuỗi phẳng tạo cây lệch trái sâu như nhau). Vượt `MAX_DEPTH` → ĐỎ **E0102** ("tách biểu thức con ra biến phụ bằng `≔`") và dừng phân tích. E0102 là lỗi người dùng, không phải ICE.
