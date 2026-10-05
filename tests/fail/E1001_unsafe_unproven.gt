@@ -1,0 +1,2 @@
+// expect: fail E1001
+ƒ f(p: usize) → i32 ! ∅ { ⚠ { raw_read(p) } }

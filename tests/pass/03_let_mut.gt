@@ -1,0 +1,7 @@
+// expect: pass
+ƒ counter() → i32 ! ∅ {
+  μn ≔ 0;
+  n ← 5;
+  n ← n +% 1;
+  n
+}

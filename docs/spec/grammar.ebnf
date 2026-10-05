@@ -1,0 +1,71 @@
+(* Grit grammar — M0 DRAFT (chờ Giang duyệt). EBNF: { } lặp 0+, [ ] tuỳ chọn, | chọn, ( ) nhóm.
+   Mọi terminal viết dạng canonical; mỗi cái có ASCII alias 1–1 trong docs/spec/symbols.md.
+   Lexer quy alias -> canonical TRƯỚC khi parser chạy, nên grammar chỉ nói canonical. *)
+
+(* ---------- Lexical ---------- *)
+ident      = XID_START { XID_CONTINUE } ;          (* trừ từ khoá/ký hiệu; NFC; không trộn bảng chữ (D15) *)
+region     = "@" ident ;                           (* lifetime/region có tên, vd @r *)
+int_lit    = dec | "0x" hex | "0b" bin , [ int_suffix ] ;   (* "_" được phép làm dấu tách *)
+int_suffix = "i8"|"i16"|"i32"|"i64"|"isize"|"u8"|"u16"|"u32"|"u64"|"usize" ;
+float_lit  = dec "." dec [ exp ] , [ "f32" | "f64" ] ;
+str_lit    = '"' { char | escape } '"' ;           (* UTF-8; cấm bidi/zero-width trần *)
+char_lit   = "'" ( char | escape ) "'" ;
+comment    = "//" { any_but_newline } | "/*" { any } "*/" ;   (* "/*" lồng nhau được *)
+
+(* ---------- Chương trình & item ---------- *)
+program    = { item } ;
+item       = [ "◈" ] ( fn_item | struct_item | enum_item | trait_item | impl_item | mod_item | use_item ) ;
+use_item   = "⇲" path [ "::" "{" ident { "," ident } "}" ] ";" ;
+path       = ident { "::" ident } ;
+mod_item   = "▦" ident "{" { item } "}" ;
+
+fn_item    = "ƒ" ident [ generics ] "(" [ params ] ")" [ "→" type ] effects { contract } block ;
+generics   = "<" gparam { "," gparam } ">" ;
+gparam     = ident [ ":" path { "+" path } ] | region ;
+params     = ( self_param | param ) { "," param } ;
+self_param = "self" | "&" "self" | "&!" "self" ;   (* chỉ trong trait/impl *)
+param      = [ "μ" ] ident ":" type ;
+effects    = "!" ( "∅" | "{" [ effect { "," effect } ] "}" ) ;   (* BẮT BUỘC (D10) *)
+effect     = ident [ "(" ident ")" ] ;             (* io | mem | st | div | ffi | lock(L) *)
+contract   = "⊳" expr | "⊲" expr ;                 (* pre/post; Phase 1: ⊲ chỉ kiểm lúc chạy *)
+
+struct_item = "▢" ident [ generics ] "{" [ field { "," field } [ "," ] ] "}" ;
+field       = [ "◈" ] ident ":" type ;
+enum_item   = "⊔" ident [ generics ] "{" variant { "," variant } [ "," ] "}" ;
+variant     = ident [ "(" type { "," type } ")" ] ;
+trait_item  = "⊏" ident [ generics ] "{" { fn_sig } "}" ;     (* static dispatch, KHÔNG dyn *)
+fn_sig      = "ƒ" ident [ generics ] "(" [ params ] ")" [ "→" type ] effects { contract } ";" ;
+impl_item   = "⊐" [ generics ] [ path "for" ] type "{" { fn_item } "}" ;
+
+(* ---------- Kiểu ---------- *)
+type       = prim | path [ "<" type { "," type } ">" ]      (* Option<T>, Secret<T>, Cap<Fs>, Arena... *)
+           | "&" [ region ] type | "&!" [ region ] type
+           | "[" type ";" const_expr "]" | "&" "[" type "]"
+           | "(" [ type { "," type } ] ")" ;
+prim       = "i8"|"i16"|"i32"|"i64"|"isize"|"u8"|"u16"|"u32"|"u64"|"usize"|"f32"|"f64"|"bool"|"char"|"str" ;
+
+(* ---------- Câu lệnh & biểu thức ---------- *)
+block      = "{" { stmt } [ expr ] "}" ;           (* biểu thức cuối không ";" = giá trị khối *)
+stmt       = let_stmt | assign_stmt | expr ";" | "⏎" [ expr ] ";" | "⊠" ";" | "⊡" ";" ;
+let_stmt   = [ "μ" ] ident [ ":" type ] "≔" expr ";" ;
+assign_stmt= place "←" expr ";" ;
+place      = [ "*" ] ident { "." ident | "[" expr "]" } ;
+
+expr       = if_expr | match_expr | loop_expr | unsafe_expr | binary ;
+if_expr    = "⎇" expr block [ "⇝" ( block | if_expr ) ] ;
+match_expr = "⌥" expr "{" arm { "," arm } [ "," ] "}" ;      (* phải đầy đủ (D6) *)
+arm        = pattern "↦" ( expr | block ) ;
+pattern    = "_" | ident | literal | path [ "(" pattern { "," pattern } ")" ] | "(" pattern { "," pattern } ")" ;
+loop_expr  = "⟳" [ expr ] [ "↓" expr ] { "⋈" expr } block ;  (* không có cond = vô hạn, cần hiệu ứng div (D12) *)
+unsafe_expr= "⚠" { "⊢" expr } block ;               (* Phase 1: cú pháp + đường Obligation; người dùng gần như luôn ĐỎ E10xx *)
+
+(* độ ưu tiên giảm dần: unary > as > * / % > + - (+% +^ +?) > so sánh > ∧ > ∨ > ⇒ (chỉ hợp đồng) *)
+binary     = unary { binop unary } ;
+binop      = "+"|"-"|"*"|"/"|"%"|"+%"|"-%"|"*%"|"+^"|"-^"|"*^"|"+?"|"-?"|"*?"
+           | "=="|"≠"|"<"|">"|"≤"|"≥"|"∧"|"∨"|"⇒"|"∈" ;
+unary      = ( "¬" | "-" | "*" | "&" | "&!" ) unary          (* "*" = giải tham chiếu *) | postfix ;
+postfix    = primary { "(" [ expr { "," expr } ] ")" | "." ident | "[" expr "]" | "as" type } ;
+primary    = literal | ident | path | "(" [ expr { "," expr } ] ")" | block
+           | "∀" ident "∈" expr "." expr | "∃" ident "∈" expr "." expr ;  (* lượng từ chỉ trong hợp đồng *)
+literal    = int_lit | float_lit | str_lit | char_lit | "⊤" | "⊥" ;
+const_expr = int_lit | path ;

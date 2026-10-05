@@ -1,0 +1,5 @@
+// expect: pass
+// note: phải sinh cùng AST với 01_add.gt (test round-trip M1)
+\fn add(a: i32, b: i32) -> i32 ! \nil
+  \pre a >= 0 \land a <= 1000 \land b >= 0 \land b <= 1000
+{ a + b }

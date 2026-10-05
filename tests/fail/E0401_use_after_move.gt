@@ -1,0 +1,4 @@
+// expect: fail E0401
+▢ B { v: i32 }
+ƒ eat(b: B) → () ! ∅ { }
+ƒ f() → i32 ! ∅ { b ≔ B { v: 1 }; eat(b); b.v }

@@ -1,0 +1,5 @@
+// expect: pass
+ƒ read_len(fs: &Cap<Fs>, path: &str) → usize ! {io} {
+  f ≔ fs.read(path);
+  f.len()
+}

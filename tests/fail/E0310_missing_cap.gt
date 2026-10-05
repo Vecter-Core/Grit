@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: dùng Cap<Fs> mà chữ ký không khai báo (D28)
+ƒ f(path: &str) → usize ! {io} { root_fs().read(path).len() }

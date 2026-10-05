@@ -1,0 +1,3 @@
+// expect: fail E1202
+// note: U+200B zero-width trong định danh
+ƒ f() → i32 ! ∅ { ab​ ≔ 1; 1 }

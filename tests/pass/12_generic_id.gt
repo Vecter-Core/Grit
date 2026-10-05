@@ -1,0 +1,3 @@
+// expect: pass
+ƒ id<T>(x: T) → T ! ∅ { x }
+ƒ use_it() → i32 ! ∅ { id(7) }

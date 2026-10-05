@@ -1,0 +1,2 @@
+// expect: fail E0405
+ƒ f() → &i32 ! {mem} { a ≔ Arena::new(); p ≔ a.alloc(1); p }

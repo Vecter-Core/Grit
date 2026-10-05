@@ -1,0 +1,3 @@
+// expect: fail E1204
+// note: "e" + U+0301 (không NFC) trong định danh
+ƒ f() → i32 ! ∅ { café ≔ 1; 1 }

@@ -1,0 +1,3 @@
+// expect: fail E1203
+// note: "а" là Cyrillic U+0430 trộn với Latin
+ƒ f() → i32 ! ∅ { xа ≔ 1; xa }

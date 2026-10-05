@@ -1,0 +1,10 @@
+// expect: pass
+ƒ first_even(n: u32) → u32 ! ∅ {
+  μi ≔ 1;
+  ⟳ i < n ↓ n - i {
+    ⎇ i % 2 == 0 { ⏎ i; }
+    i ← i +% 1;
+    ⊡;
+  }
+  0
+}

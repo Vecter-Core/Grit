@@ -1,0 +1,16 @@
+# Workspace gốc của Grit (Phase 1 — Seed). Chưa có crate nào: M0 cấm viết compiler.
+# Các crate được thêm vào `members` ở đúng milestone của chúng (xem GRIT_PLAN.md 6.1/6.2).
+[workspace]
+resolver = "3"
+members = []
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }

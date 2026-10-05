@@ -1,0 +1,4 @@
+// expect: pass
+▢ Point { x: i32, y: i32 }
+ƒ origin() → Point ! ∅ { Point { x: 0, y: 0 } }
+ƒ get_x(p: &Point) → i32 ! ∅ { p.x }

@@ -1,0 +1,2 @@
+// expect: fail E0201
+ƒ f() → i32 ! ∅ { y }

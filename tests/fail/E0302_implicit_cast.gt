@@ -1,0 +1,2 @@
+// expect: fail E0302
+ƒ f(a: i32) → i64 ! ∅ { a }

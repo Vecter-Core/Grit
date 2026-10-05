@@ -1,0 +1,10 @@
+// expect: pass
+⊔ Shape { Circle(i32), Square(i32), Empty }
+ƒ size(s: Shape) → i32 ! ∅
+{
+  ⌥ s {
+    Circle(r) ↦ r +% r,
+    Square(w) ↦ w,
+    Empty ↦ 0,
+  }
+}

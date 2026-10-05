@@ -1,0 +1,5 @@
+// expect: pass
+⊏ Area { ƒ area(&self) → i32 ! ∅; }
+▢ Sq { w: i32 }
+⊐ Area for Sq { ƒ area(&self) → i32 ! ∅ { self.w +% self.w } }
+ƒ total<T: Area>(t: &T) → i32 ! ∅ { t.area() }

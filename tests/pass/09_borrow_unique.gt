@@ -1,0 +1,10 @@
+// expect: pass
+ƒ bump(p: &!i32) → () ! ∅ {
+  *p ← *p +% 1;
+}
+ƒ caller() → i32 ! ∅ {
+  μx ≔ 1;
+  bump(&!x);
+  bump(&!x);
+  x
+}

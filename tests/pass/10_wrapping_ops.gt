@@ -1,0 +1,6 @@
+// expect: pass
+ƒ ops(a: u8, b: u8) → u8 ! ∅ {
+  w ≔ a +% b;
+  s ≔ a +^ b;
+  ⌥ a +? b { Some(v) ↦ v, None ↦ s +% w }
+}

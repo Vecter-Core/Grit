@@ -1,0 +1,3 @@
+// expect: fail E0203
+▦ m { ƒ secret() → i32 ! ∅ { 1 } }
+ƒ f() → i32 ! ∅ { m::secret() }

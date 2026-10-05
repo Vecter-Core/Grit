@@ -1,0 +1,3 @@
+// expect: warn S101
+// note: VÀNG: vẫn cho chạy (exit 0), phải in cảnh báo. Chuỗi bên dưới là GIẢ, đúng định dạng khoá cloud mẫu.
+ƒ key() → &str ! ∅ { api_key ≔ "AKIAIOSFODNN7EXAMPLE"; api_key }

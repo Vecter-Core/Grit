@@ -1,0 +1,3 @@
+// expect: fail E1201
+// note: chứa U+202E (RLO) trong comment — Trojan Source
+ƒ f() → i32 ! ∅ { 1 } // ‮ evil

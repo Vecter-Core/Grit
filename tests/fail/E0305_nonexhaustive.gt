@@ -1,0 +1,2 @@
+// expect: fail E0305
+ƒ f(o: Option<i32>) → i32 ! ∅ { ⌥ o { Some(v) ↦ v } }

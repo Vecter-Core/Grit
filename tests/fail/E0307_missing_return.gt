@@ -1,0 +1,2 @@
+// expect: fail E0307
+ƒ f(c: bool) → i32 ! ∅ { ⎇ c { ⏎ 1; } }
