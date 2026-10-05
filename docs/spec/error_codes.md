@@ -7,6 +7,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | Mã | Ý nghĩa | Milestone | Test mẫu (M0) |
 |---|---|---|---|
 | E0101 | Token bất ngờ / thiếu dấu / từ khoá cứng hoặc ký hiệu dành riêng (`self`, `Self`, `in`, `μ`, `\extern`, `\where`; comment khối `/* */`; `=` đứng riêng) dùng sai chỗ | M2 | E0101_missing_brace, E0101_mu_as_ident, E0101_star_dangling, E0101_self_as_var, E0101_self_as_var_ascii, E0101_extern_reserved, E0101_where_reserved, E0101_block_comment, E0101_compound_assign, E0101_char_multi, E0101_doc_comment_dangling, E0101_selftype_as_var, E0101_in_as_var |
+| E0102 | Lồng nhau quá sâu (> `MAX_DEPTH` = 256 mức, tính cả độ dài chuỗi toán tử/postfix) hoặc cây quá lớn. ĐỎ, không phải ICE. Gợi ý sửa: tách biểu thức con ra biến phụ bằng `≔` | M2 | E0102_too_deep |
 | E0201 | Tên chưa định nghĩa | M3 | E0201_undefined_name |
 | E0202 | Định nghĩa trùng | M3 | E0202_duplicate_def |
 | E0203 | Truy cập item private | M3 | E0203_private_item |
@@ -17,7 +18,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0303 | `==` trên số thực (D4) | M4 | E0303_float_eq |
 | E0305 | `⌥` không đầy đủ (D6) | M5 | E0305_nonexhaustive |
 | E0306 | Dùng biến chưa khởi tạo chắc chắn | M5 | — |
-| E0307 | Thiếu đường trả về | M5 | E0307_missing_return, E0307_trailing_semicolon |
+| E0307 | Thiếu đường trả về (gồm khối kết thúc bằng `;` mà hàm trả kiểu khác `()`) — **thuộc M5**, không phải parser (cần kiểu trả về và luồng điều khiển) | M5 | E0307_missing_return, E0307_trailing_semicolon |
 | E0308 | Gán vào biến bất biến (D5) | M4 | E0308_assign_immutable |
 | E0310 | Thiếu capability (D28) | M4.5 | E0310_missing_cap |
 | E0401 | Dùng sau move | M6 | E0401_use_after_move |
@@ -45,7 +46,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E1202 | Ký tự zero-width/vô hình | M1 | E1202_zero_width |
 | E1203 | Định danh trộn bảng chữ/homoglyph | M1 | E1203_homoglyph |
 | E1204 | Nguồn không phải NFC | M1 | E1204_not_nfc |
-| E9901 | ICE | M9 | — |
+| E9901 | ICE (lỗi nội bộ compiler; gồm panic trong parser bị bắt, hết bộ nhớ khi tạo luồng parser) — exit 2, không bao giờ chạy | M2 (parser) / M9 (cổng phán quyết) | — |
 | S101 | Secret nằm trong nguồn | M9 | S101_key_in_source |
 | S201 | `declassify` / Secret chảy ra sink | M9 | — |
 | N0601 | Check tràn hạ thành runtime | M7 | pass/02_sum_loop |

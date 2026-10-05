@@ -210,3 +210,8 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 - **Dòng trống:** một dòng trống giữa hai item cấp cao nhất liền kề; không dòng trống thừa; dòng trống người dùng không được bảo toàn.
 - **Comment:** `//` giữ nguyên số lượng và nội dung từng comment (bảng trivia của lexer, ADR-012); `own_line` gắn vào node kế tiếp, comment cuối dòng gắn vào node trước. **Không gắn được (vd comment giữa biểu thức/chữ ký) → gt-fmt từ chối định dạng với Diagnostic, không xoá và không dời comment.** `///` đi theo node.
 - AST không có ngoặc nhóm nên printer thêm ngoặc theo độ ưu tiên và theo luật `expr_ns` (struct literal trần trong điều kiện `⎇ ⌥ ⟳` phải bọc ngoặc).
+
+## 26. Độ sâu, stack và an toàn đệ quy (luật — ADR-014, ADR-015)
+- **`MAX_DEPTH` = 256** nằm đúng MỘT chỗ: hằng `gt_ast::MAX_DEPTH`. Mọi bộ phận (parser và các pass đệ quy sau này) dùng hằng này, không tự đặt giới hạn riêng.
+- **Độ sâu** = số mức lồng nhau của biểu thức, khối, kiểu, pattern, `▦` (tính chung một bộ đếm khi trộn lẫn) **cộng độ dài chuỗi toán tử nhị phân/postfix/`as`** (chuỗi phẳng tạo cây lệch trái sâu như nhau). Vượt `MAX_DEPTH` → ĐỎ **E0102** ("tách biểu thức con ra biến phụ bằng `≔`") và dừng phân tích. E0102 là lỗi người dùng, không phải ICE.
+- **Hợp đồng stack:** một chương trình sâu đúng `MAX_DEPTH` mức ở MỌI loại lồng phải được xử lý **trong bản debug** mà không tràn stack. Mọi pass đệ quy trên AST phải chạy qua helper `gt_stack::run_with_big_stack` (một chỗ chung); panic nội bộ thành ICE **E9901** (exit 2, không chạy). Test `depth_law` của parser kiểm: với mỗi loại lồng, độ sâu cực đại tìm được parse thành công (không E9901) và cực đại + 1 cho E0102.

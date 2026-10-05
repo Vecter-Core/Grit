@@ -200,7 +200,7 @@ Số học: mặc định **kiểm tràn**. Toán tử tường minh: `+%` (qu�
 
 - **D10** Mọi hàm **khai báo tập hiệu ứng** (`! ∅` = thuần; `! {io, mem, st, div, ffi, lock(Lk)}`…). Gritc kiểm: _khai báo ⊇ suy ra_. Hiệu ứng lan truyền lên hàm gọi.
 - **D11** Không biến toàn cục khả biến, trừ qua kiểu đồng bộ (atomic/mutex có cấp khoá) và hiệu ứng `st` khai báo rõ.
-- **D12** Vòng lặp/đệ quy: phải có `↓` hoặc nằm trong hiệu ứng `div` (chỉ cho vòng lặp chủ ý vô hạn: server, event loop, entry của luồng).
+- **D12** Vòng lặp/đệ quy: phải có `↓` hoặc nằm trong hiệu ứng `div` (chỉ cho vòng lặp chủ ý vô hạn: server, event loop, entry của luồng). **Biến thể của hàm đệ quy là contract `↓ expr` trong chữ ký hàm; đệ quy tương hỗ cần `↓` cho mọi hàm trong cùng SCC** (bổ sung theo quyết định của Giang, 2026-10-05, từ Q15h).
 
 **Bảo mật**
 

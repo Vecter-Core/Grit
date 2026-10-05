@@ -52,7 +52,7 @@ self_param = "self" | "&" "self" | "&!" "self" ;         (* chỉ trong trait/im
 param      = [ "μ" ] ident ":" type ;
 effects    = "!" ( "∅" | "{" [ effect { "," effect } ] "}" ) ;   (* BẮT BUỘC (D10) *)
 effect     = ident [ "(" ident ")" ] ;                   (* io | mem | st | div | ffi | lock(L) *)
-contract   = "⊳" expr | "⊲" expr ;
+contract   = "⊳" expr_ns | "⊲" expr_ns | "↓" expr_ns ;   (* pre | post | BIẾN THỂ của hàm đệ quy (D12, Q15h). expr_ns vì ngay sau là khối "{" (Q15a) *)
 
 struct_item = "▢" ident [ generics ] "{" [ field { "," field } [ "," ] ] "}" ;
 field       = { doc_comment } [ "◈" ] ident ":" type ;
@@ -79,16 +79,16 @@ stmt       = let_stmt | assign_stmt | expr ";" | block_stmt | "⏎" [ expr ] ";"
 block_stmt = if_expr | match_expr | loop_expr | unsafe_expr ;   (* ở vị trí câu lệnh kết thúc tại "}" — KHÔNG cần ";" (Q8 đã duyệt) *)
 let_stmt   = [ "μ" ] ident [ ":" type ] "≔" expr ";" ;  (* Phase 1: chỉ binding một tên; chưa destructure ở let *)
 assign_stmt= place "←" expr ";" ;                       (* KHÔNG có += -= ... (chủ ý, KNOWN_LIMITATIONS) *)
-place      = [ "*" ] ident { "." ( ident | dec_int ) | "[" expr "]" } ;
+place      = expr ;   (* đích gán: parse như biểu thức rồi KIỂM SAU: biến một đoạn, hoặc trường/chỉ số/"*" áp lên một vị trí — vd (*p).x, **pp, a.b[0] (Q15i) *)
 
 expr       = if_expr | match_expr | loop_expr | unsafe_expr | range ;
 expr_ns    = expr, nhưng KHÔNG cho struct_lit ở mức ngoài cùng (phải bọc "(…)") ;   (* dùng cho điều kiện/đối tượng match; tránh "⎇ p { … }" mơ hồ *)
 if_expr    = "⎇" expr_ns block [ "⇝" ( block | if_expr ) ] ;
 match_expr = "⌥" expr_ns "{" arm { "," arm } [ "," ] "}" ;   (* phải đầy đủ (D6) *)
 arm        = pattern "↦" ( expr | block ) ;
-loop_expr  = "⟳" [ expr_ns ] [ "↓" expr ] { "⋈" expr } block                  (* không cond = vô hạn (cần div, D12); có cond = while (Q11) *)
-           | "⟳" ident "in" expr_ns [ "↓" expr ] { "⋈" expr } block ;        (* for-in (Q10). Phân biệt với while bằng nhìn trước 2 token: ident rồi "in" *)
-unsafe_expr= "⚠" { "⊢" expr } block ;
+loop_expr  = "⟳" [ expr_ns ] [ "↓" expr_ns ] { "⋈" expr_ns } block                  (* không cond = vô hạn (cần div, D12); có cond = while (Q11) *)
+           | "⟳" ident "in" expr_ns [ "↓" expr_ns ] { "⋈" expr_ns } block ;        (* for-in (Q10). Phân biệt với while bằng nhìn trước 2 token: ident rồi "in" *)
+unsafe_expr= "⚠" { "⊢" expr_ns } block ;                   (* expr_ns cho MỌI biểu thức đứng ngay trước một khối: ⊳ ⊲ ↓ ⋈ ⊢ ⎇ ⟳ ⌥ (Q15a) *)
 
 pattern    = "_"                                                 (* wildcard *)
            | ident                                               (* gán tên (hoặc variant không đối số — M3 phân giải) *)
@@ -103,8 +103,9 @@ pat_list   = pat_elem { "," pat_elem } [ "," ] ;
 pat_elem   = pattern | ".." ;                                    (* ".." đơn lẻ = rest, bỏ qua phần còn lại; tối đa một lần mỗi danh sách (Q14) *)
 field_pat  = ident [ ":" pattern ] | ".." ;                      (* "x" = "x: x"; ".." = rest, phải đứng cuối *)
 
-(* độ ưu tiên giảm dần: postfix > unary > as > (* / % *% *^ *?) > (+ - +% -% +^ -^ +? -?) > so sánh (không kết hợp)
-   > ∧ > ∨ > ⇒ (chỉ hợp đồng) > range (.. ..=). So sánh không kết hợp: "a < b < c" là lỗi cú pháp. *)
+(* độ ưu tiên giảm dần: postfix > unary > as > (* / % *% *^ *?) > (+ - +% -% +^ -^ +? -?) > so sánh (== ≠ < > ≤ ≥ ∈, KHÔNG kết hợp)
+   > ∧ > ∨ > ⇒ (KẾT HỢP PHẢI: a ⇒ b ⇒ c = a ⇒ (b ⇒ c); chỉ hợp đồng) > range (.. ..=). Các toán tử khác kết hợp trái.
+   "a < b < c", "a ∈ b ∈ c", "a < b == c" là lỗi cú pháp (Q15c). *)
 range      = binary [ ".." [ binary ] | "..=" binary ] | ".." [ binary ] ;
              (* a..b không gồm b; a..=b gồm b; a.. (đến hết); ..b (từ đầu, không gồm b); .. (toàn bộ). Q14.
                 Dạng mở CHỈ có nghĩa làm chỉ số slice (xs[1..], xs[..2], xs[..]) và trong pattern; đứng độc lập = chưa có ngữ nghĩa (E0301, KNOWN_LIMITATIONS) *)
@@ -115,7 +116,7 @@ cast       = unary { "as" type } ;
 unary      = ( "¬" | "-" | "*" | "&" | "&!" ) unary | postfix ;
              (* "*" ở đầu toán hạng = deref (prefix); "*" sau một toán hạng đầy đủ = nhân (infix). Lexer chỉ phát STAR (semantics §14) *)
 postfix    = primary { "(" [ expr { "," expr } ] ")" | "." ident | "." dec_int | "[" expr "]" } ;   (* gọi, field, tuple index t.0, index/slice *)
-primary    = literal | path | struct_lit | array_lit | block
+primary    = literal | path | "self" | struct_lit | array_lit | block      (* "self" làm biểu thức (self.w) — Q15b *)
            | "(" ")" | "(" expr ")" | "(" expr "," [ expr { "," expr } [ "," ] ] ")"     (* unit, nhóm, tuple (a, b), 1-tuple (a,) *)
            | ( "∀" | "∃" ) ident "∈" expr ":" expr ;      (* lượng từ chỉ trong hợp đồng; dấu ":" (đổi từ "." vì "0..n." mơ hồ với range/field) *)
 struct_lit = path "{" [ field_init { "," field_init } [ "," ] ] "}" ;   (* Point { x: 1, y: 2 } *)
