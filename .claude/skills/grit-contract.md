@@ -49,6 +49,12 @@ Mỗi pass kiểm tra mới (borrow checker, hiệu ứng, biên, đa luồng...
 - Một **corpus chương trình đúng** — không được chặn nhầm.
 - Nếu sau này phát hiện một case lọt qua (false negative) — đây là **bug mức nghiêm trọng nhất có thể có** trong dự án này. Phải thêm ngay vào corpus vĩnh viễn, không chỉ sửa rồi thôi.
 
+**Phạm vi đột biến (mutation testing) — Giang quyết 2026-10-06 (đã sửa lần hai), áp dụng từ M4:**
+- Đã làm đột biến (tay hoặc cargo-mutants; mọi đột biến sống sót phải có test mới hoặc được chứng minh tương đương): M1 lexer, M2 (gt-ast, gt-diag, gt-parser, gt-fmt), M3 (gt-resolve).
+- **KHÔNG làm đột biến TOÀN BỘ** gt-types, gt-hir, gt-mir, gt-dataflow (M4, M5).
+- **NGOẠI LỆ có mục tiêu:** đột biến cho 4 kiểm tra an toàn trong gt-types — D1 (không ép kiểu ngầm), D4 (cấm `==` trên số thực), D5 (bất biến mặc định), phép ép kiểu `!` — khoảng 40 đột biến, làm ở CUỐI M4; mọi đột biến sống sót phải có test mới.
+- **GIỮ đột biến đầy đủ** cho M6 (borrow checker), M7 (solver/biên), M8 (đa luồng/hiệu ứng) — nơi false negative là lỗ hổng an toàn.
+- Phần không đột biến PHẢI bù bằng: TDD (test viết trước), corpus fail/pass đủ ≥3+≥3 mỗi mã, test thuộc tính/ngẫu nhiên khi có thể, và test "mọi vị trí con của AST đều được duyệt" (bài học M3: đột biến phát hiện 4 lỗi thật, trong đó 1 lỗi fail-open).
 ### 3.4 Minh bạch, không tự ý quyết định lớn
 - Mọi quyết định thiết kế quan trọng ghi thành ADR ngắn trong `docs/DECISIONS.md` (bối cảnh – quyết định – hệ quả).
 - Không tự ý đổi luật ngôn ngữ (mục 4 trong `GRIT_PLAN.md`) hoặc hệ mã lỗi mà không có ADR và chưa được chủ dự án duyệt.

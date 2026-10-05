@@ -16,10 +16,16 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0301 | Sai kiểu / biểu thức chưa có ngữ nghĩa ở Phase 1 (vd range mở độc lập) | M4 | E0301_type_mismatch, E0301_open_range_standalone |
 | E0302 | Ép kiểu ngầm số (D1) | M4 | E0302_implicit_cast |
 | E0303 | `==` trên số thực (D4) | M4 | E0303_float_eq |
-| E0305 | `⌥` không đầy đủ (D6) | M5 | E0305_nonexhaustive |
+| E0304 | Trường struct/biến thể/pattern sai: thiếu, thừa, không tồn tại hoặc trùng (literal `P { … }`, pattern `P { … }`, truy cập `.x`) — Q20 | M4 | — |
+| E0305 | `⌥` không đầy đủ (D6) | M4 | E0305_nonexhaustive |
 | E0306 | Dùng biến chưa khởi tạo chắc chắn | M5 | — |
 | E0307 | Thiếu đường trả về (gồm khối kết thúc bằng `;` mà hàm trả kiểu khác `()`) — **thuộc M5**, không phải parser (cần kiểu trả về và luồng điều khiển) | M5 | E0307_missing_return, E0307_trailing_semicolon |
 | E0308 | Gán vào biến bất biến (D5) | M4 | E0308_assign_immutable |
+| E0309 | Ràng buộc trait không thoả / không có phương thức / mơ hồ (Q20) | M4 | — |
+| E0311 | `⊐` không hợp lệ: thiếu/thừa/khác chữ ký thành viên so với trait, hoặc hai impl chồng lấn (Q20) | M4 | — |
+| E0312 | Đệ quy đa hình vượt ngưỡng instance (64) — `ƒ f<T>() { f<Vec<T>>() }` (ADR-018 §1, Q20) | M4 | — |
+| E0313 | Kiểu lang dùng sai: tạo `Secret`/`Cap` bằng literal ngoài lib/core, `⊐ Copy for` chúng (Q20, Q21) | M4 | — |
+| E0314 | Kiểu `!` ở vị trí không hợp lệ: tham số kiểu, trường, phần tử mảng (ADR-018 §3.6, Q20) | M4 | — |
 | E0310 | Thiếu capability (D28) | M4.5 | E0310_missing_cap |
 | E0401 | Dùng sau move | M6 | E0401_use_after_move |
 | E0402 | Hai `&!` chồng nhau | M6 | E0402_double_unique |
@@ -41,6 +47,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0901 | Tiền điều kiện chắc chắn sai | M7 | E0901_precondition_false |
 | E0902 | Obligation không kiểm lúc chạy được mà chưa giải (D25) | M7 | — |
 | E1001 | Nghĩa vụ `⚠` chưa giải (D21); con trỏ thô `*□ T`/`*μ T` hoặc `#noreturn` dùng ngoài phạm vi cho phép (Q12, Q13) | M7 | E1001_unsafe_unproven, E1001_raw_ptr_outside_unsafe |
+| E1002 | Thuộc tính `#lang` dùng ngoài `lib/core`/prelude (ADR-018 §5, Q21) | M4 | — |
 | E1101 | IR Guard: attestation lệch | M10 | — |
 | E1201 | Ký tự bidi (D15) | M1 | E1201_bidi |
 | E1202 | Ký tự zero-width/vô hình | M1 | E1202_zero_width |

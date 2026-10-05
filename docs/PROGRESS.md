@@ -163,3 +163,6 @@ Cập nhật: 2026-10-06.
 - `python tools/check_expectations.py`: OK — 138 file `.gt` (fail=74, warn=1, pass=37, lexer=8), 47 mã, 76 tham chiếu test; kiểm cả ca nhiều tệp và `docs/errors/`.
 - `cargo test --workspace --no-fail-fast`: **233 test pass, 0 fail**.
 - Duyệt của Giang 2026-10-06: Q17, Q18, Q19 (ADR-017) — đã quyết.
+
+## M4 — Hệ thống kiểu — **ĐÃ VIẾT ADR-018, CHƯA CODE; chờ Giang duyệt ADR**
+Cập nhật: 2026-10-06. Hai việc theo lệnh đã xong: (A) chính sách đột biến ghi vào `.claude/skills/grit-contract.md` §3.3 (không đột biến gt-types/hir/mir/dataflow; chỉ M6/M7/M8); (B) ADR-018 (đơn hình hoá lazy đề xuất, `ImplTable` + `Copy`, chi tiết lan truyền `!`) cùng phản biện kỹ thuật (mã lỗi E0305/E0306 mâu thuẫn bảng đã duyệt; M4.5 không phải kiểm trường struct; `Secret`/`Cap` cần thuộc tính lang chỉ lib/core; rủi ro cắt đột biến). OPEN_QUESTIONS Q20–Q22. Chưa có dòng code M4 nào.
