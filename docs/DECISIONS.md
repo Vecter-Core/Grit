@@ -51,3 +51,26 @@
   3. Yêu cầu "semantics §7 / §Q12 / §Q13" được đặt ở §21 / §22 / §23 (vì §7 là Secret).
   4. Range mở độc lập bị từ chối bằng E0301 (mã chọn vì "sai kiểu / chưa có ngữ nghĩa"); không thêm mã mới.
 - **Hệ quả cho lexer:** `!` phát BANG cho cả hiệu ứng lẫn kiểu never (parser phân biệt theo vị trí); `in` chỉ khớp nguyên từ (`index` vẫn là IDENT).
+
+## ADR-009 — Phụ thuộc ngoài, fuzz harness và cách hiểu D15 của lexer (M1)
+- **Phụ thuộc ngoài (TCB mở rộng, plan §3.3):** `unicode-ident` (XID_Start/XID_Continue, UAX #31), `unicode-normalization` (kiểm NFC; kéo theo `tinyvec`), `unicode-script` (script từng ký tự cho E1203).
+  Cả ba đều là thư viện Unicode phổ biến, giấy phép MIT/Apache-2.0 (tinyvec: Zlib/Apache-2.0/MIT), chỉ dùng trong `gt-lexer`; `cargo audit` sạch (1290 advisory, 6 crate). Tự viết lại bảng Unicode là rủi ro lớn hơn dùng lại.
+- **Cách hiểu D15 (Giang xem lại nếu khác ý):** (1) bidi (U+202A–202E, U+2066–2069, cộng LRM/RLM/ALM U+200E/200F/061C) cấm ở **mọi nơi** → E1201; (2) vô hình/zero-width/điều khiển/khoảng trắng lạ → E1202 ở **mọi nơi, kể cả trong chuỗi và comment** — plan nói "ngoài chuỗi/comment có chú giải" nhưng chưa định nghĩa "chú giải", nên chọn phương án chặt (fail-closed; muốn ký tự đó trong chuỗi thì dùng `\u{…}`);
+  (3) BOM đầu file là E1202; (4) trộn bảng chữ (không kể Common/Inherited) trong một định danh/lifetime → E1203; (5) `µ` (U+00B5, MICRO SIGN) bị chặn E1203 vì trông giống `μ` dành riêng; (6) nguồn không NFC → E1204.
+- **CRLF:** `\r\n` là xuống dòng; `\r` lẻ là E1202 (repo checkout trên Windows có thể là CRLF; thêm `.gitattributes` ép LF cho corpus).
+- **Fuzz harness (`crates/gt-lexer/fuzz`):** crate riêng ngoài workspace, cần nightly + `cargo-fuzz`; macro `fuzz_target!` sinh mã `unsafe` nên crate này **không** `forbid(unsafe_code)` — ngoại lệ có chủ đích, không phát hành. Trên Windows cần thêm thư mục chứa `clang_rt.asan_dynamic-x86_64.dll` (MSVC) vào PATH.
+- **Tên token** vẫn là tên tạm của tests/lexer/*.tokens; M1 đã dùng đúng các tên đó (xem `crates/gt-lexer/src/token.rs`), chờ Giang chốt.
+
+## ADR-010 — Tên token chính thức (M1, Giang 2026-10-05)
+- **Quyết định:** từ khoá dùng tiền tố `KW_` (`KW_FN KW_MUT KW_IF KW_ELSE KW_MATCH KW_BREAK KW_CONT KW_RET KW_STRUCT KW_ENUM KW_TRAIT KW_IMPL KW_MOD KW_USE KW_PUB KW_TYPE KW_CONST KW_STATIC KW_UNSAFE KW_EXTERN KW_WHERE KW_SELF_KW KW_SELF_TY KW_AS KW_FOR KW_IN KW_TRUE KW_FALSE`);
+  ký hiệu: `ARROW FAT_ARROW WALRUS ASSIGN LOOP_SYM DEC PRE POST INV PROOF_SYM EMPTY_SET IMPLIES IN_SET FORALL EXISTS LEQ GEQ NEQ LAND LOR LNOT BORROW BORROW_MUT`;
+  dấu câu: `SEMI COLON COMMA DOT DOTDOT DOTDOTEQ LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET COLONCOLON HASH STAR SLASH PERCENT PLUS MINUS LT GT EQ_EQ`;
+  đặc biệt: `LIFETIME DOC_COMMENT INT_LIT FLOAT_LIT STR_LIT CHAR_LIT IDENT EOF UNKNOWN`. Áp dụng ngay cho `gt-lexer`, `tests/lexer/*.tokens`, semantics, symbols, grammar.
+- **Cách hiểu của agent (Giang xem lại nếu khác ý):**
+  1. Danh sách có cả `KW_LOOP`/`KW_PROOF` lẫn `LOOP_SYM`/`PROOF_SYM` cho cùng `⟳`/`⊢`. Alias ASCII và canonical phải ra CÙNG một token (round-trip) nên chỉ dùng **một** tên cho mỗi khái niệm: giữ `LOOP_SYM`, `PROOF_SYM` (là cái có ghi ký hiệu); `KW_LOOP`, `KW_PROOF` **không được phát** (test `token_names.rs` ghi rõ).
+  2. `KW_IN` xuất hiện hai lần trong danh sách — coi là một tên.
+  3. Tên ngoài danh sách nhưng lexer cần, đặt theo cùng quy ước: `BANG` (`!`), `UNDERSCORE` (`_`), `PLUS_WRAP MINUS_WRAP STAR_WRAP PLUS_SAT MINUS_SAT STAR_SAT PLUS_CHK MINUS_CHK STAR_CHK` (toán tử số học `+% … *?`).
+  4. `UNKNOWN` được phát cho mọi đoạn nguồn không hợp lệ ở tầng lexer (xem semantics §24); trước đây các trường hợp này chỉ có lỗi, không có token.
+  5. Tên biến thể Rust (`TokenKind::KwMut`, `LoopSym`, `Walrus`…) đổi theo cho khớp.
+- **Hệ quả:** ADR-002…ADR-009 còn nhắc tên tạm cũ (`MUT`, `KEYWORD_IN`…) — giữ nguyên làm lịch sử; tên đúng nằm ở đây và ở `token.rs`.
+- **Xác nhận (Giang):** giữ `LOOP_SYM` và `PROOF_SYM`, bỏ `KW_LOOP`/`KW_PROOF` trùng. Nguyên tắc chung: **canonical Unicode và alias ASCII của cùng một ký hiệu luôn ra đúng một token duy nhất; không có token riêng cho từng dạng bề mặt.**

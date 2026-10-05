@@ -1,16 +1,16 @@
 # Dòng 2 của star_ctx.gt. Lexer chỉ phát STAR; deref/nhân do parser phân biệt (semantics §14).
-FN
+KW_FN
 IDENT(f)
 LPAREN
 IDENT(p)
 COLON
-AMP
+BORROW
 IDENT(i32)
 RPAREN
 ARROW
 IDENT(i32)
 BANG
-EMPTYSET
+EMPTY_SET
 LBRACE
 STAR
 IDENT(p)

@@ -1,8 +1,7 @@
-# Workspace gốc của Grit (Phase 1 — Seed). Chưa có crate nào: M0 cấm viết compiler.
-# Các crate được thêm vào `members` ở đúng milestone của chúng (xem GRIT_PLAN.md 6.1/6.2).
+# Workspace gốc của Grit (Phase 1 — Seed). Crate được thêm vào `members` ở đúng milestone của nó (crates/TASK.md).
 [workspace]
 resolver = "3"
-members = []
+members = ["crates/gt-span", "crates/gt-lexer"]
 
 [workspace.package]
 edition = "2024"

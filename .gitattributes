@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.gt text eol=lf
+*.tokens text eol=lf
+*.ebnf text eol=lf
+*.md text eol=lf

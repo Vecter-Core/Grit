@@ -1,5 +1,5 @@
-# Dòng 2 của quote_ctx.gt. 'a' (đóng ngay sau 1 ký tự) = CHAR; 'a không đóng = LIFETIME (semantics §15).
-FN
+# Dòng 2 của quote_ctx.gt. 'a' (đóng ngay sau 1 ký tự) = CHAR_LIT; 'a không đóng = LIFETIME (semantics §15).
+KW_FN
 IDENT(f)
 LT
 LIFETIME(a)
@@ -7,14 +7,14 @@ GT
 LPAREN
 IDENT(x)
 COLON
-AMP
+BORROW
 LIFETIME(a)
 IDENT(i32)
 RPAREN
 ARROW
 IDENT(char)
 BANG
-EMPTYSET
+EMPTY_SET
 LBRACE
-CHAR(a)
+CHAR_LIT(a)
 RBRACE

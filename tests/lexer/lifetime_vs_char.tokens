@@ -1,4 +1,4 @@
-# Dòng 2 của lifetime_vs_char.gt. 'x' (có dấu đóng) = CHAR; 'a (không dấu đóng) = LIFETIME (semantics §15). Giá trị CHAR là văn bản nguồn giữa hai dấu '.
+# Dòng 2 của lifetime_vs_char.gt. 'x' (có dấu đóng) = CHAR_LIT; 'a (không dấu đóng) = LIFETIME (semantics §15). Giá trị CHAR_LIT là văn bản nguồn giữa hai dấu '.
 IDENT(f)
 LT
 LIFETIME(a)
@@ -6,12 +6,12 @@ COMMA
 LIFETIME(b)
 GT
 LPAREN
-CHAR(x)
+CHAR_LIT(x)
 COMMA
-CHAR(\n)
+CHAR_LIT(\n)
 COMMA
-CHAR(\')
+CHAR_LIT(\')
 COMMA
-CHAR(é)
+CHAR_LIT(é)
 RPAREN
 LIFETIME(abc)

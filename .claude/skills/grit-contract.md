@@ -1,0 +1,80 @@
+---
+name: grit-contract
+description: Hợp đồng làm việc dự án Grit (bản sao của CLAUDE.md gốc, file gốc đã mất khỏi đĩa). Đọc trước khi chạm vào code Grit.
+---
+
+# Grit — hợp đồng làm việc
+
+> Bản sao nguyên văn của `D:\Grit\CLAUDE.md` (file gốc không còn trên đĩa và chưa từng được commit). Đây là hợp đồng, không phải gợi ý. Đọc trước khi chạm vào code.
+
+## 1. Dự án này là gì
+
+**Grit** là một ngôn ngữ lập trình mới, đuôi file `.gt`, **thiết kế cho AI viết code, không phải cho con người viết dễ dàng**. Cú pháp dùng ký hiệu toán học/logic ngắn gọn (có bí danh ASCII đi kèm để AI gõ được bằng bàn phím thường). Comment, chuỗi, commit message thì dùng ngôn ngữ tự nhiên (Việt/Anh) thoải mái.
+
+Trình biên dịch tên `gritc`. Triết lý cốt lõi, nhớ nằm lòng:
+
+> **Compiler không tin lời lập trình viên (hay AI) — mọi khẳng định an toàn phải có bằng chứng. Khi không chắc, compiler từ chối chạy (fail-closed), trừ một ngoại lệ duy nhất: lộ secret/key chỉ bị cảnh báo vàng và vẫn cho chạy.**
+
+Mục tiêu kỹ thuật: an toàn hơn Rust (sở hữu/mượn + bằng chứng cho `unsafe`, không chỉ "lời hứa"), nhanh ngang C (biên dịch qua LLVM, xoá hết check nào chứng minh được lúc biên dịch).
+
+Dự án chia **hai giai đoạn**:
+- **Phase 1 — Seed**: viết `gritc` bằng Rust, chỉ hỗ trợ tập con ngôn ngữ nhưng kiểm tra **thật**, không giả.
+- **Phase 2 — Ascend**: nâng dần (SMT, kernel chứng minh, unsafe thật, tự biên dịch bằng chính Grit…).
+
+Bạn (Claude Code) hiện đang làm **Phase 1**. Không nhảy sang ý tưởng của Phase 2 trừ khi được yêu cầu rõ ràng.
+
+## 2. Việc đầu tiên phải làm
+
+1. Đọc toàn bộ `GRIT_PLAN.md` — nguồn sự thật duy nhất về kiến trúc, milestone, luật ngôn ngữ (D1–D29), hệ mã lỗi, tiêu chí hoàn thành.
+2. Xác định milestone hiện tại bằng cách đọc `docs/PROGRESS.md` (nếu chưa có file này, nghĩa là đang ở M0).
+3. **Không được làm milestone sau khi milestone trước chưa đạt "Tiêu chí hoàn thành"** như ghi trong `GRIT_PLAN.md` mục 6.2.
+4. Nếu thấy mâu thuẫn, lỗ hổng, hoặc chỗ thiếu trong `GRIT_PLAN.md` — **dừng lại, ghi vào `docs/OPEN_QUESTIONS.md`, không tự đoán rồi code tiếp.**
+
+## 3. Quy tắc bất biến — đọc lại mỗi khi bắt đầu phiên làm việc mới
+
+### 3.1 Cấm làm qua loa
+- Không `todo!()`, `unimplemented!()`, `// TODO` không gắn issue, không stub giả vờ chạy được.
+- Không test bị tắt (`#[ignore]`) để "cho qua cổng CI".
+- Chưa làm được → ghi thẳng vào `docs/KNOWN_LIMITATIONS.md`, để compiler **từ chối** case đó (báo lỗi rõ ràng) thay vì âm thầm bỏ qua.
+- Đây không phải sở thích phong cách — đây là **yêu cầu cứng của chủ dự án**. Code dở dang ở Phase 1 sẽ thành bug ngầm ở mọi bản sau, vì các giai đoạn sau *xây trên* giả định rằng phần trước đã đúng.
+
+### 3.2 Fail-closed là luật, không phải tuỳ chọn
+- Lỗi đỏ (E...) hoặc lỗi nội bộ compiler (ICE) ⇒ **không sinh binary, không chạy**, bất kể lý do gì.
+- Chỉ đúng một ngoại lệ: cảnh báo vàng (S...) — lộ secret/key — vẫn cho chạy, chỉ in cảnh báo.
+- Khi một bộ giải (interval solver, SMT...) trả về "không biết" / hết tài nguyên ⇒ coi như **chưa chứng minh = không được qua**, không bao giờ coi "không biết" là "an toàn".
+
+### 3.3 Test trước khi tin
+Mỗi pass kiểm tra mới (borrow checker, hiệu ứng, biên, đa luồng...) phải có:
+- Một **corpus chương trình xấu** cố tình vi phạm — phải bị chặn **đúng mã lỗi**.
+- Một **corpus chương trình đúng** — không được chặn nhầm.
+- Nếu sau này phát hiện một case lọt qua (false negative) — đây là **bug mức nghiêm trọng nhất có thể có** trong dự án này. Phải thêm ngay vào corpus vĩnh viễn, không chỉ sửa rồi thôi.
+
+### 3.4 Minh bạch, không tự ý quyết định lớn
+- Mọi quyết định thiết kế quan trọng ghi thành ADR ngắn trong `docs/DECISIONS.md` (bối cảnh – quyết định – hệ quả).
+- Không tự ý đổi luật ngôn ngữ (mục 4 trong `GRIT_PLAN.md`) hoặc hệ mã lỗi mà không có ADR và chưa được chủ dự án duyệt.
+- Kết thúc mỗi milestone: chạy hết test + clippy + fmt, cập nhật `docs/PROGRESS.md` — **trung thực**, kể cả khi chưa đạt. Báo cáo "làm được gì / còn thiếu gì / rủi ro mới phát hiện".
+
+### 3.5 Rust code (crate Rust của chính gritc)
+- `#![forbid(unsafe_code)]` ở mọi crate, trừ ranh giới FFI gọi LLVM (phải có ADR giải thích).
+- `cargo clippy -- -D warnings`, `cargo fmt`, `cargo deny`, `cargo audit` sạch trước khi coi một milestone là xong.
+- Output của `gritc` phải **deterministic**: cùng input → cùng output byte-for-byte (so băm để kiểm).
+
+## 4. Cách tiếp cận một milestone (quy trình chuẩn)
+
+1. Đọc kỹ mục tương ứng trong `GRIT_PLAN.md` (mô tả + "Hoàn thành khi").
+2. Nếu milestone liên quan tới luật ngôn ngữ (D1–D29) — đọc đúng luật đó trước, đừng đoán.
+3. Viết test trước khi viết logic chính khi có thể (đặc biệt với các pass kiểm tra an toàn — xem mục 3.3).
+4. Code từng phần nhỏ, chạy test thường xuyên, không viết một khối lớn rồi mới test.
+5. Khi milestone "xong" theo tiêu chí: chạy toàn bộ test suite + lint, cập nhật `docs/PROGRESS.md`, rồi **dừng lại báo cáo** — không tự ý nhảy sang milestone kế tiếp nếu đây là lần đầu hoàn thành (chờ xác nhận), trừ khi được dặn "cứ làm liên tục tới hết Phase 1".
+
+## 5. Việc không được làm ở Phase 1 (xem mục 6.3 của GRIT_PLAN.md)
+
+Không triển khai: closure, `dyn`/trait object, macro, async, GAT/specialization, inline asm, FFI cho người dùng, `unsafe` do người dùng viết thật sự chạy được (chỉ có intrinsic `trusted` trong `lib/core`), SMT solver, kernel chứng minh, registry gói, tự biên dịch. Những thứ này thuộc Phase 2 (mục 8 của `GRIT_PLAN.md`). Nếu thấy cần dùng tạm một thứ trong danh sách này để code tiếp — dừng lại, hỏi, đừng tự thêm vào.
+
+## 6. Khi gặp bế tắc
+
+Nếu một yêu cầu không rõ, một luật mâu thuẫn với luật khác, hoặc một thiết kế trong `GRIT_PLAN.md` không khả thi khi thực sự code — **không tự chế ra giải pháp rồi code tiếp như thể nó đã được duyệt**. Ghi câu hỏi cụ thể vào `docs/OPEN_QUESTIONS.md`, giải thích ngắn gọn vì sao bế tắc, đề xuất 1–2 phương án nếu có, rồi dừng chờ trả lời.
+
+## 7. Tư duy tổng quát khi code dự án này
+
+Đây là một compiler an toàn — lỗi trong chính compiler nguy hiểm hơn lỗi thường, vì nó tạo **cảm giác an toàn giả**: người dùng tin "gritc đã kiểm rồi" trong khi thực ra chưa. Khi phân vân giữa "code nhanh cho xong milestone" và "code chậm nhưng chắc chắn đúng với chính nó" — luôn chọn vế sau. Chủ dự án đã nói rõ: làm dở dang hay thất trách ở bản đầu, bug ngầm ở các bản sau là lỗi của người code, không phải lỗi của độ khó dự án.

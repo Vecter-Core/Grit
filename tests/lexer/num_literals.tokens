@@ -1,23 +1,23 @@
-# Dòng 2 của num_literals.gt. Giá trị trong ngoặc là văn bản nguồn nguyên văn của literal. "1..2" KHÔNG phải float. Tên token tạm.
-INT(1_000i64)
+# Dòng 2 của num_literals.gt. Giá trị trong ngoặc là văn bản nguồn nguyên văn của literal. "1..2" KHÔNG phải float.
+INT_LIT(1_000i64)
 SEMI
-INT(0xFFu8)
+INT_LIT(0xFFu8)
 SEMI
-INT(0o17)
+INT_LIT(0o17)
 SEMI
-INT(0b101)
+INT_LIT(0b101)
 SEMI
-FLOAT(2.5e-3f64)
+FLOAT_LIT(2.5e-3f64)
 SEMI
-FLOAT(1e3)
+FLOAT_LIT(1e3)
 SEMI
-FLOAT(1f32)
+FLOAT_LIT(1f32)
 SEMI
-INT(1)
+INT_LIT(1)
 DOTDOT
-INT(2)
+INT_LIT(2)
 SEMI
-INT(1)
+INT_LIT(1)
 DOTDOTEQ
-INT(2)
+INT_LIT(2)
 SEMI

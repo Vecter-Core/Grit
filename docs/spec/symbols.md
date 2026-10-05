@@ -1,4 +1,4 @@
-# Bảng ký hiệu Grit — bản M0 FINAL (Q1–Q14 đã đóng); tên token vẫn tạm cho tới khi M1 chốt
+# Bảng ký hiệu Grit — bản M0 FINAL (Q1–Q14 đã đóng); tên token chính thức đã chốt (ADR-010)
 
 Quy tắc: mỗi ký hiệu canonical có **đúng một** bí danh ASCII (1–1). Lexer chấp nhận cả hai;
 `gritc fmt` in canonical. Hai dạng phải cho **cùng AST** (test round-trip, M1).
@@ -41,8 +41,8 @@ không phải chữ/số/`_`. Bí danh toán tử (`<-`, `->`, `:=`, `<=`...) d�
 | type alias | `≡` | `\type` | Giang |
 | const (hằng lúc biên dịch) | `□` | `\const` | Giang |
 | static (bất biến, Phase 1) | `■` | `\static` | Giang |
-| extern (**dành riêng**, chưa có nghĩa — Phase 2) | — | `\extern` (token `KEYWORD_EXTERN`) | Giang, ASCII-only |
-| where (**dành riêng**, chưa có nghĩa — Phase 2; Q7) | — | `\where` (token `KEYWORD_WHERE`) | Giang, ASCII-only |
+| extern (**dành riêng**, chưa có nghĩa — Phase 2) | — | `\extern` (token `KW_EXTERN`) | Giang, ASCII-only |
+| where (**dành riêng**, chưa có nghĩa — Phase 2; Q7) | — | `\where` (token `KW_WHERE`) | Giang, ASCII-only |
 
 ## Từ khoá cứng ASCII (không có canonical, không dùng làm tên — semantics §13)
 
@@ -117,19 +117,20 @@ Hệ quả: `a /*p` (chia cho deref không có khoảng trắng) bị đọc là
 - Không ép kiểu ngầm (D1): ép kiểu dùng `e as T`.
 - `==` trên `f32/f64` là ĐỎ (D4). Không shadowing (D7).
 - Mỗi ký hiệu canonical là **một codepoint** (ngoại lệ: `&!`, `+%`… là toán tử ASCII sẵn).
-- Cấm cứng (D15): bidi (U+202A–202E, U+2066–2069), zero-width (U+200B–200D, U+2060, U+FEFF),
-  định danh trộn bảng chữ. Nguồn phải là NFC.
+- Cấm cứng (D15): bidi (U+202A–202E, U+2066–2069, cộng LRM/RLM/ALM) → E1201; zero-width/vô hình/điều khiển (U+200B–200D, U+2060, U+FEFF, …) → E1202;
+  định danh trộn bảng chữ → E1203; nguồn phải là NFC → E1204. Chi tiết và cách hiểu: semantics §24, ADR-009.
+- `ƒ` (U+0192) và `μ` (U+03BC) là chữ cái nhưng là ký hiệu dành riêng: không nằm trong bất kỳ định danh nào. `µ` (U+00B5) bị chặn vì trông giống `μ`.
 - Định danh: XID_Start/XID_Continue, **ngoại trừ** mọi codepoint trong bảng trên và mọi từ khoá cứng.
-- **`μ` là ký hiệu dành riêng (Q5):** mọi codepoint `μ` (U+03BC) đều là token `MUT`; lexer không bao giờ
-  đưa `μ` vào một định danh, dù dính liền ký tự khác. `μs` → `MUT`, `IDENT(s)` (giống hệt `μ s`).
-  Hệ quả: không định danh nào chứa `μ`; `aμb` → `IDENT(a) MUT IDENT(b)` và bị parser từ chối (E0101, M2).
+- **`μ` là ký hiệu dành riêng (Q5):** mọi codepoint `μ` (U+03BC) đều là token `KW_MUT`; lexer không bao giờ
+  đưa `μ` vào một định danh, dù dính liền ký tự khác. `μs` → `KW_MUT`, `IDENT(s)` (giống hệt `μ s`).
+  Hệ quả: không định danh nào chứa `μ`; `aμb` → `IDENT(a) KW_MUT IDENT(b)` và bị parser từ chối (E0101, M2).
   `μ` ngoài vị trí khai báo (vd `μ ≔ 1`) cũng là E0101.
   Test: `tests/lexer/mu_split.gt` + `.tokens`, `tests/fail/E0101_mu_as_ident.gt`.
 - `true` / `false` là từ khoá ASCII duy nhất cho hằng boolean (Q2); không có ký hiệu `⊤ ⊥`.
-- `\extern` và `\where` được lexer nhận ra thành token riêng (`KEYWORD_EXTERN`, `KEYWORD_WHERE`) để không dùng làm tên;
+- `\extern` và `\where` được lexer nhận ra thành token riêng (`KW_EXTERN`, `KW_WHERE`) để không dùng làm tên;
   mọi chỗ dùng ở Phase 1 là E0101 (không production nào chấp nhận — D14 cấm FFI người dùng; where là Phase 2).
   Test: `tests/fail/E0101_extern_reserved.gt`, `tests/fail/E0101_where_reserved.gt`.
 - **Toán tử bit/dịch bit (Q9 — đã duyệt):** không có ký hiệu riêng. Dùng hàm `band bor bxor bnot shl shr` trong `lib/core` (M12).
   Hệ quả: `|` không được dùng ở Phase 1 (để dành cho closure Phase 2); lone `|`, `^`, `~` là E0101.
 - Không có toán tử gán kết hợp `+= -= …` (chủ ý): chỉ `x ← x + 1`. `=` đứng riêng không phải token hợp lệ (E0101); so sánh bằng là `==`.
-- Tên token trong tài liệu (`MUT`, `STAR`, `LIFETIME`, `KEYWORD_WHERE`…) là tạm; M1 chốt tên chính thức.
+- **Tên token chính thức (ADR-010):** từ khoá `KW_*`; ký hiệu `WALRUS ≔`, `FAT_ARROW ↦`, `LOOP_SYM ⟳`, `PROOF_SYM ⊢`, `EMPTY_SET ∅`, `LEQ GEQ NEQ`, `LAND LOR LNOT`, `BORROW &`, `BORROW_MUT &!`, `EQ_EQ`; literal `INT_LIT FLOAT_LIT STR_LIT CHAR_LIT`; `LIFETIME DOC_COMMENT IDENT EOF UNKNOWN`. Danh sách đầy đủ và mã nguồn: `crates/gt-lexer/src/token.rs`; test khoá: `crates/gt-lexer/tests/token_names.rs`.

@@ -78,7 +78,7 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 
 ## 12. Token hoá (lexer) — quy tắc đã duyệt
 - **[Q5] `μ` là ký hiệu dành riêng.** Test bắt buộc cho lexer (M1): nguồn `μs` phải cho đúng hai token
-  `MUT`, `IDENT(s)` — không bao giờ một `IDENT("μs")`; `μ s` cho cùng kết quả. Mọi `μ` (U+03BC) đều là `MUT`,
+  `KW_MUT`, `IDENT(s)` — không bao giờ một `IDENT("μs")`; `μ s` cho cùng kết quả. Mọi `μ` (U+03BC) đều là `KW_MUT`,
   nên không có định danh nào chứa `μ`. Chuỗi token kỳ vọng đầy đủ: `tests/lexer/mu_split.tokens`.
 - `true`/`false` là từ khoá ASCII (Q2); không có ký hiệu canonical.
 - Alias và canonical phải cho cùng chuỗi token (M1 round-trip).
@@ -88,7 +88,7 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
   biến/hàm/tham số/kiểu/trường. `self` chỉ xuất hiện như tham số đầu trong `⊏`/`⊐` (`self`, `&self`, `&!self`); `Self` là kiểu của
   `⊏`/`⊐` đang viết, dùng ở vị trí kiểu. Dùng làm tên (vd `self ≔ 1;`, `self := 1;`, `Self ≔ 1;`) → **E0101** (parser; không thêm mã mới).
   Test: `tests/fail/E0101_self_as_var*.gt`, `tests/fail/E0101_selftype_as_var.gt`.
-- **Ký hiệu dành riêng:** `μ` (Q5, luôn `MUT`), `\extern` (token `KEYWORD_EXTERN`), `\where` (token `KEYWORD_WHERE`, Q7).
+- **Ký hiệu dành riêng:** `μ` (Q5, luôn `KW_MUT`), `\extern` (token `KW_EXTERN`), `\where` (token `KW_WHERE`, Q7).
   `\extern`/`\where` chưa có nghĩa ở Phase 1: mọi chỗ dùng → E0101 (D14 cấm FFI người dùng; where-clause là Phase 2).
   Test: `tests/fail/E0101_extern_reserved.gt`, `tests/fail/E0101_where_reserved.gt`.
 - Lexer nhận ra các từ khoá/ký hiệu này **trước** khi hình thành định danh, nên chúng không bao giờ thành `IDENT`.
@@ -100,7 +100,7 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
   `[`, `≔`, `←`, `↦`, `⏎`, `⊳`, `⊲`…) thì `STAR` là **prefix deref**, độ ưu tiên unary. Ngay sau một toán hạng đầy đủ
   thì là **infix nhân**.
 - Ví dụ: `*p * *q` = `(*p) * (*q)`; `*r ← *r * 2;` (câu lệnh bắt đầu bằng `*` → đích gán là deref); `a * ;` → E0101 (thiếu toán hạng).
-- Vì câu lệnh kết thúc bằng `;` (Q8, đề xuất) nên `a;` rồi `*p ← 1;` không bao giờ bị đọc thành `a * p`. Đây là một lý do
+- Vì câu lệnh kết thúc bằng `;` (Q8, đã duyệt) nên `a;` rồi `*p ← 1;` không bao giờ bị đọc thành `a * p`. Đây là một lý do
   chống phương án "xuống dòng làm dấu kết thúc" (xem Q8).
 - Mẫu: `tests/pass/19_deref_vs_mul.gt`, `tests/lexer/star_ctx.gt`, `tests/fail/E0101_star_dangling.gt`.
 
@@ -145,8 +145,8 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 - **Literal ngoài phạm vi kiểu:** `128i8` → lỗi biên chắc chắn (E0601, M7). Dấu `-` là toán tử prefix, nhưng `-` áp trực tiếp lên một literal số
   được gấp trước khi kiểm phạm vi, nên `-128i8` hợp lệ (Q14).
 - **Range:** `1..2` lex thành `INT DOTDOT INT` (không phải float). `..=` là `DOTDOTEQ`.
-- **Chỉ số tuple:** sau token `.`, lexer đọc **chỉ chữ số thập phân** thành `INT` (không bao giờ float) ⇒ `t.0.1` = `t . 0 . 1`. Test: `tests/lexer/tuple_index.*`.
-- **Chuỗi:** UTF-8, không xuống dòng thô (không có chuỗi nhiều dòng — Phase 2/chưa có), không nội suy; escape `\n \r \t \0 \ \' \" \u{hex}`; escape lạ → E0101.
+- **Chỉ số tuple:** sau token `.`, lexer đọc **chỉ chữ số thập phân** thành `INT_LIT` (không bao giờ float) ⇒ `t.0.1` = `t . 0 . 1`. Test: `tests/lexer/tuple_index.*`.
+- **Chuỗi:** UTF-8, không xuống dòng thô (không có chuỗi nhiều dòng — Phase 2/chưa có), không nội suy; escape `\n \r \t \0 \\ \' \" \u{hex}`; escape lạ → E0101.
 - **Comment:** `//` → bỏ qua; `///` → `DOC_COMMENT` giữ lại, gắn vào node kế tiếp; `/*`/`*/` → **E0101** (Phase 1). `///` ngay trước `}` hoặc hết file
   (không có node để gắn) → E0101. `////…` (≥4 dấu `/`) là `//` thường. Văn bản `DOC_COMMENT` bỏ đúng một khoảng trắng đầu (nếu có).
   Test: `tests/pass/22_comments.gt`, `tests/lexer/comments.*`, `tests/fail/E0101_block_comment.gt`, `tests/fail/E0101_doc_comment_dangling.gt`.
@@ -189,3 +189,18 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 - Kiểu: `*□ T` (con trỏ tới T chỉ đọc) và `*μ T` (con trỏ tới T ghi được); ASCII: `*` + `\const` / `*` + `\mut`. Cú pháp con trỏ thô chỉ được **dùng bên trong khối `⚠`**.
 - Dùng ngoài `⚠` → **E1001** (tái dùng, không thêm E1002). Ngoại lệ duy nhất: intrinsic trusted trong `lib/core` (D22), vì chúng cần con trỏ thô trong chữ ký.
 - Trong `⚠`, Phase 1 mọi thao tác con trỏ thô sinh Obligation (hợp lệ, căn lề, không alias…) và hầu hết ĐỎ E1001 (D21).
+
+## 24. Lexer: xuống dòng, khoảng trắng, ký tự điều khiển, alias — D15 (chi tiết M1; ADR-009, ADR-010)
+- **Xuống dòng:** `\n` hoặc `\r\n` (CRLF coi là một xuống dòng — repo có thể được checkout với CRLF trên Windows). `\r` lẻ không đi kèm `\n` → **E1202**.
+- **Khoảng trắng hợp lệ:** dấu cách, tab, xuống dòng. Mọi khoảng trắng Unicode khác (NBSP, U+2028/2029, …) → **E1202** (có thể là ký tự vô hình/giả dạng).
+- **Ký tự điều khiển/vô hình:** C0 (trừ tab/xuống dòng), DEL, C1, và `U+200B–200D, U+2060, U+FEFF` → **E1202**, ở mọi nơi kể cả trong chuỗi/comment (fail-closed; dùng
+  escape `\u{…}` trong chuỗi nếu cần). BOM đầu file (U+FEFF) cũng là E1202. Bidi `U+202A–202E, U+2066–2069` → **E1201** ở mọi nơi (kể cả comment/chuỗi, D15).
+- **NFC:** nguồn không phải NFC → **E1204**. **Định danh trộn bảng chữ** (hai script khác nhau, không kể Common/Inherited) → **E1203**. Chưa phát hiện được
+  homoglyph "cả định danh cùng một script khác" (vd toàn Cyrillic trông như Latin): xem KNOWN_LIMITATIONS.
+- **Alias ASCII:** `\` + `[a-z][A-Za-z0-9_]*` (chạy hết dãy chữ/số/`_`), tra bảng; không có trong bảng → E0101. Toán tử ASCII dùng khớp dài nhất:
+  `-> := <- <= >= != => == &! ..= ..` và `+% -% *% +^ -^ *^ +? -? *?`. Hệ quả: `x<-1` lex là `x <- 1` (gán), viết `x < -1` có khoảng trắng.
+- **Ký tự không thuộc ngôn ngữ** (`@ $ ? ~ ^ | ` hoặc `=` đứng riêng…) → E0101.
+- Token `EOF` luôn có ở cuối (độ dài 0). Lexer không bao giờ panic; mỗi lỗi có span, lexer tiếp tục để báo nhiều lỗi (D19).
+- **Token `UNKNOWN`:** mọi ký tự/đoạn không hợp lệ (ký tự lạ, `=` đứng riêng, alias `\…` không tồn tại, `/*`, `*/`, literal số/chuỗi/char hỏng, `µ`) phát đúng **một** token `UNKNOWN`
+  phủ đoạn đó, kèm một `LexError` — để parser (M2) có điểm neo khôi phục lỗi. Chuỗi hợp lệ không bao giờ chứa `UNKNOWN`. Ký tự bị cấm ở prescan (bidi/vô hình/điều khiển)
+  chỉ báo lỗi, không phát token (coi như khoảng trắng).

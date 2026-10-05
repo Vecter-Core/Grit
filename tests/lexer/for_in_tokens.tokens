@@ -1,12 +1,12 @@
-# Dòng 2 của for_in_tokens.gt. "in" trần = KEYWORD_IN (từ khoá cứng); "index" vẫn là IDENT (từ khoá chỉ khớp nguyên từ). Tên token tạm.
-LOOP
+# Dòng 2 của for_in_tokens.gt. "in" trần = KW_IN (từ khoá cứng); "index" vẫn là IDENT (từ khoá chỉ khớp nguyên từ).
+LOOP_SYM
 IDENT(x)
-KEYWORD_IN
+KW_IN
 IDENT(xs)
 DEC
 IDENT(n)
 MINUS
-INT(1)
+INT_LIT(1)
 LBRACE
 IDENT(index)
 RBRACE

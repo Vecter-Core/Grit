@@ -1,11 +1,11 @@
 # Dòng 2 của tuple_index.gt. Sau DOT lexer đọc CHỈ chữ số thập phân thành INT: "t.0.1" KHÔNG phải t . FLOAT(0.1) (semantics §19).
 IDENT(t)
 DOT
-INT(0)
+INT_LIT(0)
 DOT
-INT(1)
+INT_LIT(1)
 SEMI
 IDENT(t)
 DOT
-INT(2)
+INT_LIT(2)
 SEMI

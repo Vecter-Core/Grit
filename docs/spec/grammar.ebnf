@@ -6,7 +6,7 @@
 (* ================= Lexical ================= *)
 ident      = XID_START { XID_CONTINUE } ;          (* trừ từ khoá cứng + ký hiệu; NFC; không trộn bảng chữ (D15) *)
 keyword    = "self" | "Self" | "as" | "for" | "in" | "true" | "false" ;   (* từ khoá cứng ASCII, phân biệt hoa/thường, KHÔNG làm tên *)
-reserved   = "\extern" | "\where" ;                 (* ASCII-only; token KEYWORD_EXTERN / KEYWORD_WHERE; lexer nhận ra để không
+reserved   = "\extern" | "\where" ;                 (* ASCII-only; token KW_EXTERN / KW_WHERE; lexer nhận ra để không
                                                        làm tên, Phase 1 KHÔNG production nào dùng => E0101 (D14; Phase 2) *)
 region     = "'" ident ;                            (* lifetime/region có tên, vd 'a — CHỈ ASCII. Phân biệt với char_lit: semantics §15 *)
 

@@ -1,0 +1,24 @@
+# Harness fuzz cho gt-lexer (M1). Crate riêng, KHÔNG thuộc workspace chính (cần nightly + cargo-fuzz).
+# Ngoại lệ forbid(unsafe_code): macro `fuzz_target!` của libfuzzer-sys sinh mã unsafe; harness không được phát hành (ADR-009).
+[package]
+name = "gt-lexer-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+gt-lexer = { path = ".." }
+gt-span = { path = "../../gt-span" }
+
+[workspace]
+
+[[bin]]
+name = "lex"
+path = "fuzz_targets/lex.rs"
+test = false
+doc = false
+bench = false
