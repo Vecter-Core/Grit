@@ -65,8 +65,9 @@
 - Số mức lồng tối đa theo từng loại khác nhau (127 cho khối `{ }`/`⎇`/`⟳`/`⚠`, 253–255 cho biểu thức/kiểu/pattern) vì mỗi loại tốn độ sâu khác nhau cho mỗi mức; giới hạn chung vẫn là 256.
 
 ## gt-fmt: giới hạn đã biết (M2, ADR-016)
-- **Comment ở nhiều vị trí tự nhiên bị TỪ CHỐI (E1301), không bị xoá/dời:** sau dòng contract, giữa các contract, sau tham số, trong đối số nhiều dòng, trong generics, trước `⇝`, và mọi vị trí giữa biểu thức/chữ ký. Đo: chèn comment sau từng token của corpus `pass` → giữ 365, từ chối 1603. Test khoá: `known_limitation_comments_in_signature_parts_and_call_args_are_refused`. Chờ Giang quyết mở rộng (OPEN_QUESTIONS Q16b).
+- **Comment được đặt theo token (v2); hệ quả bố cục:** comment cuối dòng ép xuống dòng nên một danh sách tham số/đối số ngắn bị ngắt tại comment (không tự chuyển thành mỗi phần tử một dòng); nhiều lần ép dòng liên tiếp tạo bậc thang thụt +2; comment đứng trước dấu phẩy nguồn đẩy dấu phẩy xuống dòng riêng. Hợp lệ và idempotent nhưng không đẹp; cải thiện bố cục (vd tham số mỗi dòng khi có comment) là việc có chủ đích sau này, cần ADR.
+- **E1301 chỉ khi xác minh thất bại** (phương án cuối). Hiện chưa có đầu vào hợp lệ nào kích hoạt (bài đo chèn comment sau từng token của 33 file corpus: 0 từ chối); nếu gặp là lỗi của gt-fmt.
 - **Một dạng chuẩn duy nhất, không bảo toàn bố cục người viết:** xuống dòng/thụt lề/khoảng trắng bị chuẩn hoá; ngoặc thừa bị bỏ, ngoặc cần thiết được thêm (theo độ ưu tiên của parser); `INLINE_MAX = 60` ký tự quyết định khối một dòng hay nhiều dòng; không ngắt dòng giữa các toán tử của một biểu thức dài (chỉ khối/match/danh sách mới nhiều dòng).
 - **Từ chối khi nguồn có bất kỳ chẩn đoán nào của parser** (fail-closed): gt-fmt không định dạng tệp hỏng và không có chế độ "cố gắng".
-- **`x as T < y`:** vì `T <` được đọc là tham số kiểu, vế trái của `<` kết thúc bằng kiểu phải được bọc ngoặc (`(x as T) < y`). Đây là điểm vụng của grammar (không phải của fmt); nếu muốn bỏ, cần quy tắc ở cấp ngôn ngữ (ADR).
+- **`x as T < y`:** quy tắc NGÔN NGỮ (như Rust, `semantics.md`), không phải workaround của fmt: `T <` mở tham số kiểu; parser báo lỗi kèm gợi ý máy áp dụng được bọc `(x as T)`; fmt in `(x as T) < y`.
 - **gt-fmt chỉ là thư viện** (`gt_fmt::format`); lệnh `gritc fmt` có từ M9 (gt-driver).

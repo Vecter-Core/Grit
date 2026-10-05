@@ -1,0 +1,4 @@
+// expect: pass
+// note: Q16b: comment giữa hai toán hạng — gt-fmt đặt theo token (trước đây bị từ chối); chương trình vẫn parse bình thường
+ƒ f() → i32 ! ∅ { 1 + // giữa hai toán hạng
+  2 }

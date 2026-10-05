@@ -2,10 +2,11 @@
 //! gt-fmt (M2, thư viện; chưa có lệnh `gritc fmt` — gt-driver ở M9 mới nối) — MỘT dạng chuẩn duy nhất (canonical Unicode), in lại từ AST.
 //!
 //! * AST không có ngoặc nhóm nên printer tự thêm ngoặc theo độ ưu tiên và theo luật `expr_ns`.
-//! * Comment `//` nằm ngoài AST (bảng trivia của lexer); gt-fmt gắn lại theo quy tắc ở `semantics.md` §25.
-//!   **Không gắn được thì TỪ CHỐI (E1301); không bao giờ xoá hay dời comment.**
+//! * Comment `//` nằm ngoài AST (bảng trivia của lexer); `attach` đặt lại theo TOKEN gần nhất (ADR-016, Q16b):
+//!   dòng riêng → token kế tiếp, cuối dòng → token liền trước. E1301 chỉ khi bước xác minh thất bại (phương án cuối).
+//!   **Không bao giờ xoá hay dời comment sang token khác.**
 //! * Chạy qua `gt_stack::run_with_big_stack` (printer đệ quy trên AST).
-mod comments;
+mod attach;
 mod printer;
 
 use gt_diag::{Code, Diagnostic, Diagnostics, Report};
@@ -61,18 +62,31 @@ fn format_inner(file: &str, source: &str) -> Result<String, FmtError> {
             report: parsed.report,
         });
     }
-    let mut f = printer::Fmt::new(file, source, parsed.trivia);
-    let out = f.program(&parsed.program);
-    let diags = f.finish();
-    if diags.is_empty() {
-        Ok(out)
-    } else {
-        let mut bag = Diagnostics::new(LIMIT);
-        for d in diags {
-            bag.push(d);
+    let starts = parsed.trivia.iter().map(|t| t.span.start).collect();
+    let base = printer::Fmt::new(starts).program(&parsed.program);
+    match attach::place(source, &base) {
+        Ok(out) => Ok(out),
+        Err(attach::PlaceError::Align(m)) => {
+            Err(ice(file, &format!("gt-fmt: căn token thất bại ({m})")))
         }
-        Err(FmtError {
-            report: bag.finish(),
-        })
+        Err(attach::PlaceError::Verify) => {
+            let span = parsed.trivia.first().map_or(Span::new(0, 0), |t| t.span);
+            let mut bag = Diagnostics::new(LIMIT);
+            if let Ok(code) = Code::parse("E1301") {
+                bag.push(
+                    Diagnostic::new(
+                        code,
+                        file,
+                        span,
+                        "gt-fmt: không đặt được comment mà vẫn giữ nguyên chương trình và dãy comment".to_string(),
+                    )
+                    .with_span_label("comment đầu tiên của tệp")
+                    .with_note("đây là phương án cuối cùng của cơ chế đặt comment theo token; hãy báo lỗi cùng tệp nguồn"),
+                );
+            }
+            Err(FmtError {
+                report: bag.finish(),
+            })
+        }
     }
 }

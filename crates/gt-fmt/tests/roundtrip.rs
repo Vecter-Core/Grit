@@ -65,37 +65,17 @@ fn every_pass_file_roundtrips_and_is_idempotent() {
 #[test]
 fn warn_files_and_parseable_fail_files_roundtrip_too() {
     let mut count = 0;
-    let mut refused_by_fmt = 0;
     for sub in ["warn", "fail"] {
         for p in files(sub) {
             let src = read(&p);
             if !gt_parser::parse("t.gt", &src).report.diagnostics.is_empty() {
                 continue; // lỗi cú pháp: gt-fmt từ chối (kiểm riêng)
             }
-            // mẫu E1301: cú pháp đúng nhưng có comment không gắn được → gt-fmt PHẢI từ chối đúng mã
-            if src
-                .lines()
-                .next()
-                .unwrap_or_default()
-                .ends_with("fail E1301")
-            {
-                match gt_fmt::format("t.gt", &src) {
-                    Ok(o) => panic!(
-                        "{sub}/{}: đáng lẽ phải bị từ chối, nhưng ra:
-{o}",
-                        name(&p)
-                    ),
-                    Err(e) => assert_eq!(e.codes(), ["E1301"], "{sub}/{}", name(&p)),
-                }
-                refused_by_fmt += 1;
-                continue;
-            }
             check_invariants(&format!("{sub}/{}", name(&p)), &src);
             count += 1;
         }
     }
     assert!(count >= 30, "chỉ kiểm {count} file");
-    assert!(refused_by_fmt >= 2, "thiếu mẫu E1301");
 }
 
 #[test]

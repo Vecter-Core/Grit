@@ -46,7 +46,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E1202 | Ký tự zero-width/vô hình | M1 | E1202_zero_width |
 | E1203 | Định danh trộn bảng chữ/homoglyph | M1 | E1203_homoglyph |
 | E1204 | Nguồn không phải NFC | M1 | E1204_not_nfc |
-| E1301 | gt-fmt: comment `//` không gắn được vào đâu (giữa biểu thức/chữ ký/node) nên **từ chối định dạng** (không xoá, không dời comment). ĐỎ — mã MỚI do agent đề xuất, chờ Giang duyệt | M2 (gt-fmt) | E1301_comment_in_expression, E1301_comment_in_signature |
+| E1301 | gt-fmt: không đặt được comment (bước xác minh sau khi chèn comment theo token thất bại: token hoặc dãy comment đổi). PHƯƠNG ÁN CUỐI — theo Q16b mọi vị trí comment thông thường đều được đặt; gặp mã này là lỗi của gt-fmt cần báo cáo. ĐỎ — duyệt Giang 2026-10-06 (nhóm E13xx: định dạng) Không có mẫu `.gt` (không đầu vào hợp lệ nào kích hoạt); kiểm bằng unit test `verify_rejects_changed_tokens_or_changed_comment_sequence` trong gt-fmt. | M2 (gt-fmt) | — |
 | E9901 | ICE (lỗi nội bộ compiler; gồm panic trong parser bị bắt, hết bộ nhớ khi tạo luồng parser) — exit 2, không bao giờ chạy | M2 (parser) / M9 (cổng phán quyết) | — |
 | S101 | Secret nằm trong nguồn | M9 | S101_key_in_source |
 | S201 | `declassify` / Secret chảy ra sink | M9 | — |

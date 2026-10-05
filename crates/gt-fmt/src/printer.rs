@@ -1,8 +1,6 @@
 //! Printer: AST → văn bản chuẩn. Độ ưu tiên (cao = chặt hơn): range 1 < ⇒ 2 < ∨ 3 < ∧ 4 < so sánh 5 < cộng 6 < nhân 7 < `as` 8
 //! < đơn nguyên 9 < postfix 10 < sơ cấp 11. Khối-biểu-thức (`⎇ ⌥ ⟳ ⚠`) và lượng từ có độ ưu tiên 0.
-use crate::comments::Comments;
 use gt_ast::*;
-use gt_lexer::{Token, TokenKind, Trivia};
 use gt_span::Span;
 
 const INDENT: usize = 2;
@@ -12,95 +10,39 @@ fn pad(n: usize) -> String {
     " ".repeat(n * INDENT)
 }
 
-pub(crate) struct Fmt<'a> {
-    tokens: Vec<Token>,
-    c: Comments<'a>,
+/// Printer in văn bản CƠ SỞ (không có comment); comment được đặt sau bởi `attach::place` theo token.
+/// Printer chỉ biết VỊ TRÍ comment để một khối/danh sách chứa comment không bao giờ bị in gọn một dòng.
+pub(crate) struct Fmt {
+    comment_starts: Vec<u32>,
 }
 
-impl<'a> Fmt<'a> {
-    pub fn new(file: &str, src: &'a str, trivia: Vec<Trivia>) -> Fmt<'a> {
-        Fmt {
-            tokens: gt_lexer::lex(src).tokens,
-            c: Comments::new(file, src, trivia),
-        }
+impl Fmt {
+    pub fn new(comment_starts: Vec<u32>) -> Fmt {
+        Fmt { comment_starts }
     }
 
-    pub fn finish(&mut self) -> Vec<gt_diag::Diagnostic> {
-        self.c.finish()
+    /// Có comment bắt đầu trong khoảng mở `(lo, hi)`.
+    fn has_comment_in(&self, lo: u32, hi: u32) -> bool {
+        let i = self.comment_starts.partition_point(|&c| c <= lo);
+        self.comment_starts.get(i).is_some_and(|&c| c < hi)
     }
 
-    /// Vị trí dấu `{` đầu tiên không nhỏ hơn `pos`.
-    fn open_brace_after(&self, pos: u32) -> u32 {
-        let i = self.tokens.partition_point(|t| t.span.start < pos);
-        self.tokens[i..]
-            .iter()
-            .find(|t| t.kind == TokenKind::LBrace)
-            .map_or(pos, |t| t.span.start)
+    /// Một node trong danh sách: một dòng thụt lề.
+    fn emit_node(indent: usize, text: &str) -> String {
+        format!("{}{text}\n", pad(indent))
     }
 
-    // ---------- bộ khung danh sách + comment ----------
-
-    /// Một node trong danh sách: comment đứng riêng phía trước, văn bản, comment cuối dòng.
-    fn emit_node(
-        &mut self,
-        indent: usize,
-        span: Span,
-        region_start: u32,
-        prev_end: Option<u32>,
-        text: &str,
-    ) -> String {
-        let before = self.c.take_before(span.start, region_start, prev_end);
-        self.c.refuse_inside(span.start, span.end);
-        let trailing = self.c.take_trailing(span.end);
-        let mut out = String::new();
-        for b in before {
-            out.push_str(&pad(indent));
-            out.push_str(&b);
-            out.push('\n');
-        }
-        out.push_str(&pad(indent));
-        out.push_str(text);
-        if let Some(t) = trailing {
-            out.push_str("  ");
-            out.push_str(&t);
-        }
-        out.push('\n');
-        out
-    }
-
-    /// `{ … }` nhiều dòng cho một danh sách node (trường, biến thể, thành viên, nhánh, item). `open`/`close` là vị trí `{` và `}`.
-    fn braced_list(
-        &mut self,
-        open: u32,
-        close: u32,
-        indent: usize,
-        entries: &[(Span, String)],
-        blank_between: bool,
-    ) -> String {
-        let first_start = entries.first().map_or(close, |e| e.0.start);
-        let after_open = self.c.take_after_open(open, first_start);
-        if entries.is_empty() && after_open.is_none() && !self.c.has_unused_in(open + 1, close) {
+    /// `{ … }` nhiều dòng cho một danh sách node (trường, biến thể, thành viên, nhánh, item).
+    fn braced_list(indent: usize, entries: &[(Span, String)], blank_between: bool) -> String {
+        if entries.is_empty() {
             return "{ }".to_string();
         }
-        let mut out = String::from("{");
-        if let Some(c) = after_open {
-            out.push(' ');
-            out.push_str(&c);
-        }
-        out.push('\n');
-        let mut prev_end = None;
-        for (i, (span, text)) in entries.iter().enumerate() {
+        let mut out = String::from("{\n");
+        for (i, (_, text)) in entries.iter().enumerate() {
             if i > 0 && blank_between {
                 out.push('\n');
             }
-            let node = self.emit_node(indent + 1, *span, open, prev_end, text);
-            out.push_str(&node);
-            prev_end = Some(span.end);
-        }
-        for c in self.c.dangling(open, close) {
-            out.push_str(&pad(indent + 1));
-            out.push_str(&c);
-            out.push('\n');
+            out.push_str(&Self::emit_node(indent + 1, text));
         }
         out.push_str(&pad(indent));
         out.push('}');
@@ -110,24 +52,13 @@ impl<'a> Fmt<'a> {
     // ---------- chương trình & item ----------
 
     pub fn program(&mut self, p: &Program) -> String {
-        let entries: Vec<(Span, String)> = p
-            .items
-            .iter()
-            .map(|it| (it.span, self.item(it, 0)))
-            .collect();
         let mut out = String::new();
-        let mut prev_end = None;
-        for (i, (span, text)) in entries.iter().enumerate() {
+        for (i, it) in p.items.iter().enumerate() {
             if i > 0 {
                 out.push('\n');
             }
-            let node = self.emit_node(0, *span, 0, prev_end, text);
-            out.push_str(&node);
-            prev_end = Some(span.end);
-        }
-        for c in self.c.dangling(0, u32::MAX) {
-            out.push_str(&c);
-            out.push('\n');
+            let text = self.item(it, 0);
+            out.push_str(&Self::emit_node(0, &text));
         }
         out
     }
@@ -161,7 +92,6 @@ impl<'a> Fmt<'a> {
         let body = match &it.kind {
             ItemKind::Fn(f) => self.fn_decl(vis, &f.sig, Some(&f.body), indent),
             ItemKind::Struct(s) => {
-                let open = self.open_brace_after(s.name.span.end);
                 let entries: Vec<(Span, String)> = s
                     .fields
                     .iter()
@@ -171,11 +101,10 @@ impl<'a> Fmt<'a> {
                     "{vis}▢ {}{} {}",
                     s.name.name,
                     self.generics(&s.generics),
-                    self.braced_list(open, it.span.end - 1, indent, &entries, false)
+                    Self::braced_list(indent, &entries, false)
                 )
             }
             ItemKind::Enum(e) => {
-                let open = self.open_brace_after(e.name.span.end);
                 let entries: Vec<(Span, String)> = e
                     .variants
                     .iter()
@@ -185,11 +114,10 @@ impl<'a> Fmt<'a> {
                     "{vis}⊔ {}{} {}",
                     e.name.name,
                     self.generics(&e.generics),
-                    self.braced_list(open, it.span.end - 1, indent, &entries, false)
+                    Self::braced_list(indent, &entries, false)
                 )
             }
             ItemKind::Trait(t) => {
-                let open = self.open_brace_after(t.name.span.end);
                 let entries: Vec<(Span, String)> = t
                     .members
                     .iter()
@@ -199,11 +127,10 @@ impl<'a> Fmt<'a> {
                     "{vis}⊏ {}{} {}",
                     t.name.name,
                     self.generics(&t.generics),
-                    self.braced_list(open, it.span.end - 1, indent, &entries, false)
+                    Self::braced_list(indent, &entries, false)
                 )
             }
             ItemKind::Impl(i) => {
-                let open = self.open_brace_after(i.self_ty.span.end);
                 let entries: Vec<(Span, String)> = i
                     .members
                     .iter()
@@ -216,11 +143,10 @@ impl<'a> Fmt<'a> {
                 format!(
                     "{vis}⊐{} {head} {}",
                     self.generics(&i.generics),
-                    self.braced_list(open, it.span.end - 1, indent, &entries, true)
+                    Self::braced_list(indent, &entries, true)
                 )
             }
             ItemKind::Mod(m) => {
-                let open = self.open_brace_after(m.name.span.end);
                 let entries: Vec<(Span, String)> = m
                     .items
                     .iter()
@@ -229,7 +155,7 @@ impl<'a> Fmt<'a> {
                 format!(
                     "{vis}▦ {} {}",
                     m.name.name,
-                    self.braced_list(open, it.span.end - 1, indent, &entries, true)
+                    Self::braced_list(indent, &entries, true)
                 )
             }
             ItemKind::Use(u) => {
@@ -590,7 +516,7 @@ impl<'a> Fmt<'a> {
 
     fn block(&mut self, b: &Block, indent: usize) -> String {
         let (lo, hi) = (b.span.start, b.span.end.saturating_sub(1));
-        let has_comments = self.c.has_unused_in(lo + 1, hi);
+        let has_comments = self.has_comment_in(lo, hi);
         if !has_comments && b.stmts.is_empty() {
             match &b.tail {
                 None => return "{ }".to_string(),
@@ -609,7 +535,7 @@ impl<'a> Fmt<'a> {
         if let Some(t) = &b.tail {
             entries.push((t.span, self.expr(t, 0, false, indent + 1)));
         }
-        self.braced_list(lo, hi, indent, &entries, false)
+        Self::braced_list(indent, &entries, false)
     }
 
     fn stmt(&mut self, s: &Stmt, indent: usize) -> String {
@@ -862,7 +788,6 @@ impl<'a> Fmt<'a> {
             }
             ExprKind::Match { scrutinee, arms } => {
                 let head = format!("⌥ {} ", self.expr(scrutinee, 0, true, indent));
-                let open = self.open_brace_after(scrutinee.span.end);
                 let entries: Vec<(Span, String)> = arms
                     .iter()
                     .map(|a| {
@@ -870,10 +795,7 @@ impl<'a> Fmt<'a> {
                         (a.span, format!("{} ↦ {body},", self.pat(&a.pattern)))
                     })
                     .collect();
-                format!(
-                    "{head}{}",
-                    self.braced_list(open, e.span.end.saturating_sub(1), indent, &entries, false)
-                )
+                format!("{head}{}", Self::braced_list(indent, &entries, false))
             }
             ExprKind::Loop(l) => {
                 let mut s = String::from("⟳");

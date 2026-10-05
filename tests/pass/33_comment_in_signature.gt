@@ -1,0 +1,4 @@
+// expect: pass
+// note: Q16b: comment giữa các tham số trong chữ ký — gt-fmt đặt theo token (trước đây bị từ chối)
+ƒ f(a: i32, // sau tham số a
+  b: i32) → i32 ! ∅ { a + b }
