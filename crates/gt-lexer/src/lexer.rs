@@ -2,7 +2,7 @@
 //!
 //! Nguyên tắc: không bao giờ panic, mỗi vòng lặp luôn tiến lên ít nhất một byte, lỗi không dừng lexer (D19).
 use crate::error::{ErrorCode, LexError};
-use crate::token::{SYMBOLS, Token, TokenKind};
+use crate::token::{SYMBOLS, Token, TokenKind, Trivia, TriviaKind};
 use gt_span::Span;
 use unicode_normalization::UnicodeNormalization;
 use unicode_script::Script;
@@ -12,6 +12,8 @@ use unicode_script::Script;
 pub struct LexOutput {
     pub tokens: Vec<Token>,
     pub errors: Vec<LexError>,
+    /// Comment `//` theo thứ tự nguồn (không nằm trong luồng token; `gt-fmt` dùng để gắn lại comment).
+    pub trivia: Vec<Trivia>,
 }
 
 impl LexOutput {
@@ -40,6 +42,7 @@ pub fn lex(source: &str) -> LexOutput {
         pos: 0,
         tokens: Vec::new(),
         errors: Vec::new(),
+        trivia: Vec::new(),
         last_dot_end: None,
     };
     if u32::try_from(source.len()).is_err() {
@@ -56,6 +59,7 @@ pub fn lex(source: &str) -> LexOutput {
         return LexOutput {
             tokens: lx.tokens,
             errors: lx.errors,
+            trivia: lx.trivia,
         };
     }
     lx.prescan();
@@ -70,6 +74,7 @@ pub fn lex(source: &str) -> LexOutput {
     LexOutput {
         tokens: lx.tokens,
         errors: lx.errors,
+        trivia: lx.trivia,
     }
 }
 
@@ -203,6 +208,7 @@ struct Lexer<'a> {
     errors: Vec<LexError>,
     /// Vị trí ngay sau token `.` gần nhất — để đọc chỉ số tuple `t.0.1` (số thập phân thuần).
     last_dot_end: Option<usize>,
+    trivia: Vec<Trivia>,
 }
 
 impl Lexer<'_> {
@@ -489,7 +495,21 @@ impl Lexer<'_> {
                     self.pos = line_end;
                     self.push(TokenKind::DocComment(text), start);
                 } else {
-                    self.pos = line_end; // comment thường: bỏ qua, không vào AST
+                    // comment thường: không vào luồng token nhưng PHẢI giữ lại trong bảng trivia (gt-fmt)
+                    let raw = &self.src[start..line_end];
+                    let text = raw.strip_suffix('\r').unwrap_or(raw).to_string();
+                    let line_start = self.src[..start].rfind('\n').map_or(0, |i| i + 1);
+                    let own_line = self.src[line_start..start]
+                        .chars()
+                        .all(|c| c == ' ' || c == '\t');
+                    let span = self.span(start, start + text.len());
+                    self.trivia.push(Trivia {
+                        kind: TriviaKind::LineComment,
+                        text,
+                        span,
+                        own_line,
+                    });
+                    self.pos = line_end;
                 }
             }
             Some('*') => {

@@ -11,4 +11,4 @@ mod token;
 pub use error::{ErrorCode, LexError};
 pub use gt_span::Span;
 pub use lexer::{LexOutput, lex, render_tokens};
-pub use token::{Token, TokenKind};
+pub use token::{Token, TokenKind, Trivia, TriviaKind};

@@ -97,7 +97,7 @@ Hàm trả kiểu khác `()` mà khối kết thúc bằng `;` không có `⏎` 
 
 | Dạng | Token | Xử lý |
 |---|---|---|
-| `// …` đến cuối dòng | `LINE_COMMENT` | lexer **bỏ qua**, không vào AST. `////…` (≥4 dấu `/`) cũng là `LINE_COMMENT` |
+| `// …` đến cuối dòng | `LINE_COMMENT` | không vào luồng token/AST nhưng **được giữ** trong bảng trivia (`LexOutput.trivia`: văn bản nguyên văn, span, `own_line`) cho `gt-fmt`. `////…` (≥4 dấu `/`) cũng là `LINE_COMMENT` |
 | `/// …` đến cuối dòng | `DOC_COMMENT` | lexer **giữ lại**, gắn vào node AST kế tiếp (item / field / variant / chữ ký trait); dùng ở Rig 8.F. Không có node kế tiếp → E0101 |
 | `/* … */` | — | **CẤM ở Phase 1**: gặp `/*` hoặc `*/` → E0101. Dành riêng cho Phase 2 nếu cần |
 

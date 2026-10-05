@@ -313,6 +313,28 @@ fn never_panics_and_spans_are_sane() {
             assert!(t.span.end as usize <= src.len(), "{src:?}");
             prev_end = t.span.end;
         }
+        let mut prev_trivia_end = 0u32;
+        for t in &out.trivia {
+            assert!(
+                t.span.start >= prev_trivia_end && t.span.end as usize <= src.len(),
+                "{src:?}"
+            );
+            assert!(
+                src.is_char_boundary(t.span.start as usize)
+                    && src.is_char_boundary(t.span.end as usize),
+                "{src:?}"
+            );
+            assert_eq!(
+                &src[t.span.start as usize..t.span.end as usize],
+                t.text,
+                "{src:?}"
+            );
+            assert!(
+                t.text.starts_with("//") && !t.text.contains('\n'),
+                "{src:?}"
+            );
+            prev_trivia_end = t.span.end;
+        }
         for e in &out.errors {
             assert!(
                 e.span.end as usize <= src.len()

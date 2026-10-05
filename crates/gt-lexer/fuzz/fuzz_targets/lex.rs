@@ -14,6 +14,15 @@ fuzz_target!(|data: &[u8]| {
         assert!(t.span.end as usize <= src.len());
         prev_end = t.span.end;
     }
+    // trivia (comment `//`): span hợp lệ, đúng thứ tự, text khớp nguồn, một dòng
+    let mut prev_trivia_end = 0u32;
+    for t in &out.trivia {
+        assert!(t.span.start >= prev_trivia_end && t.span.end as usize <= src.len());
+        assert!(src.is_char_boundary(t.span.start as usize) && src.is_char_boundary(t.span.end as usize));
+        assert_eq!(&src[t.span.start as usize..t.span.end as usize], t.text);
+        assert!(t.text.starts_with("//") && !t.text.contains('\n'));
+        prev_trivia_end = t.span.end;
+    }
     for e in &out.errors {
         assert!(e.span.end as usize <= src.len());
         assert!(src.is_char_boundary(e.span.start as usize) && src.is_char_boundary(e.span.end as usize));

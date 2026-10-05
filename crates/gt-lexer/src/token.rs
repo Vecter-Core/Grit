@@ -9,6 +9,24 @@ pub struct Token {
     pub span: Span,
 }
 
+/// Loại trivia (văn bản không thuộc cú pháp nhưng PHẢI được giữ để `gritc fmt` không xoá).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TriviaKind {
+    /// `// …` (kể cả `////…`). Doc comment `///` KHÔNG phải trivia: nó là token `DOC_COMMENT`.
+    LineComment,
+}
+
+/// Một mẩu trivia. `text` là văn bản nguồn NGUYÊN VĂN (gồm `//`, không gồm CR/LF cuối dòng).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Trivia {
+    pub kind: TriviaKind,
+    pub text: String,
+    pub span: Span,
+    /// `true` nếu trước comment trên dòng đó chỉ có khoảng trắng (comment đứng một mình trên dòng);
+    /// `false` nếu đứng sau mã (comment cuối dòng). Dùng để `gt-fmt` gắn lại đúng chỗ.
+    pub own_line: bool,
+}
+
 /// Loại token. Canonical Unicode và alias ASCII cho **cùng** loại (hai bề mặt, một ngữ nghĩa).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenKind {

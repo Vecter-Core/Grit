@@ -26,7 +26,7 @@ char_lit   = "'" ( char | escape ) "'" ;            (* đúng một codepoint *)
 escape     = "\" ( "n" | "r" | "t" | "0" | "\" | "'" | '"' | "u{" hex_digit { hex_digit } "}" ) ;
 
 (* --- comment (ASCII-only) --- *)
-line_comment = "//" { any_but_newline } ;           (* lexer BỎ QUA, không vào AST. "////..." (>=4 dấu /) cũng là line_comment *)
+line_comment = "//" { any_but_newline } ;           (* không vào luồng token/AST nhưng GIỮ trong bảng trivia cho gt-fmt (ADR-012). "////..." (>=4 dấu /) cũng là line_comment *)
 doc_comment  = "///" { any_but_newline } ;          (* token DOC_COMMENT, GIỮ LẠI, gắn vào node kế tiếp (item/field/variant/fn_sig) *)
                                                     (* "/*" và "*/" CẤM ở Phase 1 => E0101 (dành riêng cho Phase 2) *)
 
