@@ -177,3 +177,35 @@ fn ice_on_unsupported_constructs_is_reported_not_skipped() {
         assert_eq!(codes, ["E9901"]);
     }
 }
+
+#[test]
+fn implicit_reborrow_replaces_move_of_a_unique_reference_place_at_coercion_points() {
+    let src = "▢ P { n: i32 } ƒ bump(p: &!P) ! ∅ { } ƒ f(p: &!P, c: bool) → &!P ! ∅ { bump(p); q: &!P ≔ p; bump(q); ⎇ c { ⏎ p; } p }";
+    let (t, b) = lowered(src, "main::f");
+    assert!(validate(&b, &t.db).is_ok());
+    let unique_reborrows = b
+        .borrows
+        .iter()
+        .filter(|x| {
+            x.kind == BorrowKind::Unique
+                && x.place.projection == [PlaceElem::Deref]
+                && x.place.local == Local(1)
+        })
+        .count();
+    // bump(p), `q ≔ p`, ⏎ p: ba khoản reborrow trên `*p`; `bump(q)` reborrow trên `*q` (q là một CHỖ `&!P`); tail `p` là move
+    assert_eq!(unique_reborrows, 3, "{:?}", b.borrows);
+    // không có `move _1` nào ngoài tail
+    let moves_of_p = b
+        .blocks
+        .iter()
+        .flat_map(|x| &x.statements)
+        .filter(|s| matches!(&s.kind, StatementKind::Assign(_, Rvalue::Use(Operand::Move(p))) if *p == Place::local(Local(1))))
+        .count();
+    assert_eq!(moves_of_p, 1);
+    // `&P` (Copy) và giá trị không phải chỗ: không reborrow
+    let (_, b2) = lowered(
+        "▢ P { n: i32 } ƒ g(p: &P) → i32 ! ∅ { a ≔ p; b ≔ p; a.n +% b.n }",
+        "main::g",
+    );
+    assert!(b2.borrows.iter().all(|x| x.kind == BorrowKind::Shared));
+}

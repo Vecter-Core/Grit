@@ -327,6 +327,10 @@ impl<'t> Builder<'t> {
     /// `⏎ e`: ghi `_0`, thoát MỌI frame (kể cả drop tham số), `return`.
     pub(crate) fn ret(&mut self, e: Option<&Expr>) -> R<()> {
         match e {
+            Some(e) if self.is_unique_ref_place(e)? => {
+                let op = self.as_coerced_operand(e)?;
+                self.assign(Place::local(RETURN_PLACE), Rvalue::Use(op));
+            }
             Some(e) => self.expr_into(&Place::local(RETURN_PLACE), e)?,
             None => self.assign(
                 Place::local(RETURN_PLACE),

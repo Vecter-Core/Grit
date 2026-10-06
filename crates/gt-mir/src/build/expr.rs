@@ -196,7 +196,7 @@ impl Builder<'_> {
                 mutable,
                 name,
                 init,
-                ..
+                ty: ty_ann,
             } => self.in_stmt(|b| {
                 let Some(&id) = b.t.resolve.decls.get(&name.id) else {
                     return ice(format!("biến `{}` không có định danh", name.name));
@@ -221,6 +221,11 @@ impl Builder<'_> {
                         b.assign(dest.clone(), rv);
                         Ok(())
                     })?,
+                    // reborrow ngầm (ADR-023 §0.1): `y: &!T ≔ r;` với `r` là CHỖ kiểu `&!T`
+                    _ if ty_ann.is_some() && b.is_unique_ref_place(init)? => {
+                        let op = b.as_coerced_operand(init)?;
+                        b.assign(dest.clone(), Rvalue::Use(op));
+                    }
                     _ => b.expr_into(&dest, init)?,
                 }
                 b.push(StatementKind::FakeRead(FakeReadCause::LetInit, dest));
@@ -505,6 +510,27 @@ impl Builder<'_> {
             },
             _ => return ice(format!("literal với kiểu {ty:?}")),
         })
+    }
+
+    /// `e` là một CHỖ có kiểu `&!T`?
+    pub(crate) fn is_unique_ref_place(&self, e: &Expr) -> R<bool> {
+        Ok(self.is_place_expr(e) && matches!(self.ty_of(e)?, Ty::Ref(true, _)))
+    }
+
+    /// Toán hạng tại điểm ÉP KIỂU (đối số, `≔` có chú thích, `⏎`): một chỗ kiểu `&!T` được reborrow ngầm
+    /// (`&!*r`) thay vì move, như Rust — nếu không, `f(r); f(r)` là dùng-sau-move (ADR-023 §0.1, Q30).
+    pub(crate) fn as_coerced_operand(&mut self, e: &Expr) -> R<Operand> {
+        if self.is_unique_ref_place(e)? {
+            return self.with_at(e, |b| {
+                let ty = b.ty_of(e)?;
+                let p = b.as_place(e)?;
+                let t = b.temp(ty.clone());
+                let rv = b.new_borrow(BorrowKind::Unique, p.project(PlaceElem::Deref));
+                b.assign(Place::local(t), rv);
+                Ok(b.operand_of(Place::local(t), &ty))
+            });
+        }
+        self.as_operand(e)
     }
 
     pub(crate) fn as_operand(&mut self, e: &Expr) -> R<Operand> {
@@ -1148,7 +1174,7 @@ impl Builder<'_> {
             let mut ops = Vec::new();
             let mut spans = vec![base.span];
             for a in args {
-                ops.push(self.as_operand(a)?);
+                ops.push(self.as_coerced_operand(a)?);
                 spans.push(a.span);
             }
             let rty = self.place_ty_of(&recv)?;
@@ -1188,7 +1214,7 @@ impl Builder<'_> {
         let mut ops = Vec::new();
         let mut spans = Vec::new();
         for a in args {
-            ops.push(self.as_operand(a)?);
+            ops.push(self.as_coerced_operand(a)?);
             spans.push(a.span);
         }
         self.emit_call(dest, c, ops, spans, &ret_ty)

@@ -1,0 +1,149 @@
+fn main::bump(_1: &!P) -> () {
+    let mut _0: (); // return
+    let _1: &!P; // arg `p`; regions '#0
+    bb0: {
+        (*_1).0 = AddWrap(copy (*_1).0, const 1_i32);
+        _0 = const ();
+        return;
+    }
+}
+
+fn main::twice(_1: &!P) -> () {
+    let mut _0: (); // return
+    let _1: &!P; // arg `p`; regions '#0
+    let mut _2: (); // temp
+    let mut _3: &!P; // temp; regions '#1
+    let mut _4: (); // temp
+    let mut _5: &!P; // temp; regions '#3
+    bb0: {
+        StorageLive(_2);
+        StorageLive(_3);
+        _3 = &!(*_1) /*b0*/;
+        _2 = main::bump(move _3) -> bb1;
+    }
+    bb1: {
+        StorageDead(_3);
+        StorageDead(_2);
+        StorageLive(_4);
+        StorageLive(_5);
+        _5 = &!(*_1) /*b1*/;
+        _4 = main::bump(move _5) -> bb2;
+    }
+    bb2: {
+        StorageDead(_5);
+        StorageDead(_4);
+        _0 = const ();
+        return;
+    }
+}
+
+fn main::annotated(_1: &!P) -> () {
+    let mut _0: (); // return
+    let _1: &!P; // arg `p`; regions '#0
+    let _2: &!P; // user `q`; regions '#1
+    let mut _3: &!P; // temp; regions '#2
+    let mut _4: (); // temp
+    let mut _5: &!P; // temp; regions '#4
+    let mut _6: (); // temp
+    let mut _7: &!P; // temp; regions '#6
+    bb0: {
+        StorageLive(_2);
+        StorageLive(_3);
+        _3 = &!(*_1) /*b0*/;
+        _2 = move _3;
+        FakeRead(LetInit, _2);
+        StorageDead(_3);
+        StorageLive(_4);
+        StorageLive(_5);
+        _5 = &!(*_2) /*b1*/;
+        _4 = main::bump(move _5) -> bb1;
+    }
+    bb1: {
+        StorageDead(_5);
+        StorageDead(_4);
+        StorageLive(_6);
+        StorageLive(_7);
+        _7 = &!(*_1) /*b2*/;
+        _6 = main::bump(move _7) -> bb2;
+    }
+    bb2: {
+        StorageDead(_7);
+        StorageDead(_6);
+        _0 = const ();
+        StorageDead(_2);
+        return;
+    }
+}
+
+fn main::early(_1: &!P, _2: bool) -> &!P {
+    let mut _0: &!P; // return; regions '#0
+    let _1: &!P; // arg `p`; regions '#1
+    let _2: bool; // arg `c`
+    let mut _3: (); // temp
+    let mut _4: &!P; // temp; regions '#2
+    bb0: {
+        StorageLive(_3);
+        switchInt(copy _2) -> [0: bb2, otherwise: bb1];
+    }
+    bb1: {
+        StorageLive(_4);
+        _4 = &!(*_1) /*b0*/;
+        _0 = move _4;
+        StorageDead(_4);
+        StorageDead(_3);
+        return;
+    }
+    bb2: {
+        _3 = const ();
+        goto -> bb3;
+    }
+    bb3: {
+        StorageDead(_3);
+        _0 = move _1;
+        return;
+    }
+}
+
+fn main::shared(_1: &P) -> i32 {
+    let mut _0: i32; // return
+    let _1: &P; // arg `p`; regions '#0
+    let _2: &P; // user `a`; regions '#1
+    let _3: &P; // user `b`; regions '#2
+    bb0: {
+        StorageLive(_2);
+        _2 = copy _1;
+        FakeRead(LetInit, _2);
+        StorageLive(_3);
+        _3 = copy _1;
+        FakeRead(LetInit, _3);
+        _0 = AddWrap(copy (*_2).0, copy (*_3).0);
+        StorageDead(_3);
+        StorageDead(_2);
+        return;
+    }
+}
+
+fn main::fresh(_1: bool) -> () {
+    let mut _0: (); // return
+    let _1: bool; // arg `c`
+    let mut _2: P; // user `x`
+    let mut _3: (); // temp
+    let mut _4: &!P; // temp; regions '#0
+    bb0: {
+        StorageLive(_2);
+        _2 = P { n: const 0_i32 };
+        FakeRead(LetInit, _2);
+        StorageLive(_3);
+        StorageLive(_4);
+        _4 = &!_2 /*b0*/;
+        _3 = main::bump(move _4) -> bb1;
+    }
+    bb1: {
+        StorageDead(_4);
+        StorageDead(_3);
+        _0 = const ();
+        StorageDead(_2);
+        return;
+    }
+}
+

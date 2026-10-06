@@ -1,0 +1,22 @@
+// Reborrow ngầm (ADR-023 §0.1, Q30): `&!T` là CHỖ ở đối số / `≔` có chú thích / `⏎` được `&!*r`, không move.
+// `&T` (Copy) và giá trị không phải chỗ thì giữ nguyên.
+▢ P { n: i32 }
+ƒ bump(p: &!P) ! ∅ { p.n ← p.n +% 1; }
+ƒ twice(p: &!P) ! ∅ {
+  bump(p);
+  bump(p);
+}
+ƒ annotated(p: &!P) ! ∅ {
+  q: &!P ≔ p;
+  bump(q);
+  bump(p);
+}
+ƒ early(p: &!P, c: bool) → &!P ! ∅ {
+  ⎇ c { ⏎ p; }
+  p
+}
+ƒ shared(p: &P) → i32 ! ∅ { a ≔ p; b ≔ p; a.n +% b.n }
+ƒ fresh(c: bool) ! ∅ {
+  μx ≔ P { n: 0 };
+  bump(&!x);
+}

@@ -253,3 +253,8 @@ Theo thứ tự lệnh: định nghĩa MIR + in text → bước hạ → valida
 
 ## M6 — Borrow checker — **ADR-023 ĐÃ VIẾT, CHƯA CODE; chờ Giang duyệt** (2026-10-06)
 - ADR-023 trả lời: thuật toán (NLL 2018: liveness + ràng buộc region + tập khoản vay hiệu lực), move một phần (cho phép — bắt buộc vì `⌥`), reborrow (tường minh + ngầm ở đối số, cần sửa MIR), mượn qua lời gọi theo `RegionSig`, quy tắc "phiên bản" của Arena, bảng nới/chặt so với Rust, corpus ≥155 xấu + ≥155 đúng theo nhóm, mã lỗi cần chốt (Q30–Q33).
+
+## M6-mir: reborrow ngầm (ADR-023 §0.1, Q30) — commit riêng
+- Bước hạ MIR chèn `Ref(Unique, (*r))` khi một CHỖ kiểu `&!T` đứng ở đối số (kể cả đối số phương thức, trừ người nhận đã autoref), `≔` có chú thích kiểu, hoặc `⏎`; tail của hàm vẫn move. Golden `tests/golden/mir/reborrow.{gt,mir}` + test cấu trúc (3 reborrow, 1 move). Không đổi golden cũ.
+- Cổng chạy lại: fmt sạch; clippy workspace `-D warnings` sạch; `cargo test --workspace` 415 passed, 0 failed.
+
