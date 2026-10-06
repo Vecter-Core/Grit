@@ -250,3 +250,6 @@ Theo thứ tự lệnh: định nghĩa MIR + in text → bước hạ → valida
 ### Chờ xác nhận / hạn chế
 - ADR-022 (9 điểm), quan trọng nhất: `#lang(range_inclusive)` (sửa lỗi M4) và biến tạm của đuôi khối. Chi tiết KNOWN_LIMITATIONS (gt-mir / gt-dataflow).
 - Cổng chạy LẠI ngay trước commit M5 (2026-10-06): fmt sạch; clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (260 file .gt; 54 mã; 159 tham chiếu); `cargo test --workspace` **414 passed, 0 failed**.
+
+## M6 — Borrow checker — **ADR-023 ĐÃ VIẾT, CHƯA CODE; chờ Giang duyệt** (2026-10-06)
+- ADR-023 trả lời: thuật toán (NLL 2018: liveness + ràng buộc region + tập khoản vay hiệu lực), move một phần (cho phép — bắt buộc vì `⌥`), reborrow (tường minh + ngầm ở đối số, cần sửa MIR), mượn qua lời gọi theo `RegionSig`, quy tắc "phiên bản" của Arena, bảng nới/chặt so với Rust, corpus ≥155 xấu + ≥155 đúng theo nhóm, mã lỗi cần chốt (Q30–Q33).

@@ -351,6 +351,7 @@ grit/
 
 - MIR → LLVM IR bằng binding đã ghim; gắn metadata `!gt.obl` (Obligation-ID đã giải) và `noalias`/attribute suy ra từ borrow checker; hồ sơ `dev`/`release`.
 - **IR Guard** (nhanh, không kiểm lại toàn bộ): (a) LLVM verifier; (b) đối chiếu attestation hash; (c) mọi thao tác nhạy cảm (raw memory, atomic, spawn) phải có Obligation-ID đã giải; (d) quét metadata đa luồng/ordering nhất quán. Không khớp → E11xx, không chạy.
+- **`Unreachable` của MIR hạ thành abort (D3, fail-closed), KHÔNG BAO GIỜ thành `unreachable` của LLVM làm điều kiện tối ưu** (chứng minh của compiler sai ⇒ chương trình dừng, không chạy tiếp vào hành vi không xác định). **IR Guard từ chối IR chứa `unreachable` không do codegen cố ý sinh ra ở chỗ đã được chứng minh.** Lưu ý kỹ thuật (làm rõ lệnh): LLVM bắt buộc mỗi khối có terminator, nên `call @gritrt_abort()` (noreturn) phải được theo bởi một `unreachable` — đó là CHỖ DUY NHẤT hợp lệ (ngay sau lời gọi hàm abort của runtime, đã được chứng minh không trả về); IR Guard chấp nhận đúng mẫu đó và từ chối mọi `unreachable` khác.
 - `gritrt`: `panic = abort`, handler tối thiểu in thông tin rồi dừng tiến trình **ngay lập tức** (không unwinding, không cleanup). Hồ sơ `dev` hỗ trợ bật ASan/TSan/UBSan để bắt thêm lỗi.
 - _Hoàn thành khi:_ `gritc run` chạy được chương trình mẫu; mọi crash/abort dừng ngay với exit code riêng; golden test trên LLVM IR; benchmark nền (xem 8.G).
 

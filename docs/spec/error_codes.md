@@ -30,9 +30,10 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0401 | Dùng sau move | M6 | E0401_use_after_move |
 | E0402 | Hai `&!` chồng nhau | M6 | E0402_double_unique |
 | E0403 | `&!` chồng `&` | M6 | E0403_unique_vs_shared |
-| E0404 | Trả tham chiếu tới local | M6 | E0404_return_local_ref |
+| E0404 | Tham chiếu sống lâu hơn giá trị bị mượn: trả tham chiếu tới local/tạm/tham số theo giá trị, biến phạm vi ngoài giữ tham chiếu tới biến phạm vi trong, hoặc vi phạm region của chữ ký (ADR-023 §8) | M6 | E0404_return_local_ref |
 | E0405 | Con trỏ thoát Arena (D27) | M6 | E0405_arena_escape |
 | E0406 | Gán khi đang bị mượn | M6 | — |
+| E0407 | Move ra khỏi chỗ đi qua `*`/`[i]`/lát, hoặc move một trường ra khỏi giá trị có `⊐ Drop for`/`Arena` (ADR-023 §3, §8) | M6 | — |
 | E0501 | Chia sẻ không `Send` qua luồng | M8 | — |
 | E0502 | Vi phạm thứ tự khoá | M8 | — |
 | E0601 | Obligation biên chắc chắn sai (tràn hằng) | M7 | E0601_const_overflow, E0601_literal_out_of_range |

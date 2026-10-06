@@ -345,3 +345,106 @@ Q25 (E0306: A/B/C — đề xuất A), Q26 (có trait `Drop`? đề xuất `#lan
 7. **Bất biến "đã gán trước khi đọc" bỏ qua move và `Drop`** (đã nói ở ADR-020 §9): drop một chỗ có thể chưa khởi tạo là hợp lệ; dùng sau move là E0401 của M6.
 8. **Chưa hạ ở M5 → ICE E9901 (không bao giờ lặng lẽ bỏ hàm):** lượng từ ngoài hợp đồng (M7), hàm tạo biến thể có trường dùng như giá trị (`f ≔ Some;`), phương thức trait dùng như giá trị, `⟳ c in 'a'..='z'` (range ký tự). Không mẫu nào của corpus dùng các dạng này (test kiểm).
 9. **`→ !` "thật sự phân kỳ":** kiểm ở MIR (không `Return` nào tới được) — nhưng M4 đã buộc thân có kiểu `!` nên KHÔNG có chương trình nguồn hợp lệ nào kích hoạt nhánh này; nó là lưới an toàn, test bằng CFG dựng tay.
+
+## ADR-023 — M6: borrow checker (Giang DUYỆT 2026-10-06 — xem mục 10, 11 bổ sung)
+**Phạm vi:** crate `gt-borrowck` đọc MIR của M5 (`gt-mir`) + `gt-dataflow` + `RegionSig`/`TypeDb` của gt-types; không đọc AST. Mã lỗi E0401–E0406 (+ đề xuất ở §8). Đột biến ĐẦY ĐỦ (chính sách: M6 có đột biến toàn crate).
+
+### 0. Những chỗ cần nói thẳng trước khi duyệt
+1. **MIR của M5 còn thiếu MỘT thứ M6 cần: reborrow ngầm khi truyền `&!T`.** Hiện `f(r)` với `r: &!T` sinh `move _r` — sau lời gọi `r` dùng lại sẽ là E0401, khác hẳn Rust (Rust tự chèn `&mut *r`). Đề xuất: bước hạ MIR chèn `Ref(Unique, (*r))` ở mọi điểm ép kiểu (đối số, `≔` có chú thích kiểu, `⏎`) khi giá trị là một CHỖ kiểu `&!T`; tương tự cho `&T` không cần (Copy). Đây là sửa MIR, làm ĐẦU TIÊN của M6, có golden/validator. (Đúng điều lệnh M5 muốn tránh — tôi nêu vì phát hiện khi thiết kế M6, không phải khi thiết kế MIR.)
+2. **Không thể cấm move một phần ở Phase 1** dù mới nghe có vẻ đơn giản hơn: bước hạ `⌥` gán biến của pattern bằng cách move TRƯỜNG của scrutinee (`p ≔ move (_1 as Some).0`). Cấm move một phần ⇒ `⌥ o { Some(p) ↦ dùng(p), None ↦ … }` với `p` không Copy bị từ chối. Xem §3.
+3. **"Quy tắc phiên bản của Arena"** — tôi hiểu là: mọi thao tác làm Arena sang "phiên bản" mới (reset/clear, move, drop) VÔ HIỆU mọi tham chiếu đã cấp từ phiên bản cũ. Nếu ý Giang khác (vd đếm thế hệ lúc chạy), cần nói lại; §5 viết theo cách hiểu tĩnh này.
+4. **Bảng mã E04xx hiện có không đủ phủ hai lỗi phổ biến:** "giá trị bị mượn không sống đủ lâu" khi KHÔNG phải trả về (Rust E0597: `r` ở phạm vi ngoài mượn `x` ở phạm vi trong) và "move ra khỏi tham chiếu/chỉ số" (Rust E0507). Đề xuất ở §8 (Q31).
+
+### 1. Thuật toán: NLL theo liveness + ràng buộc region, tập khoản vay
+- **Biến region:** mọi vị trí region trong `LocalDecl.regions` + region của mỗi `BorrowData` (M5 đã cấp). **Region phổ quát** (của chữ ký: `Named`, `Anon(n)` của đầu vào, `'static`) chứa MỌI điểm của thân + điểm kết thúc của riêng nó (`end('a)`).
+- **Giá trị region** = tập điểm CFG (`Location`) + tập `end(..)`. Giải bằng lan truyền tới điểm cố định (khung gt-dataflow cho liveness; lan truyền ràng buộc bằng worklist tất định).
+- **Ràng buộc** (NLL Rust 2018, không phụ thuộc vị trí cho `outlives`):
+  - *Liveness:* nếu local `x` sống tại điểm P (gt-dataflow `Liveness`, có tính drop-use) thì mọi biến region trong kiểu của `x` chứa P.
+  - *Gán:* `dst = rvalue` sinh `'src_i : 'dst_i` theo từng vị trí region tương ứng (hiệp biến cho `&`; với `&!T` bất biến theo `T` ⇒ ràng buộc hai chiều cho region bên trong `T`).
+  - *Mượn:* `dst = &'b place` sinh `'b : 'dst_0`; nếu `place` đi qua `*p` với `p: &'p T` thì `'p : 'b` (reborrow không sống lâu hơn tham chiếu gốc).
+  - *Lời gọi:* khởi tạo `RegionSig` của callee với biến mới cho từng tên/vị trí ẩn (`Static` → `'static`); `'arg : 'param` cho mỗi vị trí của mỗi đối số; `'ret : 'dst` cho đích.
+  - *Trả về:* `'_0 : 'out_i` với region đầu ra phổ quát ⇒ mọi khoản vay chảy vào `_0` phải chứa `end('out)`.
+- **Khoản vay (loan):** mỗi `BorrowData` = (chỗ, Shared|Unique, region). Khoản vay **còn hiệu lực** tại P nếu P ∈ giá trị region của nó và chưa bị *kill* (gán đè toàn bộ local gốc của chỗ, hoặc `StorageDead` của local đó). Tập khoản vay hiệu lực tính bằng gt-dataflow (tiến, hợp: gen ở `Ref`, kill như trên, lọc theo giá trị region).
+- **Kiểm truy cập:** ở mỗi điểm, mỗi truy cập vào chỗ X (đọc nông/sâu, ghi, move, `Drop`, `StorageDead`) đối chiếu các khoản vay hiệu lực *chồng lấn* X (tiền tố/hậu tố theo phép chiếu; `Index` coi như chồng lấn mọi phần tử):
+  - tạo `&!` khi có khoản vay khác chồng lấn còn hiệu lực ⇒ **E0402** (khoản kia `&!`) / **E0403** (khoản kia `&`); tạo `&` khi có `&!` chồng lấn ⇒ **E0403**;
+  - ghi / move ra khi có khoản vay chồng lấn ⇒ **E0406**;
+  - `StorageDead`/`Drop` của local khi có khoản vay hiệu lực mà region chứa điểm sau đó (khoản vay sống quá biến) ⇒ **E0404** (nếu region phổ quát/chảy vào `_0`: trả tham chiếu tới local) hoặc **E0405** nếu local có kiểu `Arena` (`Lang::Arena`); trường hợp không trả về nhưng sống quá ⇒ mã đề xuất ở §8.
+  - đọc một move path có thể chưa khởi tạo (gt-dataflow `MaybeUninit`) ⇒ **E0401**; `Drop` của chỗ có thể chưa khởi tạo KHÔNG lỗi (no-op sau elaboration).
+- **Đánh đổi:** NLL 2018 có dương tính giả đã biết ("problem case #3": trả tham chiếu có điều kiện qua nhiều nhánh) mà Polonius sửa được. Polonius chính xác hơn nhưng phức tạp gấp nhiều lần và chưa ổn định ở chính Rust. **Đề xuất NLL 2018**, ghi KNOWN_LIMITATIONS các dương tính giả; mọi dương tính giả là chặt hơn (an toàn), không phải lỗ hổng.
+
+### 2. Reborrow
+- Tường minh `&*p`, `&!*p`: một khoản vay mới trên `(*p)` với `'p : 'b`. Mượn duy nhất qua `p: &T` (`&!*p`) là E0308 của M4 (đã có).
+- Ngầm (đề xuất §0.1): đối số, `≔` có chú thích kiểu `&!T`, `⏎`. Autoref của phương thức đã tường minh trong MIR (autoref muộn, Q28) và tự là reborrow khi người nhận đi qua `*`.
+- Khoản vay qua reborrow chặn truy cập vào `p` (gốc) như khoản vay trực tiếp, cho tới khi reborrow hết hiệu lực (NLL: lần dùng cuối).
+
+### 3. Move một phần (struct/tuple)
+- **Đề xuất: CHO PHÉP** move ra khỏi trường của một local (struct/tuple, và trường của biến thể sau `Downcast` — chính là gán biến trong `⌥`), theo move path của gt-dataflow (đã có). Dùng lại trường đã move hoặc cả local ⇒ E0401; dùng trường KHÁC chưa move ⇒ hợp lệ (như Rust).
+- **Cấm** (như Rust): move ra khỏi chỗ đi qua `*` (tham chiếu, con trỏ thô) hoặc `[i]`/lát; move một phần khỏi giá trị có `⊐ Drop` (lib/core) vì drop của nó cần cả giá trị. Mã: đề xuất §8 (E0407).
+- **Vì sao không cấm hẳn:** xem §0.2 — match trên dữ liệu không Copy sẽ không viết được.
+
+### 4. Mượn qua lời gọi hàm theo `RegionSig`
+- Ở mỗi `Call`, `RegionSig` của callee (M4.5, kể cả `Holder<'a>` của ADR-021) được khởi tạo bằng biến region MỚI: cùng tên ⇒ cùng biến (vd `ƒ pick<'a>(x: &'a T, y: &'a T) → &'a T` buộc kết quả sống không lâu hơn GIAO của hai đầu vào); `Anon(n)` ⇒ mỗi vị trí một biến; `Static` ⇒ `'static` (M6 kiểm thân hàm loại này thật sự chỉ trả dữ liệu `'static` — Q24d).
+- Callee qua trait (`Callee::TraitMethod`) dùng `RegionSig` của thành viên TRAIT (đã kiểm khớp với impl ở M4 về kiểu; về region: thành viên impl phải có cùng `RegionSig` sau đổi tên — kiểm ở M6, lỗi là E0311 mở rộng hoặc mã mới, xem Q31).
+- Khoản vay của đối số chưa kết thúc khi hàm trả về nếu region của nó chảy vào đầu ra (vd `first(&v)` trả `&T` ⇒ `v` còn bị mượn tới lần dùng cuối của kết quả).
+
+### 5. Arena và "phiên bản" (theo cách hiểu ở §0.3)
+- `a.alloc(x)` = khoản vay **chung** trên `a` (chữ ký `alloc(&'r self, …) → &'r T`); mọi tham chiếu cấp ra mang region của khoản vay đó.
+- Thao tác tạo "phiên bản mới" của Arena cần `&!a` hoặc move/drop `a`: `reset(&!self)`/`clear(&!self)` (lib/core M12), gán đè `a`, move `a`, `Drop`/`StorageDead` của `a`. Mỗi thao tác này xung đột với mọi khoản vay chung còn hiệu lực trên `a` ⇒ tham chiếu từ phiên bản cũ còn được dùng sau đó là lỗi: **E0405** (khi xung đột với drop/StorageDead/move — tham chiếu thoát khỏi Arena) và **E0403** (khi xung đột với `&!a` của reset/clear — chọn E0403 để không thêm mã; hoặc dùng E0405 cho mọi trường hợp có `Lang::Arena`, Q32).
+- Arena là tham số `a: &'r Arena`: trả `&'r T` hợp lệ (region phổ quát `'r`); Arena cục bộ: trả tham chiếu vào nó ⇒ E0405.
+
+### 6. Nới hay chặt hơn Rust (và hệ quả)
+| Điểm | So với Rust | Hệ quả |
+|---|---|---|
+| Autoref muộn (Q28) thay mượn hai pha | **Nới hơn** | `v.push(v.len())`, `x.consume(x.len())` hợp lệ; nghĩa xác định: đối số trước. Không có chương trình mất an toàn bộ nhớ. |
+| Phép gán: chỗ trước, giá trị sau (semantics §3a) | Khác | `a[i] ← f()` ghi theo `i` cũ; borrowck xét theo đúng thứ tự MIR. |
+| Elision chặt, không `'a: 'b` (ADR-019/021) | **Chặt hơn** | Một số chữ ký hợp lệ chưa viết được (KNOWN_LIMITATIONS). |
+| Tạm của đuôi khối chết ở cuối khối (ADR-022 §4) | **Chặt hơn** | `x ≔ { &mk() };` lỗi (Rust chấp nhận). |
+| NLL 2018, không Polonius | Bằng Rust 2018 (chặt hơn Polonius) | Dương tính giả "problem case #3". |
+| Reborrow ngầm chỉ ở đối số/`≔ : &!T`/`⏎` | Hẹp hơn Rust một chút | Một số chỗ cần viết `&!*r` tường minh. |
+| Move một phần | Bằng Rust | — |
+| Arena: mọi thao tác "phiên bản" xung đột tham chiếu cũ | Tương đương lifetime của Rust với `&mut self` | Không có kiểm lúc chạy. |
+
+### 7. Corpus (tiêu chí hoàn thành plan M6): ≥150 ca XẤU chặn đúng mã, ≥150 ca ĐÚNG không chặn nhầm
+Mỗi nhóm có cả biến thể trong nhánh `⎇`, trong `⌥`, trong vòng lặp (qua cạnh lùi), qua lời gọi, qua phương thức, và qua nhiều phạm vi lồng nhau. Số tối thiểu:
+| Nhóm | Xấu (mã) | Đúng tương ứng |
+|---|---|---|
+| Dùng sau move (cả local, một phần, trong vòng lặp, sau lời gọi, sau `⌥` move trường) | 30 (E0401) | 30 (move rồi gán lại; dùng trường khác; Copy) |
+| Hai `&!` chồng nhau (trực tiếp, qua trường/chỉ số, qua reborrow, qua phương thức `&!self`) | 20 (E0402) | 20 (NLL: lần dùng cuối trước khi mượn lại) |
+| `&!` chồng `&` | 20 (E0403) | 20 |
+| Trả tham chiếu tới local/tạm/tham số theo giá trị | 15 (E0404) | 15 (trả tham chiếu từ tham số; `'static`) |
+| Tham chiếu thoát Arena (trả về, sống quá phạm vi, sau reset/move/drop Arena) | 20 (E0405) | 20 (Arena là tham số; dùng trong phạm vi) |
+| Gán/move khi đang bị mượn | 20 (E0406) | 20 |
+| Sống không đủ lâu (không trả về), move ra khỏi tham chiếu | 15 (mã §8) | 15 |
+| Mượn qua lời gọi theo `RegionSig` (`pick<'a>`, `Holder<'a>`, elision) | 15 (các mã trên) | 15 |
+| **Tổng** | **≥155** | **≥155** |
+Mọi dương tính giả/âm tính giả phát hiện về sau thêm vào corpus (plan). Thêm: test thuộc tính "thêm một lần dùng sau cùng vào chương trình đúng không làm mất lỗi cũ" và đột biến đầy đủ crate gt-borrowck.
+
+### 8. Mã lỗi cần chốt (Q31)
+- **Mở rộng nghĩa E0404:** "tham chiếu sống lâu hơn giá trị bị mượn" (gồm trả về tham chiếu tới local, và biến ở phạm vi ngoài giữ tham chiếu tới biến phạm vi trong). Hoặc thêm **E0408** riêng cho trường hợp không trả về. Đề xuất: **mở rộng E0404** (ít mã, cùng bản chất).
+- **Mã mới E0407:** move ra khỏi chỗ đi qua `*`/`[i]`/lát, hoặc move một phần khỏi giá trị có `⊐ Drop`.
+- Không cần mã mới cho Arena (E0405) hay reborrow.
+
+### 9. Thứ tự làm (TDD) và kiểm chứng
+(1) reborrow ngầm trong bước hạ MIR + golden (§0.1); (2) crate gt-borrowck: biến region, ràng buộc, giải; (3) khoản vay hiệu lực (dataflow); (4) kiểm truy cập → E0402/E0403/E0406; (5) E0401 từ MaybeUninit; (6) E0404/E0405 từ StorageDead/Drop; (7) lời gọi theo `RegionSig`; (8) corpus ≥155+≥155, docs/errors cho mọi mã E04xx (≥3+≥3); (9) đột biến toàn crate gt-borrowck, mọi đột biến sống sót có test mới. Thông báo lỗi chỉ ra: chỗ mượn, chỗ dùng xung đột, và lần dùng sau khiến khoản vay còn sống (NLL), với vị trí từ `SourceInfo`/`arg_spans` của MIR.
+
+### 10. Duyệt của Giang (2026-10-06) và bổ sung — mục này THẮNG các mục 0–9 nếu khác
+Giang duyệt theo bản tóm tắt; tôi đã đối chiếu từng điểm với mục 0–9: **không có điểm nào mâu thuẫn**. Hai chỗ làm rõ:
+- **"Kiểu có Drop (hiện chỉ Arena)"** (ràng buộc E0407): ở §3 tôi viết "giá trị có `⊐ Drop`" — nay đúng là **kiểu có `⊐ Drop for` HOẶC là `Arena`** (`Lang::Arena`, cần drop dựng sẵn). Move một TRƯỜNG ra khỏi giá trị thuộc loại đó là **E0407**. Với kiểu KHÔNG có Drop, move một phần được phép; **cờ drop theo từng trường là việc của codegen M10** (elaboration, ADR-020 §9/ADR-022 §6): MIR của M5/M6 giữ `Drop` vô điều kiện cho cả local, M6 dùng MaybeUninit để biết phần nào đã move.
+- **Q32 (mã khi xung đột với Arena):** tôi chọn **E0405 cho MỌI thao tác làm Arena sang "phiên bản" mới** — move, `Drop`/`StorageDead`, gán đè, và tạo `&!a` (reset/clear) — khi còn khoản vay tới tham chiếu cấp từ phiên bản cũ. Một quy tắc, một mã, đúng D27; E0402/E0403 không dùng cho Arena. (Giang duyệt "Arena theo nghĩa tĩnh" nhưng chưa chọn mã; nếu muốn E0403 cho `reset` thì nói.)
+
+Quyết định đã duyệt: **NLL 2018** ("sound nhưng không complete, P5; Polonius xét ở Phase 2" — KNOWN_LIMITATIONS); **move một phần** + ràng buộc trên; **Arena tĩnh**; **reborrow ngầm sửa MIR ĐẦU M6, commit riêng "M6-mir: implicit reborrow"**; **mã lỗi: mở rộng E0404, thêm E0407** (đã đối chiếu `error_codes.md`: E0407/E0408 chưa dùng); bảng nới/chặt §6 (bắt buộc đầy đủ — thêm các dòng ở §11).
+
+Làm thêm (Giang):
+- **(a) Đột biến toàn crate gt-borrowck**, mọi đột biến sống sót có test mới.
+- **(b) Oracle động** (công cụ test, NGOÀI TCB, độc lập với borrowck — không dùng lại mã phân tích của nó): thông dịch MIR có theo dõi khoản vay/move/Arena; bộ sinh chương trình ngẫu nhiên. Chương trình borrowck CHẤP NHẬN mà thông dịch phát hiện vi phạm = false negative thật: vào corpus vĩnh viễn + sửa borrowck. Chiều ngược lại (chương trình bị từ chối mà chạy sạch trên mọi nhánh) chỉ ĐO và báo cáo.
+- **(c) Soundness hunting:** chương trình tấn công (alias qua reborrow/generic/match/vòng lặp, move một phần rồi dùng, mượn rồi reset Arena); mỗi cái thành test vĩnh viễn.
+- **(d) Thống kê false positive** trên corpus đúng và trên các mẫu `pass` cũ, ghi PROGRESS.md.
+
+### 11. Chi tiết thiết kế bổ sung khi cài (cần ghi để review)
+- **Phạm vi oracle động (nói thẳng giới hạn):** nó chỉ thấy vi phạm trên các ĐƯỜNG ĐÃ CHẠY (bộ sinh dùng tham số `c: bool` và chạy cả hai giá trị để phủ cả hai nhánh; vòng lặp có cận cố định) nên "oracle sạch" là bằng chứng KIỂM THỬ, không phải chứng minh. Vi phạm được định nghĩa bằng PHÂN TÍCH VẾT sau khi chạy (một khoản vay bị truy cập xung đột rồi còn được DÙNG về sau), không bằng liveness tĩnh.
+- **Region trong ADT:** không có ánh xạ trường → tham số lifetime (Ty không chứa region). Đọc/ghi trường của ADT dùng "bó" (mọi region của ADT outlive/được outlive bởi giá trị trường — chặt hơn, sound); gán nguyên giá trị ADT so khớp theo từng vị trí; biến thiên của ADT: hiệp biến nếu ADT không chứa `&!`/con trỏ thô/kiểu hàm (kể cả lồng), ngược lại bất biến. Hệ quả: một số chương trình hợp lệ có ADT giữ `&!` bị từ chối (KNOWN_LIMITATIONS).
+- **Bound ngầm (implied bounds) KHÔNG dùng:** `ƒ f<'a,'b>(x: &'a &'b T)` không ngầm có `'b: 'a`. Chặt hơn Rust.
+- **Không "static promotion":** `&1`, `&CONST` trong thân hàm không tự thành `'static`; `ƒ f() → &i32 { &1 }` là E0404. (Chốt điểm mở của `regions.md` §5.) Literal chuỗi là `&'static str`.
+- **Lỗi vi phạm region phổ quát** (vd `ƒ f<'a,'b>(x: &'a T, y: &'b T) → &'a T { y }`) báo **E0404** (tham chiếu không sống đủ lâu theo chữ ký).
+- **Phép gán `chỗ ← v` qua `*p` không xung đột với khoản vay `p` đang giữ** (truy cập đi QUA chính khoản vay đó); thứ tự đánh giá theo MIR.
+- **Bảng nới/chặt bổ sung (§6):** ADT bó/bất biến — chặt hơn; không implied bounds — chặt hơn; không static promotion — chặt hơn; `Drop` của ADT có tham chiếu giữ region sống tới điểm drop (không `may_dangle`) — chặt hơn; Arena gộp một mã E0405 — khác Rust (không có Arena); move một phần khỏi Arena/kiểu có Drop bị cấm — bằng Rust (E0509).
