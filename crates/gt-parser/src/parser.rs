@@ -862,7 +862,11 @@ impl Parser {
         let first = self.parse_type()?;
         let (trait_path, self_ty) = if self.eat(&TokenKind::KwFor) {
             let trait_path = match first.kind {
-                TypeKind::Path { path, args } if args.is_empty() => path,
+                TypeKind::Path {
+                    path,
+                    lifetimes,
+                    args,
+                } if args.is_empty() && lifetimes.is_empty() => path,
                 _ => {
                     let span = self.span_from(first_start);
                     return Err(

@@ -506,7 +506,8 @@ impl<'t> Walker<'t> {
                     self.record(t.id, "Self", Res::Err);
                 }
             }
-            TypeKind::Path { path, args } => {
+            TypeKind::Path { path, args, .. } => {
+                // đối số lifetime: kiểm ở gt-types (E0315), resolver không có không gian tên lifetime
                 self.resolve_path(path);
                 for a in args {
                     self.ty(a);

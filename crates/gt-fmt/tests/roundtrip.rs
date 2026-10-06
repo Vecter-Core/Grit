@@ -274,3 +274,24 @@ fn random_expressions_roundtrip_with_correct_parentheses() {
         "chỉ {parsed}/{total} nguồn ngẫu nhiên hợp lệ — bộ sinh quá yếu"
     );
 }
+
+#[test]
+fn lifetime_arguments_in_types_roundtrip_adr_021() {
+    // parse(fmt(x)) == parse(x) và idempotent trên mọi vị trí kiểu có đối số lifetime
+    for src in [
+        "▢ Holder<'a> { r: &'a i32 }\n",
+        "▢ Pair<'a, T> { r: &'a T, v: T }\n",
+        "ƒ get<'a>(h: Holder<'a>) → &'a i32 ! ∅ { h.r }\n",
+        "ƒ f<'a, 'b>(x: Two<'a, 'b, u8, Option<Holder<'b>>>) ! ∅ { }\n",
+        "ƒ f<'a>(x: &'a Holder<'a>) ! ∅ { y: Holder<'a> ≔ mk(x); }\n",
+        "⊐ <'a> Holder<'a> { ƒ get(&self) → &'a i32 ! ∅ { self.r } }\n",
+        "≡ H<'a> ≔ Holder<'a>;\n",
+        "ƒ f(x:Pair<'a,u8>)!∅{}",
+    ] {
+        check_invariants(src, src);
+    }
+    assert_eq!(
+        fmt_ok("ƒ f(x:Pair<'a,u8>)!∅{}"),
+        "ƒ f(x: Pair<'a, u8>) ! ∅ { }\n"
+    );
+}

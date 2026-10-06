@@ -1,0 +1,4 @@
+// expect: fail E0101
+// note: đối số lifetime phải đứng trước đối số kiểu (ADR-021)
+▢ Pair<'a, T> { r: &'a T }
+ƒ f<'a>(p: Pair<u8, 'a>) ! ∅ { }

@@ -394,11 +394,18 @@ impl Fmt {
         match &t.kind {
             TypeKind::Prim(p) => Self::prim(*p).to_string(),
             TypeKind::SelfType => "Self".to_string(),
-            TypeKind::Path { path, args } => {
-                if args.is_empty() {
+            TypeKind::Path {
+                path,
+                lifetimes,
+                args,
+            } => {
+                if args.is_empty() && lifetimes.is_empty() {
                     Self::path(path)
                 } else {
-                    let a: Vec<String> = args.iter().map(|x| self.ty(x)).collect();
+                    // lifetime trước, kiểu sau (ADR-021)
+                    let mut a: Vec<String> =
+                        lifetimes.iter().map(|l| format!("'{}", l.name)).collect();
+                    a.extend(args.iter().map(|x| self.ty(x)));
                     format!("{}<{}>", Self::path(path), a.join(", "))
                 }
             }

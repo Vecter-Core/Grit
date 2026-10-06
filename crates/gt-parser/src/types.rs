@@ -55,6 +55,7 @@ impl Parser {
                 {
                     return Ok(self.mk(start, TypeKind::Prim(p)));
                 }
+                let mut lifetimes = Vec::new();
                 let mut args = Vec::new();
                 if self.at(&TokenKind::Lt) {
                     self.bump();
@@ -62,14 +63,36 @@ impl Parser {
                         if self.at(&TokenKind::Gt) {
                             break;
                         }
-                        args.push(self.parse_type()?);
+                        if let TokenKind::Lifetime(name) = self.tok() {
+                            // ADR-021: đối số lifetime đứng trước mọi đối số kiểu
+                            if !args.is_empty() {
+                                let span = self.bump();
+                                return Err(self.error_at(
+                                    span,
+                                    "đối số lifetime phải đứng trước các đối số kiểu".to_string(),
+                                ));
+                            }
+                            let name = name.clone();
+                            let span = self.bump();
+                            let id = self.id();
+                            lifetimes.push(Lifetime { id, span, name });
+                        } else {
+                            args.push(self.parse_type()?);
+                        }
                         if !self.eat(&TokenKind::Comma) {
                             break;
                         }
                     }
                     self.expect(&TokenKind::Gt, "`>`")?;
                 }
-                Ok(self.mk(start, TypeKind::Path { path, args }))
+                Ok(self.mk(
+                    start,
+                    TypeKind::Path {
+                        path,
+                        lifetimes,
+                        args,
+                    },
+                ))
             }
             TokenKind::KwSelfTy => {
                 self.bump();

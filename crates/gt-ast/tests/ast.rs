@@ -353,7 +353,11 @@ fn every_grammar_construct_is_representable() {
     let type_kinds = vec![
         TypeKind::Prim(PrimType::Bool),
         TypeKind::SelfType,
-        TypeKind::Path { path, args },
+        TypeKind::Path {
+            path,
+            lifetimes: vec![lt.clone()],
+            args,
+        },
         TypeKind::Ref {
             lifetime: Some(lt),
             mutable: true,

@@ -97,5 +97,5 @@
 ## gt-types: capability và region (M4.5, ADR-019)
 - **Capability:** luật nguồn gốc theo kiểu (chỉ `main` cấp cao gọi được hàm trả `Cap<…>` mà không nhận `Cap<…>`). Không có phân tích dòng chảy: không phát hiện "capability cũ bị dùng sau khi đã chuyển đi" (đó là use-after-move, M6) và không kiểm hiệu ứng `{io}` của thao tác (M5). Khai báo (không gọi) nguồn gốc trong chương trình người dùng không bị báo. Danh sách loại capability do lib/core quyết.
 - **Region:** chỉ kiểm CHỮ KÝ (khai báo, trùng, elision). Region KHÔNG nằm trong `Ty`; thân hàm chưa kiểm gì về region — `ƒ f() → &i32 { &x }` trả tham chiếu local, hay Arena thoát, đều QUA M4/M4.5 và chỉ bị chặn ở M6 (E0404/E0405). Cho tới khi M6 xong, đây là lỗ hổng đã biết.
-- **Ngữ pháp:** không có đối số lifetime trong đường dẫn kiểu (`Holder<'a>`) và không có `'a: 'b` (Q24e). Elision chặt hơn Rust: không có luật `&self` thắng; không tham chiếu vào ⇒ `'static`.
+- **Ngữ pháp:** đã có đối số lifetime trong kiểu (`Holder<'a>`, ADR-021). **Chưa có ràng buộc `'a: 'b`: một số chữ ký hợp lệ chưa viết được; chỉ thêm khi chương trình thật đòi** (Giang, 2026-10-06). Elision chặt hơn Rust: không có luật `&self` thắng; không tham chiếu vào ⇒ `'static` (M6 kiểm thân hàm thật sự trả dữ liệu `'static`).
 

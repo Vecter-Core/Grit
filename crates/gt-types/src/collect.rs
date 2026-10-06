@@ -329,7 +329,11 @@ impl<'a> Env<'a> {
             TypeKind::Prim(p) => Ty::from_prim(*p),
             TypeKind::Never => Ty::Never,
             TypeKind::SelfType => self.self_of(cx, t.id, t.span),
-            TypeKind::Path { path, args } => self.lower_path_ty(t, path, args, cx),
+            TypeKind::Path {
+                path,
+                lifetimes,
+                args,
+            } => self.lower_path_ty(t, path, lifetimes, args, cx),
             TypeKind::Ref {
                 mutable,
                 inner,
@@ -461,7 +465,61 @@ impl<'a> Env<'a> {
         }
     }
 
-    fn lower_path_ty(&mut self, t: &Type, path: &Path, args: &[Type], cx: &LowerCx) -> Ty {
+    /// Số tham số lifetime của kiểu mà `path` chỉ tới (struct/enum/alias); 0 với mọi thứ khác.
+    pub(crate) fn lt_count_of(&self, path: &Path) -> usize {
+        let Some(Res::Def(d)) = self.res.uses.get(&path.id) else {
+            return 0;
+        };
+        let node = self.defs()[d.index()].node;
+        let g = match self.items.get(&node).map(|i| &i.item.kind) {
+            Some(ItemKind::Struct(s)) => &s.generics,
+            Some(ItemKind::Enum(e)) => &e.generics,
+            Some(ItemKind::TypeAlias(a)) => &a.generics,
+            _ => return 0,
+        };
+        g.as_ref().map_or(0, |g| {
+            g.params
+                .iter()
+                .filter(|p| matches!(p.kind, GenericParamKind::Lifetime(_)))
+                .count()
+        })
+    }
+
+    /// Đối số lifetime của một kiểu đường dẫn (ADR-021): đã khai báo, đúng số lượng; bỏ trống chỉ được ở nơi cho phép elision.
+    fn check_lt_args(&mut self, t: &Type, path: &Path, lifetimes: &[Lifetime], cx: &LowerCx) {
+        for l in lifetimes {
+            self.check_lifetime(Some(l), cx, t);
+        }
+        let want = self.lt_count_of(path);
+        if !lifetimes.is_empty() && lifetimes.len() != want {
+            self.err(
+                "E0315",
+                t.id,
+                t.span,
+                format!(
+                    "kiểu này có {want} tham số lifetime nhưng nhận {} đối số lifetime",
+                    lifetimes.len()
+                ),
+            );
+        } else if lifetimes.is_empty() && want > 0 && cx.no_elide {
+            self.err(
+                "E0315",
+                t.id,
+                t.span,
+                format!("kiểu này có {want} tham số lifetime; ở đây phải ghi tường minh (`<'a, …>`) — elision chỉ dùng ở chữ ký hàm"),
+            );
+        }
+    }
+
+    fn lower_path_ty(
+        &mut self,
+        t: &Type,
+        path: &Path,
+        lifetimes: &[Lifetime],
+        args: &[Type],
+        cx: &LowerCx,
+    ) -> Ty {
+        self.check_lt_args(t, path, lifetimes, cx);
         let Some(res) = self.res.uses.get(&path.id).cloned() else {
             return Ty::Err;
         };
@@ -815,7 +873,7 @@ impl<'a> Env<'a> {
                 ParamKind::Named { ty, .. } => {
                     params.push(self.lower_ty(ty, cx));
                     let mut sl = Vec::new();
-                    region::slots(ty, &mut sl);
+                    region::slots(ty, &mut sl, &|p| self.lt_count_of(p));
                     inputs.push(sl.iter().map(|x| region::region_of(x, &mut anon)).collect());
                 }
             }
@@ -829,7 +887,7 @@ impl<'a> Env<'a> {
         let mut output = Vec::new();
         if let Some(rt) = &sig.ret {
             let mut sl = Vec::new();
-            region::slots(rt, &mut sl);
+            region::slots(rt, &mut sl, &|p| self.lt_count_of(p));
             let mut reported = false;
             for x in &sl {
                 match x {

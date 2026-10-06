@@ -1,0 +1,7 @@
+// expect: pass
+// note: đối số lifetime trong kiểu (ADR-021): Holder<'a>, Pair<'a, T>; bỏ trống ở chữ ký hàm là elision
+▢ Holder<'a> { r: &'a i32 }
+▢ Pair<'a, T> { r: &'a T, v: T }
+ƒ get<'a>(h: Holder<'a>) → &'a i32 ! ∅ { h.r }
+ƒ first<'a>(p: &Pair<'a, u8>) → u8 ! ∅ { p.v }
+ƒ elided(h: Holder) → &i32 ! ∅ { h.r }

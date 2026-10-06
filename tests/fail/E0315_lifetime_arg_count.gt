@@ -1,0 +1,4 @@
+// expect: fail E0315
+// note: Holder có một tham số lifetime, nhận hai
+▢ Holder<'a> { r: &'a i32 }
+ƒ f<'a, 'b>(h: Holder<'a, 'b>) ! ∅ { }

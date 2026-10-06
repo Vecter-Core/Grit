@@ -220,3 +220,9 @@ Cập nhật: 2026-10-06. Không đột biến (đúng chính sách).
 
 ### Hạn chế / chờ xác nhận
 - Thân hàm chưa kiểm gì về region (trả tham chiếu local, Arena thoát: qua cho tới M6). Không có `Holder<'a>`/`'a: 'b` trong ngữ pháp (Q24e). Chi tiết KNOWN_LIMITATIONS.
+
+## spec: đối số lifetime trong kiểu (ADR-021, Giang duyệt Q24e, 2026-10-06)
+- `Holder<'a>`, `Pair<'a, T>` (lifetime trước kiểu): grammar.ebnf (`type_args`), gt-ast (`TypeKind::Path.lifetimes`), parser (lifetime sau kiểu → E0101), gt-fmt (in được), gt-types (E0315: chưa khai báo / sai số lượng / bỏ trống ở trường; bỏ trống ở chữ ký là vị trí ẩn trong `RegionSig`). `'a: 'b` hoãn (KNOWN_LIMITATIONS).
+- Test: `gt-parser/tests/lifetime_args.rs` (4), gt-fmt `parse(fmt(x)) == parse(x)` + idempotent trên 8 dạng mới, gt-types `regions.rs` (+2), mẫu `pass/76_lifetime_args_in_types`, `fail/E0315_lifetime_arg_count`, `E0315_lifetime_arg_undeclared`, `E0315_field_elided_lifetime_arg`, `E0101_lifetime_after_type_arg` (+ snapshot).
+- Cổng chạy lại ngay trước commit: fmt sạch; clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (256 file .gt; 55 mã; 156 tham chiếu); `cargo test --workspace` 375 passed, 0 failed.
+

@@ -1,6 +1,6 @@
 //! Region (lifetime có tên) ở chữ ký hàm — M4.5, `docs/spec/regions.md`. M4 KHÔNG suy luận region trong thân hàm (việc của M6);
 //! module này chỉ trích xuất bảng region của từng chữ ký (kèm luật elision) để M6 dùng lại, không thiết kế lại.
-use gt_ast::{Type, TypeKind};
+use gt_ast::{Path, Type, TypeKind};
 
 /// Một vị trí region trong chữ ký.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -24,26 +24,36 @@ pub struct RegionSig {
     pub output: Vec<RegionRef>,
 }
 
-/// Mọi vị trí tham chiếu `&…` trong một kiểu (theo thứ tự duyệt trước): `Some(tên)` nếu có lifetime, `None` nếu ẩn.
-/// Không đi vào kiểu hàm `ƒ(…)`: nó có phạm vi elision riêng.
-pub(crate) fn slots(t: &Type, out: &mut Vec<Option<String>>) {
+/// Mọi vị trí region trong một kiểu (theo thứ tự duyệt trước): mỗi `&…`, rồi mỗi tham số lifetime của kiểu đường dẫn
+/// (`Holder<'a>` — ADR-021; bỏ trống thì mỗi tham số là một vị trí ẩn). `Some(tên)` nếu ghi lifetime, `None` nếu ẩn.
+/// `lt_count` cho biết kiểu đường dẫn có bao nhiêu tham số lifetime. Không đi vào kiểu hàm `ƒ(…)`: nó có phạm vi elision riêng.
+pub(crate) fn slots(t: &Type, out: &mut Vec<Option<String>>, lt_count: &dyn Fn(&Path) -> usize) {
     match &t.kind {
         TypeKind::Ref {
             lifetime, inner, ..
         } => {
             out.push(lifetime.as_ref().map(|l| l.name.clone()));
-            slots(inner, out);
+            slots(inner, out, lt_count);
         }
-        TypeKind::Path { args, .. } => {
+        TypeKind::Path {
+            path,
+            lifetimes,
+            args,
+        } => {
+            if lifetimes.is_empty() {
+                out.extend(std::iter::repeat_n(None, lt_count(path)));
+            } else {
+                out.extend(lifetimes.iter().map(|l| Some(l.name.clone())));
+            }
             for a in args {
-                slots(a, out);
+                slots(a, out, lt_count);
             }
         }
-        TypeKind::Array { elem, .. } => slots(elem, out),
-        TypeKind::Slice(inner) | TypeKind::RawPtr { inner, .. } => slots(inner, out),
+        TypeKind::Array { elem, .. } => slots(elem, out, lt_count),
+        TypeKind::Slice(inner) | TypeKind::RawPtr { inner, .. } => slots(inner, out, lt_count),
         TypeKind::Tuple(v) => {
             for a in v {
-                slots(a, out);
+                slots(a, out, lt_count);
             }
         }
         _ => {}

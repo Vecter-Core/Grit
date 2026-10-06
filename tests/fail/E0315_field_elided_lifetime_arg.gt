@@ -1,0 +1,4 @@
+// expect: fail E0315
+// note: trường phải ghi đối số lifetime của kiểu có tham số lifetime
+▢ Holder<'a> { r: &'a i32 }
+▢ Outer<'a> { h: Holder }

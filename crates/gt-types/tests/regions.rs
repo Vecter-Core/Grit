@@ -208,3 +208,50 @@ fn the_prelude_arena_signature_has_a_single_borrowed_region() {
         "không thấy chữ ký alloc của prelude"
     );
 }
+
+const HOLDER: &str = "▢ Holder<'a> { r: &'a i32 } ▢ Pair<'a, T> { r: &'a T, v: T } ";
+
+#[test]
+fn lifetime_arguments_in_types_are_checked_adr_021() {
+    ok(&format!(
+        "{HOLDER}ƒ get<'a>(h: Holder<'a>) → &'a i32 ! ∅ {{ h.r }}"
+    ));
+    ok(&format!(
+        "{HOLDER}ƒ get<'a>(p: Pair<'a, u8>) → u8 ! ∅ {{ p.v }}"
+    ));
+    ok(&format!("{HOLDER}▢ Outer<'a> {{ h: Holder<'a> }}"));
+    ok(&format!("{HOLDER}ƒ f(h: Holder<'static>) ! ∅ {{ }}"));
+    for bad in [
+        "ƒ f(h: Holder<'x>) ! ∅ { }",
+        "ƒ f<'a, 'b>(h: Holder<'a, 'b>) ! ∅ { }",
+        "ƒ f<'a>(h: Option<'a, u8>) ! ∅ { }",
+        "ƒ f<'a, T>(h: T<'a>) ! ∅ { }",
+        "▢ Outer<'a> { h: Holder }",
+        "▢ Outer { h: Pair<u8> }",
+        "⊔ E { A(Holder) }",
+    ] {
+        err(&format!("{HOLDER}{bad}"), "E0315", 1);
+    }
+}
+
+#[test]
+fn elided_lifetime_arguments_count_as_input_positions() {
+    // `Holder` bỏ trống ở chữ ký: một vị trí ẩn — đủ để elision đầu ra
+    let out = ok(&format!("{HOLDER}ƒ f(h: Holder) → &i32 ! ∅ {{ h.r }}"));
+    let s = sig(&out, "main::f");
+    assert_eq!(s.inputs, vec![vec![RegionRef::Anon(0)]]);
+    assert_eq!(s.output, vec![RegionRef::Anon(0)]);
+    // `&Holder` có hai vị trí (`&` và `'a` của Holder) — đầu ra ẩn là mơ hồ
+    err(
+        &format!("{HOLDER}ƒ f(h: &Holder) → &i32 ! ∅ {{ h.r }}"),
+        "E0315",
+        1,
+    );
+    // ghi tên: thứ tự duyệt trước — `&` rồi tham số lifetime của Pair, rồi đối số kiểu
+    let out = ok(&format!(
+        "{HOLDER}ƒ g<'a, 'b>(p: &'a Pair<'b, &'a u8>) → &'b &'a u8 ! ∅ {{ p.r }}"
+    ));
+    let s = sig(&out, "main::g");
+    assert_eq!(s.inputs, vec![vec![n("a"), n("b"), n("a")]]);
+    assert_eq!(s.output, vec![n("b"), n("a")]);
+}

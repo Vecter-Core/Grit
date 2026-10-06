@@ -272,15 +272,18 @@ pub fn sty(t: &Type) -> String {
     match &t.kind {
         TypeKind::Prim(p) => format!("{p:?}"),
         TypeKind::SelfType => "Self".to_string(),
-        TypeKind::Path { path, args } => {
-            if args.is_empty() {
+        TypeKind::Path {
+            path,
+            lifetimes,
+            args,
+        } => {
+            if args.is_empty() && lifetimes.is_empty() {
                 spath(path)
             } else {
-                format!(
-                    "{}<{}>",
-                    spath(path),
-                    args.iter().map(sty).collect::<Vec<_>>().join(",")
-                )
+                let mut all: Vec<String> =
+                    lifetimes.iter().map(|l| format!("'{}", l.name)).collect();
+                all.extend(args.iter().map(sty));
+                format!("{}<{}>", spath(path), all.join(","))
             }
         }
         TypeKind::Ref {

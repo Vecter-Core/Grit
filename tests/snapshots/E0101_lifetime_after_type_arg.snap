@@ -1,0 +1,10 @@
+# tests/fail/E0101_lifetime_after_type_arg.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: đối số lifetime phải đứng trước các đối số kiểu
+ --> tests/fail/E0101_lifetime_after_type_arg.gt:4:21
+  |
+4 | ƒ f<'a>(p: Pair<u8, 'a>) ! ∅ { }
+  |                     ^^
+## [1] json
+{"code":"E0101","level":"error","message":"đối số lifetime phải đứng trước các đối số kiểu","file":"tests/fail/E0101_lifetime_after_type_arg.gt","span":{"start":{"offset":155,"line":4,"col":21},"end":{"offset":157,"line":4,"col":23}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

@@ -36,9 +36,11 @@ pub struct Type {
 pub enum TypeKind {
     Prim(PrimType),
     SelfType,
-    /// `Option<T>`, `Cap<Fs>`, `Vec`… (`args` rỗng nếu không có tham số kiểu).
+    /// `Option<T>`, `Cap<Fs>`, `Holder<'a>`, `Pair<'a, T>`… Đối số lifetime luôn đứng TRƯỚC đối số kiểu (ADR-021);
+    /// `lifetimes`/`args` rỗng nếu không có.
     Path {
         path: Path,
+        lifetimes: Vec<Lifetime>,
         args: Vec<Type>,
     },
     Ref {

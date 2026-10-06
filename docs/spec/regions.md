@@ -12,9 +12,9 @@ hợp đồng M6 phải hiện thực, chưa có mã.
 
 ## 2. Giới hạn của ngữ pháp Phase 1 (sự thật cần biết khi thiết kế M6)
 - Lifetime chỉ xuất hiện: trong danh sách generics `<'a, T>` của hàm/struct/enum/trait/impl và sau `&`/`&!` (`&'a T`, `&!'a T`).
-- **Không có đối số lifetime trong đường dẫn kiểu**: không viết được `Holder<'a>`; mỗi lần dùng `Holder` (struct có tham số lifetime) region của nó là ẩn.
-  **Không có ràng buộc outlives** `'a: 'b`. Chữ ký như `ƒ f<'a, 'b>(x: &'a &'b T) → &'b T` dùng quan hệ ngầm "'b sống lâu hơn 'a" (well-formedness).
-- Hệ quả đã biết, ghi KNOWN_LIMITATIONS và Q24: struct giữ tham chiếu dùng được nhưng không thể ràng buộc rõ region của nó ở chữ ký hàm ngoài elision.
+- **Đối số lifetime trong đường dẫn kiểu** (ADR-021, Giang 2026-10-06): `Holder<'a>`, `Pair<'a, T>` (lifetime trước kiểu). Bỏ trống ở chữ ký hàm thì mỗi tham số lifetime là một vị trí ẩn (tính vào luật elision); bỏ trống ở trường/alias là E0315; sai số lượng là E0315.
+  **Không có ràng buộc outlives** `'a: 'b` (hoãn: một số chữ ký hợp lệ chưa viết được; chỉ thêm khi chương trình thật đòi). Chữ ký như `ƒ f<'a, 'b>(x: &'a &'b T) → &'b T` dùng quan hệ ngầm "'b sống lâu hơn 'a" (well-formedness).
+- Hệ quả đã biết (KNOWN_LIMITATIONS): quan hệ giữa hai region chỉ diễn đạt được bằng cách dùng CÙNG một tên (`'a` cho cả hai), không diễn đạt được "`'a` sống lâu hơn `'b`".
 
 ## 3. Đã cài ở M4.5 (kiểm tĩnh trên CHỮ KÝ; mã E0315)
 1. Lifetime dùng phải được khai báo (`'static` luôn hợp lệ) ở: tham số, kiểu trả về, trường struct/enum, chú thích kiểu trong thân, header/thành viên impl/trait.
