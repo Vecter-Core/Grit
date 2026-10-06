@@ -1,0 +1,8 @@
+// expect: pass
+// note: `!` ở vị trí hợp lệ: nhánh hợp nhất, câu lệnh phân kỳ
+ƒ pick(c: bool) → i32 ! {div} {
+  ⎇ c { 1 } ⇝ { core::abort("no") }
+}
+ƒ must(o: Option<i32>) → i32 ! {div} {
+  ⌥ o { Some(v) ↦ v, None ↦ core::abort("none") }
+}

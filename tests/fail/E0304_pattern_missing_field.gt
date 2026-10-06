@@ -1,0 +1,4 @@
+// expect: fail E0304
+// note: pattern struct thiếu trường mà không có `..`
+▢ P { x: i32, y: i32 }
+ƒ f(p: P) → i32 ! ∅ { ⌥ p { P { x } ↦ x } }

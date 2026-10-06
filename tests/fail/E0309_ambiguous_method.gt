@@ -1,0 +1,8 @@
+// expect: fail E0309
+// note: hai trait cùng phương thức m cho một kiểu
+⊏ A { ƒ m(&self) ! ∅; }
+⊏ B { ƒ m(&self) ! ∅; }
+▢ S { x: i32 }
+⊐ A for S { ƒ m(&self) ! ∅ { } }
+⊐ B for S { ƒ m(&self) ! ∅ { } }
+ƒ f(s: S) ! ∅ { s.m(); }

@@ -1,0 +1,3 @@
+// expect: fail E0305
+// note: match bool thiếu false
+ƒ f(b: bool) → i32 ! ∅ { ⌥ b { true ↦ 1 } }

@@ -1,0 +1,7 @@
+// expect: pass
+// note: ⊐ Copy hợp lệ cho kiểu người dùng
+ƒ dup<T: Copy>(x: T) → T ! ∅ { x }
+▢ P { x: i32, y: bool }
+⊐ Copy for P { }
+ƒ f(p: P) → P ! ∅ { dup(p) }
+ƒ g(n: u8) → u8 ! ∅ { dup(n) }

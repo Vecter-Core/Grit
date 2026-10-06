@@ -1,0 +1,3 @@
+// expect: fail E0301
+// note: điều kiện của ⎇ phải là bool
+ƒ f(x: i32) → i32 ! ∅ { ⎇ x { 1 } ⇝ { 2 } }

@@ -1,0 +1,3 @@
+// expect: fail E0305
+// note: match số nguyên bằng literal cần `_`
+ƒ f(n: i32) → i32 ! ∅ { ⌥ n { 0 ↦ 1, 1 ↦ 2 } }

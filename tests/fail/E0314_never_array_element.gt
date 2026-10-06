@@ -1,0 +1,3 @@
+// expect: fail E0314
+// note: ! làm phần tử mảng
+ƒ f(a: [!; 2]) ! ∅ { }

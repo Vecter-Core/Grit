@@ -1,0 +1,6 @@
+// expect: fail E0311
+// note: hai ⊐ cùng trait cho cùng kiểu
+⊏ T { ƒ a(&self) ! ∅; }
+▢ S { x: i32 }
+⊐ T for S { ƒ a(&self) ! ∅ { } }
+⊐ T for S { ƒ a(&self) ! ∅ { } }

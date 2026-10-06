@@ -1,0 +1,3 @@
+// expect: fail E0313
+// note: tạo Cap bằng literal (D29)
+ƒ f() ! ∅ { c ≔ Cap { v: 1 }; }

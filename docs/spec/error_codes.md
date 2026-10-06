@@ -13,19 +13,19 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0203 | Truy cập item private | M3 | E0203_private_across_files, E0203_private_import, E0203_private_item, E0203_private_module_member, E0203_private_nested_sibling |
 | E0204 | Vòng phụ thuộc module | M3 | E0204_cycle_via_imports, E0204_three_files_cycle, E0204_two_files_cycle |
 | E0205 | Shadowing (D7) | M3 | E0205_shadow_import, E0205_shadow_loop_var, E0205_shadow_param, E0205_shadow_prelude, E0205_shadowing |
-| E0301 | Sai kiểu / biểu thức chưa có ngữ nghĩa ở Phase 1 (vd range mở độc lập) | M4 | E0301_type_mismatch, E0301_open_range_standalone |
-| E0302 | Ép kiểu ngầm số (D1) | M4 | E0302_implicit_cast |
-| E0303 | `==` trên số thực (D4) | M4 | E0303_float_eq |
-| E0304 | Trường struct/biến thể/pattern sai: thiếu, thừa, không tồn tại hoặc trùng (literal `P { … }`, pattern `P { … }`, truy cập `.x`) — Q20 | M4 | — |
-| E0305 | `⌥` không đầy đủ (D6) | M4 | E0305_nonexhaustive |
+| E0301 | Sai kiểu / biểu thức chưa có ngữ nghĩa ở Phase 1 (vd range mở độc lập) | M4 | E0301_break_outside_loop, E0301_if_condition_not_bool, E0301_open_range_standalone, E0301_return_type_mismatch, E0301_type_mismatch, E0301_wrong_arity |
+| E0302 | Ép kiểu ngầm số (D1) | M4 | E0302_implicit_cast, E0302_int_to_float, E0302_mixed_operands, E0302_narrowing_argument |
+| E0303 | `==` trên số thực (D4) | M4 | E0303_float_eq, E0303_float_literal_eq, E0303_float_ne |
+| E0304 | Trường struct/biến thể/pattern sai: thiếu, thừa, không tồn tại hoặc trùng (literal `P { … }`, pattern `P { … }`, truy cập `.x`) — Q20 | M4 | E0304_duplicate_field, E0304_missing_field, E0304_pattern_missing_field, E0304_tuple_index_out_of_range, E0304_unknown_field |
+| E0305 | `⌥` không đầy đủ (D6) | M4 | E0305_int_without_wildcard, E0305_missing_bool_branch, E0305_nonexhaustive, E0305_range_gap, E0305_str_without_wildcard |
 | E0306 | Dùng biến chưa khởi tạo chắc chắn | M5 | — |
 | E0307 | Thiếu đường trả về (gồm khối kết thúc bằng `;` mà hàm trả kiểu khác `()`) — **thuộc M5**, không phải parser (cần kiểu trả về và luồng điều khiển) | M5 | E0307_missing_return, E0307_trailing_semicolon |
-| E0308 | Gán vào biến bất biến (D5) | M4 | E0308_assign_immutable |
-| E0309 | Ràng buộc trait không thoả / không có phương thức / mơ hồ (Q20) | M4 | — |
-| E0311 | `⊐` không hợp lệ: thiếu/thừa/khác chữ ký thành viên so với trait, hoặc hai impl chồng lấn (Q20) | M4 | — |
-| E0312 | Đệ quy đa hình vượt ngưỡng instance (64) — `ƒ f<T>() { f<Vec<T>>() }` (ADR-018 §1, Q20) | M4 | — |
-| E0313 | Kiểu lang dùng sai: tạo `Secret`/`Cap` bằng literal ngoài lib/core, `⊐ Copy for` chúng (Q20, Q21) | M4 | — |
-| E0314 | Kiểu `!` ở vị trí không hợp lệ: tham số kiểu, trường, phần tử mảng (ADR-018 §3.6, Q20) | M4 | — |
+| E0308 | Gán vào biến bất biến (D5) | M4 | E0308_assign_immutable, E0308_assign_param, E0308_assign_through_shared_ref, E0308_method_needs_mut_receiver, E0308_unique_borrow_of_immutable |
+| E0309 | Ràng buộc trait không thoả / không có phương thức / mơ hồ (Q20) | M4 | E0309_ambiguous_method, E0309_bound_not_satisfied, E0309_no_such_method |
+| E0311 | `⊐` không hợp lệ: thiếu/thừa/khác chữ ký thành viên so với trait, hoặc hai impl chồng lấn (Q20) | M4 | E0311_copy_non_copy_field, E0311_missing_trait_method, E0311_overlapping_impls, E0311_signature_mismatch |
+| E0312 | Đệ quy đa hình vượt ngưỡng instance (64) — `ƒ f<T>() { f<Vec<T>>() }` (ADR-018 §1, Q20) | M4 | E0312_array_growth, E0312_option_growth, E0312_polymorphic_recursion |
+| E0313 | Kiểu lang dùng sai: tạo `Secret`/`Cap` bằng literal ngoài lib/core, `⊐ Copy for` chúng (Q20, Q21) | M4 | E0313_copy_for_cap, E0313_copy_for_secret, E0313_forge_cap, E0313_forge_secret |
+| E0314 | Kiểu `!` ở vị trí không hợp lệ: tham số kiểu, trường, phần tử mảng (ADR-018 §3.6, Q20) | M4 | E0314_never_array_element, E0314_never_field, E0314_never_type_argument |
 | E0310 | Thiếu capability (D28) | M4.5 | E0310_missing_cap |
 | E0401 | Dùng sau move | M6 | E0401_use_after_move |
 | E0402 | Hai `&!` chồng nhau | M6 | E0402_double_unique |
@@ -47,7 +47,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0901 | Tiền điều kiện chắc chắn sai | M7 | E0901_precondition_false |
 | E0902 | Obligation không kiểm lúc chạy được mà chưa giải (D25) | M7 | — |
 | E1001 | Nghĩa vụ `⚠` chưa giải (D21); con trỏ thô `*□ T`/`*μ T` hoặc `#noreturn` dùng ngoài phạm vi cho phép (Q12, Q13) | M7 | E1001_unsafe_unproven, E1001_raw_ptr_outside_unsafe |
-| E1002 | Thuộc tính `#lang` dùng ngoài `lib/core`/prelude (ADR-018 §5, Q21) | M4 | — |
+| E1002 | Thuộc tính `#lang` dùng ngoài `lib/core`/prelude (ADR-018 §5, Q21) | M4 | E1002_lang_on_fn, E1002_lang_on_struct, E1002_lang_on_trait |
 | E1101 | IR Guard: attestation lệch | M10 | — |
 | E1201 | Ký tự bidi (D15) | M1 | E1201_bidi |
 | E1202 | Ký tự zero-width/vô hình | M1 | E1202_zero_width |

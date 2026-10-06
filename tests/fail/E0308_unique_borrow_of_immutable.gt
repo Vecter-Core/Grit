@@ -1,0 +1,6 @@
+// expect: fail E0308
+// note: mượn duy nhất &! một biến bất biến
+ƒ f() ! ∅ {
+  x ≔ 1;
+  p ≔ &!x;
+}

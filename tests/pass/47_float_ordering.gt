@@ -1,0 +1,7 @@
+// expect: pass
+// note: số thực: so sánh thứ tự và số học đúng kiểu (D4 chỉ cấm == và ≠)
+ƒ lerp(a: f64, b: f64, t: f64) → f64 ! ∅ { a + (b - a) * t }
+ƒ clamp01(x: f64) → f64 ! ∅ {
+  ⎇ x < 0.0 { 0.0 } ⇝ ⎇ x > 1.0 { 1.0 } ⇝ { x }
+}
+ƒ same(a: i32, b: i32) → bool ! ∅ { a == b }

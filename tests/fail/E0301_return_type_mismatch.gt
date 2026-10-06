@@ -1,0 +1,3 @@
+// expect: fail E0301
+// note: giá trị trả về sai kiểu
+ƒ f() → bool ! ∅ { 1 }

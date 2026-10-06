@@ -1,0 +1,8 @@
+// expect: pass
+// note: Cap/Secret nhận từ nguồn hợp lệ và chuyển qua hàm
+ƒ use_fs(fs: &Cap<Fs>, path: &str) → usize ! {io} { fs.read(path).len() }
+ƒ main() → usize ! {io} {
+  fs ≔ root_fs();
+  use_fs(&fs, "a")
+}
+ƒ keep(k: Secret<u32>) → Secret<u32> ! ∅ { k }

@@ -1,0 +1,8 @@
+// expect: pass
+// note: thuộc tính khác #lang dùng bình thường trên struct/hàm/enum
+#allow(S101, "mẫu thử struct")
+▢ P { x: i32 }
+#allow(S102, "mẫu thử enum")
+⊔ E { A, B }
+#allow(S103, "mẫu thử hàm")
+ƒ f(p: P, e: E) → i32 ! ∅ { ⌥ e { A ↦ p.x, B ↦ 0 } }

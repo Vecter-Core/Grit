@@ -1,0 +1,8 @@
+// expect: pass
+// note: ⊐ generic và hàm kết hợp
+▢ W<T> { v: T }
+⊐ <T> W<T> {
+  ƒ get(&self) → T ! ∅ { self.v }
+}
+ƒ f(w: W<u8>) → u8 ! ∅ { w.get() }
+ƒ mk() → W<bool> ! ∅ { W { v: true } }

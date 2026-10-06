@@ -1,0 +1,3 @@
+// expect: fail E0313
+// note: khai báo Copy cho Cap (không Copy, D28)
+⊐ Copy for Cap<Fs> { }

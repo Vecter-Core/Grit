@@ -1,0 +1,3 @@
+// expect: fail E0314
+// note: ! làm kiểu trường
+▢ S { x: ! }

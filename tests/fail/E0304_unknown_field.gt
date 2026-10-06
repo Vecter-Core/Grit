@@ -1,0 +1,4 @@
+// expect: fail E0304
+// note: truy cập trường không tồn tại
+▢ P { x: i32 }
+ƒ f(p: P) → i32 ! ∅ { p.z }

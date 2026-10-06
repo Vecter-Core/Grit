@@ -1,0 +1,5 @@
+// expect: fail E0311
+// note: ⊐ Copy cho struct có trường không Copy
+▢ Q { x: i32 }
+▢ P { q: Q }
+⊐ Copy for P { }

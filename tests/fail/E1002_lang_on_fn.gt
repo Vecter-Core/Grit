@@ -1,0 +1,4 @@
+// expect: fail E1002
+// note: #lang ngoài lib/core (hàm)
+#lang(cap)
+ƒ f() ! ∅ { }

@@ -1,0 +1,18 @@
+// expect: pass
+// note: mọi dạng gán/mượn hợp lệ (D5): μ, &!, trường, chỉ số, self
+▢ C { n: i32 }
+⊐ C {
+  ƒ inc(&!self) ! ∅ { self.n ← self.n +% 1; }
+  ƒ get(&self) → i32 ! ∅ { self.n }
+}
+ƒ f() → i32 ! ∅ {
+  μc ≔ C { n: 0 };
+  c.inc();
+  μa ≔ [1, 2, 3];
+  a[0] ← 9;
+  μt ≔ (1, 2);
+  t.0 ← 5;
+  p ≔ &!c;
+  p.inc();
+  c.get()
+}

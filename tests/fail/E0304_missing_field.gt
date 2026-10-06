@@ -1,0 +1,4 @@
+// expect: fail E0304
+// note: literal struct thiếu trường (kèm gợi ý thêm trường)
+▢ P { x: i32, y: i32 }
+ƒ f() → P ! ∅ { P { x: 1 } }

@@ -1,5 +1,5 @@
 //! Kiểu dữ liệu công khai của kết quả phân giải (ADR-017).
-use gt_ast::NodeId;
+use gt_ast::{NodeId, Program};
 use gt_diag::Report;
 use gt_span::{FileId, Span};
 use std::collections::BTreeMap;
@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 pub struct DefId(u32);
 
 impl DefId {
-    pub(crate) fn from_index(i: usize) -> DefId {
+    pub fn from_index(i: usize) -> DefId {
         DefId(u32::try_from(i).unwrap_or(u32::MAX))
     }
 
@@ -103,6 +103,12 @@ pub struct ResolveOutput {
     pub uses: BTreeMap<NodeId, Res>,
     /// Mỗi chỗ khai báo biến cục bộ (NodeId của `Ident`) → LocalId.
     pub decls: BTreeMap<NodeId, LocalId>,
+    /// AST của từng tệp theo `FileId` (để pass sau — kiểm kiểu — dùng cùng cây mà `uses`/`decls` trỏ tới). Rỗng nếu có lỗi cú pháp.
+    pub programs: Vec<Program>,
+    /// Tên module của từng tệp theo `FileId`.
+    pub module_names: Vec<String>,
+    /// AST của prelude (FileId riêng, không nằm trong `programs`).
+    pub prelude_program: Option<Program>,
     pub(crate) canonical: Vec<String>,
     pub(crate) logical: Vec<String>,
 }

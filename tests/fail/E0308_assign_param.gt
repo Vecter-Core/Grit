@@ -1,0 +1,6 @@
+// expect: fail E0308
+// note: gán vào tham số bất biến (D5)
+ƒ f(x: i32) → i32 ! ∅ {
+  x ← 2;
+  x
+}

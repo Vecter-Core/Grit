@@ -1,0 +1,5 @@
+// expect: fail E0311
+// note: hàm trong ⊐ khác chữ ký trait
+⊏ T { ƒ a(&self) → i32 ! ∅; }
+▢ S { x: i32 }
+⊐ T for S { ƒ a(&self) → bool ! ∅ { true } }

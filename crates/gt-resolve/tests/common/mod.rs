@@ -6,6 +6,7 @@ use gt_resolve::{Prelude, ResolveOutput, SourceInput, resolve_program};
 pub const PRELUDE_SRC: &str = "\
 ⊔ Option<T> { None, Some(T) }
 ⊔ Result<T, E> { Ok(T), Err(E) }
+⊏ Copy { }
 ▢ Secret<T> { v: T }
 ▢ Cap<T> { v: T }
 ▢ Fs { x: i32 }

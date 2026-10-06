@@ -1,0 +1,4 @@
+// expect: fail E1002
+// note: #lang ngoài lib/core (trait)
+#lang(copy)
+⊏ MyCopy { }

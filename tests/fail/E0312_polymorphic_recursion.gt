@@ -1,0 +1,4 @@
+// expect: fail E0312
+// note: đệ quy đa hình: kiểu lồng vô hạn
+ƒ f<T>(x: T) ! ∅ { f((x,)); }
+ƒ main() ! ∅ { f(1u8); }

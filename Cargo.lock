@@ -71,6 +71,18 @@ name = "gt-stack"
 version = "0.1.0"
 
 [[package]]
+name = "gt-types"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-parser",
+ "gt-resolve",
+ "gt-span",
+ "gt-stack",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,6 @@
+// expect: pass
+// note: đệ quy đa hình KHÔNG nở kiểu: hữu hạn instance
+ƒ f<T>(x: T, n: u32) → u32 ! ∅ ↓ n {
+  ⎇ n > 0 { f(x, n - 1) } ⇝ { 0 }
+}
+ƒ main() → u32 ! ∅ { f(1u8, 3) }

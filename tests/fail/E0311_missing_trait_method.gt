@@ -1,0 +1,5 @@
+// expect: fail E0311
+// note: ⊐ thiếu hàm của trait
+⊏ T { ƒ a(&self) → i32 ! ∅; ƒ b(&self) ! ∅; }
+▢ S { x: i32 }
+⊐ T for S { ƒ a(&self) → i32 ! ∅ { 1 } }

@@ -164,5 +164,34 @@ Cập nhật: 2026-10-06.
 - `cargo test --workspace --no-fail-fast`: **233 test pass, 0 fail**.
 - Duyệt của Giang 2026-10-06: Q17, Q18, Q19 (ADR-017) — đã quyết.
 
-## M4 — Hệ thống kiểu — **ĐÃ VIẾT ADR-018, CHƯA CODE; chờ Giang duyệt ADR**
-Cập nhật: 2026-10-06. Hai việc theo lệnh đã xong: (A) chính sách đột biến ghi vào `.claude/skills/grit-contract.md` §3.3 (không đột biến gt-types/hir/mir/dataflow; chỉ M6/M7/M8); (B) ADR-018 (đơn hình hoá lazy đề xuất, `ImplTable` + `Copy`, chi tiết lan truyền `!`) cùng phản biện kỹ thuật (mã lỗi E0305/E0306 mâu thuẫn bảng đã duyệt; M4.5 không phải kiểm trường struct; `Secret`/`Cap` cần thuộc tính lang chỉ lib/core; rủi ro cắt đột biến). OPEN_QUESTIONS Q20–Q22. Chưa có dòng code M4 nào.
+## M4 — Hệ thống kiểu — **HOÀN THÀNH** (Giang duyệt Q23 và 4 điểm sai khác, 2026-10-06)
+Cập nhật: 2026-10-06. ADR-018 đã duyệt (mono lazy, `ImplTable`, `!`); mục 6 của ADR ghi các chỗ bản M4 khác lệnh (Q23).
+
+### gt-types (có thật)
+- API: `check_program(&[SourceInput], &Prelude) -> TypesOutput`. Chỉ chạy khi giải tên sạch (fail-closed). Mô-đun: `ty`, `infer` (biến suy luận Int/Float, mặc định i32/f64), `collect` (hạ kiểu, bảng ADT/trait/impl), `traits` (tra phương thức, autoderef, ràng buộc), `exhaust` (ma trận Maranget + chia khoảng), `validate` (hợp lệ của `⊐`, coherence), `mono` (instance lazy, ngưỡng 64), `check/{expr,call,pat,mod}`.
+- Làm đủ (a)–(g) theo thứ tự lệnh: nguyên thuỷ + literal; struct/enum/tuple/trường (E0304); kiểu hàm + suy luận cục bộ + generics; `Secret<T>`/`Cap<T>` mức kiểu (không Copy, cấm `⊐ Copy for`, cấm literal ngoài prelude — E0313; `#lang` ngoài prelude — E1002); `⌥` vét cạn (E0305); fixture prelude phong phú (`Cap<Fs>::read → File`, `File::len`, `Arena::new/alloc`, `Copy`…); tài liệu `docs/errors/` cho E0301–E0305, E0308, E0309, E0311–E0314, E1002 (mỗi mã ≥3 fail + ≥3 pass; `check_expectations.py` kiểm bắt buộc).
+- Gợi ý sửa dạng edit: E0302, E0304, E0305, E0308 (test áp gợi ý rồi kiểm lại sạch).
+- Corpus: `tests/fail` 116 mẫu (42 mới của M4), `tests/pass` 49 mẫu (12 mới); mọi mẫu pass kiểm kiểu sạch, mọi mẫu fail của M4 ra ĐÚNG mã (mẫu M4 có lỗi cú pháp thì test đỏ, không bỏ qua).
+- Test gt-types: 110 test (~365 ca ok/err) + 91 mẫu corpus ⇒ vượt tiêu chí ≥200 ca.
+
+### Đột biến có mục tiêu (ngoại lệ chính sách 2026-10-06) — kết quả thật
+- **49 đột biến** (48 ban đầu + 1 cho chỗ vừa sửa) trên D1 (ép số ngầm), D4 (`==` số thực), D5 (bất biến) và phép ép `!`. Công cụ: `mut.py` (mỗi đột biến cần ≥1 test ĐỎ; luôn hoàn nguyên, đã kiểm).
+- Lượt 1: **39 bị bắt, 9 sống sót.** Cả 9 đều có test mới (`tests/mutation_survivors.rs`): `&!self` trên giá trị tạm; E0314 không kéo lỗi dây chuyền; literal nguyên + literal thực không hợp nhất; thông điệp toán hạng `!`; nhánh `!` dẫn đầu không quyết định kiểu join; `==` trên tuple/mảng chứa float bị cấm; `x ≔ !` / câu lệnh `!` làm khối phân kỳ; deref kiểu không phải con trỏ.
+- Lượt 2 (chỉ 9 đột biến sống sót + 1 mới): **10/10 bị bắt, 0 sống sót.**
+- Một sống sót là LỖI THẬT nhỏ: `*x ← 1` với `x: i32` sinh thêm E0308 dây chuyền ngoài E0301; đã sửa trong code (không phải đột biến tương đương).
+- Không có đột biến nào được coi là "tương đương" để bỏ qua.
+
+### Cổng chạy lại cuối M4 (2026-10-06, kết quả thật)
+- `cargo fmt --all -- --check`: sạch. `cargo clippy --workspace --all-targets -- -D warnings`: sạch. `cargo audit`: exit 0. `tools/check_expectations.py`: OK (192 file .gt; 54 mã; 118 tham chiếu). `cargo test --workspace`: **343 test, 0 hỏng**.
+
+### Sai khác so với lệnh / spec (chi tiết ADR-018 mục 6, Q23 — cần Giang xác nhận)
+1. Match số nguyên/`char` vét cạn theo KHOẢNG (lệnh nói "chưa có range pattern" là sai: Q14 + mẫu pass 29 đã duyệt).
+2. Literal ngoài phạm vi kiểu là E0601/M7 theo spec, không phải E0301 (bản đầu của tôi sai; đã gỡ).
+3. Thiếu đường trả về (E0307) để M5; M4 im lặng.
+4. Hai mẫu M6 (`E0402_double_unique`, `E0403_unique_vs_shared`) gán sai kiểu `a ← 2`; đã sửa `*a ← 2` (mã mong đợi giữ nguyên). Fixture prelude của gt-resolve thêm `⊏ Copy { }`.
+
+### Chưa làm / hạn chế (KNOWN_LIMITATIONS)
+- Chưa bắt "trait phải thấy trong phạm vi"; generics của trait chưa dùng được; thân prelude không kiểm; hiệu ứng ghi vào chữ ký nhưng chưa kiểm gọi (M5); literal ngoài phạm vi chờ M7.
+- **Điều kiện cứng (Giang):** M9 không xong và `gritc` không sinh binary nếu E0601 (M7) / E0307 (M5) chưa có — GRIT_PLAN.md mục 7 điểm 9, KNOWN_LIMITATIONS.md.
+- Cổng chạy LẠI ngay trước commit: fmt sạch; clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (54 mã/118 tham chiếu); `cargo test --workspace` 343 passed, 0 failed.
+- Tiếp theo: M4.5 (Arena/region, E0310, ≥20 fail + ≥20 pass), rồi M5.

@@ -1,0 +1,3 @@
+// expect: fail E0302
+// note: số nguyên dùng làm số thực không ép ngầm (D1)
+ƒ f(a: i32) → f64 ! ∅ { a }

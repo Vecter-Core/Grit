@@ -1,0 +1,3 @@
+// expect: fail E0301
+// note: ⊠ chỉ trong vòng lặp
+ƒ f() ! ∅ { ⊠; }

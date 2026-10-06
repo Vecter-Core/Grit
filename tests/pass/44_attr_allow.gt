@@ -1,0 +1,4 @@
+// expect: pass
+// note: thuộc tính #allow thường (không phải #lang) không bị E1002
+#allow(S101, "mẫu thử")
+ƒ f() → i32 ! ∅ { 1 }

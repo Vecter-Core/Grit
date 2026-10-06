@@ -1,0 +1,5 @@
+// expect: fail E0309
+// note: kiểu không thoả ràng buộc trait của hàm generic
+⊏ Area { ƒ area(&self) → i32 ! ∅; }
+ƒ total<T: Area>(t: &T) → i32 ! ∅ { t.area() }
+ƒ f(x: i32) → i32 ! ∅ { total(&x) }

@@ -1,0 +1,4 @@
+// expect: fail E0304
+// note: trường khởi tạo hai lần
+▢ P { x: i32 }
+ƒ f() → P ! ∅ { P { x: 1, x: 2 } }

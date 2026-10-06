@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: gọi hàm sai số đối số
+ƒ add(a: i32, b: i32) → i32 ! ∅ { a + b }
+ƒ f() → i32 ! ∅ { add(1) }

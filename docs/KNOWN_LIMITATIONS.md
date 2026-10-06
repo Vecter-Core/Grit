@@ -78,3 +78,19 @@
 - **`result` trong `⊲`** là đề xuất chưa duyệt (Q18).
 - **Thông báo lỗi:** dòng nguồn rất dài (vd mẫu E0102_too_deep_*) bị vẽ nguyên dòng trong dạng người đọc (chưa cắt/ghi chú cột). Một số thông báo parser còn thô: `self ≔ …` báo "mong đợi `;` hoặc `}`" thay vì nói `self` là từ khoá; struct literal trần trong hợp đồng báo "mong đợi kiểu, gặp số". Snapshot khoá hiện trạng để mọi cải thiện là thay đổi có chủ đích.
 - **Hạ tầng test (Windows):** build/test/fuzz có thể hỏng ngẫu nhiên khi máy hết commit bộ nhớ (os error 1455, `only metadata stub found`, ASan `error code: 1455`) — không phải lỗi mã; chạy lại với `CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0` hoặc khi máy rảnh. Các artifact fuzz do nguyên nhân này đã được kiểm lại (chạy lại sạch) và giữ ở `crates/gt-parser/tests/fuzz_regressions/`.
+
+## gt-types (M4, ADR-018)
+- **Literal ngoài phạm vi kiểu (`x: u8 ≔ 300`) QUA M4** — theo spec đó là E0601 của M7 (ADR-018 mục 6); tới khi M7 xong chưa có gì chặn. Literal vượt `u128` thì E0301.
+- **Thiếu đường trả về** (`ƒ f() → i32 { x; }`, `⎇` không `⇝` ở đuôi) QUA M4 — E0307 thuộc M5. Hàm `→ !`: M4 chỉ yêu cầu thân có kiểu `!`; "mọi đường đều phân kỳ" do M5.
+- **Chưa bắt buộc "trait phải thấy được trong phạm vi"** để gọi phương thức: mọi `⊐` đều thấy. **Generics của trait** (`⊏ T<U>`) chưa dùng được; không kiểu liên kết, không `dyn`, không specialization.
+- **Thân hàm trong prelude KHÔNG được kiểm** (tin chữ ký; prelude là mã tin cậy, lib/core thật ở M12). `#lang` chỉ nhận option/copy/range/secret/cap.
+- **Hiệu ứng:** M4 ghi hiệu ứng vào chữ ký (kiểu hàm so sánh cả tập hiệu ứng) nhưng KHÔNG kiểm gọi hàm có hiệu ứng trong hàm thuần — việc của M5.
+- **Cú pháp:** `∈` cần miền là range có ngoặc (`x ∈ (0..10)`); không có pattern `..=b` (chỉ `a..=b`, `a..`, `..b`); `⌥` trên `&T` là lỗi kiểu ở Phase 1 (không auto-deref scrutinee).
+- **Mã chết sau nhánh bắt-tất-cả** không phải lỗi M4 (ghi chú N của M5).
+- **Instance:** bảng instance lazy chỉ từ các gốc không generic; hàm generic không được gọi từ gốc nào không có instance (vẫn được kiểm một lần, ở dạng đa hình). Ngưỡng 64 → E0312.
+- **Đột biến:** KHÔNG đột biến toàn bộ gt-types (chính sách 2026-10-06); chỉ ~48 đột biến có mục tiêu cho D1/D4/D5/`!` (kết quả ở PROGRESS.md).
+
+## ĐIỀU KIỆN CỨNG: lỗ hổng tạm thời của M4/M5 (Giang, 2026-10-06; cũng ở GRIT_PLAN.md mục 7, điểm 9)
+- Trước M7, literal ngoài phạm vi (`x: u8 ≔ 300`) lọt qua M4; E0307 (thiếu đường trả về) phụ thuộc M5.
+- **M9 không được coi là xong, và `gritc` KHÔNG ĐƯỢC sinh binary, nếu E0601 (M7) chưa được triển khai và có test; tương tự E0307 (M5).** Cổng này phải được kiểm tường minh khi làm gt-driver (M9): driver từ chối sinh đầu ra nếu các kiểm tra này chưa có.
+

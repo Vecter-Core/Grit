@@ -90,6 +90,9 @@ fn ice(msg: &str) -> ResolveOutput {
         defs: Vec::new(),
         uses: BTreeMap::new(),
         decls: BTreeMap::new(),
+        programs: Vec::new(),
+        module_names: Vec::new(),
+        prelude_program: None,
         canonical: Vec::new(),
         logical: Vec::new(),
     }
@@ -101,6 +104,9 @@ fn syntax_failure(report: Report) -> ResolveOutput {
         defs: Vec::new(),
         uses: BTreeMap::new(),
         decls: BTreeMap::new(),
+        programs: Vec::new(),
+        module_names: Vec::new(),
+        prelude_program: None,
         canonical: Vec::new(),
         logical: Vec::new(),
     }
@@ -142,6 +148,12 @@ fn resolve_inner(map: &SourceMap, mods: &[String], prelude: &Prelude) -> Resolve
         }
     }
 
+    // prelude: cùng luật giải tên (chữ ký/kiểu của nó phải phân giải để pass sau dùng được)
+    {
+        let pm = t.prelude;
+        walk::walk_items(&mut t, &prelude.program.items, pm, prelude::prelude_file());
+    }
+
     // 4. vòng phụ thuộc module
     graph::report_cycles(&mut t);
 
@@ -174,6 +186,9 @@ fn resolve_inner(map: &SourceMap, mods: &[String], prelude: &Prelude) -> Resolve
         defs: std::mem::take(&mut t.defs),
         uses: std::mem::take(&mut t.res),
         decls: std::mem::take(&mut t.decls),
+        programs: parsed,
+        module_names: mods.to_vec(),
+        prelude_program: Some(prelude.program.clone()),
         canonical,
         logical,
     }

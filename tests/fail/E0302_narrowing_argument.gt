@@ -1,0 +1,4 @@
+// expect: fail E0302
+// note: đối số i64 cho tham số i32 (D1)
+ƒ take(x: i32) ! ∅ { }
+ƒ f(a: i64) ! ∅ { take(a); }

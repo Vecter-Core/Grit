@@ -1,0 +1,8 @@
+// expect: fail E0308
+// note: phương thức &!self gọi trên biến bất biến
+▢ C { n: i32 }
+⊐ C { ƒ inc(&!self) ! ∅ { self.n ← self.n + 1; } }
+ƒ f() ! ∅ {
+  c ≔ C { n: 0 };
+  c.inc();
+}

@@ -1,0 +1,5 @@
+// expect: fail E0308
+// note: gán qua tham chiếu chung &T
+ƒ f(p: &i32) ! ∅ {
+  *p ← 1;
+}

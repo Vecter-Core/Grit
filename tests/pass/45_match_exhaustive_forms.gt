@@ -1,0 +1,7 @@
+// expect: pass
+// note: các dạng match đầy đủ: enum, bool, tuple, khoảng số, catch-all
+⊔ Color { Red, Green, Blue(u8) }
+ƒ c(x: Color) → u8 ! ∅ { ⌥ x { Red ↦ 1, Green ↦ 2, Blue(n) ↦ n } }
+ƒ b(x: bool, y: bool) → u8 ! ∅ { ⌥ (x, y) { (true, true) ↦ 3, (true, false) ↦ 2, (false, _) ↦ 0 } }
+ƒ r(n: u8) → u8 ! ∅ { ⌥ n { 0..=127 ↦ 0, 128..=255 ↦ 1 } }
+ƒ s(t: &str) → u8 ! ∅ { ⌥ t { "a" ↦ 1, _ ↦ 0 } }

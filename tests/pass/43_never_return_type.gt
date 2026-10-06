@@ -1,0 +1,6 @@
+// expect: pass
+// note: hàm → ! phân kỳ và nhánh ! hợp nhất
+ƒ die() → ! ! {div} { core::abort("x") }
+ƒ get(o: Option<u8>) → u8 ! {div} {
+  ⌥ o { Some(v) ↦ v, None ↦ die() }
+}

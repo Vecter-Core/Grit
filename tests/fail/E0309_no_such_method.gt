@@ -1,0 +1,4 @@
+// expect: fail E0309
+// note: gọi phương thức không tồn tại
+▢ P { x: i32 }
+ƒ f(p: P) ! ∅ { p.nope(); }

@@ -1,0 +1,3 @@
+// expect: fail E0303
+// note: == với literal thực (D4)
+ƒ f(a: f64) → bool ! ∅ { a == 1.0 }

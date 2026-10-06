@@ -397,6 +397,7 @@ Chỉ chuyển khi đạt **tất cả**:
 6. `KNOWN_LIMITATIONS.md` và `PROGRESS.md` được xem xét bởi Giang.
 7. Có ADR chốt giao diện **Obligation IR** ở dạng ổn định (đây là "khớp nối" quan trọng nhất sang Phase 2).
 8. M13 (LSP) hoàn thành và schema JSON chẩn đoán đóng băng (đây là "khớp nối" thứ hai sang 8.E).
+9. **Điều kiện cứng về lỗ hổng đã biết của M4/M5 (Giang, 2026-10-06):** trước M7, literal ngoài phạm vi kiểu (`x: u8 ≔ 300`) LỌT qua M4 (E0601 thuộc M7), và thiếu đường trả về (E0307) thuộc M5. Vì vậy **M9 không được coi là xong, và `gritc` không được sinh binary**, nếu E0601 (M7) chưa được triển khai và qua test; tương tự nếu E0307 (M5) chưa triển khai. Đây là cổng chặn, không phải ghi chú.
 
 ---
 
