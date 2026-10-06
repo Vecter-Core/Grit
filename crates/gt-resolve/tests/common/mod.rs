@@ -7,6 +7,9 @@ pub const PRELUDE_SRC: &str = "\
 ⊔ Option<T> { None, Some(T) }
 ⊔ Result<T, E> { Ok(T), Err(E) }
 ⊏ Copy { }
+⊏ Drop { }
+▢ Buf { n: i32 }
+ƒ mk_buf() → Buf ! ∅ { }
 ▢ Secret<T> { v: T }
 ▢ Cap<T> { v: T }
 ▢ Fs { x: i32 }

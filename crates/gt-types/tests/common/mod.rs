@@ -11,8 +11,15 @@ pub const PRELUDE_SRC: &str = "\
 ⊔ Result<T, E> { Ok(T), Err(E) }
 #lang(range)
 ▢ Range<T> { start: T, end: T }
+#lang(range_inclusive)
+▢ RangeInclusive<T> { start: T, end: T }
 #lang(copy)
 ⊏ Copy { }
+#lang(drop)
+⊏ Drop { ƒ drop(&!self) ! ∅; }
+▢ Buf { n: i32 }
+⊐ Drop for Buf { ƒ drop(&!self) ! ∅ { } }
+ƒ mk_buf() → Buf ! ∅ { }
 #lang(secret)
 ▢ Secret<T> { v: T }
 #lang(cap)

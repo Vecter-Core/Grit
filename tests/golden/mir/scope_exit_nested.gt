@@ -1,0 +1,18 @@
+// Golden bắt buộc (Giang): ⊠ ⊡ ⏎ xuyên nhiều phạm vi lồng nhau — Drop/StorageDead theo thứ tự NGƯỢC khai báo,
+// không thiếu, không thừa, trên MỌI đường thoát. `Buf` và `Arena` cần drop; `i32` không.
+ƒ nested(n: u32) → i32 ! {mem} {
+  a ≔ mk_buf();
+  ⟳ i in 0..n {
+    b ≔ mk_buf();
+    x ≔ 1;
+    {
+      c ≔ Arena::new();
+      ⎇ i == 1 { ⊡; }
+      ⎇ i == 2 { ⊠; }
+      ⎇ i == 3 { ⏎ 7; }
+      y ≔ 2;
+    };
+    z ≔ 3;
+  }
+  0
+}

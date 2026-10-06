@@ -44,7 +44,7 @@ impl Env<'_> {
         match ty {
             Ty::Bool => Some(vec![Ctor::Bool(false), Ctor::Bool(true)]),
             Ty::Tuple(_) => Some(vec![Ctor::Single]),
-            Ty::Adt(d, _) => match self.adts.get(d).map(|a| &a.kind) {
+            Ty::Adt(d, _) => match self.db.adts.get(d).map(|a| &a.kind) {
                 Some(AdtKind::Struct(_)) => Some(vec![Ctor::Single]),
                 Some(AdtKind::Enum(vs)) => Some((0..vs.len()).map(Ctor::Variant).collect()),
                 None => None,
@@ -79,7 +79,7 @@ impl Env<'_> {
         match (ty, c) {
             (Ty::Tuple(v), Ctor::Single) => v.clone(),
             (Ty::Adt(d, args), Ctor::Single) => {
-                match self.adts.get(d).map(|a| (&a.kind, &a.generics)) {
+                match self.db.adts.get(d).map(|a| (&a.kind, &a.generics)) {
                     Some((AdtKind::Struct(fs), gens)) => fs
                         .iter()
                         .map(|f| crate::traits::subst_with(&f.ty, gens, args))
@@ -88,7 +88,7 @@ impl Env<'_> {
                 }
             }
             (Ty::Adt(d, args), Ctor::Variant(i)) => {
-                match self.adts.get(d).map(|a| (&a.kind, &a.generics)) {
+                match self.db.adts.get(d).map(|a| (&a.kind, &a.generics)) {
                     Some((AdtKind::Enum(vs), gens)) => vs
                         .get(*i)
                         .map(|v| {
@@ -108,7 +108,7 @@ impl Env<'_> {
     fn describe(&self, ty: &Ty, c: &Ctor) -> String {
         match (ty, c) {
             (_, Ctor::Bool(b)) => b.to_string(),
-            (Ty::Adt(d, _), Ctor::Variant(i)) => match self.adts.get(d).map(|a| &a.kind) {
+            (Ty::Adt(d, _), Ctor::Variant(i)) => match self.db.adts.get(d).map(|a| &a.kind) {
                 Some(AdtKind::Enum(vs)) => {
                     let v = &vs[*i];
                     if v.fields.is_empty() {

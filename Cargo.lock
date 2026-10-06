@@ -10,6 +10,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "gt-dataflow"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-mir",
+ "gt-parser",
+ "gt-resolve",
+ "gt-span",
+ "gt-types",
+]
+
+[[package]]
 name = "gt-diag"
 version = "0.1.0"
 dependencies = [
@@ -37,6 +50,19 @@ dependencies = [
  "unicode-ident",
  "unicode-normalization",
  "unicode-script",
+]
+
+[[package]]
+name = "gt-mir"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-parser",
+ "gt-resolve",
+ "gt-span",
+ "gt-stack",
+ "gt-types",
 ]
 
 [[package]]

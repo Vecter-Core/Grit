@@ -226,8 +226,27 @@ Cập nhật: 2026-10-06. Không đột biến (đúng chính sách).
 - Test: `gt-parser/tests/lifetime_args.rs` (4), gt-fmt `parse(fmt(x)) == parse(x)` + idempotent trên 8 dạng mới, gt-types `regions.rs` (+2), mẫu `pass/76_lifetime_args_in_types`, `fail/E0315_lifetime_arg_count`, `E0315_lifetime_arg_undeclared`, `E0315_field_elided_lifetime_arg`, `E0101_lifetime_after_type_arg` (+ snapshot).
 - Cổng chạy lại ngay trước commit: fmt sạch; clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (256 file .gt; 55 mã; 156 tham chiếu); `cargo test --workspace` 375 passed, 0 failed.
 
-## M5 — MIR + dataflow — **ADR-020 ĐÃ DUYỆT (có sửa đổi); đang làm** (2026-10-06)
-- Chỉ viết ADR (theo lệnh): `docs/DECISIONS.md` ADR-020 trả lời (a) biểu diễn MIR, (b) thông tin M6 cần + danh sách thiếu-thì-phải-sửa, (c) khung dataflow, (d) kiểm đầy đủ, (e) MIR text ổn định, (f) cắt phạm vi; thêm mục 7 (validator + thông dịch MIR bù cho việc không đột biến).
-- Phát hiện cần Giang quyết (Q25–Q29): **E0306 không thể kích hoạt** trong ngữ pháp hiện tại; "drop elaboration" không cần cho M6 và Phase 1 chưa có `Drop`; MIR cần bảng vị trí region riêng vì `Ty` không chứa region; đề xuất không có crate `gt-hir`.
-- **Giang duyệt ADR-020 có sửa đổi (2026-10-06, §9):** E0306 nghỉ (rút khỏi bảng + gt-diag), `#lang(drop)`, không gt-hir (hoãn), autoref muộn + luật kéo dài tạm, `Assert` có từ M5, không unwind, thứ tự trái-sang-phải (semantics §3a), golden thoát phạm vi bắt buộc.
-- Cổng chạy lại ngay trước commit M5-adr: fmt sạch (sau `cargo fmt` cho danh sách mã của gt-diag); clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (256 file .gt; **54 mã** — E0306 đã rút; 156 tham chiếu); `cargo test --workspace` 375 passed, 0 failed.
+## M5 — MIR + dataflow — **HOÀN THÀNH** (Giang duyệt ADR-022/Q34, Q24f, `TypeDb`, 2026-10-06)
+Theo thứ tự lệnh: định nghĩa MIR + in text → bước hạ → validator → dataflow (khởi tạo chắc chắn, liveness) → E0307 và `→ !` → thông dịch MIR + bộ sinh ngẫu nhiên. Không đột biến (chính sách).
+
+### Đã làm (có thật, có test)
+- **gt-types (bước 1, ADR-020 §1):** `TypeDb` công khai (`is_copy_resolved`, `needs_drop`, `sig_by_node`), `sites`, `bodies`, `scope_of`, `file_names`; `Lang::Drop` (`⊐ Drop for` ngoài lib/core → E0313); `Lang::RangeInclusive` (ADR-022 §1 — sửa lỗi M4); khoá impl ổn định (ADR-022 §3). Test: `typedb.rs` (9).
+- **gt-mir:** biểu diễn (`mir.rs`: place gồm deref/field/index/downcast/subslice, rvalue, terminator gồm `Assert` với loại nghĩa vụ, `Call{target: None}` cho `→ !`, không unwind/cleanup); bảng biến region theo từng local + `BorrowData` cho mọi `Ref`; in text ổn định (`print.rs`); validator (`validate.rs`, cân bằng `StorageLive/Dead` trên mọi đường); bước hạ (`build/`: biểu thức, câu lệnh, `⎇ ⌥ ⟳` 3 dạng + `⟳ in` range/range gồm/slice, phương thức với autoref muộn, kéo dài tạm của `≔ &V`, thoát phạm vi với `Drop`/`StorageDead` ngược thứ tự trên mọi đường `⊠ ⊡ ⏎`, `Assert` cho tràn/chia 0/MIN÷-1/-MIN/chỉ số/lát/ép mất thông tin, bỏ mã chết); E0307 và kiểm `→ !` (`completeness`).
+- **gt-dataflow:** dàn tổng quát (`BitSet`, `Dual`), bộ giải tiến/lùi theo RPO với trần số bước; `MovePaths`, `MaybeInit`, `MaybeUninit`, `Liveness`, `DefinitelyAssigned` + `check_definitely_assigned`/`check_invariants` (vi phạm = ICE; E0306 đã nghỉ).
+- **E0307:** 5 mẫu fail (3 mới) + 4 pass được tham chiếu; `docs/errors/E0307.md`; `DOC_REQUIRED` có E0307.
+
+### Tiêu chí hoàn thành (plan M5) và bù cho việc không đột biến
+- **MIR text ổn định:** 9 ca golden `tests/golden/mir/*.gt → *.mir` (gồm ca BẮT BUỘC thoát phạm vi lồng nhau `scope_exit_nested`, `scope_exit_loops`), đọc kiểm tay; in hai lần giống từng byte.
+- **Test đặc tả dataflow trên CFG mẫu, kết quả cố định:** `spec.rs` (9).
+- **Test thuộc tính dataflow:** 300 CFG ngẫu nhiên × 4 phân tích — trùng điểm cố định với một bộ giải ngây thơ viết độc lập; bất biến khi đánh số lại khối; tất định; dàn đơn điệu. Đã kiểm độ nhạy: làm hỏng hiệu ứng cạnh `Call` → test đỏ.
+- **Validator:** chạy trên MỌI thân của corpus; test bỏ từng `StorageDead` trên đường tới được (≥10 vị trí) → đều bị bắt; trùng `StorageDead`, dùng biến đã chết, khoản mượn trùng id, sai số biến region, sai kiểu gán, nhảy sai khối → đều bị bắt.
+- **Bảo toàn ngữ nghĩa:** 400 chương trình ngẫu nhiên (bộ sinh có bộ đánh giá AST riêng) → kết quả MIR (thông dịch) trùng kỳ vọng, kể cả LOẠI abort; mọi loại `Assert` đều được kích hoạt và khớp; thứ tự đánh giá trái-sang-phải (kể cả struct literal theo thứ tự viết) có test riêng. Đã kiểm độ nhạy: `+%` hạ sai thành `+^` → đỏ; struct literal đánh giá theo thứ tự khai báo → đỏ.
+- **Corpus:** 77 mẫu pass hạ được, qua validator, qua bất biến khởi tạo, các phân tích hội tụ; mẫu M6+ (E04xx) hạ được không lỗi.
+
+### Cổng chạy lại cuối M5 (2026-10-06, kết quả thật, sau `cargo clean`)
+- `cargo fmt --check` sạch; `cargo clippy --workspace --all-targets -- -D warnings` sạch; `cargo audit` exit 0; `check_expectations.py` OK (260 file .gt: fail=156, pass=77; 54 mã; 159 tham chiếu); `cargo test --workspace`: **414 passed, 0 failed**.
+- Dung lượng: `cargo clean` xoá 1620 tệp / 508 MiB (binary test cũ tích tụ); sau build lại `target/` 425 MB, `.git/` 1,8 MB. Không còn fuzz target cũ (đã xoá ở M4.5); chỉ dùng profile `dev`.
+
+### Chờ xác nhận / hạn chế
+- ADR-022 (9 điểm), quan trọng nhất: `#lang(range_inclusive)` (sửa lỗi M4) và biến tạm của đuôi khối. Chi tiết KNOWN_LIMITATIONS (gt-mir / gt-dataflow).
+- Cổng chạy LẠI ngay trước commit M5 (2026-10-06): fmt sạch; clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (260 file .gt; 54 mã; 159 tham chiếu); `cargo test --workspace` **414 passed, 0 failed**.

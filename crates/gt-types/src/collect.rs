@@ -15,8 +15,12 @@ pub enum Lang {
     Option,
     Copy,
     Range,
+    /// `a..=b` (gồm đầu mút): khác kiểu với `a..b` để giá trị range không mất thông tin (ADR-022).
+    RangeInclusive,
     Secret,
     Cap,
+    /// `Drop` (ADR-020 §9, Q26): `⊐ Drop for` chỉ trong lib/core.
+    Drop,
     /// `Arena`: vùng nhớ; mượn `&Arena` sinh region "gốc Arena" cho M6 (E0405 khác E0404).
     Arena,
 }
@@ -27,9 +31,11 @@ impl Lang {
             "option" => Lang::Option,
             "copy" => Lang::Copy,
             "range" => Lang::Range,
+            "range_inclusive" => Lang::RangeInclusive,
             "secret" => Lang::Secret,
             "cap" => Lang::Cap,
             "arena" => Lang::Arena,
+            "drop" => Lang::Drop,
             _ => return None,
         })
     }
@@ -69,6 +75,8 @@ pub enum AdtKind {
 #[derive(Clone, Debug)]
 pub struct AdtDef {
     pub def: DefId,
+    /// Số tham số lifetime (`▢ Holder<'a>` → 1): số vị trí region của kiểu này ngoài các đối số kiểu (ADR-021).
+    pub lt_params: usize,
     pub generics: Vec<GParam>,
     pub kind: AdtKind,
     pub lang: Option<Lang>,
@@ -131,14 +139,9 @@ pub(crate) struct Env<'a> {
     pub diags: Vec<Diagnostic>,
     pub items: BTreeMap<NodeId, ItemInfo<'a>>,
     pub def_by_node: BTreeMap<NodeId, DefId>,
-    pub adts: BTreeMap<DefId, AdtDef>,
-    pub traits: BTreeMap<DefId, TraitDef>,
+    pub db: crate::db::TypeDb,
     pub aliases: BTreeMap<DefId, AliasDef>,
     alias_tys: BTreeMap<DefId, Option<Ty>>,
-    pub fns: BTreeMap<DefId, (FnSigInfo, DefId)>,
-    pub consts: BTreeMap<DefId, Ty>,
-    pub impls: Vec<ImplDef>,
-    pub lang: BTreeMap<Lang, DefId>,
     pub fn_items: Vec<FnBody<'a>>,
     const_depth: u32,
     pub out_types: BTreeMap<NodeId, Ty>,
@@ -147,6 +150,7 @@ pub(crate) struct Env<'a> {
     /// Bảng region của từng chữ ký (M4.5).
     pub region_sigs: BTreeMap<NodeId, RegionSig>,
     pub out_calls: Vec<crate::check::CallRec>,
+    pub out_sites: BTreeMap<NodeId, crate::check::CallSite>,
 }
 
 /// Một thân hàm cần kiểm.
@@ -171,14 +175,9 @@ impl<'a> Env<'a> {
             diags: Vec::new(),
             items: BTreeMap::new(),
             def_by_node: BTreeMap::new(),
-            adts: BTreeMap::new(),
-            traits: BTreeMap::new(),
+            db: crate::db::TypeDb::default(),
             aliases: BTreeMap::new(),
             alias_tys: BTreeMap::new(),
-            fns: BTreeMap::new(),
-            consts: BTreeMap::new(),
-            impls: Vec::new(),
-            lang: BTreeMap::new(),
             fn_items: Vec::new(),
             const_depth: 0,
             out_types: BTreeMap::new(),
@@ -186,6 +185,7 @@ impl<'a> Env<'a> {
             out_methods: BTreeMap::new(),
             region_sigs: BTreeMap::new(),
             out_calls: Vec::new(),
+            out_sites: BTreeMap::new(),
         }
     }
 
@@ -541,7 +541,7 @@ impl<'a> Env<'a> {
                 let kind = self.defs()[d.index()].kind;
                 match kind {
                     DefKind::Struct | DefKind::Enum => {
-                        let want = self.adts.get(&d).map_or(0, |a| a.generics.len());
+                        let want = self.db.adts.get(&d).map_or(0, |a| a.generics.len());
                         let a: Vec<Ty> = args
                             .iter()
                             .map(|x| self.elem_ty(x, cx, "đối số kiểu"))
@@ -707,10 +707,12 @@ impl<'a> Env<'a> {
                 ItemKind::Struct(s) => {
                     if let Some(&d) = self.def_by_node.get(n) {
                         let g = self.gparams(&s.generics, item.id);
-                        self.adts.insert(
+                        let lt_params = count_lifetimes(&s.generics);
+                        self.db.adts.insert(
                             d,
                             AdtDef {
                                 def: d,
+                                lt_params,
                                 generics: g,
                                 kind: AdtKind::Struct(Vec::new()),
                                 lang,
@@ -718,17 +720,19 @@ impl<'a> Env<'a> {
                             },
                         );
                         if let Some(l) = lang {
-                            self.lang.insert(l, d);
+                            self.db.lang.insert(l, d);
                         }
                     }
                 }
                 ItemKind::Enum(e) => {
                     if let Some(&d) = self.def_by_node.get(n) {
                         let g = self.gparams(&e.generics, item.id);
-                        self.adts.insert(
+                        let lt_params = count_lifetimes(&e.generics);
+                        self.db.adts.insert(
                             d,
                             AdtDef {
                                 def: d,
+                                lt_params,
                                 generics: g,
                                 kind: AdtKind::Enum(Vec::new()),
                                 lang,
@@ -736,7 +740,7 @@ impl<'a> Env<'a> {
                             },
                         );
                         if let Some(l) = lang {
-                            self.lang.insert(l, d);
+                            self.db.lang.insert(l, d);
                         }
                     }
                 }
@@ -744,7 +748,7 @@ impl<'a> Env<'a> {
                     if let Some(&d) = self.def_by_node.get(n) {
                         // (chỉ để kiểm ràng buộc; generics của trait chưa dùng được — KNOWN_LIMITATIONS)
                         self.gparams(&t.generics, item.id);
-                        self.traits.insert(
+                        self.db.traits.insert(
                             d,
                             TraitDef {
                                 node: item.id,
@@ -753,7 +757,7 @@ impl<'a> Env<'a> {
                             },
                         );
                         if let Some(l) = lang {
-                            self.lang.insert(l, d);
+                            self.db.lang.insert(l, d);
                         }
                     }
                 }
@@ -778,13 +782,13 @@ impl<'a> Env<'a> {
                 ItemKind::Const(c) => {
                     let ty = self.lower_ty(&c.ty, &LowerCx::default());
                     if let Some(&d) = self.def_by_node.get(n) {
-                        self.consts.insert(d, ty);
+                        self.db.consts.insert(d, ty);
                     }
                 }
                 ItemKind::Static(c) => {
                     let ty = self.lower_ty(&c.ty, &LowerCx::default());
                     if let Some(&d) = self.def_by_node.get(n) {
-                        self.consts.insert(d, ty);
+                        self.db.consts.insert(d, ty);
                     }
                 }
                 ItemKind::Impl(i) => self.fill_impl(item, i, module),
@@ -812,7 +816,7 @@ impl<'a> Env<'a> {
                 public: f.vis == Visibility::Public,
             })
             .collect();
-        if let Some(a) = self.adts.get_mut(&d) {
+        if let Some(a) = self.db.adts.get_mut(&d) {
             a.kind = AdtKind::Struct(fields);
         }
     }
@@ -843,7 +847,7 @@ impl<'a> Env<'a> {
                 fields,
             });
         }
-        if let Some(a) = self.adts.get_mut(&d) {
+        if let Some(a) = self.db.adts.get_mut(&d) {
             a.kind = AdtKind::Enum(vs);
         }
     }
@@ -938,7 +942,7 @@ impl<'a> Env<'a> {
         };
         let info = self.sig_info(&f.sig, item.id, &LowerCx::default());
         let lts = self.region_sigs[&item.id].declared.clone();
-        self.fns.insert(d, (info.clone(), module));
+        self.db.fns.insert(d, (info.clone(), module));
         let key = self.defs()[d.index()].path.clone();
         self.fn_items.push(FnBody {
             sig: info,
@@ -985,7 +989,7 @@ impl<'a> Env<'a> {
                 key: format!("{tkey}::{}", m.sig.name.name),
             });
         }
-        if let Some(td) = self.traits.get_mut(&d) {
+        if let Some(td) = self.db.traits.get_mut(&d) {
             td.members = members;
         }
     }
@@ -1017,9 +1021,18 @@ impl<'a> Env<'a> {
             lts: ilts.clone(),
             no_elide: false,
         };
-        let idx = self.impls.len();
+        let idx = self.db.impls.len();
         let mut members = Vec::new();
-        let ikey = format!("impl#{}", item.id.raw());
+        // khoá ổn định (không phụ thuộc NodeId): `module::Kiểu::hàm` hoặc `module::<Kiểu as Trait>::hàm`
+        let mpath = self.defs()[module.index()].path.clone();
+        let sname = self_ty.render(self.defs());
+        let ikey = match &trait_ref {
+            Some(tr) => {
+                let tn = self.defs()[tr.trait_def.index()].path.clone();
+                format!("{mpath}::<{sname} as {tn}>")
+            }
+            None => format!("{mpath}::{sname}"),
+        };
         for m in &i.members {
             let info = self.sig_info(&m.func.sig, m.id, &cx);
             let mut lts = ilts.clone();
@@ -1036,7 +1049,7 @@ impl<'a> Env<'a> {
                 key: format!("{ikey}::{}", m.func.sig.name.name),
             });
         }
-        self.impls.push(ImplDef {
+        self.db.impls.push(ImplDef {
             node: item.id,
             generics,
             trait_ref,
@@ -1102,4 +1115,14 @@ pub(crate) fn as_suggestion(file_name: &str, end: u32, ty: &str) -> Suggestion {
             replacement: format!(" as {ty}"),
         }],
     )
+}
+
+/// Số tham số lifetime trong một danh sách generics.
+pub(crate) fn count_lifetimes(g: &Option<Generics>) -> usize {
+    g.as_ref().map_or(0, |g| {
+        g.params
+            .iter()
+            .filter(|p| matches!(p.kind, GenericParamKind::Lifetime(_)))
+            .count()
+    })
 }

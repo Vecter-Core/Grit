@@ -99,3 +99,13 @@
 - **Region:** chỉ kiểm CHỮ KÝ (khai báo, trùng, elision). Region KHÔNG nằm trong `Ty`; thân hàm chưa kiểm gì về region — `ƒ f() → &i32 { &x }` trả tham chiếu local, hay Arena thoát, đều QUA M4/M4.5 và chỉ bị chặn ở M6 (E0404/E0405). Cho tới khi M6 xong, đây là lỗ hổng đã biết.
 - **Ngữ pháp:** đã có đối số lifetime trong kiểu (`Holder<'a>`, ADR-021). **Chưa có ràng buộc `'a: 'b`: một số chữ ký hợp lệ chưa viết được; chỉ thêm khi chương trình thật đòi** (Giang, 2026-10-06). Elision chặt hơn Rust: không có luật `&self` thắng; không tham chiếu vào ⇒ `'static` (M6 kiểm thân hàm thật sự trả dữ liệu `'static`).
 
+## gt-mir / gt-dataflow (M5, ADR-020, ADR-022)
+- **Chưa hạ (ICE E9901, không bỏ qua):** lượng từ `∀ ∃` ngoài hợp đồng; hợp đồng `⊳ ⊲ ↓ ⋈` và chứng cứ của `⚠` chỉ được GHI NHẬN (`Body.contracts`), hạ ở M7/M10; hàm tạo biến thể có trường dùng như giá trị; phương thức trait dùng như giá trị; `⟳` trên range ký tự.
+- **Không có crate gt-hir** (hoãn, Q27): bước hạ MIR đọc thẳng AST + bảng của gt-types.
+- **Không elaboration drop** (cờ drop) — `Drop` vô điều kiện ở cuối phạm vi, kể cả biến đã move; M10 làm elaboration.
+- **Không tối ưu MIR:** `⌥` kiểm từng nhánh tuần tự (đọc lại discriminant mỗi nhánh); nhiều biến tạm/`StorageLive` hơn cần thiết. Đúng trước, nhanh sau.
+- **Biến tạm của đuôi khối chết ở cuối khối** (chặt hơn Rust, ADR-022 §4); người nhận theo giá trị bị move sau đối số (ADR-022 §5).
+- **Thứ tự đánh giá của phép gán khác Rust:** chỗ trước, giá trị sau (semantics §3a).
+- **Thông dịch MIR (test) chỉ phủ** số nguyên, bool, rẽ nhánh, vòng lặp, gọi hàm, struct/tuple/enum, tham chiếu; không số thực, không lời gọi qua trait, không prelude ngoài `core::abort`. Nó và bộ sinh chương trình là công cụ test, không thuộc TCB.
+- **`→ !` thật sự phân kỳ** chỉ kiểm được trên CFG dựng tay (M4 đã chặn mọi nguồn có thể kích hoạt).
+

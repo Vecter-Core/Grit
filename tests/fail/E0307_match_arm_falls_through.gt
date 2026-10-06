@@ -1,0 +1,5 @@
+// expect: fail E0307
+// note: nhánh None không ⏎ nên có đường chạy tới cuối hàm
+ƒ f(o: Option<i32>) → i32 ! ∅ {
+  ⌥ o { Some(v) ↦ { ⏎ v; }, None ↦ { } };
+}

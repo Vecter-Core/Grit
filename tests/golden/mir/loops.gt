@@ -1,0 +1,28 @@
+ƒ sum_range(n: u32) → u32 ! ∅ {
+  μs ≔ 0;
+  ⟳ i in 0..n ↓ n - i { s ← s +% i; }
+  s
+}
+ƒ sum_incl(n: u8) → u32 ! ∅ {
+  μs ≔ 0u32;
+  ⟳ i in 0..=n { s ← s +% (i as u32); }
+  s
+}
+ƒ sum_slice(xs: &[i32]) → i32 ! ∅ {
+  μs ≔ 0;
+  ⟳ x in xs { s ← s +% *x; }
+  s
+}
+ƒ count(n: u32) → u32 ! ∅ {
+  μi ≔ 0;
+  ⟳ i < n ↓ n - i { i ← i + 1; }
+  i
+}
+ƒ forever() → ! ! {div} {
+  ⟳ { }
+}
+ƒ while_true() → u32 ! {div} {
+  μi ≔ 0u32;
+  ⟳ true { ⎇ i == 10 { ⊠; } i ← i +% 1; }
+  i
+}

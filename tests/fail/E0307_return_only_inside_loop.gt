@@ -1,0 +1,8 @@
+// expect: fail E0307
+// note: ⏎ chỉ trong vòng lặp; vòng có thể kết thúc mà không trả
+ƒ f(n: u32) → u32 ! ∅ {
+  ⟳ i in 0..n {
+    ⎇ i == 3 { ⏎ i; }
+  }
+  x ≔ 1;
+}

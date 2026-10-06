@@ -1,0 +1,203 @@
+fn main::ops(_1: i32, _2: i32, _3: u8, _4: f64, _5: &[i32]) -> i32 {
+    let mut _0: i32; // return
+    let _1: i32; // arg `a`
+    let _2: i32; // arg `b`
+    let _3: u8; // arg `u`
+    let _4: f64; // arg `f`
+    let _5: &[i32]; // arg `xs`; regions '#0
+    let _6: i32; // user `s`
+    let mut _7: (i32, bool); // temp
+    let _8: i32; // user `d`
+    let mut _9: (i32, bool); // temp
+    let _10: i32; // user `m`
+    let mut _11: (i32, bool); // temp
+    let _12: i32; // user `q`
+    let mut _13: bool; // temp
+    let mut _14: bool; // temp
+    let mut _15: bool; // temp
+    let mut _16: bool; // temp
+    let _17: i32; // user `r`
+    let mut _18: bool; // temp
+    let mut _19: bool; // temp
+    let mut _20: bool; // temp
+    let mut _21: bool; // temp
+    let _22: i32; // user `n`
+    let mut _23: bool; // temp
+    let _24: i32; // user `w`
+    let _25: i32; // user `t`
+    let _26: Option<i32>; // user `c`
+    let mut _27: (i32, bool); // temp
+    let _28: f64; // user `g`
+    let _29: i32; // user `k`
+    let mut _30: usize; // temp
+    let mut _31: usize; // temp
+    let mut _32: bool; // temp
+    let _33: u8; // user `v`
+    let mut _34: bool; // temp
+    let _35: i32; // user `e`
+    bb0: {
+        StorageLive(_6);
+        StorageLive(_7);
+        _7 = CheckedAdd(copy _1, copy _2);
+        assert(!copy _7.1, overflow Add(copy _1, copy _2)) -> bb1;
+    }
+    bb1: {
+        _6 = copy _7.0;
+        FakeRead(LetInit, _6);
+        StorageDead(_7);
+        StorageLive(_8);
+        StorageLive(_9);
+        _9 = CheckedSub(copy _1, copy _2);
+        assert(!copy _9.1, overflow Sub(copy _1, copy _2)) -> bb2;
+    }
+    bb2: {
+        _8 = copy _9.0;
+        FakeRead(LetInit, _8);
+        StorageDead(_9);
+        StorageLive(_10);
+        StorageLive(_11);
+        _11 = CheckedMul(copy _1, copy _2);
+        assert(!copy _11.1, overflow Mul(copy _1, copy _2)) -> bb3;
+    }
+    bb3: {
+        _10 = copy _11.0;
+        FakeRead(LetInit, _10);
+        StorageDead(_11);
+        StorageLive(_12);
+        StorageLive(_13);
+        _13 = Ne(copy _2, const 0_i32);
+        assert(copy _13, div_by_zero(copy _1)) -> bb4;
+    }
+    bb4: {
+        StorageLive(_14);
+        _14 = Eq(copy _1, const -2147483648_i32);
+        StorageLive(_15);
+        _15 = Eq(copy _2, const -1_i32);
+        StorageLive(_16);
+        _16 = BitAnd(copy _14, copy _15);
+        assert(!copy _16, overflow Div(copy _1, copy _2)) -> bb5;
+    }
+    bb5: {
+        _12 = Div(copy _1, copy _2);
+        FakeRead(LetInit, _12);
+        StorageDead(_16);
+        StorageDead(_15);
+        StorageDead(_14);
+        StorageDead(_13);
+        StorageLive(_17);
+        StorageLive(_18);
+        _18 = Ne(copy _2, const 0_i32);
+        assert(copy _18, rem_by_zero(copy _1)) -> bb6;
+    }
+    bb6: {
+        StorageLive(_19);
+        _19 = Eq(copy _1, const -2147483648_i32);
+        StorageLive(_20);
+        _20 = Eq(copy _2, const -1_i32);
+        StorageLive(_21);
+        _21 = BitAnd(copy _19, copy _20);
+        assert(!copy _21, overflow Rem(copy _1, copy _2)) -> bb7;
+    }
+    bb7: {
+        _17 = Rem(copy _1, copy _2);
+        FakeRead(LetInit, _17);
+        StorageDead(_21);
+        StorageDead(_20);
+        StorageDead(_19);
+        StorageDead(_18);
+        StorageLive(_22);
+        StorageLive(_23);
+        _23 = Eq(copy _1, const -2147483648_i32);
+        assert(!copy _23, overflow_neg(copy _1)) -> bb8;
+    }
+    bb8: {
+        _22 = Neg(copy _1);
+        FakeRead(LetInit, _22);
+        StorageDead(_23);
+        StorageLive(_24);
+        _24 = AddWrap(copy _1, copy _2);
+        FakeRead(LetInit, _24);
+        StorageLive(_25);
+        _25 = AddSat(copy _1, copy _2);
+        FakeRead(LetInit, _25);
+        StorageLive(_26);
+        StorageLive(_27);
+        _27 = CheckedAdd(copy _1, copy _2);
+        switchInt(copy _27.1) -> [0: bb10, otherwise: bb9];
+    }
+    bb9: {
+        _26 = Option<i32>::None;
+        goto -> bb11;
+    }
+    bb10: {
+        _26 = Option<i32>::Some(copy _27.0);
+        goto -> bb11;
+    }
+    bb11: {
+        FakeRead(LetInit, _26);
+        StorageDead(_27);
+        StorageLive(_28);
+        _28 = Mul(copy _4, const 2.0);
+        FakeRead(LetInit, _28);
+        StorageLive(_29);
+        StorageLive(_30);
+        StorageLive(_31);
+        _31 = const 1_usize;
+        _30 = Len((*_5));
+        StorageLive(_32);
+        _32 = Lt(copy _31, copy _30);
+        assert(copy _32, index_out_of_bounds(len copy _30, index copy _31)) -> bb12;
+    }
+    bb12: {
+        _29 = copy (*_5)[_31];
+        FakeRead(LetInit, _29);
+        StorageDead(_32);
+        StorageDead(_31);
+        StorageDead(_30);
+        StorageLive(_33);
+        StorageLive(_34);
+        _34 = CastFits(copy _1 as u8);
+        assert(copy _34, cast_lossy(copy _1 as u8)) -> bb13;
+    }
+    bb13: {
+        _33 = copy _1 as u8;
+        FakeRead(LetInit, _33);
+        StorageDead(_34);
+        StorageLive(_35);
+        _35 = copy _3 as i32;
+        FakeRead(LetInit, _35);
+        _0 = copy _6;
+        StorageDead(_35);
+        StorageDead(_33);
+        StorageDead(_29);
+        StorageDead(_28);
+        StorageDead(_26);
+        StorageDead(_25);
+        StorageDead(_24);
+        StorageDead(_22);
+        StorageDead(_17);
+        StorageDead(_12);
+        StorageDead(_10);
+        StorageDead(_8);
+        StorageDead(_6);
+        return;
+    }
+}
+
+fn main::udiv(_1: u32, _2: u32) -> u32 {
+    let mut _0: u32; // return
+    let _1: u32; // arg `a`
+    let _2: u32; // arg `b`
+    let mut _3: bool; // temp
+    bb0: {
+        StorageLive(_3);
+        _3 = Ne(copy _2, const 0_u32);
+        assert(copy _3, div_by_zero(copy _1)) -> bb1;
+    }
+    bb1: {
+        _0 = Div(copy _1, copy _2);
+        StorageDead(_3);
+        return;
+    }
+}
+

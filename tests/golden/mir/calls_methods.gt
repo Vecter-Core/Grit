@@ -1,0 +1,22 @@
+⊏ Area { ƒ area(&self) → i32 ! ∅; }
+▢ Sq { w: i32 }
+⊐ Area for Sq { ƒ area(&self) → i32 ! ∅ { self.w } }
+▢ C { n: i32 }
+⊐ C {
+  ƒ inc(&!self, k: i32) ! ∅ { self.n ← self.n +% k; }
+  ƒ get(&self) → i32 ! ∅ { self.n }
+  ƒ into_n(self) → i32 ! ∅ { self.n }
+}
+ƒ total<T: Area>(t: &T) → i32 ! ∅ { t.area() }
+ƒ id<T>(x: T) → T ! ∅ { x }
+ƒ twice(f: ƒ(i32) → i32 ! ∅, x: i32) → i32 ! ∅ { f(f(x)) }
+ƒ die() → ! ! {div} { core::abort("x") }
+ƒ calls(s: Sq, r: &&C) → i32 ! {div} {
+  μc ≔ C { n: 1 };
+  c.inc(c.get());
+  a ≔ total(&s);
+  b ≔ id(3u8);
+  d ≔ r.get();
+  e ≔ c.into_n();
+  ⎇ e == 0 { die() } ⇝ { a }
+}

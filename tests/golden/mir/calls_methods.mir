@@ -1,0 +1,178 @@
+fn main::<Sq as main::Area>::area(_1: &Sq) -> i32 {
+    let mut _0: i32; // return
+    let _1: &Sq; // arg self; regions '#0
+    bb0: {
+        _0 = copy (*_1).0;
+        return;
+    }
+}
+
+fn main::C::inc(_1: &!C, _2: i32) -> () {
+    let mut _0: (); // return
+    let _1: &!C; // arg self; regions '#0
+    let _2: i32; // arg `k`
+    bb0: {
+        (*_1).0 = AddWrap(copy (*_1).0, copy _2);
+        _0 = const ();
+        return;
+    }
+}
+
+fn main::C::get(_1: &C) -> i32 {
+    let mut _0: i32; // return
+    let _1: &C; // arg self; regions '#0
+    bb0: {
+        _0 = copy (*_1).0;
+        return;
+    }
+}
+
+fn main::C::into_n(_1: C) -> i32 {
+    let mut _0: i32; // return
+    let _1: C; // arg self
+    bb0: {
+        _0 = copy _1.0;
+        return;
+    }
+}
+
+fn main::total(_1: &T0) -> i32 {
+    let mut _0: i32; // return
+    let _1: &T0; // arg `t`; regions '#0
+    let mut _2: &T0; // temp; regions '#1
+    bb0: {
+        StorageLive(_2);
+        _2 = &(*_1) /*b0*/;
+        _0 = <T0 as main::Area>::area(copy _2) -> bb1;
+    }
+    bb1: {
+        StorageDead(_2);
+        return;
+    }
+}
+
+fn main::id(_1: T0) -> T0 {
+    let mut _0: T0; // return
+    let _1: T0; // arg `x`
+    bb0: {
+        _0 = move _1;
+        drop(_1) -> bb1;
+    }
+    bb1: {
+        return;
+    }
+}
+
+fn main::twice(_1: ƒ(i32) → i32 ! ∅, _2: i32) -> i32 {
+    let mut _0: i32; // return
+    let _1: ƒ(i32) → i32 ! ∅; // arg `f`
+    let _2: i32; // arg `x`
+    let mut _3: i32; // temp
+    bb0: {
+        StorageLive(_3);
+        _3 = (copy _1)(copy _2) -> bb1;
+    }
+    bb1: {
+        _0 = (copy _1)(copy _3) -> bb2;
+    }
+    bb2: {
+        StorageDead(_3);
+        return;
+    }
+}
+
+fn main::die() -> ! {
+    let mut _0: !; // return
+    let mut _1: !; // temp
+    bb0: {
+        StorageLive(_1);
+        _1 = $prelude::core::abort(const "x") -> !;
+    }
+}
+
+fn main::calls(_1: Sq, _2: &&C) -> i32 {
+    let mut _0: i32; // return
+    let _1: Sq; // arg `s`
+    let _2: &&C; // arg `r`; regions '#0 '#1
+    let mut _3: C; // user `c`
+    let mut _4: (); // temp
+    let mut _5: i32; // temp
+    let mut _6: &C; // temp; regions '#2
+    let mut _7: &!C; // temp; regions '#4
+    let _8: i32; // user `a`
+    let mut _9: &Sq; // temp; regions '#6
+    let _10: u8; // user `b`
+    let _11: i32; // user `d`
+    let mut _12: &C; // temp; regions '#8
+    let _13: i32; // user `e`
+    let mut _14: bool; // temp
+    let mut _15: !; // temp
+    bb0: {
+        StorageLive(_3);
+        _3 = C { n: const 1_i32 };
+        FakeRead(LetInit, _3);
+        StorageLive(_4);
+        StorageLive(_5);
+        StorageLive(_6);
+        _6 = &_3 /*b0*/;
+        _5 = main::C::get(copy _6) -> bb1;
+    }
+    bb1: {
+        StorageLive(_7);
+        _7 = &!_3 /*b1*/;
+        _4 = main::C::inc(move _7, copy _5) -> bb2;
+    }
+    bb2: {
+        StorageDead(_7);
+        StorageDead(_6);
+        StorageDead(_5);
+        StorageDead(_4);
+        StorageLive(_8);
+        StorageLive(_9);
+        _9 = &_1 /*b2*/;
+        _8 = main::total::<Sq>(copy _9) -> bb3;
+    }
+    bb3: {
+        FakeRead(LetInit, _8);
+        StorageDead(_9);
+        StorageLive(_10);
+        _10 = main::id::<u8>(const 3_u8) -> bb4;
+    }
+    bb4: {
+        FakeRead(LetInit, _10);
+        StorageLive(_11);
+        StorageLive(_12);
+        _12 = &(*(*_2)) /*b3*/;
+        _11 = main::C::get(copy _12) -> bb5;
+    }
+    bb5: {
+        FakeRead(LetInit, _11);
+        StorageDead(_12);
+        StorageLive(_13);
+        _13 = main::C::into_n(move _3) -> bb6;
+    }
+    bb6: {
+        FakeRead(LetInit, _13);
+        StorageLive(_14);
+        _14 = Eq(copy _13, const 0_i32);
+        switchInt(copy _14) -> [0: bb8, otherwise: bb7];
+    }
+    bb7: {
+        StorageLive(_15);
+        _15 = main::die() -> !;
+    }
+    bb8: {
+        _0 = copy _8;
+        goto -> bb9;
+    }
+    bb9: {
+        StorageDead(_14);
+        StorageDead(_13);
+        StorageDead(_11);
+        StorageDead(_10);
+        StorageDead(_8);
+        StorageDead(_3);
+        return;
+    }
+}
+

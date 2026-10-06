@@ -155,7 +155,7 @@ impl<'e, 'a> Checker<'e, 'a> {
 
     fn variant_pat(&mut self, p: &Pattern, vd: DefId, args: &[Pattern], ty: &Ty) -> XPat {
         let parent = self.env.defs()[vd.index()].parent;
-        let Some(adt) = parent.and_then(|x| self.env.adts.get(&x)).cloned() else {
+        let Some(adt) = parent.and_then(|x| self.env.db.adts.get(&x)).cloned() else {
             self.bind_all(args);
             return XPat::Wild;
         };
@@ -271,8 +271,8 @@ impl<'e, 'a> Checker<'e, 'a> {
         ty: &Ty,
     ) -> XPat {
         let aty = match self.env.res.uses.get(&path.id).cloned() {
-            Some(Res::Def(d)) if self.env.adts.contains_key(&d) => {
-                let n = self.env.adts[&d].generics.len();
+            Some(Res::Def(d)) if self.env.db.adts.contains_key(&d) => {
+                let n = self.env.db.adts[&d].generics.len();
                 let args: Vec<Ty> = (0..n).map(|_| self.fresh()).collect();
                 Ty::Adt(d, args)
             }
@@ -300,7 +300,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         let Ty::Adt(d, targs) = self.infer.resolve(&aty) else {
             return XPat::Wild;
         };
-        let Some(adt) = self.env.adts.get(&d).cloned() else {
+        let Some(adt) = self.env.db.adts.get(&d).cloned() else {
             return XPat::Wild;
         };
         let AdtKind::Struct(defs) = &adt.kind else {
@@ -396,7 +396,7 @@ impl<'e, 'a> Checker<'e, 'a> {
 }
 
 /// Giải mã literal ký tự (văn bản nguồn giữa hai dấu nháy, có thể có escape đơn giản) thành điểm mã.
-fn decode_char(s: &str) -> Option<u32> {
+pub(crate) fn decode_char(s: &str) -> Option<u32> {
     let inner = s
         .strip_prefix('\'')
         .and_then(|x| x.strip_suffix('\''))

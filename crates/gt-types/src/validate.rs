@@ -6,7 +6,7 @@ use crate::ty::Ty;
 
 impl Env<'_> {
     pub(crate) fn validate_impls(&mut self) {
-        let n = self.impls.len();
+        let n = self.db.impls.len();
         for i in 0..n {
             self.validate_trait_impl(i);
         }
@@ -18,15 +18,25 @@ impl Env<'_> {
     }
 
     fn validate_trait_impl(&mut self, idx: usize) {
-        let imp = self.impls[idx].clone();
+        let imp = self.db.impls[idx].clone();
         let Some(tr) = imp.trait_ref.clone() else {
             return;
         };
-        let Some(td) = self.traits.get(&tr.trait_def).cloned() else {
+        let Some(td) = self.db.traits.get(&tr.trait_def).cloned() else {
             return;
         };
         let node = imp.node;
         let tname = self.defs()[tr.trait_def.index()].path.clone();
+        // Drop: Phase 1 chỉ lib/core được viết `⊐ Drop for` (ADR-020 §9, Q26)
+        if self.db.lang.get(&Lang::Drop) == Some(&tr.trait_def) && !self.is_prelude(node.file()) {
+            self.err(
+                "E0313",
+                node,
+                imp.span,
+                "`⊐ Drop for …` chỉ được viết trong lib/core ở Phase 1 (ADR-020 §9)".to_string(),
+            );
+            return;
+        }
         // Copy: không cho kiểu lang; mọi trường phải Copy
         if td.lang == Some(Lang::Copy) {
             self.validate_copy_impl(&imp, node);
@@ -114,7 +124,7 @@ impl Env<'_> {
             }
             return;
         };
-        let Some(adt) = self.adts.get(d).cloned() else {
+        let Some(adt) = self.db.adts.get(d).cloned() else {
             return;
         };
         if matches!(adt.lang, Some(Lang::Secret | Lang::Cap)) {
@@ -157,12 +167,12 @@ impl Env<'_> {
         if matches!(ty, Ty::Adt(d, _) if *d == own) {
             return true;
         }
-        self.is_copy(infer, ty, &[], 0)
+        self.db.is_copy(infer, ty, &[], 0)
     }
 
     /// Hai impl chồng lấn: cùng trait mà đầu đề hợp nhất được; hoặc cùng kiểu (inherent) và trùng tên thành viên.
     fn check_overlap(&mut self, i: usize, j: usize) {
-        let (a, b) = (self.impls[i].clone(), self.impls[j].clone());
+        let (a, b) = (self.db.impls[i].clone(), self.db.impls[j].clone());
         let same_trait = match (&a.trait_ref, &b.trait_ref) {
             (Some(x), Some(y)) => x.trait_def == y.trait_def,
             (None, None) => true,

@@ -65,7 +65,7 @@ fn other_literal_kinds() {
         ("x ≔ [1, 2, 3];", "[i32; 3]"),
         ("x ≔ [0u8; 4];", "[u8; 4]"),
         ("x ≔ 1..2;", "Range<i32>"),
-        ("x ≔ 1u8..=9;", "Range<u8>"),
+        ("x ≔ 1u8..=9;", "RangeInclusive<u8>"),
     ] {
         assert_eq!(local_ty(body, "x"), want, "{body}");
     }

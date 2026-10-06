@@ -2,6 +2,7 @@
 mod call;
 mod expr;
 mod pat;
+pub(crate) use pat::decode_char;
 
 use crate::collect::{Env, FnBody, FnSigInfo, GParam, Lang, LowerCx};
 use crate::exhaust::Pat as XPat;
@@ -47,6 +48,33 @@ pub(crate) struct MatchCheck {
     pub insert_at: u32,
 }
 
+/// Hàm được một chỗ dùng (đường dẫn hàm, `Kiểu::hàm`, lời gọi phương thức) chỉ tới — cho bước hạ MIR (ADR-020 §1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CallTarget {
+    /// Hàm tự do hoặc thành viên impl (NodeId của hàm).
+    Fn(NodeId),
+    /// Qua trait trên kiểu chưa chọn impl (tham số kiểu): giải khi đơn hình hoá.
+    TraitMethod {
+        trait_def: DefId,
+        member: usize,
+        self_ty: Ty,
+    },
+}
+
+/// Thông tin một chỗ dùng hàm, đã giải kiểu.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallSite {
+    pub target: CallTarget,
+    /// Đối số kiểu: với thành viên impl là tham số của impl rồi tham số của chính hàm.
+    pub generics: Vec<Ty>,
+    /// `self` của phương thức (nếu có).
+    pub self_kind: Option<SelfKind>,
+    /// Số lần deref người nhận (lời gọi dạng `x.m()`); 0 với các dạng khác.
+    pub derefs: usize,
+    /// Có phải dạng `x.m(…)` (người nhận ngầm là đối số đầu)?
+    pub method_syntax: bool,
+}
+
 /// Một lời gọi trong thân hàm (cho bộ thu thập instance, ADR-018 §1).
 #[derive(Clone, Debug)]
 pub struct CallRec {
@@ -75,6 +103,7 @@ pub(crate) struct Checker<'e, 'a> {
     pub matches: Vec<MatchCheck>,
     pub calls: Vec<CallRec>,
     pub cap_uses: Vec<CapUse>,
+    pub sites: Vec<(NodeId, CallSite)>,
     /// Hàm này là `main` (nguồn duy nhất của capability gốc, D29).
     pub entry: bool,
     pub in_unsafe: u32,
@@ -106,6 +135,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             matches: Vec::new(),
             calls: Vec::new(),
             cap_uses: Vec::new(),
+            sites: Vec::new(),
             entry: false,
             in_unsafe: 0,
             unresolved_reported: false,
@@ -134,7 +164,7 @@ impl<'e, 'a> Checker<'e, 'a> {
     }
 
     pub(crate) fn lang(&self, l: Lang) -> Option<DefId> {
-        self.env.lang.get(&l).copied()
+        self.env.db.lang.get(&l).copied()
     }
 
     pub(crate) fn fresh(&mut self) -> Ty {
@@ -168,15 +198,27 @@ impl<'e, 'a> Checker<'e, 'a> {
         }
     }
 
-    pub(crate) fn range_of(&mut self, t: Ty, node: NodeId, span: Span) -> Ty {
-        match self.lang(Lang::Range) {
+    pub(crate) fn range_of(&mut self, t: Ty, inclusive: bool, node: NodeId, span: Span) -> Ty {
+        let l = if inclusive {
+            Lang::RangeInclusive
+        } else {
+            Lang::Range
+        };
+        match self.lang(l) {
             Some(d) => Ty::Adt(d, vec![t]),
             None => {
                 self.err(
                     "E0301",
                     node,
                     span,
-                    "thiếu lang item `range` trong prelude".to_string(),
+                    format!(
+                        "thiếu lang item `{}` trong prelude",
+                        if inclusive {
+                            "range_inclusive"
+                        } else {
+                            "range"
+                        }
+                    ),
                 );
                 Ty::Err
             }
@@ -464,6 +506,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             let scope = self.scope.clone();
             if !self
                 .env
+                .db
                 .satisfies_bound(&mut self.infer, &ty, o.trait_def, &scope, 0)
             {
                 let (s, tn) = (
@@ -531,6 +574,14 @@ impl<'e, 'a> Checker<'e, 'a> {
         let ms = std::mem::take(&mut self.methods);
         for (n, m) in ms {
             self.env.out_methods.insert(n, m);
+        }
+        let sites = std::mem::take(&mut self.sites);
+        for (n, mut s) in sites {
+            s.generics = s.generics.iter().map(|t| self.infer.resolve(t)).collect();
+            if let CallTarget::TraitMethod { self_ty, .. } = &mut s.target {
+                *self_ty = self.infer.resolve(self_ty);
+            }
+            self.env.out_sites.insert(n, s);
         }
         let calls = std::mem::take(&mut self.calls);
         for mut c in calls {

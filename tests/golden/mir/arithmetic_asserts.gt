@@ -1,0 +1,19 @@
+// Assert cho mọi nghĩa vụ (ADR-020 §9): tràn + - * và -x có dấu; / % chia 0 và MIN / -1; chỉ số; ép kiểu mất thông tin.
+// +% +^ +? và số thực: không Assert.
+ƒ ops(a: i32, b: i32, u: u8, f: f64, xs: &[i32]) → i32 ! ∅ {
+  s ≔ a + b;
+  d ≔ a - b;
+  m ≔ a * b;
+  q ≔ a / b;
+  r ≔ a % b;
+  n ≔ -a;
+  w ≔ a +% b;
+  t ≔ a +^ b;
+  c ≔ a +? b;
+  g ≔ f * 2.0;
+  k ≔ xs[1];
+  v ≔ a as u8;
+  e ≔ u as i32;
+  s
+}
+ƒ udiv(a: u32, b: u32) → u32 ! ∅ { a / b }

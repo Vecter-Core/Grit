@@ -1,0 +1,16 @@
+// ⊠/⊡ trong vòng lặp lồng nhau thoát đúng số phạm vi của vòng gần nhất
+ƒ inner(n: u32) ! {div, mem} {
+  ⟳ {
+    a ≔ mk_buf();
+    ⟳ i in 0..n {
+      b ≔ mk_buf();
+      ⎇ i == 0 { ⊡; }
+      ⊠;
+    }
+    ⊠;
+  }
+}
+ƒ args_dropped(p: Buf, q: i32) → i32 ! ∅ {
+  ⎇ q == 0 { ⏎ 1; }
+  q
+}

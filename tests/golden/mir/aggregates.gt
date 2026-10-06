@@ -1,0 +1,13 @@
+▢ P { x: i32, y: bool }
+ƒ build(a: i32) → (P, [u8; 3], [i32; 2]) ! ∅ {
+  p ≔ P { y: true, x: a };
+  (p, [7u8; 3], [a, a])
+}
+ƒ ranges(x: i32) → bool ! ∅ {
+  r ≔ 0..10;
+  q ≔ 0..=10;
+  x ∈ r ∧ x ∈ q ∧ x ∈ (1..5)
+}
+ƒ slices(xs: &[i32]) → &[i32] ! ∅ { &xs[1..=2] }
+□ LIMIT: u32 ≔ 100;
+■ NAME: &str ≔ "grit";

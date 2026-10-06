@@ -39,7 +39,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         let kind = self.env.defs()[d.index()].kind;
         match kind {
             DefKind::Fn => {
-                let Some((sig, _)) = self.env.fns.get(&d).cloned() else {
+                let Some((sig, _)) = self.env.db.fns.get(&d).cloned() else {
                     return Ty::Err;
                 };
                 let args = fresh_args(&mut self.infer, &sig.generics);
@@ -53,6 +53,16 @@ impl<'e, 'a> Checker<'e, 'a> {
                     args: args.clone(),
                     trait_method: None,
                 });
+                self.sites.push((
+                    e.id,
+                    CallSite {
+                        target: CallTarget::Fn(sig.node),
+                        generics: args.clone(),
+                        self_kind: sig.self_kind,
+                        derefs: 0,
+                        method_syntax: false,
+                    },
+                ));
                 let ps: Vec<Ty> = sig.params.iter().map(sub).collect();
                 let rt = sub(&sig.ret);
                 self.cap_uses.push(CapUse {
@@ -63,10 +73,12 @@ impl<'e, 'a> Checker<'e, 'a> {
                 });
                 Ty::Fn(ps, Box::new(rt), sig.effects.clone())
             }
-            DefKind::Const | DefKind::Static => self.env.consts.get(&d).cloned().unwrap_or(Ty::Err),
+            DefKind::Const | DefKind::Static => {
+                self.env.db.consts.get(&d).cloned().unwrap_or(Ty::Err)
+            }
             DefKind::Variant => {
                 let parent = self.env.defs()[d.index()].parent;
-                let Some(adt) = parent.and_then(|p| self.env.adts.get(&p)).cloned() else {
+                let Some(adt) = parent.and_then(|p| self.env.db.adts.get(&p)).cloned() else {
                     return Ty::Err;
                 };
                 let AdtKind::Enum(vs) = &adt.kind else {
@@ -113,14 +125,14 @@ impl<'e, 'a> Checker<'e, 'a> {
             return Ty::Err;
         }
         let base_ty = match base {
-            Res::Def(d) if self.env.adts.contains_key(d) => {
-                let n = self.env.adts[d].generics.len();
+            Res::Def(d) if self.env.db.adts.contains_key(d) => {
+                let n = self.env.db.adts[d].generics.len();
                 let args: Vec<Ty> = (0..n).map(|_| self.fresh()).collect();
                 Ty::Adt(*d, args)
             }
-            Res::Def(d) if self.env.traits.contains_key(d) => {
+            Res::Def(d) if self.env.db.traits.contains_key(d) => {
                 // `Trait::hàm(x)`: Self suy ra từ đối số
-                let td = self.env.traits[d].clone();
+                let td = self.env.db.traits[d].clone();
                 let Some(mi) = td.members.iter().position(|m| m.name == member) else {
                     self.err(
                         "E0309",
@@ -166,6 +178,20 @@ impl<'e, 'a> Checker<'e, 'a> {
                     args: targs.clone(),
                     trait_method: Some((*d, mi, self_ty.clone())),
                 });
+                self.sites.push((
+                    e.id,
+                    CallSite {
+                        target: CallTarget::TraitMethod {
+                            trait_def: *d,
+                            member: mi,
+                            self_ty: self_ty.clone(),
+                        },
+                        generics: targs.clone(),
+                        self_kind: m.self_kind,
+                        derefs: 0,
+                        method_syntax: false,
+                    },
+                ));
                 let rt = sub(&m.ret);
                 self.cap_uses.push(CapUse {
                     params: ps.clone(),
@@ -227,6 +253,7 @@ impl<'e, 'a> Checker<'e, 'a> {
     }
 
     fn record_pick(&mut self, node: NodeId, pick: &Pick) {
+        self.record_pick_site(node, pick, false);
         self.methods.push((node, pick.res.clone()));
         match &pick.res {
             MethodRes::Impl {
@@ -236,6 +263,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             } => {
                 let callee = self
                     .env
+                    .db
                     .impls
                     .iter()
                     .find(|i| i.node == *impl_node)
@@ -262,6 +290,55 @@ impl<'e, 'a> Checker<'e, 'a> {
                     trait_method: Some((*trait_def, *member, self_ty.clone())),
                 });
             }
+        }
+    }
+
+    fn record_pick_site(&mut self, node: NodeId, pick: &Pick, method_syntax: bool) {
+        let (target, generics) = match &pick.res {
+            MethodRes::Impl {
+                impl_node,
+                member,
+                args,
+            } => {
+                let callee = self
+                    .env
+                    .db
+                    .impls
+                    .iter()
+                    .find(|i| i.node == *impl_node)
+                    .and_then(|i| i.members.get(*member))
+                    .map(|m| m.node);
+                let Some(callee) = callee else {
+                    return;
+                };
+                let mut all = args.clone();
+                all.extend(pick.generics.iter().cloned());
+                (CallTarget::Fn(callee), all)
+            }
+            MethodRes::TraitMethod {
+                trait_def,
+                member,
+                self_ty,
+            } => (
+                CallTarget::TraitMethod {
+                    trait_def: *trait_def,
+                    member: *member,
+                    self_ty: self_ty.clone(),
+                },
+                pick.generics.clone(),
+            ),
+        };
+        let site = CallSite {
+            target,
+            generics,
+            self_kind: pick.self_kind,
+            derefs: pick.derefs,
+            method_syntax,
+        };
+        if let Some(slot) = self.sites.iter_mut().find(|(n, _)| *n == node) {
+            slot.1 = site;
+        } else {
+            self.sites.push((node, site));
         }
     }
 
@@ -372,6 +449,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             self.push_oblig(t.clone(), *tr, e.id, e.span);
         }
         self.record_pick(e.id, &pick);
+        self.record_pick_site(e.id, &pick, true);
         let mut cap_ps = vec![pick.recv_self.clone()];
         cap_ps.extend(pick.params.iter().cloned());
         self.cap_uses.push(CapUse {

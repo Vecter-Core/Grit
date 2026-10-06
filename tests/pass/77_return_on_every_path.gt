@@ -1,0 +1,15 @@
+// expect: pass
+// note: mọi đường đều ⏎ (E0307 không xảy ra): ⏎ sau ⎇, mọi nhánh của ⌥ đều ⏎, ⏎ trong vòng lặp + ⏎ sau vòng
+ƒ f(c: bool) → i32 ! ∅ {
+  ⎇ c { ⏎ 1; }
+  ⏎ 2;
+}
+ƒ g(o: Option<i32>) → i32 ! ∅ {
+  ⌥ o { Some(v) ↦ { ⏎ v; }, None ↦ { ⏎ 0; } }
+}
+ƒ h(n: u32) → u32 ! ∅ {
+  ⟳ i in 0..n {
+    ⎇ i == 3 { ⏎ i; }
+  }
+  ⏎ 0;
+}

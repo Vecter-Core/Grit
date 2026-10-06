@@ -160,6 +160,7 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 
 ## 20. Biểu thức: range, tuple, struct, pattern
 - **Range (Q14):** `a..b` (không gồm `b`), `a..=b` (gồm `b`), và dạng **mở**: `a..` (đến hết), `..b` (từ đầu, không gồm `b`), `..` (toàn bộ). Độ ưu tiên thấp nhất (dưới `⇒`).
+  `a..b` có kiểu `Range<T>`, `a..=b` có kiểu `RangeInclusive<T>` (ADR-022: hai kiểu khác nhau để giá trị range không mất "gồm b").
   Dạng mở có nghĩa **chỉ** làm chỉ số slice (`xs[1..]`, `xs[..2]`, `xs[..]`) và trong pattern. Range mở trong biểu thức độc lập (ví dụ `r ≔ 1..;`) **chưa có ngữ nghĩa — chờ iterator Phase 2**:
   compiler từ chối (E0301). Range đóng `a..b`/`a..=b` làm giá trị độc lập chỉ dùng được làm đối tượng của `⟳ x in a..b`.
 - **Tuple:** `()` unit, `(e)` nhóm, `(e,)` 1-tuple, `(a, b)` tuple. `t.0` truy cập phần tử.

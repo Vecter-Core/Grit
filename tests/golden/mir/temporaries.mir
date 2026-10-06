@@ -1,0 +1,68 @@
+fn main::mk() -> P {
+    let mut _0: P; // return
+    bb0: {
+        _0 = P { x: const 1_i32 };
+        return;
+    }
+}
+
+fn main::peek(_1: &P) -> i32 {
+    let mut _0: i32; // return
+    let _1: &P; // arg `p`; regions '#0
+    bb0: {
+        _0 = copy (*_1).0;
+        return;
+    }
+}
+
+fn main::f() -> i32 {
+    let mut _0: i32; // return
+    let _1: &P; // user `r`; regions '#0
+    let mut _2: P; // temp
+    let _3: i32; // user `a`
+    let mut _4: &P; // temp; regions '#2
+    let mut _5: P; // temp
+    let _6: i32; // user `b`
+    let mut _7: P; // temp
+    let mut _8: i32; // temp
+    bb0: {
+        StorageLive(_1);
+        StorageLive(_2);
+        _2 = main::mk() -> bb1;
+    }
+    bb1: {
+        _1 = &_2 /*b0*/;
+        FakeRead(LetInit, _1);
+        StorageLive(_3);
+        StorageLive(_4);
+        StorageLive(_5);
+        _5 = main::mk() -> bb2;
+    }
+    bb2: {
+        _4 = &_5 /*b1*/;
+        _3 = main::peek(copy _4) -> bb3;
+    }
+    bb3: {
+        FakeRead(LetInit, _3);
+        StorageDead(_5);
+        StorageDead(_4);
+        StorageLive(_6);
+        StorageLive(_7);
+        _7 = main::mk() -> bb4;
+    }
+    bb4: {
+        _6 = copy _7.0;
+        FakeRead(LetInit, _6);
+        StorageDead(_7);
+        StorageLive(_8);
+        _8 = AddWrap(copy (*_1).0, copy _3);
+        _0 = AddWrap(copy _8, copy _6);
+        StorageDead(_8);
+        StorageDead(_6);
+        StorageDead(_3);
+        StorageDead(_2);
+        StorageDead(_1);
+        return;
+    }
+}
+

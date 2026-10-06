@@ -1,0 +1,225 @@
+//! `TypeDb`: các bảng kết quả của gt-types (ADT, trait, chữ ký, impl, lang item) — chỉ đọc sau M4, dùng chung với các
+//! pass sau (bước hạ MIR, M5; ADR-020 §1). Truy vấn `is_copy`/`needs_drop`/`satisfies_bound` nằm ở đây để Env và MIR dùng chung.
+use crate::collect::{AdtDef, AdtKind, FnSigInfo, ImplDef, Lang, TraitDef};
+use crate::infer::InferCtx;
+use crate::traits::{Bound, fresh_args, subst_with};
+use crate::ty::Ty;
+use gt_ast::NodeId;
+use gt_resolve::DefId;
+use std::collections::BTreeMap;
+
+#[derive(Clone, Debug, Default)]
+pub struct TypeDb {
+    pub adts: BTreeMap<DefId, AdtDef>,
+    pub traits: BTreeMap<DefId, TraitDef>,
+    /// Chữ ký hàm (không thuộc impl/trait) + module chứa.
+    pub fns: BTreeMap<DefId, (FnSigInfo, DefId)>,
+    pub consts: BTreeMap<DefId, Ty>,
+    pub impls: Vec<ImplDef>,
+    pub lang: BTreeMap<Lang, DefId>,
+}
+
+impl TypeDb {
+    /// Tìm impl của `trait_def` cho `ty` (đã giải). Trả (chỉ số impl, tham số impl) nếu có đúng một.
+    pub(crate) fn find_impl(
+        &self,
+        infer: &mut InferCtx,
+        trait_def: DefId,
+        ty: &Ty,
+        depth: u32,
+    ) -> Option<(usize, Vec<Ty>)> {
+        if depth > 8 {
+            return None;
+        }
+        let mut found = Vec::new();
+        for (i, imp) in self.impls.iter().enumerate() {
+            if imp.trait_ref.as_ref().map(|t| t.trait_def) != Some(trait_def) {
+                continue;
+            }
+            let ok = infer.probe(|inf| {
+                let args = fresh_args(inf, &imp.generics);
+                let st = subst_with(&imp.self_ty, &imp.generics, &args);
+                if !inf.unify(&st, ty) {
+                    return false;
+                }
+                // ràng buộc inline của impl phải thoả
+                imp.generics.iter().zip(&args).all(|(g, a)| {
+                    let a = inf.resolve(a);
+                    g.bounds
+                        .iter()
+                        .all(|b| self.satisfies_bound(inf, &a, b.trait_def, &[], depth + 1))
+                })
+            });
+            if ok {
+                found.push(i);
+            }
+        }
+        if found.len() != 1 {
+            return None;
+        }
+        let imp = &self.impls[found[0]];
+        let args = fresh_args(infer, &imp.generics);
+        let st = subst_with(&imp.self_ty, &imp.generics, &args);
+        infer.unify(&st, ty);
+        Some((found[0], args))
+    }
+
+    /// `ty: trait_def` có thoả không? `scope` là các ràng buộc có hiệu lực (cho tham số kiểu).
+    pub(crate) fn satisfies_bound(
+        &self,
+        infer: &mut InferCtx,
+        ty: &Ty,
+        trait_def: DefId,
+        scope: &[Bound],
+        depth: u32,
+    ) -> bool {
+        let ty = infer.resolve(ty);
+        match &ty {
+            Ty::Err => true,
+            Ty::Infer(_) => true, // chưa biết: hoãn (bộ giải nghĩa vụ chạy lại sau khi mặc định hoá)
+            Ty::Param(_) => scope
+                .iter()
+                .any(|b| b.trait_def == trait_def && infer.resolve(&b.ty) == ty),
+            _ => {
+                if self.lang.get(&Lang::Copy) == Some(&trait_def) {
+                    return self.is_copy(infer, &ty, scope, depth);
+                }
+                self.find_impl(infer, trait_def, &ty, depth).is_some()
+            }
+        }
+    }
+
+    /// `is_copy` cho M6 (ADR-018 §2): nguyên thuỷ số/bool/char, `&T`, con trỏ thô, hàm, `!`; tuple/mảng toàn phần tử Copy;
+    /// ADT chỉ khi có `⊐ Copy for` hợp lệ; `&!T`, `Secret<_>`, `Cap<_>` không bao giờ.
+    pub(crate) fn is_copy(
+        &self,
+        infer: &mut InferCtx,
+        ty: &Ty,
+        scope: &[Bound],
+        depth: u32,
+    ) -> bool {
+        let ty = infer.resolve(ty);
+        match &ty {
+            Ty::Int(_)
+            | Ty::Float(_)
+            | Ty::Bool
+            | Ty::Char
+            | Ty::Never
+            | Ty::Err
+            | Ty::Fn(..)
+            | Ty::RawPtr(..) => true,
+            Ty::Ref(false, _) => true,
+            Ty::Ref(true, _) | Ty::Str | Ty::Slice(_) => false,
+            Ty::Tuple(v) => v.iter().all(|t| self.is_copy(infer, t, scope, depth + 1)),
+            Ty::Array(t, _) => self.is_copy(infer, t, scope, depth + 1),
+            Ty::Infer(_) => true,
+            Ty::Param(_) => {
+                let Some(&copy) = self.lang.get(&Lang::Copy) else {
+                    return false;
+                };
+                scope
+                    .iter()
+                    .any(|b| b.trait_def == copy && infer.resolve(&b.ty) == ty)
+            }
+            Ty::Adt(d, _) => {
+                if matches!(
+                    self.adts.get(d).and_then(|a| a.lang),
+                    Some(Lang::Secret | Lang::Cap)
+                ) {
+                    return false;
+                }
+                let Some(&copy) = self.lang.get(&Lang::Copy) else {
+                    return false;
+                };
+                self.find_impl(infer, copy, &ty, depth + 1).is_some()
+            }
+        }
+    }
+
+    /// Giá trị kiểu này có cần `Drop` tường minh không (ADR-020 §9, Q26): ADT có `⊐ Drop for` (chỉ lib/core), `Arena` (luôn),
+    /// tuple/mảng/ADT chứa thành phần cần drop; tham số kiểu: coi là cần (MIR đa hình). `Copy`, tham chiếu, nguyên thuỷ: không.
+    #[must_use]
+    pub fn needs_drop(&self, ty: &Ty) -> bool {
+        self.needs_drop_inner(ty, 0)
+    }
+
+    fn needs_drop_inner(&self, ty: &Ty, depth: u32) -> bool {
+        if depth > 32 {
+            return true; // kiểu đệ quy sâu bất thường: an toàn là coi như cần drop
+        }
+        match ty {
+            Ty::Int(_)
+            | Ty::Float(_)
+            | Ty::Bool
+            | Ty::Char
+            | Ty::Str
+            | Ty::Never
+            | Ty::Err
+            | Ty::Fn(..)
+            | Ty::RawPtr(..)
+            | Ty::Ref(..)
+            | Ty::Infer(_) => false,
+            Ty::Param(_) => true,
+            Ty::Tuple(v) => v.iter().any(|t| self.needs_drop_inner(t, depth + 1)),
+            Ty::Array(t, n) => *n > 0 && self.needs_drop_inner(t, depth + 1),
+            Ty::Slice(t) => self.needs_drop_inner(t, depth + 1),
+            Ty::Adt(d, args) => {
+                let Some(adt) = self.adts.get(d) else {
+                    return false;
+                };
+                if adt.lang == Some(Lang::Arena) {
+                    return true;
+                }
+                if self.has_drop_impl(ty) {
+                    return true;
+                }
+                match &adt.kind {
+                    AdtKind::Struct(fs) => fs.iter().any(|f| {
+                        self.needs_drop_inner(&subst_with(&f.ty, &adt.generics, args), depth + 1)
+                    }),
+                    AdtKind::Enum(vs) => vs.iter().any(|v| {
+                        v.fields.iter().any(|f| {
+                            self.needs_drop_inner(&subst_with(f, &adt.generics, args), depth + 1)
+                        })
+                    }),
+                }
+            }
+        }
+    }
+
+    /// Có `⊐ Drop for` khớp kiểu này không (impl của lang item `drop`).
+    #[must_use]
+    pub fn has_drop_impl(&self, ty: &Ty) -> bool {
+        let Some(&drop) = self.lang.get(&Lang::Drop) else {
+            return false;
+        };
+        let mut inf = InferCtx::new();
+        self.find_impl(&mut inf, drop, ty, 0).is_some()
+    }
+
+    /// `is_copy` với các ràng buộc `scope` của hàm đang xét (kiểu đã giải hết — dùng sau M4).
+    #[must_use]
+    pub fn is_copy_resolved(&self, ty: &Ty, scope: &[Bound]) -> bool {
+        let mut inf = InferCtx::new();
+        self.is_copy(&mut inf, ty, scope, 0)
+    }
+
+    /// Chữ ký của hàm/thành viên theo NodeId (hàm tự do, thành viên impl, thành viên trait).
+    #[must_use]
+    pub fn sig_by_node(&self, node: NodeId) -> Option<&FnSigInfo> {
+        if let Some((s, _)) = self.fns.values().find(|(s, _)| s.node == node) {
+            return Some(s);
+        }
+        for imp in &self.impls {
+            if let Some(m) = imp.members.iter().find(|m| m.node == node) {
+                return Some(m);
+            }
+        }
+        for t in self.traits.values() {
+            if let Some(m) = t.members.iter().find(|m| m.node == node) {
+                return Some(m);
+            }
+        }
+        None
+    }
+}

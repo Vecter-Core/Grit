@@ -18,7 +18,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0303 | `==` trên số thực (D4) | M4 | E0303_float_eq, E0303_float_literal_eq, E0303_float_ne |
 | E0304 | Trường struct/biến thể/pattern sai: thiếu, thừa, không tồn tại hoặc trùng (literal `P { … }`, pattern `P { … }`, truy cập `.x`) — Q20 | M4 | E0304_duplicate_field, E0304_missing_field, E0304_pattern_missing_field, E0304_tuple_index_out_of_range, E0304_unknown_field |
 | E0305 | `⌥` không đầy đủ (D6) | M4 | E0305_int_without_wildcard, E0305_missing_bool_branch, E0305_nonexhaustive, E0305_range_gap, E0305_str_without_wildcard |
-| E0307 | Thiếu đường trả về (gồm khối kết thúc bằng `;` mà hàm trả kiểu khác `()`) — **thuộc M5**, không phải parser (cần kiểu trả về và luồng điều khiển) | M5 | E0307_missing_return, E0307_trailing_semicolon |
+| E0307 | Thiếu đường trả về (gồm khối kết thúc bằng `;` mà hàm trả kiểu khác `()`) — **thuộc M5**, không phải parser (cần kiểu trả về và luồng điều khiển) | M5 | E0307_missing_return, E0307_trailing_semicolon, E0307_match_arm_falls_through, E0307_return_only_inside_loop, E0307_last_if_without_else |
 | E0308 | Gán vào biến bất biến (D5) | M4 | E0308_assign_immutable, E0308_assign_param, E0308_assign_through_shared_ref, E0308_method_needs_mut_receiver, E0308_unique_borrow_of_immutable |
 | E0309 | Ràng buộc trait không thoả / không có phương thức / mơ hồ (Q20) | M4 | E0309_ambiguous_method, E0309_bound_not_satisfied, E0309_no_such_method |
 | E0311 | `⊐` không hợp lệ: thiếu/thừa/khác chữ ký thành viên so với trait, hoặc hai impl chồng lấn (Q20) | M4 | E0311_copy_non_copy_field, E0311_missing_trait_method, E0311_overlapping_impls, E0311_signature_mismatch |

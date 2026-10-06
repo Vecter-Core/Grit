@@ -27,7 +27,7 @@ impl Env<'_> {
             }
             let mut ps: Vec<ParamId> = Vec::new();
             if let Some(i) = f.impl_idx {
-                ps.extend(self.impls[i].generics.iter().map(|g| g.id));
+                ps.extend(self.db.impls[i].generics.iter().map(|g| g.id));
             }
             ps.extend(f.sig.generics.iter().map(|g| g.id));
             if ps.is_empty() {
@@ -73,6 +73,7 @@ impl Env<'_> {
                             continue;
                         }
                         let Some(tm) = self
+                            .db
                             .traits
                             .get(td)
                             .and_then(|t| t.members.get(*mi))
@@ -81,10 +82,11 @@ impl Env<'_> {
                             continue;
                         };
                         let mut inf = crate::infer::InferCtx::new();
-                        let Some((ii, iargs)) = self.find_impl(&mut inf, *td, &st, 0) else {
+                        let Some((ii, iargs)) = self.db.find_impl(&mut inf, *td, &st, 0) else {
                             continue;
                         };
-                        let Some(m) = self.impls[ii].members.iter().find(|m| m.name == tm) else {
+                        let Some(m) = self.db.impls[ii].members.iter().find(|m| m.name == tm)
+                        else {
                             continue;
                         };
                         let mut all: Vec<Ty> = iargs.iter().map(|a| inf.resolve(a)).collect();

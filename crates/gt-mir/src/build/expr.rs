@@ -1,0 +1,1481 @@
+//! Hạ biểu thức và câu lệnh. Thứ tự đánh giá trái sang phải (semantics §3a); `Assert` cho mọi nghĩa vụ (ADR-020 §9).
+use super::{Builder, R, ice};
+use crate::mir::*;
+use crate::types::{place_ty, variant_fields};
+use gt_ast::{
+    BinaryOp, Block, Expr, ExprKind, FieldName, Lit, LitKind, Loop, LoopKind, Stmt, StmtKind,
+    UnaryOp,
+};
+use gt_resolve::{DefKind, Res};
+use gt_types::{AdtKind, CallTarget, FloatTy, IntTy, Lang, Ty};
+
+/// Giải escape của literal chuỗi.
+pub(crate) fn decode_str(s: &str) -> Option<String> {
+    // AST giữ nội dung KHÔNG gồm dấu `"` (escape còn nguyên)
+    let inner = s
+        .strip_prefix('"')
+        .and_then(|x| x.strip_suffix('"'))
+        .unwrap_or(s);
+    let mut out = String::new();
+    let mut it = inner.chars().peekable();
+    while let Some(c) = it.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match it.next()? {
+            'n' => out.push('\n'),
+            't' => out.push('\t'),
+            'r' => out.push('\r'),
+            '0' => out.push('\0'),
+            '\\' => out.push('\\'),
+            '\'' => out.push('\''),
+            '"' => out.push('"'),
+            'u' => {
+                if it.next()? != '{' {
+                    return None;
+                }
+                let mut hex = String::new();
+                loop {
+                    let h = it.next()?;
+                    if h == '}' {
+                        break;
+                    }
+                    hex.push(h);
+                }
+                out.push(char::from_u32(u32::from_str_radix(&hex, 16).ok()?)?);
+            }
+            _ => return None,
+        }
+    }
+    Some(out)
+}
+
+fn mask(ty: IntTy) -> u128 {
+    if ty.bits() == 128 {
+        u128::MAX
+    } else {
+        (1u128 << ty.bits()) - 1
+    }
+}
+
+/// Hằng số nguyên dạng mẫu bit của kiểu `ty`.
+pub(crate) fn int_const(v: i128, ty: IntTy) -> Const {
+    Const::Int {
+        bits: (v as u128) & mask(ty),
+        ty,
+    }
+}
+
+/// `MIN` của kiểu có dấu.
+fn min_const(ty: IntTy) -> Const {
+    int_const(ty.min_val(), ty)
+}
+
+/// Ép `from as to` có thể mất thông tin (nghĩa vụ D1)?
+pub(crate) fn cast_may_lose(from: &Ty, to: &Ty) -> bool {
+    match (from, to) {
+        (a, b) if a == b => false,
+        (Ty::Int(f), Ty::Int(t)) => {
+            let widen_same = f.signed() == t.signed() && t.bits() >= f.bits();
+            let u_to_wider_s = !f.signed() && t.signed() && t.bits() > f.bits();
+            !(widen_same || u_to_wider_s)
+        }
+        (Ty::Bool, Ty::Int(_)) => false,
+        (Ty::Char, Ty::Int(t)) => t.bits() < 32,
+        (Ty::Int(IntTy::U8), Ty::Char) => false,
+        (Ty::Int(f), Ty::Float(t)) => {
+            let mant = if *t == FloatTy::F32 { 24 } else { 53 };
+            f.bits() > mant || (f.signed() && f.bits() > mant)
+        }
+        (Ty::Float(FloatTy::F32), Ty::Float(FloatTy::F64)) => false,
+        _ => true,
+    }
+}
+
+impl Builder<'_> {
+    // ---------------- tiện ích ----------------
+
+    pub(crate) fn operand_of(&self, p: Place, ty: &Ty) -> Operand {
+        if self.is_copy(ty) {
+            Operand::Copy(p)
+        } else {
+            Operand::Move(p)
+        }
+    }
+
+    /// `Assert(cond == expected)` rồi đi tiếp ở khối mới.
+    pub(crate) fn assert(&mut self, cond: Operand, expected: bool, kind: AssertKind) -> R<()> {
+        let next = self.new_block();
+        self.terminate(TerminatorKind::Assert {
+            cond,
+            expected,
+            kind,
+            target: next,
+        })?;
+        self.cur = next;
+        Ok(())
+    }
+
+    /// Rẽ nhánh theo một rvalue (bool/số nguyên): giá trị nằm trong một biến tạm chết NGAY ở đầu mọi nhánh, để không có
+    /// biến tạm nào chỉ sống trên một đường (giữ `StorageLive/Dead` nhất quán ở điểm hợp).
+    pub(crate) fn switch_rv(
+        &mut self,
+        rv: Rvalue,
+        ty: Ty,
+        targets: Vec<(u128, BasicBlock)>,
+        otherwise: BasicBlock,
+    ) -> R<()> {
+        let t = self.decl_temp_unregistered(ty);
+        self.push(StatementKind::StorageLive(t));
+        self.assign(Place::local(t), rv);
+        let mut tramp = Vec::new();
+        for (v, b) in &targets {
+            let x = self.new_block();
+            tramp.push((*v, x, *b));
+        }
+        let ow = self.new_block();
+        self.terminate(TerminatorKind::SwitchInt {
+            discr: Operand::Copy(Place::local(t)),
+            targets: tramp.iter().map(|(v, x, _)| (*v, *x)).collect(),
+            otherwise: ow,
+        })?;
+        for (_, x, b) in tramp {
+            self.cur = x;
+            self.push(StatementKind::StorageDead(t));
+            self.terminate(TerminatorKind::Goto(b))?;
+        }
+        self.cur = ow;
+        self.push(StatementKind::StorageDead(t));
+        self.terminate(TerminatorKind::Goto(otherwise))?;
+        Ok(())
+    }
+
+    fn decl_temp_unregistered(&mut self, ty: Ty) -> Local {
+        let n = crate::types::region_slots(self.db, &ty);
+        let regions = (0..n)
+            .map(|_| {
+                let r = RegionVid(self.body.region_count);
+                self.body.region_count += 1;
+                r
+            })
+            .collect();
+        self.body.locals.push(LocalDecl {
+            ty,
+            regions,
+            kind: LocalKind::Temp,
+            mutable: true,
+            span: self.at.0,
+        });
+        Local(u32::try_from(self.body.locals.len() - 1).unwrap_or(u32::MAX))
+    }
+
+    /// Nhảy theo bool: `false` → `f`, khác → `t`.
+    fn branch_bool(&mut self, rv: Rvalue, t: BasicBlock, f: BasicBlock) -> R<()> {
+        self.switch_rv(rv, Ty::Bool, vec![(0, f)], t)
+    }
+
+    fn place_ty_of(&self, p: &Place) -> R<Ty> {
+        place_ty(&self.body, p).map_or_else(|| ice("kiểu của chỗ không xác định"), Ok)
+    }
+
+    fn with_at<T>(&mut self, e: &Expr, f: impl FnOnce(&mut Self) -> R<T>) -> R<T> {
+        let old = self.at;
+        self.at = (e.span, e.id);
+        let r = f(self);
+        self.at = old;
+        r
+    }
+
+    // ---------------- câu lệnh ----------------
+
+    pub(crate) fn lower_stmt(&mut self, s: &Stmt) -> R<()> {
+        self.at = (s.span, s.id);
+        match &s.kind {
+            StmtKind::Let {
+                mutable,
+                name,
+                init,
+                ..
+            } => self.in_stmt(|b| {
+                let Some(&id) = b.t.resolve.decls.get(&name.id) else {
+                    return ice(format!("biến `{}` không có định danh", name.name));
+                };
+                let l = b.user_var(id, *mutable, name.span)?;
+                let dest = Place::local(l);
+                // luật kéo dài tạm (ADR-020 §9): `x ≔ &V` / `&!V`, V không phải chỗ ⇒ tạm sống tới cuối khối
+                match &init.kind {
+                    ExprKind::Unary {
+                        op: op @ (UnaryOp::Borrow | UnaryOp::BorrowMut),
+                        operand,
+                    } if !b.is_place_expr(operand) => b.with_at(init, |b| {
+                        let ty = b.ty_of(operand)?;
+                        let t = b.extended_temp(ty);
+                        b.expr_into(&Place::local(t), operand)?;
+                        let k = if *op == UnaryOp::Borrow {
+                            BorrowKind::Shared
+                        } else {
+                            BorrowKind::Unique
+                        };
+                        let rv = b.new_borrow(k, Place::local(t));
+                        b.assign(dest.clone(), rv);
+                        Ok(())
+                    })?,
+                    _ => b.expr_into(&dest, init)?,
+                }
+                b.push(StatementKind::FakeRead(FakeReadCause::LetInit, dest));
+                Ok(())
+            }),
+            StmtKind::Assign { target, value } => self.in_stmt(|b| {
+                // chỗ trước (kể cả kiểm chỉ số), rồi giá trị, rồi drop giá trị cũ, rồi ghi (semantics §3a)
+                let p = b.as_place(target)?;
+                let rv = b.as_rvalue(value)?;
+                let ty = b.place_ty_of(&p)?;
+                if b.needs_drop(&ty) {
+                    // giữ giá trị mới trong một tạm trong lúc drop giá trị cũ
+                    let t = b.temp(ty);
+                    b.assign(Place::local(t), rv);
+                    let next = b.new_block();
+                    b.terminate(TerminatorKind::Drop {
+                        place: p.clone(),
+                        target: next,
+                    })?;
+                    b.cur = next;
+                    b.assign(p, Rvalue::Use(Operand::Move(Place::local(t))));
+                } else {
+                    b.assign(p, rv);
+                }
+                Ok(())
+            }),
+            StmtKind::Expr { expr, .. } => self.in_stmt(|b| b.discard(expr)),
+            StmtKind::Return(e) => self.in_stmt(|b| b.ret(e.as_ref())),
+            StmtKind::Break => self.break_or_continue(true),
+            StmtKind::Continue => self.break_or_continue(false),
+        }
+    }
+
+    /// Đánh giá để lấy tác dụng phụ; giá trị nằm trong một tạm của câu lệnh.
+    fn discard(&mut self, e: &Expr) -> R<()> {
+        let ty = self.ty_of(e)?;
+        let t = self.temp(ty);
+        self.expr_into(&Place::local(t), e)
+    }
+
+    // ---------------- chỗ ----------------
+
+    /// Biểu thức chỉ một chỗ (không tạo tạm)?
+    pub(crate) fn is_place_expr(&self, e: &Expr) -> bool {
+        match &e.kind {
+            ExprKind::Path(p) => matches!(self.res_of(p.id), Some(Res::Local(_) | Res::SelfValue)),
+            ExprKind::Field { base, .. } | ExprKind::Index { base, .. } => self.is_place_expr(base),
+            ExprKind::Unary {
+                op: UnaryOp::Deref, ..
+            } => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn as_place(&mut self, e: &Expr) -> R<Place> {
+        self.with_at(e, |b| match &e.kind {
+            ExprKind::Path(p) => match b.res_of(p.id) {
+                Some(Res::Local(id)) => match b.vars.get(&id) {
+                    Some(l) => Ok(Place::local(*l)),
+                    None => ice(format!("biến {id:?} chưa được khai báo trong MIR")),
+                },
+                Some(Res::SelfValue) => Ok(Place::local(Local(1))),
+                _ => b.temp_place(e),
+            },
+            ExprKind::Field { base, name } => b.field_place(base, name),
+            ExprKind::Index { base, index } => b.index_place(base, index),
+            ExprKind::Unary {
+                op: UnaryOp::Deref,
+                operand,
+            } => {
+                let p = if b.is_place_expr(operand) {
+                    b.as_place(operand)?
+                } else {
+                    b.temp_place(operand)?
+                };
+                Ok(p.project(PlaceElem::Deref))
+            }
+            _ => b.temp_place(e),
+        })
+    }
+
+    fn temp_place(&mut self, e: &Expr) -> R<Place> {
+        let ty = self.ty_of(e)?;
+        let t = self.temp(ty);
+        self.expr_into(&Place::local(t), e)?;
+        Ok(Place::local(t))
+    }
+
+    /// Chỗ của `base` sau khi bỏ mọi lớp tham chiếu (autoderef), cùng kiểu cuối.
+    fn autoderef_place(&mut self, base: &Expr) -> R<(Place, Ty)> {
+        let mut p = if self.is_place_expr(base) {
+            self.as_place(base)?
+        } else {
+            self.temp_place(base)?
+        };
+        let mut ty = self.ty_of(base)?;
+        while let Ty::Ref(_, inner) = ty {
+            p = p.project(PlaceElem::Deref);
+            ty = *inner;
+        }
+        Ok((p, ty))
+    }
+
+    fn field_place(&mut self, base: &Expr, name: &FieldName) -> R<Place> {
+        let (p, ty) = self.autoderef_place(base)?;
+        match (&ty, name) {
+            (Ty::Tuple(v), FieldName::Index(i)) => {
+                let k = i.value as usize;
+                let Some(ft) = v.get(k) else {
+                    return ice("chỉ số tuple vượt phạm vi sau M4");
+                };
+                Ok(p.project(PlaceElem::Field(i.value, ft.clone())))
+            }
+            (Ty::Adt(d, args), FieldName::Named(n)) => {
+                let Some(adt) = self.db.adts.get(d) else {
+                    return ice("thiếu ADT");
+                };
+                let AdtKind::Struct(fs) = &adt.kind else {
+                    return ice("truy cập trường trên enum sau M4");
+                };
+                let Some(k) = fs.iter().position(|f| f.name == n.name) else {
+                    return ice(format!("không có trường `{}` sau M4", n.name));
+                };
+                let fts = variant_fields(self.db, *d, 0, args);
+                Ok(p.project(PlaceElem::Field(k as u32, fts[k].clone())))
+            }
+            _ => ice(format!("truy cập trường trên kiểu {ty:?}")),
+        }
+    }
+
+    fn usize_temp(&mut self, op: Operand) -> Local {
+        let t = self.temp(Ty::Int(IntTy::Usize));
+        self.assign(Place::local(t), Rvalue::Use(op));
+        t
+    }
+
+    fn index_place(&mut self, base: &Expr, index: &Expr) -> R<Place> {
+        let (p, ty) = self.autoderef_place(base)?;
+        if !matches!(ty, Ty::Array(..) | Ty::Slice(_)) {
+            return ice(format!("đánh chỉ số kiểu {ty:?}"));
+        }
+        let usz = Ty::Int(IntTy::Usize);
+        let len = self.temp(usz.clone());
+        if let ExprKind::Range {
+            start,
+            end,
+            inclusive,
+        } = &index.kind
+        {
+            // lát con: from ≤ to ≤ len
+            let from = match start {
+                Some(s) => {
+                    let o = self.as_operand(s)?;
+                    self.usize_temp(o)
+                }
+                None => self.usize_temp(Operand::Const(int_const(0, IntTy::Usize))),
+            };
+            self.assign(Place::local(len), Rvalue::Len(p.clone()));
+            let to = match end {
+                Some(e) => {
+                    let o = self.as_operand(e)?;
+                    let t = self.usize_temp(o);
+                    if *inclusive {
+                        // `..=b`: b < len trước, nên b + 1 không tràn
+                        let ok = self.temp(Ty::Bool);
+                        self.assign(
+                            Place::local(ok),
+                            Rvalue::BinaryOp(
+                                BinOp::Lt,
+                                Operand::Copy(Place::local(t)),
+                                Operand::Copy(Place::local(len)),
+                            ),
+                        );
+                        self.assert(
+                            Operand::Copy(Place::local(ok)),
+                            true,
+                            AssertKind::IndexOutOfBounds {
+                                len: Operand::Copy(Place::local(len)),
+                                index: Operand::Copy(Place::local(t)),
+                            },
+                        )?;
+                        self.assign(
+                            Place::local(t),
+                            Rvalue::BinaryOp(
+                                BinOp::AddWrap,
+                                Operand::Copy(Place::local(t)),
+                                Operand::Const(int_const(1, IntTy::Usize)),
+                            ),
+                        );
+                    }
+                    Some(t)
+                }
+                None => None,
+            };
+            let to_op = match to {
+                Some(t) => Operand::Copy(Place::local(t)),
+                None => Operand::Copy(Place::local(len)),
+            };
+            let a = self.temp(Ty::Bool);
+            self.assign(
+                Place::local(a),
+                Rvalue::BinaryOp(BinOp::Le, Operand::Copy(Place::local(from)), to_op.clone()),
+            );
+            let c = self.temp(Ty::Bool);
+            self.assign(
+                Place::local(c),
+                Rvalue::BinaryOp(BinOp::Le, to_op.clone(), Operand::Copy(Place::local(len))),
+            );
+            let both = self.temp(Ty::Bool);
+            self.assign(
+                Place::local(both),
+                Rvalue::BinaryOp(
+                    BinOp::BitAnd,
+                    Operand::Copy(Place::local(a)),
+                    Operand::Copy(Place::local(c)),
+                ),
+            );
+            self.assert(
+                Operand::Copy(Place::local(both)),
+                true,
+                AssertKind::SliceRange {
+                    from: Operand::Copy(Place::local(from)),
+                    to: to_op,
+                    len: Operand::Copy(Place::local(len)),
+                },
+            )?;
+            return Ok(p.project(PlaceElem::Subslice { from, to }));
+        }
+        let o = self.as_operand(index)?;
+        let i = self.usize_temp(o);
+        self.assign(Place::local(len), Rvalue::Len(p.clone()));
+        let ok = self.temp(Ty::Bool);
+        self.assign(
+            Place::local(ok),
+            Rvalue::BinaryOp(
+                BinOp::Lt,
+                Operand::Copy(Place::local(i)),
+                Operand::Copy(Place::local(len)),
+            ),
+        );
+        self.assert(
+            Operand::Copy(Place::local(ok)),
+            true,
+            AssertKind::IndexOutOfBounds {
+                len: Operand::Copy(Place::local(len)),
+                index: Operand::Copy(Place::local(i)),
+            },
+        )?;
+        Ok(p.project(PlaceElem::Index(i)))
+    }
+
+    // ---------------- toán hạng / rvalue ----------------
+
+    pub(crate) fn lit_const(&self, l: &Lit, ty: &Ty) -> R<Const> {
+        Ok(match (&l.kind, ty) {
+            (LitKind::Int(s), Ty::Int(it)) => {
+                let Some((v, _)) = gt_types::int_literal_value(s) else {
+                    return ice("literal nguyên hỏng sau M4");
+                };
+                let bits = if l.negative { 0u128.wrapping_sub(v) } else { v };
+                Const::Int {
+                    bits: bits & mask(*it),
+                    ty: *it,
+                }
+            }
+            (LitKind::Float(s), Ty::Float(ft)) => Const::Float {
+                text: if l.negative {
+                    format!("-{s}")
+                } else {
+                    s.clone()
+                },
+                ty: *ft,
+            },
+            (LitKind::Bool(b), _) => Const::Bool(*b),
+            (LitKind::Char(c), _) => match gt_types::char_literal_value(c) {
+                Some(cp) => Const::Char(cp),
+                None => return ice("literal ký tự hỏng"),
+            },
+            (LitKind::Str(s), _) => match decode_str(s) {
+                Some(x) => Const::Str(x),
+                None => return ice("literal chuỗi hỏng"),
+            },
+            _ => return ice(format!("literal với kiểu {ty:?}")),
+        })
+    }
+
+    pub(crate) fn as_operand(&mut self, e: &Expr) -> R<Operand> {
+        self.with_at(e, |b| {
+            let ty = b.ty_of(e)?;
+            match &e.kind {
+                ExprKind::Lit(l) => return Ok(Operand::Const(b.lit_const(l, &ty)?)),
+                ExprKind::Path(p) => match b.res_of(p.id) {
+                    Some(Res::Local(_) | Res::SelfValue) => {
+                        let pl = b.as_place(e)?;
+                        return Ok(b.operand_of(pl, &ty));
+                    }
+                    Some(Res::Def(d)) => {
+                        if let Some(c) = b.def_const(e, d, &ty)? {
+                            return Ok(Operand::Const(c));
+                        }
+                    }
+                    _ => {}
+                },
+                _ if b.is_place_expr(e) => {
+                    let pl = b.as_place(e)?;
+                    return Ok(b.operand_of(pl, &ty));
+                }
+                _ => {}
+            }
+            let t = b.temp(ty.clone());
+            b.expr_into(&Place::local(t), e)?;
+            Ok(b.operand_of(Place::local(t), &ty))
+        })
+    }
+
+    /// Hằng của một định nghĩa dùng như giá trị: hàm, `□`/`■`. `None` nếu không phải hằng (vd biến thể).
+    fn def_const(&self, e: &Expr, d: gt_resolve::DefId, ty: &Ty) -> R<Option<Const>> {
+        let def = &self.t.defs()[d.index()];
+        Ok(match def.kind {
+            DefKind::Fn => {
+                let Some(site) = self.t.sites.get(&e.id) else {
+                    return ice("thiếu chỗ gọi của hàm");
+                };
+                let CallTarget::Fn(node) = site.target else {
+                    return ice("hàm qua trait dùng như giá trị");
+                };
+                Some(Const::FnItem {
+                    node,
+                    generics: site.generics.clone(),
+                    ty: ty.clone(),
+                })
+            }
+            DefKind::Const | DefKind::Static => Some(Const::Item {
+                node: def.node,
+                ty: ty.clone(),
+            }),
+            _ => None,
+        })
+    }
+
+    /// (enum, chỉ số biến thể) của một định nghĩa biến thể.
+    pub(crate) fn variant_of(&self, vd: gt_resolve::DefId) -> R<(gt_resolve::DefId, u32)> {
+        let Some(parent) = self.t.defs()[vd.index()].parent else {
+            return ice("biến thể không có enum cha");
+        };
+        let Some(adt) = self.db.adts.get(&parent) else {
+            return ice("thiếu enum");
+        };
+        let AdtKind::Enum(vs) = &adt.kind else {
+            return ice("biến thể của kiểu không phải enum");
+        };
+        match vs.iter().position(|v| v.def == vd) {
+            Some(i) => Ok((parent, i as u32)),
+            None => ice("không tìm thấy biến thể"),
+        }
+    }
+
+    fn adt_args(ty: &Ty) -> Vec<Ty> {
+        match ty {
+            Ty::Adt(_, a) => a.clone(),
+            _ => Vec::new(),
+        }
+    }
+
+    pub(crate) fn as_rvalue(&mut self, e: &Expr) -> R<Rvalue> {
+        self.with_at(e, |b| {
+            let ty = b.ty_of(e)?;
+            match &e.kind {
+                ExprKind::Lit(_) => Ok(Rvalue::Use(b.as_operand(e)?)),
+                ExprKind::Path(p) => match b.res_of(p.id) {
+                    Some(Res::Def(d)) if b.t.defs()[d.index()].kind == DefKind::Variant => {
+                        let (_, vi) = b.variant_of(d)?;
+                        let Ty::Adt(ed, args) = &ty else {
+                            return ice("biến thể dùng như hàm (chưa hỗ trợ ở M5)");
+                        };
+                        Ok(Rvalue::Aggregate(
+                            AggregateKind::Adt(*ed, vi, args.clone()),
+                            Vec::new(),
+                        ))
+                    }
+                    _ => Ok(Rvalue::Use(b.as_operand(e)?)),
+                },
+                ExprKind::Field { .. } | ExprKind::Index { .. } => {
+                    let p = b.as_place(e)?;
+                    Ok(Rvalue::Use(b.operand_of(p, &ty)))
+                }
+                ExprKind::Unary { op, operand } => b.unary(*op, operand, &ty, e),
+                ExprKind::Binary { op, lhs, rhs } => b.binary(*op, lhs, rhs, &ty, e),
+                ExprKind::Cast { expr, .. } => {
+                    let from = b.ty_of(expr)?;
+                    let a = b.as_operand(expr)?;
+                    if cast_may_lose(&from, &ty) {
+                        let f = b.temp(Ty::Bool);
+                        b.assign(Place::local(f), Rvalue::CastFits(a.clone(), ty.clone()));
+                        b.assert(
+                            Operand::Copy(Place::local(f)),
+                            true,
+                            AssertKind::CastLossy {
+                                value: a.clone(),
+                                to: ty.clone(),
+                            },
+                        )?;
+                    }
+                    Ok(Rvalue::Cast(a, ty))
+                }
+                ExprKind::Tuple(v) => {
+                    let ops = v.iter().map(|x| b.as_operand(x)).collect::<R<Vec<_>>>()?;
+                    Ok(Rvalue::Aggregate(AggregateKind::Tuple, ops))
+                }
+                ExprKind::Array(v) => {
+                    let Ty::Array(el, _) = &ty else {
+                        return ice("literal mảng không có kiểu mảng");
+                    };
+                    let ops = v.iter().map(|x| b.as_operand(x)).collect::<R<Vec<_>>>()?;
+                    Ok(Rvalue::Aggregate(AggregateKind::Array((**el).clone()), ops))
+                }
+                ExprKind::ArrayRepeat { value, .. } => {
+                    let Ty::Array(_, n) = &ty else {
+                        return ice("mảng lặp không có kiểu mảng");
+                    };
+                    let o = b.as_operand(value)?;
+                    Ok(Rvalue::Repeat(o, *n))
+                }
+                ExprKind::StructLit { fields, .. } => {
+                    let Ty::Adt(d, args) = &ty else {
+                        return ice("struct literal không có kiểu ADT");
+                    };
+                    let Some(AdtKind::Struct(defs)) = b.db.adts.get(d).map(|a| a.kind.clone())
+                    else {
+                        return ice("struct literal của kiểu không phải struct");
+                    };
+                    // đánh giá theo thứ tự VIẾT, rồi xếp theo thứ tự khai báo
+                    let mut got: Vec<(String, Operand)> = Vec::new();
+                    for f in fields {
+                        let o = b.as_operand(&f.value)?;
+                        got.push((f.name.name.clone(), o));
+                    }
+                    let mut ops = Vec::new();
+                    for df in &defs {
+                        match got.iter().position(|(n, _)| *n == df.name) {
+                            Some(i) => ops.push(got.remove(i).1),
+                            None => return ice(format!("thiếu trường `{}` sau M4", df.name)),
+                        }
+                    }
+                    Ok(Rvalue::Aggregate(
+                        AggregateKind::Adt(*d, 0, args.clone()),
+                        ops,
+                    ))
+                }
+                ExprKind::Range {
+                    start: Some(s),
+                    end: Some(en),
+                    ..
+                } => {
+                    let Ty::Adt(d, args) = &ty else {
+                        return ice("range không có kiểu Range");
+                    };
+                    let a = b.as_operand(s)?;
+                    let c = b.as_operand(en)?;
+                    let order = b.range_field_order(*d)?;
+                    let ops = if order { vec![a, c] } else { vec![c, a] };
+                    Ok(Rvalue::Aggregate(
+                        AggregateKind::Adt(*d, 0, args.clone()),
+                        ops,
+                    ))
+                }
+                ExprKind::Call { callee, args } => {
+                    if let ExprKind::Path(p) = &callee.kind
+                        && let Some(Res::Def(d)) = b.res_of(p.id)
+                        && b.t.defs()[d.index()].kind == DefKind::Variant
+                    {
+                        let (ed, vi) = b.variant_of(d)?;
+                        let ops = args
+                            .iter()
+                            .map(|x| b.as_operand(x))
+                            .collect::<R<Vec<_>>>()?;
+                        return Ok(Rvalue::Aggregate(
+                            AggregateKind::Adt(ed, vi, Self::adt_args(&ty)),
+                            ops,
+                        ));
+                    }
+                    b.via_temp(e, &ty)
+                }
+                _ => b.via_temp(e, &ty),
+            }
+        })
+    }
+
+    /// Trường `start` có đứng trước `end` trong khai báo của Range không (để dựng Aggregate đúng thứ tự).
+    fn range_field_order(&self, d: gt_resolve::DefId) -> R<bool> {
+        match self.db.adts.get(&d).map(|a| &a.kind) {
+            Some(AdtKind::Struct(fs)) => {
+                let s = fs.iter().position(|f| f.name == "start");
+                let e = fs.iter().position(|f| f.name == "end");
+                match (s, e) {
+                    (Some(s), Some(e)) if fs.len() == 2 => Ok(s < e),
+                    _ => ice("lang item range cần đúng hai trường `start`, `end`"),
+                }
+            }
+            _ => ice("lang item range phải là struct"),
+        }
+    }
+
+    fn via_temp(&mut self, e: &Expr, ty: &Ty) -> R<Rvalue> {
+        let t = self.temp(ty.clone());
+        self.expr_into(&Place::local(t), e)?;
+        Ok(Rvalue::Use(self.operand_of(Place::local(t), ty)))
+    }
+
+    fn unary(&mut self, op: UnaryOp, operand: &Expr, ty: &Ty, e: &Expr) -> R<Rvalue> {
+        match op {
+            UnaryOp::Not => Ok(Rvalue::UnaryOp(UnOp::Not, self.as_operand(operand)?)),
+            UnaryOp::Neg => {
+                let a = self.as_operand(operand)?;
+                if let Ty::Int(it) = ty
+                    && it.signed()
+                {
+                    let z = self.temp(Ty::Bool);
+                    self.assign(
+                        Place::local(z),
+                        Rvalue::BinaryOp(BinOp::Eq, a.clone(), Operand::Const(min_const(*it))),
+                    );
+                    self.assert(
+                        Operand::Copy(Place::local(z)),
+                        false,
+                        AssertKind::OverflowNeg(a.clone()),
+                    )?;
+                }
+                Ok(Rvalue::UnaryOp(UnOp::Neg, a))
+            }
+            UnaryOp::Deref => {
+                let p = self.as_place(e)?;
+                Ok(Rvalue::Use(self.operand_of(p, ty)))
+            }
+            UnaryOp::Borrow | UnaryOp::BorrowMut => {
+                let p = if self.is_place_expr(operand) {
+                    self.as_place(operand)?
+                } else {
+                    self.temp_place(operand)?
+                };
+                let k = if op == UnaryOp::Borrow {
+                    BorrowKind::Shared
+                } else {
+                    BorrowKind::Unique
+                };
+                Ok(self.new_borrow(k, p))
+            }
+        }
+    }
+
+    fn binary(&mut self, op: BinaryOp, lhs: &Expr, rhs: &Expr, ty: &Ty, e: &Expr) -> R<Rvalue> {
+        use BinaryOp as B;
+        let cmp = |o: B| match o {
+            B::Eq => Some(BinOp::Eq),
+            B::Ne => Some(BinOp::Ne),
+            B::Lt => Some(BinOp::Lt),
+            B::Le => Some(BinOp::Le),
+            B::Gt => Some(BinOp::Gt),
+            B::Ge => Some(BinOp::Ge),
+            _ => None,
+        };
+        if let Some(c) = cmp(op) {
+            let a = self.as_operand(lhs)?;
+            let b2 = self.as_operand(rhs)?;
+            return Ok(Rvalue::BinaryOp(c, a, b2));
+        }
+        match op {
+            B::And | B::Or | B::Implies | B::AddChecked | B::SubChecked | B::MulChecked => {
+                self.via_temp(e, ty)
+            }
+            B::InSet => self.in_set(lhs, rhs),
+            B::AddWrap | B::SubWrap | B::MulWrap | B::AddSat | B::SubSat | B::MulSat => {
+                let bo = match op {
+                    B::AddWrap => BinOp::AddWrap,
+                    B::SubWrap => BinOp::SubWrap,
+                    B::MulWrap => BinOp::MulWrap,
+                    B::AddSat => BinOp::AddSat,
+                    B::SubSat => BinOp::SubSat,
+                    _ => BinOp::MulSat,
+                };
+                let a = self.as_operand(lhs)?;
+                let c = self.as_operand(rhs)?;
+                Ok(Rvalue::BinaryOp(bo, a, c))
+            }
+            B::Add | B::Sub | B::Mul | B::Div | B::Rem => {
+                let bo = match op {
+                    B::Add => BinOp::Add,
+                    B::Sub => BinOp::Sub,
+                    B::Mul => BinOp::Mul,
+                    B::Div => BinOp::Div,
+                    _ => BinOp::Rem,
+                };
+                let a = self.as_operand(lhs)?;
+                let c = self.as_operand(rhs)?;
+                let Ty::Int(it) = ty else {
+                    // số thực: không có nghĩa vụ
+                    return Ok(Rvalue::BinaryOp(bo, a, c));
+                };
+                match bo {
+                    BinOp::Add | BinOp::Sub | BinOp::Mul => {
+                        let t = self.temp(Ty::Tuple(vec![ty.clone(), Ty::Bool]));
+                        self.assign(
+                            Place::local(t),
+                            Rvalue::CheckedBinaryOp(bo, a.clone(), c.clone()),
+                        );
+                        self.assert(
+                            Operand::Copy(Place::local(t).project(PlaceElem::Field(1, Ty::Bool))),
+                            false,
+                            AssertKind::Overflow(bo, a, c),
+                        )?;
+                        Ok(Rvalue::Use(Operand::Copy(
+                            Place::local(t).project(PlaceElem::Field(0, ty.clone())),
+                        )))
+                    }
+                    _ => {
+                        let z = self.temp(Ty::Bool);
+                        self.assign(
+                            Place::local(z),
+                            Rvalue::BinaryOp(
+                                BinOp::Ne,
+                                c.clone(),
+                                Operand::Const(int_const(0, *it)),
+                            ),
+                        );
+                        let k = if bo == BinOp::Div {
+                            AssertKind::DivisionByZero(a.clone())
+                        } else {
+                            AssertKind::RemainderByZero(a.clone())
+                        };
+                        self.assert(Operand::Copy(Place::local(z)), true, k)?;
+                        if it.signed() {
+                            // MIN / -1 tràn
+                            let m1 = self.temp(Ty::Bool);
+                            self.assign(
+                                Place::local(m1),
+                                Rvalue::BinaryOp(
+                                    BinOp::Eq,
+                                    a.clone(),
+                                    Operand::Const(min_const(*it)),
+                                ),
+                            );
+                            let m2 = self.temp(Ty::Bool);
+                            self.assign(
+                                Place::local(m2),
+                                Rvalue::BinaryOp(
+                                    BinOp::Eq,
+                                    c.clone(),
+                                    Operand::Const(int_const(-1, *it)),
+                                ),
+                            );
+                            let both = self.temp(Ty::Bool);
+                            self.assign(
+                                Place::local(both),
+                                Rvalue::BinaryOp(
+                                    BinOp::BitAnd,
+                                    Operand::Copy(Place::local(m1)),
+                                    Operand::Copy(Place::local(m2)),
+                                ),
+                            );
+                            self.assert(
+                                Operand::Copy(Place::local(both)),
+                                false,
+                                AssertKind::Overflow(bo, a.clone(), c.clone()),
+                            )?;
+                        }
+                        Ok(Rvalue::BinaryOp(bo, a, c))
+                    }
+                }
+            }
+            _ => ice("toán tử nhị phân lạ"),
+        }
+    }
+
+    /// `x ∈ r`: `r.start ≤ x` và `x < r.end` (hoặc `≤` với `a..=b`).
+    fn in_set(&mut self, lhs: &Expr, rhs: &Expr) -> R<Rvalue> {
+        let x = self.as_operand(lhs)?;
+        let (lo, hi, incl) = match &rhs.kind {
+            ExprKind::Range {
+                start: Some(s),
+                end: Some(e),
+                inclusive,
+            } => (self.as_operand(s)?, self.as_operand(e)?, *inclusive),
+            _ => {
+                let rty = self.ty_of(rhs)?;
+                let Ty::Adt(d, args) = &rty else {
+                    return ice("∈ trên kiểu không phải range");
+                };
+                let el = args.first().cloned().unwrap_or(Ty::Err);
+                let incl = self.db.lang.get(&Lang::RangeInclusive) == Some(d);
+                let order = self.range_field_order(*d)?;
+                let (si, ei) = if order { (0, 1) } else { (1, 0) };
+                let p = if self.is_place_expr(rhs) {
+                    self.as_place(rhs)?
+                } else {
+                    self.temp_place(rhs)?
+                };
+                (
+                    Operand::Copy(p.project(PlaceElem::Field(si, el.clone()))),
+                    Operand::Copy(p.project(PlaceElem::Field(ei, el))),
+                    incl,
+                )
+            }
+        };
+        let c1 = self.temp(Ty::Bool);
+        self.assign(Place::local(c1), Rvalue::BinaryOp(BinOp::Ge, x.clone(), lo));
+        let c2 = self.temp(Ty::Bool);
+        let op = if incl { BinOp::Le } else { BinOp::Lt };
+        self.assign(Place::local(c2), Rvalue::BinaryOp(op, x, hi));
+        Ok(Rvalue::BinaryOp(
+            BinOp::BitAnd,
+            Operand::Copy(Place::local(c1)),
+            Operand::Copy(Place::local(c2)),
+        ))
+    }
+
+    // ---------------- ghi vào đích ----------------
+
+    pub(crate) fn expr_into(&mut self, dest: &Place, e: &Expr) -> R<()> {
+        self.with_at(e, |b| match &e.kind {
+            ExprKind::Block(blk) => b.lower_block(dest, blk),
+            ExprKind::If {
+                cond,
+                then_block,
+                else_branch,
+            } => b.if_into(dest, cond, then_block, else_branch.as_deref()),
+            ExprKind::Match { scrutinee, arms } => b.match_into(dest, scrutinee, arms),
+            ExprKind::Loop(l) => {
+                b.loop_into(l)?;
+                b.assign_unit_if_unit(dest)
+            }
+            ExprKind::Unsafe { proofs, body } => {
+                for p in proofs {
+                    b.body.contracts.push(p.id);
+                }
+                let old = b.enter_unsafe();
+                let r = b.lower_block(dest, body);
+                b.leave_scope(old);
+                r
+            }
+            ExprKind::Call { callee, args } => b.call_into(dest, e, callee, args),
+            ExprKind::Binary {
+                op: op @ (BinaryOp::And | BinaryOp::Or | BinaryOp::Implies),
+                lhs,
+                rhs,
+            } => b.short_circuit(dest, *op, lhs, rhs),
+            ExprKind::Binary {
+                op: op @ (BinaryOp::AddChecked | BinaryOp::SubChecked | BinaryOp::MulChecked),
+                lhs,
+                rhs,
+            } => b.checked_option(dest, *op, lhs, rhs, e),
+            ExprKind::Quantifier { .. } => {
+                ice("lượng từ ∀/∃ ngoài hợp đồng chưa hạ ở M5 (hoãn M7, Q29)")
+            }
+            _ => {
+                let rv = b.as_rvalue(e)?;
+                b.assign(dest.clone(), rv);
+                Ok(())
+            }
+        })
+    }
+
+    pub(crate) fn assign_unit_if_unit(&mut self, dest: &Place) -> R<()> {
+        if self.place_ty_of(dest)?.is_unit() {
+            self.assign(dest.clone(), Rvalue::Use(Operand::Const(Const::Unit)));
+        }
+        Ok(())
+    }
+
+    fn if_into(&mut self, dest: &Place, cond: &Expr, then_b: &Block, els: Option<&Expr>) -> R<()> {
+        // gấp hằng nghĩa đen (ADR-020 §4b): KHÔNG const-prop
+        if let ExprKind::Lit(Lit {
+            kind: LitKind::Bool(v),
+            ..
+        }) = &cond.kind
+        {
+            return if *v {
+                self.lower_block(dest, then_b)
+            } else {
+                match els {
+                    Some(x) => self.in_stmt(|b| b.expr_into(dest, x)),
+                    None => self.assign_unit_if_unit(dest),
+                }
+            };
+        }
+        let c = self.as_operand(cond)?;
+        let then_bb = self.new_block();
+        let else_bb = self.new_block();
+        let join = self.new_block();
+        self.terminate(TerminatorKind::SwitchInt {
+            discr: c,
+            targets: vec![(0, else_bb)],
+            otherwise: then_bb,
+        })?;
+        self.cur = then_bb;
+        self.lower_block(dest, then_b)?;
+        self.terminate(TerminatorKind::Goto(join))?;
+        self.cur = else_bb;
+        match els {
+            Some(x) => self.in_stmt(|b| b.expr_into(dest, x))?,
+            None => self.assign_unit_if_unit(dest)?,
+        }
+        self.terminate(TerminatorKind::Goto(join))?;
+        self.cur = join;
+        Ok(())
+    }
+
+    fn short_circuit(&mut self, dest: &Place, op: BinaryOp, lhs: &Expr, rhs: &Expr) -> R<()> {
+        let a = self.as_operand(lhs)?;
+        let rhs_bb = self.new_block();
+        let short_bb = self.new_block();
+        let join = self.new_block();
+        // And: a sai ⇒ false; Or: a đúng ⇒ true; Implies: a sai ⇒ true
+        let (targets, otherwise, short_val) = match op {
+            BinaryOp::And => (vec![(0, short_bb)], rhs_bb, false),
+            BinaryOp::Or => (vec![(0, rhs_bb)], short_bb, true),
+            _ => (vec![(0, short_bb)], rhs_bb, true),
+        };
+        self.terminate(TerminatorKind::SwitchInt {
+            discr: a,
+            targets,
+            otherwise,
+        })?;
+        self.cur = rhs_bb;
+        self.in_stmt(|b| {
+            let r = b.as_operand(rhs)?;
+            b.assign(dest.clone(), Rvalue::Use(r));
+            Ok(())
+        })?;
+        self.terminate(TerminatorKind::Goto(join))?;
+        self.cur = short_bb;
+        self.assign(
+            dest.clone(),
+            Rvalue::Use(Operand::Const(Const::Bool(short_val))),
+        );
+        self.terminate(TerminatorKind::Goto(join))?;
+        self.cur = join;
+        Ok(())
+    }
+
+    /// `a +? b`: `None` nếu tràn, ngược lại `Some(a + b)` (không có `Assert`).
+    fn checked_option(
+        &mut self,
+        dest: &Place,
+        op: BinaryOp,
+        lhs: &Expr,
+        rhs: &Expr,
+        e: &Expr,
+    ) -> R<()> {
+        let ty = self.ty_of(e)?;
+        let Ty::Adt(opt, args) = &ty else {
+            return ice("`+?` không trả Option");
+        };
+        let el = args.first().cloned().unwrap_or(Ty::Err);
+        let bo = match op {
+            BinaryOp::AddChecked => BinOp::Add,
+            BinaryOp::SubChecked => BinOp::Sub,
+            _ => BinOp::Mul,
+        };
+        let (none_i, some_i) = self.option_variants(*opt)?;
+        let a = self.as_operand(lhs)?;
+        let c = self.as_operand(rhs)?;
+        let t = self.temp(Ty::Tuple(vec![el.clone(), Ty::Bool]));
+        self.assign(Place::local(t), Rvalue::CheckedBinaryOp(bo, a, c));
+        let ov = self.new_block();
+        let ok = self.new_block();
+        let join = self.new_block();
+        self.terminate(TerminatorKind::SwitchInt {
+            discr: Operand::Copy(Place::local(t).project(PlaceElem::Field(1, Ty::Bool))),
+            targets: vec![(0, ok)],
+            otherwise: ov,
+        })?;
+        self.cur = ov;
+        self.assign(
+            dest.clone(),
+            Rvalue::Aggregate(AggregateKind::Adt(*opt, none_i, args.clone()), Vec::new()),
+        );
+        self.terminate(TerminatorKind::Goto(join))?;
+        self.cur = ok;
+        self.assign(
+            dest.clone(),
+            Rvalue::Aggregate(
+                AggregateKind::Adt(*opt, some_i, args.clone()),
+                vec![Operand::Copy(
+                    Place::local(t).project(PlaceElem::Field(0, el)),
+                )],
+            ),
+        );
+        self.terminate(TerminatorKind::Goto(join))?;
+        self.cur = join;
+        Ok(())
+    }
+
+    fn option_variants(&self, d: gt_resolve::DefId) -> R<(u32, u32)> {
+        match self.db.adts.get(&d).map(|a| &a.kind) {
+            Some(AdtKind::Enum(vs)) => {
+                let n = vs.iter().position(|v| v.name == "None");
+                let s = vs.iter().position(|v| v.name == "Some");
+                match (n, s) {
+                    (Some(n), Some(s)) => Ok((n as u32, s as u32)),
+                    _ => ice("lang item option cần biến thể `None` và `Some`"),
+                }
+            }
+            _ => ice("lang item option phải là enum"),
+        }
+    }
+
+    // ---------------- lời gọi ----------------
+
+    fn call_into(&mut self, dest: &Place, e: &Expr, callee: &Expr, args: &[Expr]) -> R<()> {
+        let ret_ty = self.ty_of(e)?;
+        // dạng phương thức `x.m(…)`
+        if let ExprKind::Field { base, .. } = &callee.kind
+            && let Some(site) = self.t.sites.get(&e.id).cloned()
+            && site.method_syntax
+        {
+            let mut recv = if self.is_place_expr(base) {
+                self.as_place(base)?
+            } else {
+                self.temp_place(base)?
+            };
+            for _ in 0..site.derefs {
+                recv = recv.project(PlaceElem::Deref);
+            }
+            // đối số trước, khoản mượn của người nhận SAU (autoref muộn, Q28)
+            let mut ops = Vec::new();
+            let mut spans = vec![base.span];
+            for a in args {
+                ops.push(self.as_operand(a)?);
+                spans.push(a.span);
+            }
+            let rty = self.place_ty_of(&recv)?;
+            let recv_op = match site.self_kind {
+                Some(gt_ast::SelfKind::Ref) | Some(gt_ast::SelfKind::RefMut) => {
+                    let k = if site.self_kind == Some(gt_ast::SelfKind::RefMut) {
+                        BorrowKind::Unique
+                    } else {
+                        BorrowKind::Shared
+                    };
+                    let rt = Ty::Ref(k == BorrowKind::Unique, Box::new(rty));
+                    let t = self.temp(rt.clone());
+                    let rv = self.new_borrow(k, recv);
+                    self.assign(Place::local(t), rv);
+                    self.operand_of(Place::local(t), &rt)
+                }
+                _ => self.operand_of(recv, &rty),
+            };
+            ops.insert(0, recv_op);
+            let c = Self::callee_of(&site);
+            return self.emit_call(dest, c, ops, spans, &ret_ty);
+        }
+        // biến thể có trường: dựng giá trị
+        if let ExprKind::Path(p) = &callee.kind
+            && let Some(Res::Def(d)) = self.res_of(p.id)
+            && self.t.defs()[d.index()].kind == DefKind::Variant
+        {
+            let rv = self.as_rvalue(e)?;
+            self.assign(dest.clone(), rv);
+            return Ok(());
+        }
+        // hàm/hàm kết hợp gọi trực tiếp, hoặc giá trị kiểu hàm
+        let c = match (&callee.kind, self.t.sites.get(&callee.id).cloned()) {
+            (ExprKind::Path(_), Some(site)) => Self::callee_of(&site),
+            _ => Callee::Value(self.as_operand(callee)?),
+        };
+        let mut ops = Vec::new();
+        let mut spans = Vec::new();
+        for a in args {
+            ops.push(self.as_operand(a)?);
+            spans.push(a.span);
+        }
+        self.emit_call(dest, c, ops, spans, &ret_ty)
+    }
+
+    fn callee_of(site: &gt_types::CallSite) -> Callee {
+        match &site.target {
+            CallTarget::Fn(n) => Callee::Fn {
+                node: *n,
+                generics: site.generics.clone(),
+            },
+            CallTarget::TraitMethod {
+                trait_def,
+                member,
+                self_ty,
+            } => Callee::TraitMethod {
+                trait_def: *trait_def,
+                member: *member,
+                self_ty: self_ty.clone(),
+                generics: site.generics.clone(),
+            },
+        }
+    }
+
+    fn emit_call(
+        &mut self,
+        dest: &Place,
+        callee: Callee,
+        args: Vec<Operand>,
+        arg_spans: Vec<gt_span::Span>,
+        ret_ty: &Ty,
+    ) -> R<()> {
+        if *ret_ty == Ty::Never {
+            // hàm `→ !`: không có khối sau, không có cạnh unwind (ADR-020 §9)
+            let t = self.temp(Ty::Never);
+            self.terminate(TerminatorKind::Call {
+                callee,
+                args,
+                arg_spans,
+                dest: Place::local(t),
+                target: None,
+            })?;
+            self.diverge();
+            return Ok(());
+        }
+        let next = self.new_block();
+        self.terminate(TerminatorKind::Call {
+            callee,
+            args,
+            arg_spans,
+            dest: dest.clone(),
+            target: Some(next),
+        })?;
+        self.cur = next;
+        Ok(())
+    }
+
+    // ---------------- vòng lặp ----------------
+
+    fn loop_into(&mut self, l: &Loop) -> R<()> {
+        if let Some(v) = &l.variant {
+            self.body.contracts.push(v.id);
+        }
+        for i in &l.invariants {
+            self.body.contracts.push(i.id);
+        }
+        let scratch = self.temp(Ty::unit());
+        let scr = Place::local(scratch);
+        match &l.kind {
+            LoopKind::Infinite => {
+                let head = self.new_block();
+                let exit = self.new_block();
+                self.goto(head)?;
+                self.enter_loop(exit, head);
+                self.lower_block(&scr, &l.body)?;
+                self.terminate(TerminatorKind::Goto(head))?;
+                self.leave_loop();
+                self.cur = exit;
+                Ok(())
+            }
+            LoopKind::While(c) => {
+                let head = self.new_block();
+                let body_bb = self.new_block();
+                let exit = self.new_block();
+                let lit = match &c.kind {
+                    ExprKind::Lit(Lit {
+                        kind: LitKind::Bool(v),
+                        ..
+                    }) => Some(*v),
+                    _ => None,
+                };
+                let cv = self.temp(Ty::Bool);
+                self.goto(head)?;
+                match lit {
+                    Some(true) => self.terminate(TerminatorKind::Goto(body_bb))?,
+                    Some(false) => self.terminate(TerminatorKind::Goto(exit))?,
+                    None => {
+                        self.in_stmt(|b| {
+                            let o = b.as_operand(c)?;
+                            b.assign(Place::local(cv), Rvalue::Use(o));
+                            Ok(())
+                        })?;
+                        self.terminate(TerminatorKind::SwitchInt {
+                            discr: Operand::Copy(Place::local(cv)),
+                            targets: vec![(0, exit)],
+                            otherwise: body_bb,
+                        })?;
+                    }
+                }
+                self.cur = body_bb;
+                self.enter_loop(exit, head);
+                self.lower_block(&scr, &l.body)?;
+                self.terminate(TerminatorKind::Goto(head))?;
+                self.leave_loop();
+                self.cur = exit;
+                Ok(())
+            }
+            LoopKind::ForIn { var, iter } => self.for_in(var, iter, &l.body, &scr),
+        }
+    }
+
+    fn for_in(&mut self, var: &gt_ast::Ident, iter: &Expr, body: &Block, scr: &Place) -> R<()> {
+        let Some(&vid) = self.t.resolve.decls.get(&var.id) else {
+            return ice("biến lặp không có định danh");
+        };
+        let ity = self.ty_of(iter)?;
+        match &ity {
+            Ty::Ref(m, inner) if matches!(**inner, Ty::Slice(_) | Ty::Array(..)) => {
+                let m = *m;
+                let el = match &**inner {
+                    Ty::Slice(t) | Ty::Array(t, _) => (**t).clone(),
+                    _ => Ty::Err,
+                };
+                let s = if self.is_place_expr(iter) {
+                    self.as_place(iter)?
+                } else {
+                    self.temp_place(iter)?
+                };
+                let base = s.project(PlaceElem::Deref);
+                let usz = Ty::Int(IntTy::Usize);
+                let len = self.temp(usz.clone());
+                self.assign(Place::local(len), Rvalue::Len(base.clone()));
+                let i = self.temp(usz.clone());
+                self.assign(
+                    Place::local(i),
+                    Rvalue::Use(Operand::Const(int_const(0, IntTy::Usize))),
+                );
+                let head = self.new_block();
+                let body_bb = self.new_block();
+                let step = self.new_block();
+                let exit = self.new_block();
+                self.goto(head)?;
+                self.branch_bool(
+                    Rvalue::BinaryOp(
+                        BinOp::Lt,
+                        Operand::Copy(Place::local(i)),
+                        Operand::Copy(Place::local(len)),
+                    ),
+                    body_bb,
+                    exit,
+                )?;
+                self.cur = body_bb;
+                self.enter_loop(exit, step);
+                self.in_block(|b| {
+                    let x = b.user_var(vid, false, var.span)?;
+                    let k = if m {
+                        BorrowKind::Unique
+                    } else {
+                        BorrowKind::Shared
+                    };
+                    let rv = b.new_borrow(k, base.project(PlaceElem::Index(i)));
+                    b.assign(Place::local(x), rv);
+                    b.lower_block(scr, body)
+                })?;
+                self.terminate(TerminatorKind::Goto(step))?;
+                self.leave_loop();
+                self.cur = step;
+                self.assign(
+                    Place::local(i),
+                    Rvalue::BinaryOp(
+                        BinOp::AddWrap,
+                        Operand::Copy(Place::local(i)),
+                        Operand::Const(int_const(1, IntTy::Usize)),
+                    ),
+                );
+                self.terminate(TerminatorKind::Goto(head))?;
+                self.cur = exit;
+                let _ = el;
+                Ok(())
+            }
+            Ty::Adt(d, args) => {
+                let el = args.first().cloned().unwrap_or(Ty::Err);
+                let Ty::Int(eit) = el else {
+                    return ice("lặp trên range không phải số nguyên chưa hỗ trợ ở M5");
+                };
+                let incl = self.db.lang.get(&Lang::RangeInclusive) == Some(d);
+                let (lo, hi) = match &iter.kind {
+                    ExprKind::Range {
+                        start: Some(s),
+                        end: Some(e),
+                        ..
+                    } => (self.as_operand(s)?, self.as_operand(e)?),
+                    _ => {
+                        let order = self.range_field_order(*d)?;
+                        let (si, ei) = if order { (0, 1) } else { (1, 0) };
+                        let p = if self.is_place_expr(iter) {
+                            self.as_place(iter)?
+                        } else {
+                            self.temp_place(iter)?
+                        };
+                        (
+                            Operand::Copy(p.project(PlaceElem::Field(si, el.clone()))),
+                            Operand::Copy(p.project(PlaceElem::Field(ei, el.clone()))),
+                        )
+                    }
+                };
+                let hi_t = self.temp(el.clone());
+                self.assign(Place::local(hi_t), Rvalue::Use(hi));
+                let i = self.temp(el.clone());
+                self.assign(Place::local(i), Rvalue::Use(lo));
+                let head = self.new_block();
+                let body_bb = self.new_block();
+                let step = self.new_block();
+                let exit = self.new_block();
+                if incl {
+                    // rỗng nếu lo > hi; i == hi ở cuối vòng thì thoát (không tăng quá MAX)
+                    let pre = self.new_block();
+                    self.branch_bool(
+                        Rvalue::BinaryOp(
+                            BinOp::Le,
+                            Operand::Copy(Place::local(i)),
+                            Operand::Copy(Place::local(hi_t)),
+                        ),
+                        pre,
+                        exit,
+                    )?;
+                    self.cur = pre;
+                    self.goto(head)?;
+                    self.terminate(TerminatorKind::Goto(body_bb))?;
+                } else {
+                    self.goto(head)?;
+                    self.branch_bool(
+                        Rvalue::BinaryOp(
+                            BinOp::Lt,
+                            Operand::Copy(Place::local(i)),
+                            Operand::Copy(Place::local(hi_t)),
+                        ),
+                        body_bb,
+                        exit,
+                    )?;
+                }
+                self.cur = body_bb;
+                self.enter_loop(exit, step);
+                self.in_block(|b| {
+                    let x = b.user_var(vid, false, var.span)?;
+                    b.assign(Place::local(x), Rvalue::Use(Operand::Copy(Place::local(i))));
+                    b.lower_block(scr, body)
+                })?;
+                self.terminate(TerminatorKind::Goto(step))?;
+                self.leave_loop();
+                self.cur = step;
+                if incl {
+                    let inc = self.new_block();
+                    self.branch_bool(
+                        Rvalue::BinaryOp(
+                            BinOp::Eq,
+                            Operand::Copy(Place::local(i)),
+                            Operand::Copy(Place::local(hi_t)),
+                        ),
+                        exit,
+                        inc,
+                    )?;
+                    self.cur = inc;
+                }
+                self.assign(
+                    Place::local(i),
+                    Rvalue::BinaryOp(
+                        BinOp::AddWrap,
+                        Operand::Copy(Place::local(i)),
+                        Operand::Const(int_const(1, eit)),
+                    ),
+                );
+                self.terminate(TerminatorKind::Goto(head))?;
+                self.cur = exit;
+                Ok(())
+            }
+            _ => ice(format!("⟳ in trên kiểu {ity:?}")),
+        }
+    }
+}

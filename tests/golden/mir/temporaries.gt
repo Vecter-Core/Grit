@@ -1,0 +1,9 @@
+▢ P { x: i32 }
+ƒ mk() → P ! ∅ { P { x: 1 } }
+ƒ peek(p: &P) → i32 ! ∅ { p.x }
+ƒ f() → i32 ! ∅ {
+  r ≔ &mk();
+  a ≔ peek(&mk());
+  b ≔ mk().x;
+  r.x +% a +% b
+}

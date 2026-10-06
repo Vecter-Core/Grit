@@ -52,7 +52,11 @@ impl<'e, 'a> Checker<'e, 'a> {
             ExprKind::Call { callee, args } => self.call(e, callee, args, expect),
             ExprKind::Field { base, name } => self.field(e, base, name),
             ExprKind::Index { base, index } => self.index(e, base, index),
-            ExprKind::Range { start, end, .. } => self.range(e, start.as_deref(), end.as_deref()),
+            ExprKind::Range {
+                start,
+                end,
+                inclusive,
+            } => self.range(e, start.as_deref(), end.as_deref(), *inclusive),
             ExprKind::Tuple(v) => {
                 let hints: Vec<Option<Ty>> = match expect.map(|t| self.infer.shallow(t)) {
                     Some(Ty::Tuple(h)) if h.len() == v.len() => h.into_iter().map(Some).collect(),
@@ -412,7 +416,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                 }
             },
             (Ty::Adt(d, args), FieldName::Named(n)) => {
-                let Some(adt) = self.env.adts.get(d).cloned() else {
+                let Some(adt) = self.env.db.adts.get(d).cloned() else {
                     return Ty::Err;
                 };
                 match &adt.kind {
@@ -515,7 +519,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         elem
     }
 
-    fn range(&mut self, e: &Expr, start: Option<&Expr>, end: Option<&Expr>) -> Ty {
+    fn range(&mut self, e: &Expr, start: Option<&Expr>, end: Option<&Expr>, inclusive: bool) -> Ty {
         match (start, end) {
             (Some(a), Some(b)) => {
                 let at = self.expr(a, None);
@@ -534,7 +538,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                         format!("range cần số nguyên hoặc `char`, gặp `{s}`"),
                     );
                 }
-                self.range_of(at, e.id, e.span)
+                self.range_of(at, inclusive, e.id, e.span)
             }
             _ => {
                 self.err(
@@ -551,9 +555,7 @@ impl<'e, 'a> Checker<'e, 'a> {
     /// Phần tử của một miền lặp/lượng từ: `Range<T>` → `T`.
     pub(crate) fn range_elem(&mut self, t: &Ty, node: NodeId, span: Span) -> Ty {
         match self.infer.shallow(t) {
-            Ty::Adt(d, args) if Some(d) == self.lang(Lang::Range) => {
-                args.first().cloned().unwrap_or(Ty::Err)
-            }
+            Ty::Adt(d, args) if self.is_range_def(d) => args.first().cloned().unwrap_or(Ty::Err),
             Ty::Err => Ty::Err,
             other => {
                 let s = self.show(&other);
@@ -578,8 +580,8 @@ impl<'e, 'a> Checker<'e, 'a> {
         expect: Option<&Ty>,
     ) -> Ty {
         let adt_ty = match self.env.res.uses.get(&path.id).cloned() {
-            Some(Res::Def(d)) if self.env.adts.contains_key(&d) => {
-                let n = self.env.adts[&d].generics.len();
+            Some(Res::Def(d)) if self.env.db.adts.contains_key(&d) => {
+                let n = self.env.db.adts[&d].generics.len();
                 let args: Vec<Ty> = (0..n).map(|_| self.fresh()).collect();
                 Ty::Adt(d, args)
             }
@@ -604,7 +606,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         let Ty::Adt(d, args) = self.infer.resolve(&adt_ty) else {
             return Ty::Err;
         };
-        let Some(adt) = self.env.adts.get(&d).cloned() else {
+        let Some(adt) = self.env.db.adts.get(&d).cloned() else {
             return Ty::Err;
         };
         let AdtKind::Struct(def_fields) = &adt.kind else {
@@ -812,9 +814,7 @@ impl<'e, 'a> Checker<'e, 'a> {
     /// Phần tử khi lặp: `Range<T>` → `T`; `&[T]`/`&[T; N]` → `&T` (`semantics.md` §21).
     fn iter_elem(&mut self, t: &Ty, iter: &Expr) -> Ty {
         match self.infer.shallow(t) {
-            Ty::Adt(d, args) if Some(d) == self.lang(Lang::Range) => {
-                args.first().cloned().unwrap_or(Ty::Err)
-            }
+            Ty::Adt(d, args) if self.is_range_def(d) => args.first().cloned().unwrap_or(Ty::Err),
             Ty::Ref(m, inner) => match self.infer.shallow(&inner) {
                 Ty::Slice(e) | Ty::Array(e, _) => Ty::Ref(m, e),
                 _ => self.not_iterable(t, iter),
@@ -822,6 +822,11 @@ impl<'e, 'a> Checker<'e, 'a> {
             Ty::Err => Ty::Err,
             _ => self.not_iterable(t, iter),
         }
+    }
+
+    /// `Range<T>` hoặc `RangeInclusive<T>`.
+    fn is_range_def(&self, d: DefId) -> bool {
+        Some(d) == self.lang(Lang::Range) || Some(d) == self.lang(Lang::RangeInclusive)
     }
 
     fn not_iterable(&mut self, t: &Ty, iter: &Expr) -> Ty {

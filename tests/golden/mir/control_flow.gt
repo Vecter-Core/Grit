@@ -1,0 +1,12 @@
+ƒ logic(a: bool, b: bool) → bool ! ∅ { a ∧ b ∨ (a ⇒ b) }
+ƒ chain(n: i32) → i32 ! ∅ {
+  ⎇ n < 0 { -1 } ⇝ ⎇ n == 0 { 0 } ⇝ { 1 }
+}
+ƒ folded() → i32 ! ∅ {
+  ⎇ true { 1 } ⇝ { 2 }
+}
+ƒ stmt_if(c: bool) → i32 ! ∅ {
+  μx ≔ 0;
+  ⎇ c { x ← 1; }
+  x
+}

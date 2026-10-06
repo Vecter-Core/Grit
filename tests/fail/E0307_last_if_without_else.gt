@@ -1,0 +1,6 @@
+// expect: fail E0307
+// note: hai ⎇ không có ⇝; khi cả hai điều kiện sai thì rơi khỏi cuối hàm
+ƒ f(c: bool, d: bool) → i32 ! ∅ {
+  ⎇ c { ⏎ 1; }
+  ⎇ d { ⏎ 2; }
+}
