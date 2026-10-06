@@ -517,6 +517,65 @@ impl Builder<'_> {
         Ok(self.is_place_expr(e) && matches!(self.ty_of(e)?, Ty::Ref(true, _)))
     }
 
+    /// Biểu thức không thể ghi/move/mượn gì (chỉ đọc, tối đa abort): đứng sau một toán hạng chỗ thì không cần chụp lại.
+    fn is_read_only(e: &Expr) -> bool {
+        match &e.kind {
+            ExprKind::Lit(_) | ExprKind::Path(_) => true,
+            ExprKind::Unary { op, operand } => {
+                !matches!(op, UnaryOp::Borrow | UnaryOp::BorrowMut) && Self::is_read_only(operand)
+            }
+            ExprKind::Binary { lhs, rhs, .. } => Self::is_read_only(lhs) && Self::is_read_only(rhs),
+            ExprKind::Cast { expr, .. } => Self::is_read_only(expr),
+            ExprKind::Field { base, .. } => Self::is_read_only(base),
+            ExprKind::Index { base, index } => {
+                Self::is_read_only(base) && Self::is_read_only(index)
+            }
+            ExprKind::Tuple(v) | ExprKind::Array(v) => v.iter().all(Self::is_read_only),
+            ExprKind::ArrayRepeat { value, .. } => Self::is_read_only(value),
+            ExprKind::StructLit { fields, .. } => {
+                fields.iter().all(|f| Self::is_read_only(&f.value))
+            }
+            _ => false,
+        }
+    }
+
+    /// Thứ tự đánh giá trái sang phải (semantics §3a): toán hạng là CHỖ (biến/trường/`*r`) bị đọc/move ở lúc dùng,
+    /// nên nếu một biểu thức đứng sau có thể ghi/move/mượn thì phải chụp giá trị vào biến tạm NGAY bây giờ.
+    fn stabilize(&mut self, op: Operand, ty: &Ty, later: &[&Expr]) -> Operand {
+        if later.iter().all(|l| Self::is_read_only(l)) {
+            return op;
+        }
+        let p = match &op {
+            Operand::Copy(p) | Operand::Move(p) => p.clone(),
+            Operand::Const(_) => return op,
+        };
+        let decl = &self.body.locals[p.local.index()];
+        let is_temp = p.projection.is_empty() && matches!(decl.kind, LocalKind::Temp);
+        // chỗ chép (Copy) của biến bất biến, không qua tham chiếu: không ai ghi được
+        let frozen = matches!(op, Operand::Copy(_)) && p.projection.is_empty() && !decl.mutable;
+        if is_temp || frozen {
+            return op;
+        }
+        let t = self.temp(ty.clone());
+        self.assign(Place::local(t), Rvalue::Use(op));
+        self.operand_of(Place::local(t), ty)
+    }
+
+    /// Các toán hạng theo thứ tự trái sang phải, mỗi cái được chụp lại nếu biểu thức sau nó có thể làm đổi nó.
+    pub(crate) fn seq_operands(&mut self, es: &[&Expr], coerced: bool) -> R<Vec<Operand>> {
+        let mut out = Vec::with_capacity(es.len());
+        for (i, e) in es.iter().enumerate() {
+            let o = if coerced {
+                self.as_coerced_operand(e)?
+            } else {
+                self.as_operand(e)?
+            };
+            let ty = self.ty_of(e)?;
+            out.push(self.stabilize(o, &ty, &es[i + 1..]));
+        }
+        Ok(out)
+    }
+
     /// Toán hạng tại điểm ÉP KIỂU (đối số, `≔` có chú thích, `⏎`): một chỗ kiểu `&!T` được reborrow ngầm
     /// (`&!*r`) thay vì move, như Rust — nếu không, `f(r); f(r)` là dùng-sau-move (ADR-023 §0.1, Q30).
     pub(crate) fn as_coerced_operand(&mut self, e: &Expr) -> R<Operand> {
@@ -653,14 +712,16 @@ impl Builder<'_> {
                     Ok(Rvalue::Cast(a, ty))
                 }
                 ExprKind::Tuple(v) => {
-                    let ops = v.iter().map(|x| b.as_operand(x)).collect::<R<Vec<_>>>()?;
+                    let es: Vec<&Expr> = v.iter().collect();
+                    let ops = b.seq_operands(&es, false)?;
                     Ok(Rvalue::Aggregate(AggregateKind::Tuple, ops))
                 }
                 ExprKind::Array(v) => {
                     let Ty::Array(el, _) = &ty else {
                         return ice("literal mảng không có kiểu mảng");
                     };
-                    let ops = v.iter().map(|x| b.as_operand(x)).collect::<R<Vec<_>>>()?;
+                    let es: Vec<&Expr> = v.iter().collect();
+                    let ops = b.seq_operands(&es, false)?;
                     Ok(Rvalue::Aggregate(AggregateKind::Array((**el).clone()), ops))
                 }
                 ExprKind::ArrayRepeat { value, .. } => {
@@ -679,11 +740,11 @@ impl Builder<'_> {
                         return ice("struct literal của kiểu không phải struct");
                     };
                     // đánh giá theo thứ tự VIẾT, rồi xếp theo thứ tự khai báo
-                    let mut got: Vec<(String, Operand)> = Vec::new();
-                    for f in fields {
-                        let o = b.as_operand(&f.value)?;
-                        got.push((f.name.name.clone(), o));
-                    }
+                    let es: Vec<&Expr> = fields.iter().map(|f| &f.value).collect();
+                    let os = b.seq_operands(&es, false)?;
+                    let got: Vec<(String, Operand)> =
+                        fields.iter().map(|f| f.name.name.clone()).zip(os).collect();
+                    let mut got = got;
                     let mut ops = Vec::new();
                     for df in &defs {
                         match got.iter().position(|(n, _)| *n == df.name) {
@@ -704,8 +765,9 @@ impl Builder<'_> {
                     let Ty::Adt(d, args) = &ty else {
                         return ice("range không có kiểu Range");
                     };
-                    let a = b.as_operand(s)?;
-                    let c = b.as_operand(en)?;
+                    let mut ac = b.seq_operands(&[&**s, &**en], false)?;
+                    let c = ac.remove(1);
+                    let a = ac.remove(0);
                     let order = b.range_field_order(*d)?;
                     let ops = if order { vec![a, c] } else { vec![c, a] };
                     Ok(Rvalue::Aggregate(
@@ -719,10 +781,8 @@ impl Builder<'_> {
                         && b.t.defs()[d.index()].kind == DefKind::Variant
                     {
                         let (ed, vi) = b.variant_of(d)?;
-                        let ops = args
-                            .iter()
-                            .map(|x| b.as_operand(x))
-                            .collect::<R<Vec<_>>>()?;
+                        let es: Vec<&Expr> = args.iter().collect();
+                        let ops = b.seq_operands(&es, false)?;
                         return Ok(Rvalue::Aggregate(
                             AggregateKind::Adt(ed, vi, Self::adt_args(&ty)),
                             ops,
@@ -809,8 +869,9 @@ impl Builder<'_> {
             _ => None,
         };
         if let Some(c) = cmp(op) {
-            let a = self.as_operand(lhs)?;
-            let b2 = self.as_operand(rhs)?;
+            let mut ab = self.seq_operands(&[lhs, rhs], false)?;
+            let b2 = ab.remove(1);
+            let a = ab.remove(0);
             return Ok(Rvalue::BinaryOp(c, a, b2));
         }
         match op {
@@ -827,8 +888,9 @@ impl Builder<'_> {
                     B::SubSat => BinOp::SubSat,
                     _ => BinOp::MulSat,
                 };
-                let a = self.as_operand(lhs)?;
-                let c = self.as_operand(rhs)?;
+                let mut ac = self.seq_operands(&[lhs, rhs], false)?;
+                let c = ac.remove(1);
+                let a = ac.remove(0);
                 Ok(Rvalue::BinaryOp(bo, a, c))
             }
             B::Add | B::Sub | B::Mul | B::Div | B::Rem => {
@@ -839,8 +901,9 @@ impl Builder<'_> {
                     B::Div => BinOp::Div,
                     _ => BinOp::Rem,
                 };
-                let a = self.as_operand(lhs)?;
-                let c = self.as_operand(rhs)?;
+                let mut ac = self.seq_operands(&[lhs, rhs], false)?;
+                let c = ac.remove(1);
+                let a = ac.remove(0);
                 let Ty::Int(it) = ty else {
                     // số thực: không có nghĩa vụ
                     return Ok(Rvalue::BinaryOp(bo, a, c));
@@ -922,14 +985,23 @@ impl Builder<'_> {
 
     /// `x ∈ r`: `r.start ≤ x` và `x < r.end` (hoặc `≤` với `a..=b`).
     fn in_set(&mut self, lhs: &Expr, rhs: &Expr) -> R<Rvalue> {
-        let x = self.as_operand(lhs)?;
-        let (lo, hi, incl) = match &rhs.kind {
+        let (lo, hi, incl, x) = match &rhs.kind {
             ExprKind::Range {
                 start: Some(s),
                 end: Some(e),
                 inclusive,
-            } => (self.as_operand(s)?, self.as_operand(e)?, *inclusive),
+            } => {
+                let mut v = self.seq_operands(&[lhs, &**s, &**e], false)?;
+                let hi = v.remove(2);
+                let lo = v.remove(1);
+                (lo, hi, *inclusive, v.remove(0))
+            }
             _ => {
+                let x = {
+                    let o = self.as_operand(lhs)?;
+                    let lty = self.ty_of(lhs)?;
+                    self.stabilize(o, &lty, &[rhs])
+                };
                 let rty = self.ty_of(rhs)?;
                 let Ty::Adt(d, args) = &rty else {
                     return ice("∈ trên kiểu không phải range");
@@ -947,6 +1019,7 @@ impl Builder<'_> {
                     Operand::Copy(p.project(PlaceElem::Field(si, el.clone()))),
                     Operand::Copy(p.project(PlaceElem::Field(ei, el))),
                     incl,
+                    x,
                 )
             }
         };
@@ -1106,8 +1179,9 @@ impl Builder<'_> {
             _ => BinOp::Mul,
         };
         let (none_i, some_i) = self.option_variants(*opt)?;
-        let a = self.as_operand(lhs)?;
-        let c = self.as_operand(rhs)?;
+        let mut ac = self.seq_operands(&[lhs, rhs], false)?;
+        let c = ac.remove(1);
+        let a = ac.remove(0);
         let t = self.temp(Ty::Tuple(vec![el.clone(), Ty::Bool]));
         self.assign(Place::local(t), Rvalue::CheckedBinaryOp(bo, a, c));
         let ov = self.new_block();
@@ -1170,13 +1244,12 @@ impl Builder<'_> {
             for _ in 0..site.derefs {
                 recv = recv.project(PlaceElem::Deref);
             }
-            // đối số trước, khoản mượn của người nhận SAU (autoref muộn, Q28)
-            let mut ops = Vec::new();
+            // đối số trước, người nhận SAU: khoản mượn (`&self`/`&!self`, autoref muộn, Q28) và cả người nhận theo giá trị
+            // (ADR-022 §5: `x.consume(x.len())` hợp lệ — đối số đánh giá trước khi người nhận bị tiêu thụ)
+            let es: Vec<&Expr> = args.iter().collect();
+            let ops = self.seq_operands(&es, true)?;
             let mut spans = vec![base.span];
-            for a in args {
-                ops.push(self.as_coerced_operand(a)?);
-                spans.push(a.span);
-            }
+            spans.extend(args.iter().map(|a| a.span));
             let rty = self.place_ty_of(&recv)?;
             let recv_op = match site.self_kind {
                 Some(gt_ast::SelfKind::Ref) | Some(gt_ast::SelfKind::RefMut) => {
@@ -1193,6 +1266,7 @@ impl Builder<'_> {
                 }
                 _ => self.operand_of(recv, &rty),
             };
+            let mut ops = ops;
             ops.insert(0, recv_op);
             let c = Self::callee_of(&site);
             return self.emit_call(dest, c, ops, spans, &ret_ty);
@@ -1209,14 +1283,16 @@ impl Builder<'_> {
         // hàm/hàm kết hợp gọi trực tiếp, hoặc giá trị kiểu hàm
         let c = match (&callee.kind, self.t.sites.get(&callee.id).cloned()) {
             (ExprKind::Path(_), Some(site)) => Self::callee_of(&site),
-            _ => Callee::Value(self.as_operand(callee)?),
+            _ => {
+                let o = self.as_operand(callee)?;
+                let cty = self.ty_of(callee)?;
+                let es: Vec<&Expr> = args.iter().collect();
+                Callee::Value(self.stabilize(o, &cty, &es))
+            }
         };
-        let mut ops = Vec::new();
-        let mut spans = Vec::new();
-        for a in args {
-            ops.push(self.as_coerced_operand(a)?);
-            spans.push(a.span);
-        }
+        let es: Vec<&Expr> = args.iter().collect();
+        let ops = self.seq_operands(&es, true)?;
+        let spans = args.iter().map(|a| a.span).collect();
         self.emit_call(dest, c, ops, spans, &ret_ty)
     }
 

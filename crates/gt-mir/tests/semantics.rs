@@ -13,9 +13,11 @@ const PROGRAMS: u64 = 400;
 fn lowering_preserves_the_meaning_of_random_programs() {
     let mut aborts = 0;
     let mut values = 0;
+    let mut place_then_effect = 0u64;
     for seed in 1..=PROGRAMS {
         let mut g = Gen::new(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15));
         let fns = g.program();
+        place_then_effect += g.place_then_effect as u64;
         let src = print(&fns);
         let t = one(&src);
         assert!(
@@ -43,6 +45,12 @@ fn lowering_preserves_the_meaning_of_random_programs() {
         "chỉ {values} chương trình trả giá trị"
     );
     assert!(aborts >= PROGRAMS / 20, "chỉ {aborts} chương trình abort");
+    // độ phủ: toán hạng là CHỖ đứng trước một toán hạng ghi đúng chỗ đó (lỗi M5 đã lọt qua 400 chương trình cũ vì bộ sinh
+    // không có biểu thức có tác dụng phụ)
+    assert!(
+        place_then_effect >= PROGRAMS / 2,
+        "chỉ {place_then_effect} biểu thức chỗ-rồi-tác-dụng-phụ trong {PROGRAMS} chương trình"
+    );
 }
 
 #[test]
@@ -132,5 +140,51 @@ fn evaluation_order_is_left_to_right_including_struct_literals_in_written_order(
             Outcome::Abort(kind.to_string()),
             "{src}"
         );
+    }
+}
+
+/// Toán hạng là CHỖ phải được đọc ở lúc đánh giá của nó, không phải lúc dùng: biểu thức đứng sau có thể ghi vào chỗ đó
+/// (lỗi tìm thấy khi viết corpus M6: `g(x, { x ← 2; 3 })` đọc x = 2).
+#[test]
+fn place_operands_are_read_before_later_operands_can_change_them() {
+    for (src, want) in [
+        (
+            "ƒ g(a: i32, b: i32) → i32 ! ∅ { a } ƒ entry() → i32 ! ∅ { μx ≔ 1; g(x, { x ← 2; 3 }) }",
+            1,
+        ),
+        ("ƒ entry() → i32 ! ∅ { μx ≔ 1; x - { x ← 5; 0 } }", 1),
+        ("ƒ entry() → i32 ! ∅ { μx ≔ 1; x +% { x ← 9; 10 } }", 11),
+        (
+            "ƒ entry() → i32 ! ∅ { μx ≔ 1; t ≔ (x, { x ← 7; 0 }); t.0 }",
+            1,
+        ),
+        (
+            "ƒ entry() → i32 ! ∅ { μx ≔ 1; a ≔ [x, { x ← 7; 0 }]; a[0] }",
+            1,
+        ),
+        (
+            "▢ P { a: i32, b: i32 } ƒ entry() → i32 ! ∅ { μx ≔ 1; P { a: x, b: { x ← 3; 0 } }.a }",
+            1,
+        ),
+        ("ƒ entry() → bool ! ∅ { μx ≔ 1; x < { x ← 0; 2 } }", 1),
+    ] {
+        let (_, m) = mir(src);
+        match Interp::new(&m, 10_000).call_key("main::entry", Vec::new()) {
+            Outcome::Value(V::Int(v, _)) => assert_eq!(v, want, "{src}"),
+            Outcome::Value(V::Bool(b)) => assert_eq!(i128::from(b), want, "{src}"),
+            other => panic!("{src}: {other:?}"),
+        }
+    }
+}
+
+/// ADR-022 §5 (đã duyệt): người nhận THEO GIÁ TRỊ bị tiêu thụ SAU các đối số (cùng nguyên tắc autoref muộn, Q28).
+/// Khác với toán hạng đối số, nó KHÔNG được chụp trước: `p.add({ p ← P { a: 100 }; 5 })` đọc `p` mới.
+#[test]
+fn by_value_receiver_is_consumed_after_the_arguments() {
+    let src = "▢ P { a: i32 } ⊐ P { ƒ add(self, k: i32) → i32 ! ∅ { self.a + k } } ƒ entry() → i32 ! ∅ { μp ≔ P { a: 1 }; p.add({ p ← P { a: 100 }; 5 }) }";
+    let (_, m) = mir(src);
+    match Interp::new(&m, 10_000).call_key("main::entry", Vec::new()) {
+        Outcome::Value(V::Int(v, _)) => assert_eq!(v, 105, "{src}"),
+        other => panic!("{src}: {other:?}"),
     }
 }

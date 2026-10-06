@@ -58,6 +58,8 @@ pub enum E {
     MatchOpt(Box<C>, Box<E>, String, Box<E>, Box<E>),
     /// `((e as u8) as i32)`
     CastU8(Box<E>),
+    /// `{ v ← e1; e2 }`: biểu thức có tác dụng phụ lên biến `v` (thứ tự đánh giá của toán hạng là CHỖ đứng trước nó).
+    Eff(String, Box<E>, Box<E>),
 }
 
 #[derive(Clone, Debug)]
@@ -92,6 +94,10 @@ pub struct Gen {
     pub rng: Rng,
     counter: usize,
     pub fns: Vec<F>,
+    /// biến gán được (`μ`) trong phạm vi đang sinh — cho `E::Eff`
+    cur_muts: Vec<String>,
+    /// số biểu thức "toán hạng là chỗ + toán hạng sau ghi đúng chỗ đó" đã sinh (độ phủ)
+    pub place_then_effect: usize,
 }
 
 const I32_MIN: i64 = i32::MIN as i64;
@@ -103,6 +109,8 @@ impl Gen {
             rng: Rng(seed | 1),
             counter: 0,
             fns: Vec::new(),
+            cur_muts: Vec::new(),
+            place_then_effect: 0,
         }
     }
 
@@ -131,6 +139,9 @@ impl Gen {
             };
         }
         let d = depth - 1;
+        if !self.cur_muts.is_empty() && self.rng.chance(12) {
+            return self.place_then_effect_expr(vars, d, fidx);
+        }
         match self.rng.below(12) {
             0..=3 => {
                 let op = [Op::Add, Op::Sub, Op::Mul, Op::Div, Op::Rem, Op::AddWrap]
@@ -201,6 +212,38 @@ impl Gen {
         }
     }
 
+    /// Toán hạng đầu là CHỖ `x`, toán hạng sau là `{ x ← e1; e2 }`: đánh giá trái sang phải đọc `x` TRƯỚC khi bị ghi.
+    fn place_then_effect_expr(&mut self, vars: &[String], d: u32, fidx: usize) -> E {
+        let x = self.cur_muts[self.rng.below(self.cur_muts.len() as u64) as usize].clone();
+        let e1 = self.expr(vars, d.min(1), fidx);
+        let e2 = self.expr(vars, d.min(1), fidx);
+        let eff = E::Eff(x.clone(), Box::new(e1), Box::new(e2));
+        let place = E::Var(x);
+        self.place_then_effect += 1;
+        match self.rng.below(5) {
+            0 => E::Bin(Op::AddWrap, Box::new(place), Box::new(eff)),
+            1 => E::Bin(Op::Sub, Box::new(place), Box::new(eff)),
+            2 => E::TupleGet(Box::new(place), Box::new(eff), self.rng.below(2) as u8),
+            // thứ tự viết: `b` trước ⇒ b = place, a = eff
+            3 => E::StructGet(Box::new(eff), Box::new(place), self.rng.chance(50)),
+            _ => {
+                let two: Vec<usize> = (0..fidx)
+                    .filter(|j| self.fns[*j].params.len() >= 2)
+                    .collect();
+                if let Some(&j) = two.get(self.rng.below(two.len().max(1) as u64) as usize) {
+                    let n = self.fns[j].params.len();
+                    let mut args = vec![place, eff];
+                    while args.len() < n {
+                        args.push(E::Lit(self.lit()));
+                    }
+                    E::Call(j, args)
+                } else {
+                    E::Bin(Op::AddWrap, Box::new(place), Box::new(eff))
+                }
+            }
+        }
+    }
+
     fn cond(&mut self, vars: &[String], depth: u32, fidx: usize) -> C {
         let d = depth.saturating_sub(1);
         match self.rng.below(7) {
@@ -236,6 +279,7 @@ impl Gen {
         let n = self.rng.below(4);
         let mut out = Vec::new();
         for _ in 0..n {
+            self.cur_muts = muts.clone();
             let s = match self.rng.below(8) {
                 0 | 1 => {
                     let v = self.fresh("v");
@@ -298,6 +342,7 @@ impl Gen {
             let mut vars = params.clone();
             let mut muts = Vec::new();
             let body = self.stmts(&mut vars, &mut muts, 2, false, k);
+            self.cur_muts = muts.clone();
             let tail = self.expr(&vars, 3, k);
             let name = if k == nf {
                 "entry".to_string()
@@ -385,6 +430,7 @@ fn pe(e: &E, fns: &[F]) -> String {
             pe(none, fns)
         ),
         E::CastU8(a) => format!("(({} as u8) as i32)", pe(a, fns)),
+        E::Eff(v, e1, e2) => format!("{{ {v} ← {}; {} }}", pe(e1, fns), pe(e2, fns)),
     }
 }
 
@@ -572,6 +618,13 @@ fn ev(e: &E, env: &mut Env, fns: &[F]) -> Result<i64, &'static str> {
                 return Err("cast_lossy");
             }
             x
+        }
+        E::Eff(v, e1, e2) => {
+            let x = ev(e1, env, fns)?;
+            if let Some(slot) = env.iter_mut().rev().find(|(n, _)| n == v) {
+                slot.1 = x;
+            }
+            ev(e2, env, fns)?
         }
     })
 }
