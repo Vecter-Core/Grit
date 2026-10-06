@@ -414,6 +414,12 @@ impl<'a> Oracle<'a> {
                             via = Some(r.loan);
                             loc = r.loc;
                         }
+                        V::Uninit => {
+                            return viol(
+                                VKind::UseAfterMove,
+                                "giải tham chiếu một tham chiếu đã move/chưa gán",
+                            );
+                        }
                         other => return bug(format!("deref {other:?}")),
                     }
                 }

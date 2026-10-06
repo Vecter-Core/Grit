@@ -46,6 +46,8 @@ pub const PRELUDE: &str = "\
 ƒ pick2<'a, 'b>(x: &'a i32, y: &'b i32) → &'a i32 ! ∅ { x }
 ƒ first(a: &[i32]) → &i32 ! ∅ { &a[0] }
 ƒ use_i(x: i32) ! ∅ { }
+ƒ takes(r: &!i32) ! ∅ { *r ← 1; }
+ƒ look(r: &i32) ! ∅ { use_i(*r); }
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
@@ -279,7 +281,7 @@ impl Gen {
 
     fn int_action(&mut self, x: &str, r: &str, unique: bool) -> St {
         let k = self.k();
-        match self.rng.below(6) {
+        match self.rng.below(10) {
             0 | 1 => {
                 if unique {
                     raw_r(format!("*{r} ← {k};"), Role::UseRef { var: r.into() })
@@ -293,9 +295,31 @@ impl Gen {
                 let s = self.fresh("s");
                 raw(format!("{s} ≔ &{x}; use_i(*{s});"))
             }
-            _ => {
+            5 => {
                 let t = self.fresh("t");
                 raw(format!("{t} ≔ &!{x}; *{t} ← {k};"))
+            }
+            // truyền tham chiếu cho hàm: `&!` được reborrow ngầm (ADR-023 §0.1), `&` được sao chép
+            8 => raw_r(
+                if unique {
+                    format!("takes({r});")
+                } else {
+                    format!("look({r});")
+                },
+                Role::UseRef { var: r.into() },
+            ),
+            // sao chép tham chiếu bằng gán: `&` là Copy, `&!` bị MOVE (dùng lại `r` sau đó là dùng-sau-move)
+            6 => {
+                let v = self.fresh("v");
+                raw(format!("{v} ≔ {r}; use_i(*{v});"))
+            }
+            _ => {
+                let v = self.fresh("v");
+                if unique {
+                    raw(format!("{v} ≔ {r}; *{v} ← {k};"))
+                } else {
+                    raw(format!("{v} ≔ {r}; use_i(*{v});"))
+                }
             }
         }
     }

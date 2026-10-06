@@ -379,6 +379,22 @@ impl<'a> Checker<'a> {
                 continue;
             }
             if a.kind == Kind::Write {
+                // ghi QUA một tham chiếu/chỉ số: bản thân con trỏ/mảng phải còn nguyên (`*a ← v` sau `b ≔ a` là dùng-sau-move;
+                // lỗ hổng tìm thấy khi săn soundness: hai `&!` cùng ghi được vào một chỗ)
+                let last_indirection = a.place.projection.iter().rposition(|e| {
+                    matches!(
+                        e,
+                        PlaceElem::Deref | PlaceElem::Index(_) | PlaceElem::Subslice { .. }
+                    )
+                });
+                if let Some(k) = last_indirection {
+                    let mut base = a.place.clone();
+                    base.projection.truncate(k);
+                    if Self::maybe_uninit(mp, us, &base) {
+                        self.report_use_after_move(&a.place, src, "ghi qua");
+                        continue;
+                    }
+                }
                 // ghi vào trường: phần cha phải còn nguyên (không bị move cả khối)
                 if let Some(PlaceElem::Field(..) | PlaceElem::Downcast(_)) =
                     a.place.projection.last()
