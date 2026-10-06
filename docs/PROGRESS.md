@@ -303,3 +303,32 @@ Toán hạng là một CHỖ được đọc/move lúc dùng chứ không phải
 - `python tools/check_expectations.py`: OK (616 tệp .gt: fail=325, warn=1, pass=264, lexer=8; 55 mã; 159 tham chiếu).
 - `python -m unittest tools/test_check_expectations.py`: 9 test, OK.
 - Cổng của commit `M5-fix` chạy riêng trên cây sạch (HEAD + 3 tệp): fmt sạch, clippy exit 0, audit exit 0, 417 passed 0 failed, check_expectations OK.
+
+## M6 — oracle động (ADR-024, commit "M6: dynamic oracle …")
+Thông dịch MIR có theo dõi khoản vay/move/Arena, độc lập với mã phân tích của borrowck; bộ sinh chương trình ngẫu nhiên có ĐỘ PHỦ theo loại cấu trúc; tấn công hai phía; hiệu chuẩn trên corpus. Mã: `crates/gt-borrowck/tests/{oracle.rs,support/}`.
+
+### Kết quả lần chạy đầy đủ (2026-10-06; `cargo test -p gt-borrowck --test oracle -- --nocapture`, ~2 phút)
+- **20 000 chương trình ngẫu nhiên** (mỗi chương trình chạy 8 tổ hợp `(c, d, e)`), **455 966 khoản vay được theo dõi**; mọi chương trình qua M4/M5; oracle không gặp MIR ngoài phạm vi (0 `Bug`).
+  - borrowck chấp nhận ∧ oracle sạch: **10 002**.
+  - borrowck chấp nhận ∧ oracle thấy vi phạm (**âm tính giả thật**): **0**.
+  - borrowck từ chối ∧ oracle thấy vi phạm: **9 979**; trong đó mã oracle ≠ mã borrowck: 0.
+  - borrowck từ chối ∧ oracle sạch (ứng viên dương tính giả): **19 = 0,19%** của 10 021 chương trình oracle sạch; **cả 19 đều thuộc một nguyên nhân đã biết: chữ ký `RegionSig`** (`pick(&x, &y)` buộc kết quả với cả hai đối số dù thân chỉ trả `x`), cùng mã E0406; nhóm "KHÁC (cần xem tay)" = 0 ca.
+- **Độ phủ bộ sinh theo loại cấu trúc** (ngưỡng ADR-024 §2: ≥ 300 chấp nhận+sạch VÀ ≥ 300 oracle thấy vi phạm; mọi loại đạt):
+  | loại | tổng | chấp nhận+sạch | oracle thấy vi phạm |
+  |---|---|---|---|
+  | move | 6 725 | 2 404 | 4 319 |
+  | reborrow | 4 751 | 1 693 | 3 055 |
+  | borrow_in_loop | 4 224 | 1 848 | 2 374 |
+  | borrow_via_match | 4 003 | 1 920 | 2 080 |
+  | partial_move | 1 783 | 446 | 1 336 |
+  | arena_reset | 1 708 | 500 | 1 208 |
+  | call_regionsig | 4 923 | 2 609 | 2 295 |
+  | nested_struct | 6 153 | 2 674 | 3 476 |
+- **Tấn công hai phía:** 1 577 chương trình cơ sở hợp lệ ở cả hai phía; hai phía cùng bắt **UseAfterMove 400, SecondBorrow 753, ArenaReset 424**; **0 bất đồng**.
+- **Hiệu chuẩn trên corpus:** 114 mẫu đúng chạy được → 0 vi phạm; 133 mẫu xấu chạy được → oracle thấy **127 (95,5%)** (E0401 26/28, E0402 19/21, E0403 20/20, E0404 21/21, E0405 21/21, E0406 20/21, E0407 0/1). 6 mẫu oracle không thấy, đều có lý do: `E0401_move_in_condition` (điều kiện luôn đúng nên nhánh dùng-sau-move không chạy), `E0401_move_in_conditional_loop_branch` (vòng chỉ 2 lần, move ở lần cuối), `E0402_array_elements_conservative` và `E0406_assign_element_while_other_borrowed` (borrowck coi mọi chỉ số chồng lấn; oracle chính xác theo chỉ số), `E0402_method_and_arg_unique` (hai `&!` truyền vào hàm có thân rỗng nên không bao giờ được dùng), `E0407_drop_type_field_let` (quy tắc tĩnh Drop, thân prelude không chạy).
+
+### Lỗi/bài học trong lúc làm (đều của oracle/bộ sinh, không phải của borrowck)
+1. Bộ sinh dùng chung một điều kiện `c` cho `⎇` lồng nhau ⇒ nhánh chèn không bao giờ chạy ⇒ lần đầu 11 "bất đồng" giả; sửa bằng điều kiện riêng mỗi tầng (`c`, `d`, `e`).
+2. Vòng lặp `0..1` làm 180 chương trình thành "ứng viên dương tính giả" (borrowck đúng khi thấy cạnh lùi); sửa bằng ≥ 2 lần lặp ⇒ ứng viên còn 19 (chữ ký).
+3. Oracle thiếu: mượn chỗ đã move cả struct, tham chiếu treo nằm trong giá trị trả về, hằng `□` — đã bổ sung (đều tìm ra nhờ phân loại ứng viên dương tính giả và hiệu chuẩn trên corpus).
+4. Thiếu độ nhạy ban đầu: hiệu chuẩn chỉ thấy 102/133 mẫu xấu ⇒ sửa oracle ⇒ 127/133.
