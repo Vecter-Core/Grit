@@ -18,13 +18,12 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0303 | `==` trên số thực (D4) | M4 | E0303_float_eq, E0303_float_literal_eq, E0303_float_ne |
 | E0304 | Trường struct/biến thể/pattern sai: thiếu, thừa, không tồn tại hoặc trùng (literal `P { … }`, pattern `P { … }`, truy cập `.x`) — Q20 | M4 | E0304_duplicate_field, E0304_missing_field, E0304_pattern_missing_field, E0304_tuple_index_out_of_range, E0304_unknown_field |
 | E0305 | `⌥` không đầy đủ (D6) | M4 | E0305_int_without_wildcard, E0305_missing_bool_branch, E0305_nonexhaustive, E0305_range_gap, E0305_str_without_wildcard |
-| E0306 | Dùng biến chưa khởi tạo chắc chắn | M5 | — |
 | E0307 | Thiếu đường trả về (gồm khối kết thúc bằng `;` mà hàm trả kiểu khác `()`) — **thuộc M5**, không phải parser (cần kiểu trả về và luồng điều khiển) | M5 | E0307_missing_return, E0307_trailing_semicolon |
 | E0308 | Gán vào biến bất biến (D5) | M4 | E0308_assign_immutable, E0308_assign_param, E0308_assign_through_shared_ref, E0308_method_needs_mut_receiver, E0308_unique_borrow_of_immutable |
 | E0309 | Ràng buộc trait không thoả / không có phương thức / mơ hồ (Q20) | M4 | E0309_ambiguous_method, E0309_bound_not_satisfied, E0309_no_such_method |
 | E0311 | `⊐` không hợp lệ: thiếu/thừa/khác chữ ký thành viên so với trait, hoặc hai impl chồng lấn (Q20) | M4 | E0311_copy_non_copy_field, E0311_missing_trait_method, E0311_overlapping_impls, E0311_signature_mismatch |
 | E0312 | Đệ quy đa hình vượt ngưỡng instance (64) — `ƒ f<T>() { f<Vec<T>>() }` (ADR-018 §1, Q20) | M4 | E0312_array_growth, E0312_option_growth, E0312_polymorphic_recursion |
-| E0313 | Kiểu lang dùng sai: tạo `Secret`/`Cap` bằng literal ngoài lib/core, `⊐ Copy for` chúng (Q20, Q21) | M4 | E0313_copy_for_cap, E0313_copy_for_secret, E0313_forge_cap, E0313_forge_secret |
+| E0313 | Kiểu lang dùng sai: tạo `Secret`/`Cap` bằng literal ngoài lib/core, `⊐ Copy for` chúng, `⊐ Drop for` ngoài lib/core (ADR-020 §9) (Q20, Q21) | M4 | E0313_copy_for_cap, E0313_copy_for_secret, E0313_forge_cap, E0313_forge_secret |
 | E0314 | Kiểu `!` ở vị trí không hợp lệ: tham số kiểu, trường, phần tử mảng (ADR-018 §3.6, Q20) | M4 | E0314_never_array_element, E0314_never_field, E0314_never_type_argument |
 | E0310 | Thiếu capability: gọi nguồn capability gốc (hàm trả `Cap<…>` mà không nhận `Cap<…>`) ngoài `main` (D28, D29) | M4.5 | E0310_missing_cap, E0310_as_argument, E0310_assoc_root, E0310_both_branches, E0310_bound_to_local, E0310_const_initializer, E0310_fn_as_value, E0310_helper_called_from_main, E0310_in_generic_fn, E0310_in_impl_method, E0310_in_trait_impl_method, E0310_in_tuple, E0310_in_variant, E0310_inside_if_branch, E0310_inside_while_body, E0310_main_in_nested_module, E0310_method_named_main, E0310_missing_cap, E0310_returned_as_is, E0310_root_alloc, E0310_root_clock, E0310_root_env, E0310_root_net, E0310_root_then_split, E0310_static_initializer, E0310_two_roots |
 | E0315 | Lifetime/region trong chữ ký không hợp lệ: chưa khai báo, khai báo trùng/che, trường thiếu lifetime, elision mơ hồ ở kiểu trả về (ADR-019) | M4.5 | E0315_ambiguous_elision, E0315_duplicate_lifetime, E0315_enum_field_undeclared, E0315_field_elision, E0315_let_annotation, E0315_method_two_refs, E0315_shadow_impl_lifetime, E0315_undeclared_in_return, E0315_undeclared_lifetime, E0315_lifetime_arg_count, E0315_lifetime_arg_undeclared, E0315_field_elided_lifetime_arg |
@@ -64,3 +63,5 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 
 Ghi chú: plan ghi match-đầy-đủ và capability thuộc "E01xx/E03xx/E06xx" / "E03xx/E08xx" mơ hồ → đề xuất
 E0305/E0310 (xem OPEN_QUESTIONS Q4). Các test `—` do milestone sở hữu viết (cần đa file/pass chưa có).
+
+**Mã đã nghỉ (không tái sử dụng số):** E0306 ("dùng biến chưa khởi tạo") — D3 cấm biến chưa khởi tạo và `≔` luôn có vế khởi tạo nên không có nguồn kích hoạt; khởi tạo chắc chắn là bất biến của MIR, vi phạm là ICE (ADR-020 §9, Q25). Mở lại nếu Phase 2 thêm khởi tạo trì hoãn.

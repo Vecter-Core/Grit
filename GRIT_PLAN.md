@@ -109,7 +109,7 @@ MIR(CFG)  [7] Hạ xuống MIR: basic block, place, borrow, drop
 
 ### 3.3 Cơ sở tin cậy (TCB) — thứ ta _buộc_ phải tin
 
-Phase 1: (1) mã gritc0, (2) `rustc` + thư viện chuẩn Rust, (3) LLVM, (4) linker, (5) OS/phần cứng, (6) các `intrinsic` trong `lib/core` (được đánh dấu `trusted`, mỗi cái kèm lý do và được người duyệt), (6b) danh sách **lang item** `#lang(…)` mà compiler gán ý nghĩa đặc biệt và chỉ lib/core được khai báo: `option`, `copy`, `range`, `secret`, `cap`, `arena` (ADR-018, ADR-019; mỗi mục mới cần Giang duyệt).
+Phase 1: (1) mã gritc0, (2) `rustc` + thư viện chuẩn Rust, (3) LLVM, (4) linker, (5) OS/phần cứng, (6) các `intrinsic` trong `lib/core` (được đánh dấu `trusted`, mỗi cái kèm lý do và được người duyệt), (6b) danh sách **lang item** `#lang(…)` mà compiler gán ý nghĩa đặc biệt và chỉ lib/core được khai báo: `option`, `copy`, `range`, `secret`, `cap`, `arena`, `drop` (ADR-018, ADR-019, ADR-020; mỗi mục mới cần Giang duyệt).
 Phase 2 thêm/đổi: (7) SMT solver (giảm dần khi có Kernel), (8) Kernel kiểm bằng chứng. **Mục tiêu dài hạn: thu nhỏ TCB, không phải làm nó biến mất.**
 
 ---
@@ -266,7 +266,8 @@ grit/
     gt-lexer/  gt-ast/  gt-parser/
     gt-resolve/              giải tên, module
     gt-types/                kiểm kiểu, traits tĩnh, đơn hình hoá
-    gt-hir/  gt-mir/         biểu diễn trung gian
+    gt-mir/                  biểu diễn trung gian (MIR); bước hạ MIR là nơi DUY NHẤT đọc AST + bảng của gt-types
+    (gt-hir/)                HOÃN, không bỏ (ADR-020 §9, Q27): chưa cần lớp HIR riêng ở Phase 1
     gt-dataflow/             khung phân tích lattice
     gt-borrowck/             sở hữu & mượn
     gt-effects/  gt-conc/  gt-edge/  gt-term/  gt-secrets/

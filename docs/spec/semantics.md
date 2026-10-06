@@ -41,6 +41,12 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 - `⟳` — xem §21 (termination của while / for-in / vòng vô hạn). `⋈` (bất biến): Phase 1 kiểm lúc chạy trong `dev`, không dùng để chứng minh (chờ 8.A).
 - Mọi đường điều khiển của hàm có kiểu trả về khác `()` phải trả giá trị (E0307).
 
+## 3a. Thứ tự đánh giá và biến tạm (Giang, 2026-10-06, ADR-020 §9)
+- **Trái sang phải.** Toán hạng trái rồi phải (`∧ ∨ ⇒` ngắn mạch); lời gọi: callee rồi đối số theo thứ tự; phương thức: toán hạng của chỗ người nhận rồi đối số, khoản mượn tự động (`&self`/`&!self`) tạo SAU đối số (autoref muộn); tuple/mảng/struct literal: theo thứ tự viết trong nguồn.
+- **Gán `chỗ ← giá_trị`:** biểu thức con của chỗ (chỉ số, deref) trước, kiểm chỉ số, rồi giá trị, rồi ghi. Khác Rust (Rust đánh giá vế phải trước).
+- **Biến tạm** chết ở cuối câu lệnh, trừ `tên [: T] ≔ &V;` / `≔ &!V;` với V không phải biểu thức chỗ: tạm sống tới cuối khối chứa câu lệnh.
+- Lỗi lúc chạy (tràn, chia 0, chỉ số, ép kiểu mất thông tin) là `Assert` ⇒ abort tức thì, không unwind (D3).
+
 ## 4. Hiệu ứng (D10)
 - Chữ ký hàm **luôn** có `! ∅` hoặc `! {…}`. Hiệu ứng đã định nghĩa: `io, mem, st, div, ffi, lock(L)`.
 - Kiểm: khai báo ⊇ suy ra (thân hàm + hiệu ứng các hàm được gọi) → E0801/E0802.

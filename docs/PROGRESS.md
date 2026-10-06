@@ -226,3 +226,8 @@ Cập nhật: 2026-10-06. Không đột biến (đúng chính sách).
 - Test: `gt-parser/tests/lifetime_args.rs` (4), gt-fmt `parse(fmt(x)) == parse(x)` + idempotent trên 8 dạng mới, gt-types `regions.rs` (+2), mẫu `pass/76_lifetime_args_in_types`, `fail/E0315_lifetime_arg_count`, `E0315_lifetime_arg_undeclared`, `E0315_field_elided_lifetime_arg`, `E0101_lifetime_after_type_arg` (+ snapshot).
 - Cổng chạy lại ngay trước commit: fmt sạch; clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (256 file .gt; 55 mã; 156 tham chiếu); `cargo test --workspace` 375 passed, 0 failed.
 
+## M5 — MIR + dataflow — **ADR-020 ĐÃ DUYỆT (có sửa đổi); đang làm** (2026-10-06)
+- Chỉ viết ADR (theo lệnh): `docs/DECISIONS.md` ADR-020 trả lời (a) biểu diễn MIR, (b) thông tin M6 cần + danh sách thiếu-thì-phải-sửa, (c) khung dataflow, (d) kiểm đầy đủ, (e) MIR text ổn định, (f) cắt phạm vi; thêm mục 7 (validator + thông dịch MIR bù cho việc không đột biến).
+- Phát hiện cần Giang quyết (Q25–Q29): **E0306 không thể kích hoạt** trong ngữ pháp hiện tại; "drop elaboration" không cần cho M6 và Phase 1 chưa có `Drop`; MIR cần bảng vị trí region riêng vì `Ty` không chứa region; đề xuất không có crate `gt-hir`.
+- **Giang duyệt ADR-020 có sửa đổi (2026-10-06, §9):** E0306 nghỉ (rút khỏi bảng + gt-diag), `#lang(drop)`, không gt-hir (hoãn), autoref muộn + luật kéo dài tạm, `Assert` có từ M5, không unwind, thứ tự trái-sang-phải (semantics §3a), golden thoát phạm vi bắt buộc.
+- Cổng chạy lại ngay trước commit M5-adr: fmt sạch (sau `cargo fmt` cho danh sách mã của gt-diag); clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (256 file .gt; **54 mã** — E0306 đã rút; 156 tham chiếu); `cargo test --workspace` 375 passed, 0 failed.
