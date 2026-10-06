@@ -1,0 +1,7 @@
+// expect: pass
+// note: main cấp xuống hàm phụ
+ƒ helper(fs: &Cap<Fs>) → usize ! {io} { fs.read("a").len() }
+ƒ main() → usize ! {io} {
+  fs ≔ root_fs();
+  helper(&fs)
+}

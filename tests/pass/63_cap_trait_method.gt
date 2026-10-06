@@ -1,0 +1,5 @@
+// expect: pass
+// note: trait có tham số capability
+⊏ Reader { ƒ load(&self, fs: &Cap<Fs>) → usize ! {io}; }
+▢ App { n: i32 }
+⊐ Reader for App { ƒ load(&self, fs: &Cap<Fs>) → usize ! {io} { fs.read("a").len() } }

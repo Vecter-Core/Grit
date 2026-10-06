@@ -1,0 +1,3 @@
+// expect: pass
+// note: elision: một tham chiếu vào, trả tham chiếu
+ƒ first(xs: &[i32]) → &i32 ! ∅ { &xs[0] }

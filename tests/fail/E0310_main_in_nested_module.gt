@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: `main` lồng trong module không phải entry
+▦ m { ◈ ƒ main() ! {io} { fs ≔ root_fs(); } }

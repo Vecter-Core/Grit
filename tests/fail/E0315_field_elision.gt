@@ -1,0 +1,3 @@
+// expect: fail E0315
+// note: trường struct phải ghi lifetime
+▢ P { r: &i32 }

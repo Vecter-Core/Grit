@@ -26,7 +26,8 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0312 | Đệ quy đa hình vượt ngưỡng instance (64) — `ƒ f<T>() { f<Vec<T>>() }` (ADR-018 §1, Q20) | M4 | E0312_array_growth, E0312_option_growth, E0312_polymorphic_recursion |
 | E0313 | Kiểu lang dùng sai: tạo `Secret`/`Cap` bằng literal ngoài lib/core, `⊐ Copy for` chúng (Q20, Q21) | M4 | E0313_copy_for_cap, E0313_copy_for_secret, E0313_forge_cap, E0313_forge_secret |
 | E0314 | Kiểu `!` ở vị trí không hợp lệ: tham số kiểu, trường, phần tử mảng (ADR-018 §3.6, Q20) | M4 | E0314_never_array_element, E0314_never_field, E0314_never_type_argument |
-| E0310 | Thiếu capability (D28) | M4.5 | E0310_missing_cap |
+| E0310 | Thiếu capability: gọi nguồn capability gốc (hàm trả `Cap<…>` mà không nhận `Cap<…>`) ngoài `main` (D28, D29) | M4.5 | E0310_missing_cap, E0310_as_argument, E0310_assoc_root, E0310_both_branches, E0310_bound_to_local, E0310_const_initializer, E0310_fn_as_value, E0310_helper_called_from_main, E0310_in_generic_fn, E0310_in_impl_method, E0310_in_trait_impl_method, E0310_in_tuple, E0310_in_variant, E0310_inside_if_branch, E0310_inside_while_body, E0310_main_in_nested_module, E0310_method_named_main, E0310_missing_cap, E0310_returned_as_is, E0310_root_alloc, E0310_root_clock, E0310_root_env, E0310_root_net, E0310_root_then_split, E0310_static_initializer, E0310_two_roots |
+| E0315 | Lifetime/region trong chữ ký không hợp lệ: chưa khai báo, khai báo trùng/che, trường thiếu lifetime, elision mơ hồ ở kiểu trả về (ADR-019) | M4.5 | E0315_ambiguous_elision, E0315_duplicate_lifetime, E0315_enum_field_undeclared, E0315_field_elision, E0315_let_annotation, E0315_method_two_refs, E0315_shadow_impl_lifetime, E0315_undeclared_in_return, E0315_undeclared_lifetime |
 | E0401 | Dùng sau move | M6 | E0401_use_after_move |
 | E0402 | Hai `&!` chồng nhau | M6 | E0402_double_unique |
 | E0403 | `&!` chồng `&` | M6 | E0403_unique_vs_shared |

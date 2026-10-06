@@ -1,0 +1,7 @@
+// expect: pass
+// note: hàm trong module nhận capability qua tham số
+▦ iox { ◈ ƒ size(fs: &Cap<Fs>, p: &str) → usize ! {io} { fs.read(p).len() } }
+ƒ main() → usize ! {io} {
+  fs ≔ root_fs();
+  iox::size(&fs, "a")
+}

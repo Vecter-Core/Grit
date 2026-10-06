@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: nguồn capability gốc Clock ngoài main
+ƒ f() → u64 ! {io} { root_clock().now() }

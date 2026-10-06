@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: trong Some(…)
+ƒ f() ! {io} { o ≔ Some(root_fs()); }

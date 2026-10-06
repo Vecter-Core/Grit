@@ -1,0 +1,3 @@
+// expect: fail E0315
+// note: lifetime chưa khai báo ở kiểu trả về
+ƒ f<'a>(x: &'a i32) → &'b i32 ! ∅ { x }

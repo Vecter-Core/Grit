@@ -1,0 +1,3 @@
+// expect: fail E0315
+// note: biến thể dùng lifetime chưa khai báo
+⊔ E<'a> { A(&'b i32) }

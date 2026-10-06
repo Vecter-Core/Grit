@@ -40,7 +40,7 @@ fn user_types_are_copy_only_through_a_valid_copy_impl() {
     ));
     // trường không Copy làm impl không hợp lệ
     err("▢ Q { x: i32 } ▢ P { q: Q } ⊐ Copy for P { }", "E0311", 1);
-    err("▢ P { x: &!i32 } ⊐ Copy for P { }", "E0311", 1);
+    err("▢ P<'a> { x: &!'a i32 } ⊐ Copy for P { }", "E0311", 1);
     // Copy cho kiểu không phải ADT của người dùng
     err("⊐ Copy for i32 { }", "E0311", 1);
     // generic: trường kiểu tham số do ràng buộc của impl quyết định
@@ -82,7 +82,7 @@ fn secret_and_cap_cannot_be_forged_with_a_literal_outside_the_core() {
     err("ƒ f() ! ∅ { k ≔ Secret { v: 1u64 }; }", "E0313", 1);
     err("ƒ f() ! ∅ { c ≔ Cap { v: 1 }; }", "E0313", 1);
     // nhận từ nguồn hợp lệ thì được
-    ok("ƒ f() ! ∅ { c ≔ root_fs(); }");
+    ok("ƒ main() ! ∅ { c ≔ root_fs(); }");
     ok("ƒ pass_through(k: Secret<u64>) → Secret<u64> ! ∅ { k }");
     // kiểu thường thì tạo được
     ok("▢ P { x: i32 } ƒ f() ! ∅ { p ≔ P { x: 1 }; }");

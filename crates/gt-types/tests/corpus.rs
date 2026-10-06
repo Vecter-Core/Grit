@@ -76,7 +76,7 @@ fn every_pass_case_typechecks_cleanly() {
 
 const OWNED: &[&str] = &[
     "E0301", "E0302", "E0303", "E0304", "E0305", "E0308", "E0309", "E0311", "E0312", "E0313",
-    "E0314", "E1002",
+    "E0310", "E0314", "E0315", "E1002",
 ];
 
 #[test]

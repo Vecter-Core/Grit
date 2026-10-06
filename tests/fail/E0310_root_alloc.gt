@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: nguồn capability gốc Alloc ngoài main
+ƒ f() → Arena ! {mem} { root_alloc().arena() }

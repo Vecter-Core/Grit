@@ -1,0 +1,4 @@
+// expect: fail E0315
+// note: &self và một tham chiếu khác: elision mơ hồ
+▢ S { n: i32 }
+⊐ S { ƒ get(&self, k: &i32) → &i32 ! ∅ { k } }

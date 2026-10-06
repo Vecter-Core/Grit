@@ -1,0 +1,4 @@
+// expect: fail E0315
+// note: hàm che lifetime của impl
+▢ S { n: i32 }
+⊐ <'a> S { ƒ f<'a>(&self) ! ∅ { } }

@@ -1,0 +1,4 @@
+// expect: pass
+// note: hai tham chiếu, lifetime tường minh
+ƒ longest<'a>(x: &'a str, y: &'a str) → &'a str ! ∅ { x }
+ƒ first<'a, 'b>(x: &'a i32, y: &'b i32) → &'a i32 ! ∅ { x }

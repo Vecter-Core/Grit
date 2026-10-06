@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: tham chiếu hàm nguồn như giá trị cũng bị chặn
+ƒ f() ! {io} { g ≔ root_fs; }

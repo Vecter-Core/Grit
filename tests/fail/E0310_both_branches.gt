@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: cả hai nhánh đều mint
+ƒ f(c: bool) ! {io} { fs ≔ ⎇ c { root_fs() } ⇝ { root_fs() }; }

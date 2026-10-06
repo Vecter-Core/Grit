@@ -1,0 +1,3 @@
+// expect: pass
+// note: capability trong tuple tham số
+ƒ second(p: (Cap<Fs>, u8)) → u8 ! ∅ { p.1 }

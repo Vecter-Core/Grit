@@ -11,12 +11,21 @@ pub const PRELUDE_SRC: &str = "\
 ▢ Cap<T> { v: T }
 ▢ Fs { x: i32 }
 ▢ Net { x: i32 }
+▢ Env { x: i32 }
+▢ Clock { x: i32 }
+▢ Alloc { x: i32 }
+▢ Host { x: i32 }
+▢ File { x: i32 }
 ▢ Arena { x: i32 }
 ▦ core {
   ◈ ƒ abort() ! ∅ { }
   ƒ hidden() ! ∅ { }
 }
 ƒ root_fs() → Cap<Fs> ! ∅ { }
+ƒ root_net() → Cap<Net> ! ∅ { }
+ƒ root_env() → Cap<Env> ! ∅ { }
+ƒ root_clock() → Cap<Clock> ! ∅ { }
+ƒ root_alloc() → Cap<Alloc> ! ∅ { }
 ƒ raw_read(p: usize) → i32 ! ∅ { }
 ";
 

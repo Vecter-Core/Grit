@@ -1,0 +1,4 @@
+// expect: pass
+// note: chuyển sở hữu capability vào hàm
+ƒ consume(fs: Cap<Fs>) → usize ! {io} { fs.read("a").len() }
+ƒ main() → usize ! {io} { consume(root_fs()) }

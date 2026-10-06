@@ -94,3 +94,8 @@
 - Trước M7, literal ngoài phạm vi (`x: u8 ≔ 300`) lọt qua M4; E0307 (thiếu đường trả về) phụ thuộc M5.
 - **M9 không được coi là xong, và `gritc` KHÔNG ĐƯỢC sinh binary, nếu E0601 (M7) chưa được triển khai và có test; tương tự E0307 (M5).** Cổng này phải được kiểm tường minh khi làm gt-driver (M9): driver từ chối sinh đầu ra nếu các kiểm tra này chưa có.
 
+## gt-types: capability và region (M4.5, ADR-019)
+- **Capability:** luật nguồn gốc theo kiểu (chỉ `main` cấp cao gọi được hàm trả `Cap<…>` mà không nhận `Cap<…>`). Không có phân tích dòng chảy: không phát hiện "capability cũ bị dùng sau khi đã chuyển đi" (đó là use-after-move, M6) và không kiểm hiệu ứng `{io}` của thao tác (M5). Khai báo (không gọi) nguồn gốc trong chương trình người dùng không bị báo. Danh sách loại capability do lib/core quyết.
+- **Region:** chỉ kiểm CHỮ KÝ (khai báo, trùng, elision). Region KHÔNG nằm trong `Ty`; thân hàm chưa kiểm gì về region — `ƒ f() → &i32 { &x }` trả tham chiếu local, hay Arena thoát, đều QUA M4/M4.5 và chỉ bị chặn ở M6 (E0404/E0405). Cho tới khi M6 xong, đây là lỗ hổng đã biết.
+- **Ngữ pháp:** không có đối số lifetime trong đường dẫn kiểu (`Holder<'a>`) và không có `'a: 'b` (Q24e). Elision chặt hơn Rust: không có luật `&self` thắng; không tham chiếu vào ⇒ `'static`.
+

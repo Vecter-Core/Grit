@@ -1,0 +1,3 @@
+// expect: fail E0315
+// note: hai tham chiếu vào, trả tham chiếu không ghi lifetime
+ƒ pick(x: &i32, y: &i32) → &i32 ! ∅ { x }

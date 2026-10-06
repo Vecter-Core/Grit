@@ -1,0 +1,3 @@
+// expect: pass
+// note: hàm nhận &Cap<Fs> dùng được thao tác Fs
+ƒ size(fs: &Cap<Fs>, p: &str) → usize ! {io} { fs.read(p).len() }

@@ -1,0 +1,5 @@
+// expect: pass
+// note: Option<Cap> dựng từ capability đang giữ
+ƒ maybe(fs: &Cap<Fs>, b: bool) → Option<Cap<Fs>> ! {io} {
+  ⎇ b { Some(fs.sub("x")) } ⇝ { None }
+}

@@ -1,0 +1,4 @@
+// expect: pass
+// note: elision: &self là tham chiếu duy nhất
+▢ S { n: i32 }
+⊐ S { ƒ get(&self) → &i32 ! ∅ { &self.n } }

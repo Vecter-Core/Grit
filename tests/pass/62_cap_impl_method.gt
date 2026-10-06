@@ -1,0 +1,4 @@
+// expect: pass
+// note: phương thức impl nhận &Cap qua tham số
+▢ App { n: i32 }
+⊐ App { ƒ run(&self, fs: &Cap<Fs>) → usize ! {io} { fs.read("a").len() } }

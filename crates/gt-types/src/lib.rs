@@ -7,6 +7,7 @@ mod collect;
 mod exhaust;
 mod infer;
 mod mono;
+mod region;
 mod traits;
 mod ty;
 mod validate;
@@ -14,6 +15,7 @@ mod validate;
 pub use check::CallRec;
 pub use collect::Lang;
 pub use mono::{Instance, MAX_INSTANCE_DEPTH};
+pub use region::{RegionRef, RegionSig};
 pub use traits::MethodRes;
 pub use ty::{FloatTy, IntTy, ParamId, Ty};
 
@@ -42,6 +44,8 @@ pub struct TypesOutput {
     pub instances: Vec<Instance>,
     /// Key of every fn with a body by NodeId (to read the instance table).
     pub fn_keys: BTreeMap<NodeId, String>,
+    /// Bảng region của từng chữ ký hàm/thành viên (M4.5; M6 dùng lại).
+    pub regions: BTreeMap<NodeId, RegionSig>,
 }
 
 impl TypesOutput {
@@ -112,6 +116,7 @@ fn ice(msg: &str, resolve: ResolveOutput) -> TypesOutput {
         methods: BTreeMap::new(),
         instances: Vec::new(),
         fn_keys: BTreeMap::new(),
+        regions: BTreeMap::new(),
     }
 }
 
@@ -128,13 +133,14 @@ pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesO
             methods: BTreeMap::new(),
             instances: Vec::new(),
             fn_keys: BTreeMap::new(),
+            regions: BTreeMap::new(),
         });
     }
     let mut names: Vec<String> = inputs.iter().map(|i| i.name.clone()).collect();
     names.sort();
     let result = gt_stack::run_with_big_stack(|| run(&resolve, names));
     match result {
-        Ok((report, types, locals, methods, instances, fn_keys)) => Ok(TypesOutput {
+        Ok((report, types, locals, methods, instances, fn_keys, regions)) => Ok(TypesOutput {
             report,
             resolve,
             types,
@@ -142,6 +148,7 @@ pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesO
             methods,
             instances,
             fn_keys,
+            regions,
         }),
         Err(e) => Ok(ice(&e.to_string(), resolve)),
     }
@@ -154,6 +161,7 @@ type Outputs = (
     BTreeMap<NodeId, MethodRes>,
     Vec<Instance>,
     BTreeMap<NodeId, String>,
+    BTreeMap<NodeId, RegionSig>,
 );
 
 fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
@@ -217,5 +225,6 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
         env.out_methods,
         instances,
         fn_keys,
+        env.region_sigs,
     )
 }

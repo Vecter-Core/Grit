@@ -32,7 +32,7 @@ CASE_EXPECT_RE = re.compile(r"^expect: (pass|fail E\d{4}|warn S\d{3})\s*$")
 DOC_REQUIRED = [
     "E0101", "E0102", "E0201", "E0202", "E0203", "E0204", "E0205",
     "E0301", "E0302", "E0303", "E0304", "E0305", "E0308", "E0309",
-    "E0311", "E0312", "E0313", "E0314", "E1002",
+    "E0310", "E0311", "E0312", "E0313", "E0314", "E0315", "E1002",
 ]
 DOC_LINE_RE = re.compile(r"^- (fail|pass): (\S+)\s*$")
 

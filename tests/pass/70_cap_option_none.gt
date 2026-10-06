@@ -1,0 +1,3 @@
+// expect: pass
+// note: Option<Cap> không mint gì
+ƒ nothing() → Option<Cap<Fs>> ! ∅ { None }

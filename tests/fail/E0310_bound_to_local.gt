@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: gán capability gốc vào biến cục bộ ngoài main
+ƒ f() ! {io} { fs ≔ root_fs(); }

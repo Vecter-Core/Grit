@@ -23,6 +23,14 @@ pub(crate) struct LocalInfo {
     pub mut_hint: Option<(NodeId, u32)>,
 }
 
+/// Một chỗ dùng hàm/phương thức có thể sinh capability gốc (E0310, D28/D29): kiểm sau khi kiểu đã giải xong.
+pub(crate) struct CapUse {
+    pub params: Vec<Ty>,
+    pub ret: Ty,
+    pub node: NodeId,
+    pub span: Span,
+}
+
 pub(crate) struct Oblig {
     pub ty: Ty,
     pub trait_def: DefId,
@@ -66,6 +74,9 @@ pub(crate) struct Checker<'e, 'a> {
     pub methods: Vec<(NodeId, MethodRes)>,
     pub matches: Vec<MatchCheck>,
     pub calls: Vec<CallRec>,
+    pub cap_uses: Vec<CapUse>,
+    /// Hàm này là `main` (nguồn duy nhất của capability gốc, D29).
+    pub entry: bool,
     pub in_unsafe: u32,
     pub unresolved_reported: bool,
 }
@@ -94,6 +105,8 @@ impl<'e, 'a> Checker<'e, 'a> {
             methods: Vec::new(),
             matches: Vec::new(),
             calls: Vec::new(),
+            cap_uses: Vec::new(),
+            entry: false,
             in_unsafe: 0,
             unresolved_reported: false,
         }
@@ -288,8 +301,17 @@ impl<'e, 'a> Checker<'e, 'a> {
     ) {
         let mut c = Checker::new(env, f.module, f.node, f.key.clone());
         c.ret = f.sig.ret.clone();
-        c.cx = LowerCx { self_ty };
+        c.cx = LowerCx {
+            self_ty,
+            lts: f.lts.clone(),
+            no_elide: false,
+        };
         c.self_kind = f.sig.self_kind;
+        // entry: hàm `main` cấp cao của một tệp (`tệp::main`), không phải thành viên impl/trait
+        c.entry = f.impl_idx.is_none()
+            && f.body.is_some()
+            && f.key.split("::").count() == 2
+            && f.key.ends_with("::main");
         let all: Vec<&GParam> = impl_gens.iter().chain(f.sig.generics.iter()).collect();
         c.scope = scope_bounds(&all);
         c.bind_params(f);
@@ -393,6 +415,42 @@ impl<'e, 'a> Checker<'e, 'a> {
 
     // ---------------- kết thúc một thân ----------------
 
+    /// `ty` có chứa `Cap<_>` ở đâu đó không?
+    fn has_cap(&self, ty: &Ty) -> bool {
+        let Some(cap) = self.lang(Lang::Cap) else {
+            return false;
+        };
+        fn go(t: &Ty, cap: DefId) -> bool {
+            match t {
+                Ty::Adt(d, args) => *d == cap || args.iter().any(|a| go(a, cap)),
+                Ty::Tuple(v) => v.iter().any(|a| go(a, cap)),
+                Ty::Array(t, _) | Ty::Slice(t) | Ty::Ref(_, t) | Ty::RawPtr(_, t) => go(t, cap),
+                Ty::Fn(p, r, _) => p.iter().any(|a| go(a, cap)) || go(r, cap),
+                _ => false,
+            }
+        }
+        go(&self.infer.resolve(ty), cap)
+    }
+
+    /// D28/D29: hàm trả `Cap<…>` mà không nhận `Cap<…>` nào là NGUỒN capability gốc; chỉ `main` được gọi nó.
+    fn check_caps(&mut self) {
+        let uses = std::mem::take(&mut self.cap_uses);
+        if self.entry {
+            return;
+        }
+        for u in uses {
+            if self.has_cap(&u.ret) && !u.params.iter().any(|p| self.has_cap(p)) {
+                let rt = self.show(&u.ret);
+                self.err(
+                    "E0310",
+                    u.node,
+                    u.span,
+                    format!("thiếu capability: lời gọi này tạo `{rt}` từ hư không (nguồn capability gốc); chỉ `main` được gọi nó — các hàm khác phải nhận `Cap<…>` qua tham số (D28, D29)"),
+                );
+            }
+        }
+    }
+
     fn finish(&mut self, _sig: &FnSigInfo) {
         // nghĩa vụ trait lần 1 (trước khi mặc định hoá), rồi mặc định hoá literal, rồi lần cuối
         self.infer.default_literals();
@@ -420,6 +478,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                 );
             }
         }
+        self.check_caps();
         // vét cạn
         let ms = std::mem::take(&mut self.matches);
         for m in ms {

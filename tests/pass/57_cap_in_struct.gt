@@ -1,0 +1,8 @@
+// expect: pass
+// note: capability làm trường struct
+▢ Ctx { fs: Cap<Fs> }
+ƒ size(c: &Ctx) → usize ! {io} { c.fs.read("x").len() }
+ƒ main() → usize ! {io} {
+  c ≔ Ctx { fs: root_fs() };
+  size(&c)
+}

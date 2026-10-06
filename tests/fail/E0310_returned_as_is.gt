@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: hàm tự trả capability gốc
+ƒ mint() → Cap<Fs> ! ∅ { root_fs() }

@@ -53,11 +53,15 @@ impl<'e, 'a> Checker<'e, 'a> {
                     args: args.clone(),
                     trait_method: None,
                 });
-                Ty::Fn(
-                    sig.params.iter().map(sub).collect(),
-                    Box::new(sub(&sig.ret)),
-                    sig.effects.clone(),
-                )
+                let ps: Vec<Ty> = sig.params.iter().map(sub).collect();
+                let rt = sub(&sig.ret);
+                self.cap_uses.push(CapUse {
+                    params: ps.clone(),
+                    ret: rt.clone(),
+                    node: e.id,
+                    span: e.span,
+                });
+                Ty::Fn(ps, Box::new(rt), sig.effects.clone())
             }
             DefKind::Const | DefKind::Static => self.env.consts.get(&d).cloned().unwrap_or(Ty::Err),
             DefKind::Variant => {
@@ -162,7 +166,14 @@ impl<'e, 'a> Checker<'e, 'a> {
                     args: targs.clone(),
                     trait_method: Some((*d, mi, self_ty.clone())),
                 });
-                return Ty::Fn(ps, Box::new(sub(&m.ret)), m.effects.clone());
+                let rt = sub(&m.ret);
+                self.cap_uses.push(CapUse {
+                    params: ps.clone(),
+                    ret: rt.clone(),
+                    node: e.id,
+                    span: e.span,
+                });
+                return Ty::Fn(ps, Box::new(rt), m.effects.clone());
             }
             Res::Generic(o, i) => Ty::Param(crate::ty::ParamId {
                 owner: *o,
@@ -206,6 +217,12 @@ impl<'e, 'a> Checker<'e, 'a> {
             None => {}
         }
         ps.extend(pick.params.iter().cloned());
+        self.cap_uses.push(CapUse {
+            params: ps.clone(),
+            ret: pick.ret.clone(),
+            node: e.id,
+            span: e.span,
+        });
         Ty::Fn(ps, Box::new(pick.ret.clone()), Vec::new())
     }
 
@@ -355,6 +372,14 @@ impl<'e, 'a> Checker<'e, 'a> {
             self.push_oblig(t.clone(), *tr, e.id, e.span);
         }
         self.record_pick(e.id, &pick);
+        let mut cap_ps = vec![pick.recv_self.clone()];
+        cap_ps.extend(pick.params.iter().cloned());
+        self.cap_uses.push(CapUse {
+            params: cap_ps,
+            ret: pick.ret.clone(),
+            node: e.id,
+            span: e.span,
+        });
         if pick.params.len() != args.len() {
             self.err(
                 "E0301",

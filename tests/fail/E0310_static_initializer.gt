@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: không có capability toàn cục: static
+■ FS: Cap<Fs> ≔ root_fs();

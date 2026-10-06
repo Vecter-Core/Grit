@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: trong thân vòng lặp
+ƒ f(c: bool) ! {io} { ⟳ c { fs ≔ root_fs(); } }

@@ -1,0 +1,4 @@
+// expect: fail E0310
+// note: phương thức tên main không phải entry
+▢ A { n: i32 }
+⊐ A { ƒ main(&self) ! {io} { fs ≔ root_fs(); } }

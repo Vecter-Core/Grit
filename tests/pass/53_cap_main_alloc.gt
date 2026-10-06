@@ -1,0 +1,6 @@
+// expect: pass
+// note: main nhận Alloc và tạo Arena
+ƒ main() ! {mem} {
+  alloc ≔ root_alloc();
+  arena ≔ alloc.arena();
+}

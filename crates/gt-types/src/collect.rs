@@ -1,4 +1,5 @@
 //! Nạp định nghĩa kiểu: ADT, trait, alias, hàm, hằng, impl; hạ kiểu AST → `Ty`; lang item (`#lang`).
+use crate::region::{self, RegionRef, RegionSig};
 use crate::ty::{ParamId, SELF_INDEX, Ty};
 use gt_ast::*;
 use gt_diag::{Applicability, Code, Diagnostic, Suggestion};
@@ -16,6 +17,8 @@ pub enum Lang {
     Range,
     Secret,
     Cap,
+    /// `Arena`: vùng nhớ; mượn `&Arena` sinh region "gốc Arena" cho M6 (E0405 khác E0404).
+    Arena,
 }
 
 impl Lang {
@@ -26,6 +29,7 @@ impl Lang {
             "range" => Lang::Range,
             "secret" => Lang::Secret,
             "cap" => Lang::Cap,
+            "arena" => Lang::Arena,
             _ => return None,
         })
     }
@@ -115,6 +119,10 @@ pub(crate) struct ItemInfo<'a> {
 #[derive(Clone, Debug, Default)]
 pub struct LowerCx {
     pub self_ty: Option<Ty>,
+    /// Lifetime đang trong phạm vi (không gồm dấu `'`); `static` luôn hợp lệ.
+    pub lts: Vec<String>,
+    /// Cấm `&T` không ghi lifetime (trường struct/enum, alias): elision chỉ có ở chữ ký hàm và thân hàm.
+    pub no_elide: bool,
 }
 
 pub(crate) struct Env<'a> {
@@ -136,6 +144,8 @@ pub(crate) struct Env<'a> {
     pub out_types: BTreeMap<NodeId, Ty>,
     pub out_locals: BTreeMap<gt_resolve::LocalId, (String, String, Ty)>,
     pub out_methods: BTreeMap<NodeId, crate::traits::MethodRes>,
+    /// Bảng region của từng chữ ký (M4.5).
+    pub region_sigs: BTreeMap<NodeId, RegionSig>,
     pub out_calls: Vec<crate::check::CallRec>,
 }
 
@@ -148,6 +158,8 @@ pub(crate) struct FnBody<'a> {
     pub module: DefId,
     /// Chỉ số trong `impls` nếu là thành viên impl.
     pub impl_idx: Option<usize>,
+    /// Lifetime trong phạm vi của thân (của impl/trait chứa và của chính hàm).
+    pub lts: Vec<String>,
     pub key: String,
 }
 
@@ -172,6 +184,7 @@ impl<'a> Env<'a> {
             out_types: BTreeMap::new(),
             out_locals: BTreeMap::new(),
             out_methods: BTreeMap::new(),
+            region_sigs: BTreeMap::new(),
             out_calls: Vec::new(),
         }
     }
@@ -317,7 +330,12 @@ impl<'a> Env<'a> {
             TypeKind::Never => Ty::Never,
             TypeKind::SelfType => self.self_of(cx, t.id, t.span),
             TypeKind::Path { path, args } => self.lower_path_ty(t, path, args, cx),
-            TypeKind::Ref { mutable, inner, .. } => {
+            TypeKind::Ref {
+                mutable,
+                inner,
+                lifetime,
+            } => {
+                self.check_lifetime(lifetime.as_ref(), cx, t);
                 Ty::Ref(*mutable, Box::new(self.lower_ty(inner, cx)))
             }
             TypeKind::RawPtr { mutable, inner } => {
@@ -359,6 +377,58 @@ impl<'a> Env<'a> {
                 Ty::Fn(p, Box::new(r), effect_names(effects))
             }
         }
+    }
+
+    /// `&'a T` phải dùng lifetime đã khai báo (hoặc `'static`); `&T` không lifetime bị cấm ở nơi `no_elide` (E0315).
+    fn check_lifetime(&mut self, lt: Option<&Lifetime>, cx: &LowerCx, t: &Type) {
+        match lt {
+            Some(l) => {
+                if l.name != "static" && !cx.lts.contains(&l.name) {
+                    self.err(
+                        "E0315",
+                        l.id,
+                        l.span,
+                        format!(
+                            "lifetime `'{}` chưa được khai báo; khai báo ở `<'{}>` của hàm/kiểu chứa nó",
+                            l.name, l.name
+                        ),
+                    );
+                }
+            }
+            None if cx.no_elide => {
+                self.err(
+                    "E0315",
+                    t.id,
+                    t.span,
+                    "tham chiếu ở đây phải ghi lifetime tường minh (`&'a T`) — elision chỉ dùng ở chữ ký hàm".to_string(),
+                );
+            }
+            None => {}
+        }
+    }
+
+    /// Lifetime khai báo trong một danh sách generics; trùng tên (kể cả che lifetime của phạm vi ngoài) là E0315.
+    pub(crate) fn lifetimes(&mut self, g: &Option<Generics>, outer: &[String]) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        let Some(g) = g else { return out };
+        for p in &g.params {
+            if let GenericParamKind::Lifetime(l) = &p.kind {
+                if out.contains(&l.name) || outer.contains(&l.name) {
+                    self.err(
+                        "E0315",
+                        l.id,
+                        l.span,
+                        format!(
+                            "lifetime `'{}` đã được khai báo (không che lifetime ngoài)",
+                            l.name
+                        ),
+                    );
+                } else {
+                    out.push(l.name.clone());
+                }
+            }
+        }
+        out
     }
 
     /// Kiểu ở vị trí không cho phép `!` (tham số kiểu, trường, phần tử): E0314.
@@ -484,7 +554,17 @@ impl<'a> Env<'a> {
                         ItemKind::TypeAlias(a2) => &a2.ty,
                         _ => &a.ty,
                     };
-                    self.lower_ty(ty_ast, &LowerCx::default())
+                    let g = match &self.items[&node].item.kind {
+                        ItemKind::TypeAlias(a2) => a2.generics.clone(),
+                        _ => None,
+                    };
+                    let lts = self.lifetimes(&g, &[]);
+                    let cx = LowerCx {
+                        self_ty: None,
+                        lts,
+                        no_elide: true,
+                    };
+                    self.lower_ty(ty_ast, &cx)
                 }
                 _ => Ty::Err,
             };
@@ -659,12 +739,18 @@ impl<'a> Env<'a> {
         let Some(&d) = self.def_by_node.get(&item.id) else {
             return;
         };
+        let lts = self.lifetimes(&s.generics, &[]);
+        let cx = LowerCx {
+            self_ty: None,
+            lts,
+            no_elide: true,
+        };
         let fields: Vec<FieldInfo> = s
             .fields
             .iter()
             .map(|f| FieldInfo {
                 name: f.name.name.clone(),
-                ty: self.elem_ty(&f.ty, &LowerCx::default(), "trường"),
+                ty: self.elem_ty(&f.ty, &cx, "trường"),
                 public: f.vis == Visibility::Public,
             })
             .collect();
@@ -677,6 +763,12 @@ impl<'a> Env<'a> {
         let Some(&d) = self.def_by_node.get(&item.id) else {
             return;
         };
+        let lts = self.lifetimes(&e.generics, &[]);
+        let cx = LowerCx {
+            self_ty: None,
+            lts,
+            no_elide: true,
+        };
         let mut vs = Vec::new();
         for v in &e.variants {
             let Some(&vd) = self.def_by_node.get(&v.id) else {
@@ -685,7 +777,7 @@ impl<'a> Env<'a> {
             let fields: Vec<Ty> = v
                 .fields
                 .iter()
-                .map(|t| self.elem_ty(t, &LowerCx::default(), "trường của biến thể"))
+                .map(|t| self.elem_ty(t, &cx, "trường của biến thể"))
                 .collect();
             vs.push(VariantInfo {
                 def: vd,
@@ -698,20 +790,78 @@ impl<'a> Env<'a> {
         }
     }
 
-    fn sig_info(&mut self, sig: &'a gt_ast::FnSig, owner: NodeId, cx: &LowerCx) -> FnSigInfo {
+    fn sig_info(&mut self, sig: &'a gt_ast::FnSig, owner: NodeId, cx0: &LowerCx) -> FnSigInfo {
         let generics = self.gparams(&sig.generics, owner);
+        let declared = self.lifetimes(&sig.generics, &cx0.lts);
+        let mut cx = cx0.clone();
+        cx.lts.extend(declared.iter().cloned());
+        let cx = &cx;
         let mut self_kind = None;
         let mut params = Vec::new();
+        let mut anon = 0u32;
+        let mut inputs: Vec<Vec<RegionRef>> = Vec::new();
         for p in &sig.params {
             match &p.kind {
-                ParamKind::SelfParam(k) => self_kind = Some(*k),
-                ParamKind::Named { ty, .. } => params.push(self.lower_ty(ty, cx)),
+                ParamKind::SelfParam(k) => {
+                    self_kind = Some(*k);
+                    // `&self`/`&!self`: một vị trí region ẩn; `self` theo giá trị: không có
+                    let mut rs = Vec::new();
+                    if *k != SelfKind::Value {
+                        rs.push(RegionRef::Anon(anon));
+                        anon += 1;
+                    }
+                    inputs.push(rs);
+                }
+                ParamKind::Named { ty, .. } => {
+                    params.push(self.lower_ty(ty, cx));
+                    let mut sl = Vec::new();
+                    region::slots(ty, &mut sl);
+                    inputs.push(sl.iter().map(|x| region::region_of(x, &mut anon)).collect());
+                }
             }
         }
         let ret = sig
             .ret
             .as_ref()
             .map_or_else(Ty::unit, |t| self.lower_ty(t, cx));
+        // elision của kiểu trả về (semantics §5): có đúng MỘT vị trí tham chiếu đầu vào thì mọi `&` ẩn ở đầu ra nhận region đó
+        let all_in: Vec<RegionRef> = inputs.iter().flatten().cloned().collect();
+        let mut output = Vec::new();
+        if let Some(rt) = &sig.ret {
+            let mut sl = Vec::new();
+            region::slots(rt, &mut sl);
+            let mut reported = false;
+            for x in &sl {
+                match x {
+                    Some(_) => output.push(region::region_of(x, &mut 0)),
+                    None if all_in.len() == 1 => output.push(all_in[0].clone()),
+                    // không có tham chiếu đầu vào: chỉ có thể trả dữ liệu `'static` (vd literal chuỗi); M6 kiểm thân hàm
+                    None if all_in.is_empty() => output.push(RegionRef::Static),
+                    None => {
+                        if !reported {
+                            reported = true;
+                            self.err(
+                                "E0315",
+                                rt.id,
+                                rt.span,
+                                format!(
+                                    "không suy ra được lifetime của kiểu trả về: có {} vị trí tham chiếu ở đầu vào (cần đúng một, hoặc không có để mặc định `'static`); ghi `'r` tường minh",
+                                    all_in.len()
+                                ),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        self.region_sigs.insert(
+            owner,
+            RegionSig {
+                declared,
+                inputs,
+                output,
+            },
+        );
         FnSigInfo {
             node: owner,
             name: sig.name.name.clone(),
@@ -729,6 +879,7 @@ impl<'a> Env<'a> {
             return;
         };
         let info = self.sig_info(&f.sig, item.id, &LowerCx::default());
+        let lts = self.region_sigs[&item.id].declared.clone();
         self.fns.insert(d, (info.clone(), module));
         let key = self.defs()[d.index()].path.clone();
         self.fn_items.push(FnBody {
@@ -738,6 +889,7 @@ impl<'a> Env<'a> {
             ast_sig: &f.sig,
             module,
             impl_idx: None,
+            lts,
             key,
         });
     }
@@ -750,13 +902,18 @@ impl<'a> Env<'a> {
             owner: item.id,
             index: SELF_INDEX,
         });
+        let tlts = self.lifetimes(&t.generics, &[]);
         let cx = LowerCx {
             self_ty: Some(self_ty),
+            lts: tlts.clone(),
+            no_elide: false,
         };
         let mut members = Vec::new();
         let tkey = self.defs()[d.index()].path.clone();
         for m in &t.members {
             let info = self.sig_info(&m.sig, m.id, &cx);
+            let mut lts = tlts.clone();
+            lts.extend(self.region_sigs[&m.id].declared.iter().cloned());
             members.push(info.clone());
             let module = self.items[&item.id].module;
             self.fn_items.push(FnBody {
@@ -766,6 +923,7 @@ impl<'a> Env<'a> {
                 ast_sig: &m.sig,
                 module,
                 impl_idx: None,
+                lts,
                 key: format!("{tkey}::{}", m.sig.name.name),
             });
         }
@@ -776,7 +934,12 @@ impl<'a> Env<'a> {
 
     fn fill_impl(&mut self, item: &'a Item, i: &'a ImplItem, module: DefId) {
         let generics = self.gparams(&i.generics, item.id);
-        let cx0 = LowerCx::default();
+        let ilts = self.lifetimes(&i.generics, &[]);
+        let cx0 = LowerCx {
+            self_ty: None,
+            lts: ilts.clone(),
+            no_elide: false,
+        };
         let self_ty = self.lower_ty(&i.self_ty, &cx0);
         let trait_ref = match &i.trait_path {
             Some(p) => match self.res.uses.get(&p.id) {
@@ -793,12 +956,16 @@ impl<'a> Env<'a> {
         };
         let cx = LowerCx {
             self_ty: Some(self_ty.clone()),
+            lts: ilts.clone(),
+            no_elide: false,
         };
         let idx = self.impls.len();
         let mut members = Vec::new();
         let ikey = format!("impl#{}", item.id.raw());
         for m in &i.members {
             let info = self.sig_info(&m.func.sig, m.id, &cx);
+            let mut lts = ilts.clone();
+            lts.extend(self.region_sigs[&m.id].declared.iter().cloned());
             members.push(info.clone());
             self.fn_items.push(FnBody {
                 sig: info,
@@ -807,6 +974,7 @@ impl<'a> Env<'a> {
                 ast_sig: &m.func.sig,
                 module,
                 impl_idx: Some(idx),
+                lts,
                 key: format!("{ikey}::{}", m.func.sig.name.name),
             });
         }

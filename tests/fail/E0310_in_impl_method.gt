@@ -1,0 +1,4 @@
+// expect: fail E0310
+// note: trong phương thức impl
+▢ A { n: i32 }
+⊐ A { ƒ go(&self) → usize ! {io} { root_fs().read("a").len() } }

@@ -109,7 +109,7 @@ MIR(CFG)  [7] Hạ xuống MIR: basic block, place, borrow, drop
 
 ### 3.3 Cơ sở tin cậy (TCB) — thứ ta _buộc_ phải tin
 
-Phase 1: (1) mã gritc0, (2) `rustc` + thư viện chuẩn Rust, (3) LLVM, (4) linker, (5) OS/phần cứng, (6) các `intrinsic` trong `lib/core` (được đánh dấu `trusted`, mỗi cái kèm lý do và được người duyệt).
+Phase 1: (1) mã gritc0, (2) `rustc` + thư viện chuẩn Rust, (3) LLVM, (4) linker, (5) OS/phần cứng, (6) các `intrinsic` trong `lib/core` (được đánh dấu `trusted`, mỗi cái kèm lý do và được người duyệt), (6b) danh sách **lang item** `#lang(…)` mà compiler gán ý nghĩa đặc biệt và chỉ lib/core được khai báo: `option`, `copy`, `range`, `secret`, `cap`, `arena` (ADR-018, ADR-019; mỗi mục mới cần Giang duyệt).
 Phase 2 thêm/đổi: (7) SMT solver (giảm dần khi có Kernel), (8) Kernel kiểm bằng chứng. **Mục tiêu dài hạn: thu nhỏ TCB, không phải làm nó biến mất.**
 
 ---

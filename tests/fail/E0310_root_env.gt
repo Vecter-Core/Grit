@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: nguồn capability gốc Env ngoài main
+ƒ f() → usize ! {io} { root_env().var("HOME") }

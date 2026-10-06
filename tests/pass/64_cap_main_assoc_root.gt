@@ -1,0 +1,6 @@
+// expect: pass
+// note: main gọi hàm kết hợp sinh capability gốc
+ƒ main() → usize ! {io} {
+  fs ≔ Host::fs();
+  fs.read("a").len()
+}

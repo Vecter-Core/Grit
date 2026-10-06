@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: trong tuple
+ƒ f() ! {io} { t ≔ (root_fs(), 1); }

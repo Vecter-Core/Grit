@@ -1,0 +1,4 @@
+// expect: fail E0310
+// note: làm đối số của hàm hợp lệ
+ƒ use_fs(fs: &Cap<Fs>) → usize ! {io} { fs.read("a").len() }
+ƒ f() → usize ! {io} { use_fs(&root_fs()) }

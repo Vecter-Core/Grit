@@ -19,14 +19,31 @@ pub const PRELUDE_SRC: &str = "\
 ▢ Cap<T> { v: T }
 ▢ Fs { x: i32 }
 ▢ Net { x: i32 }
+▢ Env { x: i32 }
+▢ Clock { x: i32 }
+▢ Alloc { x: i32 }
+▢ Host { x: i32 }
+#lang(arena)
 ▢ Arena { x: i32 }
 ▢ File { x: i32 }
 ⊐ <T> [T] { ƒ len(&self) → usize ! ∅ { } }
 ⊐ File { ƒ len(&self) → usize ! ∅ { } }
-⊐ Cap<Fs> { ƒ read(&self, p: &str) → File ! {io} { } }
+⊐ Cap<Fs> {
+  ƒ read(&self, p: &str) → File ! {io} { }
+  ƒ sub(&self, p: &str) → Cap<Fs> ! {io} { }
+}
+⊐ Cap<Net> { ƒ connect(&self, h: &str) → File ! {io} { } }
+⊐ Cap<Env> { ƒ var(&self, n: &str) → usize ! {io} { } }
+⊐ Cap<Clock> { ƒ now(&self) → u64 ! {io} { } }
+⊐ Cap<Alloc> { ƒ arena(&self) → Arena ! {mem} { } }
+⊐ Host { ƒ fs() → Cap<Fs> ! {io} { } }
 ⊐ Arena { ƒ new() → Arena ! {mem} { } ƒ alloc<T>(&self, v: T) → &T ! {mem} { } }
 ▦ core { ◈ ƒ abort(msg: &str) → ! ! {div} { } }
 ƒ root_fs() → Cap<Fs> ! ∅ { }
+ƒ root_net() → Cap<Net> ! ∅ { }
+ƒ root_env() → Cap<Env> ! ∅ { }
+ƒ root_clock() → Cap<Clock> ! ∅ { }
+ƒ root_alloc() → Cap<Alloc> ! ∅ { }
 ƒ raw_read(p: usize) → i32 ! ∅ { }
 ";
 

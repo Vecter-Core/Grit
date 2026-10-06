@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: chia nhỏ hợp lệ nhưng gốc sai chỗ
+ƒ f() → usize ! {io} { root_fs().sub("d").read("x").len() }

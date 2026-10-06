@@ -1,0 +1,4 @@
+// expect: pass
+// note: struct có lifetime khai báo, trường ghi lifetime
+▢ Holder<'a> { r: &'a i32 }
+ƒ get(h: &Holder) → i32 ! ∅ { *h.r }

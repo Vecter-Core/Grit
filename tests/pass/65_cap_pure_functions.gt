@@ -1,0 +1,4 @@
+// expect: pass
+// note: hàm thuần không đụng capability
+ƒ add(a: i32, b: i32) → i32 ! ∅ { a +% b }
+ƒ twice(a: i32) → i32 ! ∅ { add(a, a) }

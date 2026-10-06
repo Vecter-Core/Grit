@@ -1,0 +1,4 @@
+// expect: pass
+// note: hàm generic chuyển tiếp capability nhận từ tham số
+ƒ pass<T>(x: T) → T ! ∅ { x }
+ƒ g(fs: Cap<Fs>) → Cap<Fs> ! ∅ { pass(fs) }

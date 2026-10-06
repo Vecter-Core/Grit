@@ -1,0 +1,7 @@
+// expect: pass
+// note: Arena cục bộ (vùng nhớ của hàm) không cần capability
+ƒ f() → i32 ! {mem} {
+  a ≔ Arena::new();
+  p ≔ a.alloc(1);
+  *p +% 1
+}

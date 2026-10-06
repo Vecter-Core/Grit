@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: trong hàm generic
+ƒ g<T>(x: T) → usize ! {io} { root_fs().read("a").len() }

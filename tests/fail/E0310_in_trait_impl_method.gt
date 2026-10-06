@@ -1,0 +1,5 @@
+// expect: fail E0310
+// note: trong phương thức của ⊐ Trait for
+⊏ T { ƒ go(&self) → usize ! {io}; }
+▢ A { n: i32 }
+⊐ T for A { ƒ go(&self) → usize ! {io} { root_fs().read("a").len() } }

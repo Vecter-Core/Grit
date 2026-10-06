@@ -1,0 +1,6 @@
+// expect: pass
+// note: main nhận Net từ nguồn gốc
+ƒ main() → usize ! {io} {
+  net ≔ root_net();
+  net.connect("host").len()
+}

@@ -195,3 +195,28 @@ Cập nhật: 2026-10-06. ADR-018 đã duyệt (mono lazy, `ImplTable`, `!`); m�
 - **Điều kiện cứng (Giang):** M9 không xong và `gritc` không sinh binary nếu E0601 (M7) / E0307 (M5) chưa có — GRIT_PLAN.md mục 7 điểm 9, KNOWN_LIMITATIONS.md.
 - Cổng chạy LẠI ngay trước commit: fmt sạch; clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (54 mã/118 tham chiếu); `cargo test --workspace` 343 passed, 0 failed.
 - Tiếp theo: M4.5 (Arena/region, E0310, ≥20 fail + ≥20 pass), rồi M5.
+
+## M4.5 — Kiểu vùng nhớ & kiểu capability — **HOÀN THÀNH** (Giang duyệt Q24 a–e, 2026-10-06; Q24f chưa trả lời)
+Cập nhật: 2026-10-06. Không đột biến (đúng chính sách).
+
+### Đã làm (có thật, có test)
+- **E0310 (D28/D29):** luật NGUỒN GỐC theo kiểu đã giải — hàm trả kiểu chứa `Cap<…>` mà không nhận `Cap<…>` chỉ `main` cấp cao được gọi/nhắc tới; mọi nơi khác (hàm, phương thức, trait impl, generic, nhánh/vòng lặp, `□`/`■`) là E0310. Hook ở 4 chỗ (tham chiếu hàm, hàm kết hợp trait, hàm kết hợp impl, lời gọi phương thức), kiểm ở `finish` sau suy luận.
+- **E0315 (mã MỚI):** lifetime ở chữ ký: chưa khai báo / khai báo trùng hoặc che / trường struct-enum không ghi lifetime / elision mơ hồ ở kiểu trả về (đúng một vị trí tham chiếu vào, hoặc không có ⇒ `'static`).
+- **`RegionSig`** (`TypesOutput.regions`) cho mọi chữ ký (kể cả prelude); **`Lang::Arena`** (`#lang(arena)`; ngoài prelude là E1002).
+- Fixture prelude: thêm `Env/Clock/Alloc/Host`, `Cap<Fs>::sub`, `Cap<Net|Env|Clock|Alloc>` + thao tác, `root_net/env/clock/alloc`, `Host::fs()` (cả fixture của gt-resolve).
+- Tài liệu: `docs/errors/E0310.md`, `E0315.md`; `docs/spec/regions.md` (mô hình region + hợp đồng cho M6); ADR-019; semantics §5/§6; error_codes (E0315 mới); KNOWN_LIMITATIONS; Q24.
+
+### Tiêu chí hoàn thành (plan)
+- ≥20 ca thiếu capability bị chặn đúng mã: **25 mẫu fail E0310** (1 có sẵn + 24 mới) + 11 test biên trong `capabilities.rs`.
+- ≥20 ca có capability hợp lệ qua: **26 mẫu pass mới** (+ 16_cap_fs, 17_secret_type, 42_cap_pass_through, 15_arena_region cũ).
+- E0315: **9 mẫu fail**, 7 mẫu pass được tham chiếu; 14 test trong `regions.rs` (mọi vị trí kiểu lồng nhau được duyệt).
+- Bản nháp ngữ nghĩa region sẵn sàng cho M6: `docs/spec/regions.md`.
+
+### Cổng chạy lại (2026-10-06, kết quả thật)
+- `cargo fmt --check` sạch; `cargo clippy --workspace --all-targets -- -D warnings` sạch; `cargo audit` exit 0; `check_expectations.py` OK (251 file .gt: fail=149, pass=75; 55 mã, 152 tham chiếu); `cargo test --workspace`: **368 passed, 0 failed**.
+- Dung lượng sau dọn: `target/` 394 MB (đã xoá `debug/incremental` 84 MB, không dùng — build đặt `CARGO_INCREMENTAL=0`), `.git/` 1.1 MB; xoá `crates/gt-lexer/fuzz/target` (101 MB) và `crates/gt-parser/fuzz/target` (111 MB) vì chỉ là build ASan cũ, sinh lại được; giữ corpus fuzz (25 MB + 15 MB, ngoài git).
+
+- **Chạy LẠI ngay trước commit M4.5** (sau khi ghi quyết định Q24): fmt sạch; clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (251 file .gt; 55 mã; 152 tham chiếu); `cargo test --workspace` 368 passed, 0 failed.
+
+### Hạn chế / chờ xác nhận
+- Thân hàm chưa kiểm gì về region (trả tham chiếu local, Arena thoát: qua cho tới M6). Không có `Holder<'a>`/`'a: 'b` trong ngữ pháp (Q24e). Chi tiết KNOWN_LIMITATIONS.

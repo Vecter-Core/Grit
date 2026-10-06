@@ -1,0 +1,4 @@
+// expect: fail E0310
+// note: main hợp lệ nhưng hàm phụ không
+ƒ helper() → usize ! {io} { root_fs().read("a").len() }
+ƒ main() → usize ! {io} { helper() }

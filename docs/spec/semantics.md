@@ -50,12 +50,12 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 - `&T` nhiều lượt cùng lúc; `&!T` duy nhất, loại trừ mọi `&`/`&!` khác còn sống (NLL: sống theo lần
   dùng cuối) → E0402/E0403. Trả tham chiếu tới local → E0404. Gán khi đang bị mượn → E0406.
 - `Arena` là một region có tên `'r`; tham chiếu `&'r T` không được thoát khỏi phạm vi của arena → E0405.
-- **[ĐỀ XUẤT]** Elision lifetime: chỉ cho trường hợp một tham số tham chiếu duy nhất; còn lại phải ghi `'r`.
+- Elision lifetime (đã cài ở M4.5, E0315): chỉ khi chữ ký có đúng một vị trí tham chiếu vào; không có thì `'static`; còn lại phải ghi `'r`. Mô hình region đầy đủ và hợp đồng cho M6: `docs/spec/regions.md`.
 
 ## 6. Capability (D28/D29, M4.5)
 - `Cap<Fs|Net|Env|Clock|Secret|Alloc>` là kiểu affine: không `Copy`, không `Default`, không có literal.
 - Hàm dùng thao tác cần capability mà `Cap<…>` không có trong chữ ký → E0310 (lỗi kiểu).
-- Chỉ `entry` nhận capability gốc từ runtime; chia nhỏ qua hàm tạo trong `lib/core` (intrinsic `trusted`).
+- Chỉ `main` (hàm cấp cao `main` của một tệp) được gọi NGUỒN capability gốc (hàm trả `Cap<…>` mà không nhận `Cap<…>`, vd `root_fs()`); chia nhỏ qua hàm nhận `&Cap<…>` trong `lib/core` (intrinsic `trusted`). Mọi nơi khác gọi nguồn gốc → E0310 (ADR-019).
 
 ## 7. Secret (D13, M9)
 - `Secret<T>`: không `Display`, không vào sink log/mạng/tệp. `declassify` đọc cần `Cap<Secret>` và

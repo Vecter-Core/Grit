@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: hai nguồn gốc → hai lỗi
+ƒ f() ! {io} { a ≔ root_fs(); b ≔ root_net(); }

@@ -1,0 +1,3 @@
+// expect: fail E0310
+// note: hàm kết hợp sinh capability gốc
+ƒ f() ! {io} { fs ≔ Host::fs(); }

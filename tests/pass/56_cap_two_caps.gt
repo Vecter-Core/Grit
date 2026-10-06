@@ -1,0 +1,3 @@
+// expect: pass
+// note: hai capability trong một chữ ký
+ƒ copy_len(fs: &Cap<Fs>, net: &Cap<Net>) → usize ! {io} { fs.read("a").len() + net.connect("h").len() }
