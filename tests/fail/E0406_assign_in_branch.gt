@@ -1,0 +1,27 @@
+// expect: fail E0406
+// note: gán trong nhánh khi ref còn dùng
+// group: G6
+▢ B { v: i32 }
+▢ W { b: B, n: i32 }
+▢ Hm<'a> { r: &!'a i32 }
+▢ Hs<'a> { r: &'a i32 }
+ƒ eat(b: B) ! ∅ { }
+ƒ eatw(w: W) ! ∅ { }
+ƒ chk(b: B) → bool ! ∅ { true }
+ƒ peek(b: &B) → i32 ! ∅ { b.v }
+ƒ bump(b: &!B) ! ∅ { b.v ← b.v +% 1; }
+ƒ mk() → B ! ∅ { B { v: 0 } }
+ƒ mkw() → W ! ∅ { W { b: B { v: 0 }, n: 0 } }
+ƒ two(a: &!i32, b: &!i32) ! ∅ { *a ← 1; *b ← 2; }
+ƒ mix(a: &i32, b: &!i32) ! ∅ { *b ← *a; }
+ƒ id<T>(x: T) → T ! ∅ { x }
+ƒ idr<'a>(x: &'a i32) → &'a i32 ! ∅ { x }
+ƒ first(a: &[i32]) → &i32 ! ∅ { &a[0] }
+ƒ use_i(x: i32) ! ∅ { }
+⊐ B {
+  ƒ take(self) ! ∅ { }
+  ƒ get(&self) → i32 ! ∅ { self.v }
+  ƒ refv(&self) → &i32 ! ∅ { &self.v }
+  ƒ inc(&!self) ! ∅ { self.v ← self.v +% 1; }
+}
+ƒ f(c: bool) → i32 ! ∅ { μx ≔ 1; r ≔ &x; ⎇ c { x ← 2; } *r }

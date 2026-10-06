@@ -33,6 +33,7 @@ DOC_REQUIRED = [
     "E0101", "E0102", "E0201", "E0202", "E0203", "E0204", "E0205",
     "E0301", "E0302", "E0303", "E0304", "E0305", "E0307", "E0308", "E0309",
     "E0310", "E0311", "E0312", "E0313", "E0314", "E0315", "E1002",
+    "E0401", "E0402", "E0403", "E0404", "E0405", "E0406", "E0407",
 ]
 DOC_LINE_RE = re.compile(r"^- (fail|pass): (\S+)\s*$")
 
@@ -272,11 +273,21 @@ def main():
             err(f"error_codes.md: {code} tham chiếu '{ref}' nhưng tests/{sub}/{base}.gt không tồn tại")
         elif sub != "pass" and not base.startswith(code + "_"):
             err(f"error_codes.md: {code} tham chiếu '{ref}' không khớp tiền tố mã")
-    # file fail/warn không được mồ côi (mọi mẫu phải được liệt kê trong bảng)
+    # file fail/warn không được mồ côi: liệt kê trong bảng, hoặc (cho mã có docs/errors, corpus lớn như M6) trong
+    # docs/errors/<mã>.md với dòng `- fail: fail/<tên>` — bảng không chứa nổi hàng trăm mẫu
+    documented = set()
+    for code in DOC_REQUIRED:
+        path = os.path.join(ROOT, "docs", "errors", code + ".md")
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8") as f:
+                for ln in f.read().split("\n"):
+                    m = DOC_LINE_RE.match(ln)
+                    if m and m.group(1) == "fail" and m.group(2).startswith("fail/"):
+                        documented.add(("fail", m.group(2)[5:]))
     for sub in ("fail", "warn"):
         for base in sorted(seen_files[sub]):
-            if (sub, base) not in cited:
-                err(f"tests/{sub}/{base}.gt không được liệt kê trong error_codes.md")
+            if (sub, base) not in cited and (sub, base) not in documented:
+                err(f"tests/{sub}/{base}.gt không được liệt kê trong error_codes.md (hay docs/errors/<mã>.md)")
 
     # tên file không được trùng khi bỏ phân biệt hoa/thường (Windows/macOS sẽ ghi đè lẫn nhau)
     for kind in DIR_KIND:

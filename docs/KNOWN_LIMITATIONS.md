@@ -109,3 +109,9 @@
 - **Thông dịch MIR (test) chỉ phủ** số nguyên, bool, rẽ nhánh, vòng lặp, gọi hàm, struct/tuple/enum, tham chiếu; không số thực, không lời gọi qua trait, không prelude ngoài `core::abort`. Nó và bộ sinh chương trình là công cụ test, không thuộc TCB.
 - **`→ !` thật sự phân kỳ** chỉ kiểm được trên CFG dựng tay (M4 đã chặn mọi nguồn có thể kích hoạt).
 
+
+## Môi trường build trên Windows (để phiên sau không gặp lại)
+- **Ổ C: có thể hết chỗ** (đã gặp: 0 byte trống) ⇒ `link.exe` lỗi `LNK1104`/`LNK1108`, và cả công cụ shell báo `No space left on device`. `link.exe` và rustc ghi tệp tạm vào `%TEMP%`. Cách làm đã chốt: đặt `TEMP`/`TMP`/`TMPDIR` về `D:\Grit\target\tmp` (thư mục này nằm trong `target/`, đã bị `.gitignore`). `t.sh` (chạy `cargo test` có thử lại khi `LNK1104/LNK1108/1455`) và `tools/gate.sh` (cổng đầy đủ) đều làm việc đó sẵn — luôn chạy cargo qua hai script này.
+- Kèm `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1` (Windows hết commit bộ nhớ khi build song song). Không chạy hai `cargo` cùng lúc (tranh chấp khoá `target/` và bộ nhớ).
+- Khi C: đầy mà shell không chạy được: giải phóng chỗ ở `%TEMP%` (thư mục cài đặt .NET/VS cũ). 2026-10-06 đã xoá `%TEMP%\meaphhtb` (4,2 GB, 16 ngày tuổi, là tệp tạm của cài đặt workload .NET — sinh lại được).
+- Python in tiếng Việt ra ống/tệp cần `PYTHONIOENCODING=utf-8` (mặc định cp1252 làm script chết giữa chừng); không dùng `\` trong chuỗi Python gửi qua heredoc shell (xem `env-gotchas`).

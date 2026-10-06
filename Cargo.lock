@@ -10,6 +10,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "gt-borrowck"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-dataflow",
+ "gt-diag",
+ "gt-mir",
+ "gt-parser",
+ "gt-resolve",
+ "gt-span",
+ "gt-stack",
+ "gt-types",
+]
+
+[[package]]
 name = "gt-dataflow"
 version = "0.1.0"
 dependencies = [

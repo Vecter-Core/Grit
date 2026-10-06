@@ -131,6 +131,8 @@ pub struct LowerCx {
     pub lts: Vec<String>,
     /// Cấm `&T` không ghi lifetime (trường struct/enum, alias): elision chỉ có ở chữ ký hàm và thân hàm.
     pub no_elide: bool,
+    /// Các vị trí region của kiểu `Self` của impl (theo header `⊐ Holder<'a>`); rỗng ngoài impl.
+    pub self_slots: Vec<Option<String>>,
 }
 
 pub(crate) struct Env<'a> {
@@ -621,6 +623,7 @@ impl<'a> Env<'a> {
                         self_ty: None,
                         lts,
                         no_elide: true,
+                        self_slots: Vec::new(),
                     };
                     self.lower_ty(ty_ast, &cx)
                 }
@@ -806,6 +809,7 @@ impl<'a> Env<'a> {
             self_ty: None,
             lts,
             no_elide: true,
+            self_slots: Vec::new(),
         };
         let fields: Vec<FieldInfo> = s
             .fields
@@ -830,6 +834,7 @@ impl<'a> Env<'a> {
             self_ty: None,
             lts,
             no_elide: true,
+            self_slots: Vec::new(),
         };
         let mut vs = Vec::new();
         for v in &e.variants {
@@ -862,23 +867,59 @@ impl<'a> Env<'a> {
         let mut params = Vec::new();
         let mut anon = 0u32;
         let mut inputs: Vec<Vec<RegionRef>> = Vec::new();
+        let mut input_self: Vec<Vec<bool>> = Vec::new();
+        // vị trí đầu vào dùng cho elision (không tính vị trí đến từ `Self`)
+        let mut elide_in: Vec<RegionRef> = Vec::new();
+        // các vị trí của kiểu `Self` (impl) — mọi chỗ `Self` trong chữ ký dùng CHUNG các region này
+        let self_refs: Vec<RegionRef> = cx
+            .self_slots
+            .iter()
+            .map(|s| region::region_of(s, &mut anon))
+            .collect();
+        let mut self_i = 0usize;
         for p in &sig.params {
             match &p.kind {
                 ParamKind::SelfParam(k) => {
                     self_kind = Some(*k);
-                    // `&self`/`&!self`: một vị trí region ẩn; `self` theo giá trị: không có
+                    // `&self`/`&!self`: một vị trí region ẩn (đếm cho elision); rồi các vị trí của kiểu `Self` của impl
                     let mut rs = Vec::new();
+                    let mut fs = Vec::new();
                     if *k != SelfKind::Value {
-                        rs.push(RegionRef::Anon(anon));
+                        let r = RegionRef::Anon(anon);
                         anon += 1;
+                        elide_in.push(r.clone());
+                        rs.push(r);
+                        fs.push(false);
+                    }
+                    for r in &self_refs {
+                        rs.push(r.clone());
+                        fs.push(true);
                     }
                     inputs.push(rs);
+                    input_self.push(fs);
                 }
                 ParamKind::Named { ty, .. } => {
                     params.push(self.lower_ty(ty, cx));
                     let mut sl = Vec::new();
-                    region::slots(ty, &mut sl, &|p| self.lt_count_of(p));
-                    inputs.push(sl.iter().map(|x| region::region_of(x, &mut anon)).collect());
+                    region::slots(ty, &mut sl, &|p| self.lt_count_of(p), &cx.self_slots);
+                    let mut rs = Vec::new();
+                    let mut fs = Vec::new();
+                    for (name, from_self) in &sl {
+                        let r = if *from_self && !self_refs.is_empty() {
+                            let r = self_refs[self_i % self_refs.len()].clone();
+                            self_i += 1;
+                            r
+                        } else {
+                            region::region_of(name, &mut anon)
+                        };
+                        if !from_self {
+                            elide_in.push(r.clone());
+                        }
+                        rs.push(r);
+                        fs.push(*from_self);
+                    }
+                    inputs.push(rs);
+                    input_self.push(fs);
                 }
             }
         }
@@ -887,13 +928,22 @@ impl<'a> Env<'a> {
             .as_ref()
             .map_or_else(Ty::unit, |t| self.lower_ty(t, cx));
         // elision của kiểu trả về (semantics §5): có đúng MỘT vị trí tham chiếu đầu vào thì mọi `&` ẩn ở đầu ra nhận region đó
-        let all_in: Vec<RegionRef> = inputs.iter().flatten().cloned().collect();
+        let all_in = elide_in;
         let mut output = Vec::new();
+        let mut output_self: Vec<bool> = Vec::new();
         if let Some(rt) = &sig.ret {
             let mut sl = Vec::new();
-            region::slots(rt, &mut sl, &|p| self.lt_count_of(p));
+            region::slots(rt, &mut sl, &|p| self.lt_count_of(p), &cx.self_slots);
             let mut reported = false;
-            for x in &sl {
+            let mut out_self_i = 0usize;
+            for (x, from_self) in &sl {
+                if *from_self && !self_refs.is_empty() {
+                    output.push(self_refs[out_self_i % self_refs.len()].clone());
+                    output_self.push(true);
+                    out_self_i += 1;
+                    continue;
+                }
+                output_self.push(false);
                 match x {
                     Some(_) => output.push(region::region_of(x, &mut 0)),
                     None if all_in.len() == 1 => output.push(all_in[0].clone()),
@@ -922,6 +972,8 @@ impl<'a> Env<'a> {
                 declared,
                 inputs,
                 output,
+                input_self,
+                output_self,
             },
         );
         FnSigInfo {
@@ -969,6 +1021,7 @@ impl<'a> Env<'a> {
             self_ty: Some(self_ty),
             lts: tlts.clone(),
             no_elide: false,
+            self_slots: Vec::new(),
         };
         let mut members = Vec::new();
         let tkey = self.defs()[d.index()].path.clone();
@@ -1001,6 +1054,7 @@ impl<'a> Env<'a> {
             self_ty: None,
             lts: ilts.clone(),
             no_elide: false,
+            self_slots: Vec::new(),
         };
         let self_ty = self.lower_ty(&i.self_ty, &cx0);
         let trait_ref = match &i.trait_path {
@@ -1016,10 +1070,13 @@ impl<'a> Env<'a> {
             },
             None => None,
         };
+        let mut self_sl: Vec<region::Slot> = Vec::new();
+        region::slots(&i.self_ty, &mut self_sl, &|p| self.lt_count_of(p), &[]);
         let cx = LowerCx {
             self_ty: Some(self_ty.clone()),
             lts: ilts.clone(),
             no_elide: false,
+            self_slots: self_sl.into_iter().map(|(n, _)| n).collect(),
         };
         let idx = self.db.impls.len();
         let mut members = Vec::new();

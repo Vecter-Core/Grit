@@ -22,7 +22,7 @@ pub use mono::{Instance, MAX_INSTANCE_DEPTH};
 pub use region::{RegionRef, RegionSig};
 pub use traits::Bound;
 pub use traits::MethodRes;
-pub use ty::{FloatTy, IntTy, ParamId, Ty};
+pub use ty::{FloatTy, IntTy, ParamId, SELF_INDEX, Ty};
 
 use collect::{Env, ItemInfo};
 use gt_ast::{ItemKind, NodeId};

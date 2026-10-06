@@ -347,6 +347,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             self_ty,
             lts: f.lts.clone(),
             no_elide: false,
+            self_slots: Vec::new(),
         };
         c.self_kind = f.sig.self_kind;
         // entry: hàm `main` cấp cao của một tệp (`tệp::main`), không phải thành viên impl/trait

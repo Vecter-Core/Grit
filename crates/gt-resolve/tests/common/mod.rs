@@ -10,6 +10,8 @@ pub const PRELUDE_SRC: &str = "\
 ⊏ Drop { }
 ▢ Buf { n: i32 }
 ƒ mk_buf() → Buf ! ∅ { }
+▢ Guard { ◈ inner: Buf, ◈ n: i32 }
+ƒ mk_guard() → Guard ! ∅ { }
 ▢ Secret<T> { v: T }
 ▢ Cap<T> { v: T }
 ▢ Fs { x: i32 }

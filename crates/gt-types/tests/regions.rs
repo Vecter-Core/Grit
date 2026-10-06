@@ -255,3 +255,67 @@ fn elided_lifetime_arguments_count_as_input_positions() {
     assert_eq!(s.inputs, vec![vec![n("a"), n("b"), n("a")]]);
     assert_eq!(s.output, vec![n("b"), n("a")]);
 }
+
+#[test]
+fn the_self_type_of_an_impl_contributes_region_positions_that_elision_does_not_count() {
+    let src = "▢ H<'a> { r: &'a i32 } ⊐ <'a> H<'a> { ƒ get(&self) → &'a i32 ! ∅ { self.r } ƒ me(self) → Self ! ∅ { self } ƒ first(&self) → &i32 ! ∅ { &1 } }";
+    let out = one(src);
+    let get = out
+        .fn_keys
+        .iter()
+        .find(|(_, k)| k.ends_with("::get"))
+        .map(|(n, _)| *n)
+        .expect("get");
+    let s = &out.regions[&get];
+    assert_eq!(s.inputs, vec![vec![RegionRef::Anon(0), n("a")]]);
+    assert_eq!(s.input_self, vec![vec![false, true]]);
+    assert_eq!(s.output, vec![n("a")]);
+    let me = out
+        .fn_keys
+        .iter()
+        .find(|(_, k)| k.ends_with("::me"))
+        .map(|(n, _)| *n)
+        .expect("me");
+    let s = &out.regions[&me];
+    assert_eq!(s.inputs, vec![vec![n("a")]]);
+    assert_eq!(s.output, vec![n("a")]);
+    assert_eq!(s.output_self, vec![true]);
+    // `first(&self) → &i32`: elision chỉ đếm `&self` (một vị trí) — KHÔNG đếm `'a` của Self
+    let first = out
+        .fn_keys
+        .iter()
+        .find(|(_, k)| k.ends_with("::first"))
+        .map(|(n, _)| *n)
+        .expect("first");
+    assert_eq!(out.regions[&first].output, vec![RegionRef::Anon(0)]);
+}
+
+#[test]
+fn trait_impl_may_not_promise_less_about_lifetimes_than_the_trait_e0311() {
+    let t = "⊏ T { ƒ pick<'b, 'c>(&self, y: &'b i32, z: &'c i32) → &'b i32 ! ∅; } ▢ S { n: i32 } ";
+    ok(&format!(
+        "{t}⊐ T for S {{ ƒ pick<'b, 'c>(&self, y: &'b i32, z: &'c i32) → &'b i32 ! ∅ {{ y }} }}"
+    ));
+    // impl hứa kết quả gắn với `z` thay vì `y`: người gọi qua trait tin chữ ký trait ⇒ không được
+    err(
+        &format!(
+            "{t}⊐ T for S {{ ƒ pick<'b, 'c>(&self, y: &'b i32, z: &'c i32) → &'c i32 ! ∅ {{ z }} }}"
+        ),
+        "E0311",
+        1,
+    );
+    // đổi tên lifetime nhưng cùng quan hệ: được
+    ok(&format!(
+        "{t}⊐ T for S {{ ƒ pick<'p, 'q>(&self, y: &'p i32, z: &'q i32) → &'p i32 ! ∅ {{ y }} }}"
+    ));
+    // impl hứa NHIỀU hơn (kết quả 'static) thì được
+    ok(&format!(
+        "{t}⊐ T for S {{ ƒ pick<'b, 'c>(&self, y: &'b i32, z: &'c i32) → &'static i32 ! ∅ {{ core::abort(\"n\") }} }}"
+    ));
+    // ngược lại: trait hứa 'static, impl chỉ hứa gắn với self ⇒ lỗi
+    err(
+        "⊏ U { ƒ k(&self) → &'static i32 ! ∅; } ▢ S { n: i32 } ⊐ U for S { ƒ k(&self) → &i32 ! ∅ { &self.n } }",
+        "E0311",
+        1,
+    );
+}

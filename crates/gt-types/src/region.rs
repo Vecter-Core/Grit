@@ -22,18 +22,35 @@ pub struct RegionSig {
     pub inputs: Vec<Vec<RegionRef>>,
     /// Các vị trí region của kiểu trả về, theo thứ tự duyệt trước; vị trí ẩn đã được gán theo luật elision.
     pub output: Vec<RegionRef>,
+    /// Song song với `inputs`: vị trí đó đến từ kiểu của impl (`Self` trong `⊐ Holder<'a>`) chứ không phải do chữ ký tự ghi.
+    /// M6 dùng để so chữ ký impl với trait (không tính vị trí của `Self`); luật elision cũng không đếm chúng.
+    pub input_self: Vec<Vec<bool>>,
+    /// Song song với `output`: vị trí đến từ `Self`.
+    pub output_self: Vec<bool>,
 }
+
+/// Một vị trí region: tên (nếu ghi) và có đến từ `Self` không.
+pub(crate) type Slot = (Option<String>, bool);
 
 /// Mọi vị trí region trong một kiểu (theo thứ tự duyệt trước): mỗi `&…`, rồi mỗi tham số lifetime của kiểu đường dẫn
 /// (`Holder<'a>` — ADR-021; bỏ trống thì mỗi tham số là một vị trí ẩn). `Some(tên)` nếu ghi lifetime, `None` nếu ẩn.
-/// `lt_count` cho biết kiểu đường dẫn có bao nhiêu tham số lifetime. Không đi vào kiểu hàm `ƒ(…)`: nó có phạm vi elision riêng.
-pub(crate) fn slots(t: &Type, out: &mut Vec<Option<String>>, lt_count: &dyn Fn(&Path) -> usize) {
+/// `lt_count` cho biết kiểu đường dẫn có bao nhiêu tham số lifetime; `self_slots` là các vị trí của kiểu `Self` (impl).
+/// Không đi vào kiểu hàm `ƒ(…)`: nó có phạm vi elision riêng.
+pub(crate) fn slots(
+    t: &Type,
+    out: &mut Vec<Slot>,
+    lt_count: &dyn Fn(&Path) -> usize,
+    self_slots: &[Option<String>],
+) {
     match &t.kind {
+        TypeKind::SelfType => {
+            out.extend(self_slots.iter().map(|s| (s.clone(), true)));
+        }
         TypeKind::Ref {
             lifetime, inner, ..
         } => {
-            out.push(lifetime.as_ref().map(|l| l.name.clone()));
-            slots(inner, out, lt_count);
+            out.push((lifetime.as_ref().map(|l| l.name.clone()), false));
+            slots(inner, out, lt_count, self_slots);
         }
         TypeKind::Path {
             path,
@@ -41,19 +58,21 @@ pub(crate) fn slots(t: &Type, out: &mut Vec<Option<String>>, lt_count: &dyn Fn(&
             args,
         } => {
             if lifetimes.is_empty() {
-                out.extend(std::iter::repeat_n(None, lt_count(path)));
+                out.extend(std::iter::repeat_n((None, false), lt_count(path)));
             } else {
-                out.extend(lifetimes.iter().map(|l| Some(l.name.clone())));
+                out.extend(lifetimes.iter().map(|l| (Some(l.name.clone()), false)));
             }
             for a in args {
-                slots(a, out, lt_count);
+                slots(a, out, lt_count, self_slots);
             }
         }
-        TypeKind::Array { elem, .. } => slots(elem, out, lt_count),
-        TypeKind::Slice(inner) | TypeKind::RawPtr { inner, .. } => slots(inner, out, lt_count),
+        TypeKind::Array { elem, .. } => slots(elem, out, lt_count, self_slots),
+        TypeKind::Slice(inner) | TypeKind::RawPtr { inner, .. } => {
+            slots(inner, out, lt_count, self_slots);
+        }
         TypeKind::Tuple(v) => {
             for a in v {
-                slots(a, out, lt_count);
+                slots(a, out, lt_count, self_slots);
             }
         }
         _ => {}

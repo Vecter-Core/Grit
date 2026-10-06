@@ -251,10 +251,55 @@ Theo thứ tự lệnh: định nghĩa MIR + in text → bước hạ → valida
 - ADR-022 (9 điểm), quan trọng nhất: `#lang(range_inclusive)` (sửa lỗi M4) và biến tạm của đuôi khối. Chi tiết KNOWN_LIMITATIONS (gt-mir / gt-dataflow).
 - Cổng chạy LẠI ngay trước commit M5 (2026-10-06): fmt sạch; clippy workspace `-D warnings` sạch; audit exit 0; check_expectations OK (260 file .gt; 54 mã; 159 tham chiếu); `cargo test --workspace` **414 passed, 0 failed**.
 
-## M6 — Borrow checker — **ADR-023 ĐÃ VIẾT, CHƯA CODE; chờ Giang duyệt** (2026-10-06)
+## M6 — Borrow checker — **ĐANG LÀM** (ADR-023 đã duyệt 2026-10-06; checker + corpus xong, oracle/đột biến/soundness hunting còn lại)
 - ADR-023 trả lời: thuật toán (NLL 2018: liveness + ràng buộc region + tập khoản vay hiệu lực), move một phần (cho phép — bắt buộc vì `⌥`), reborrow (tường minh + ngầm ở đối số, cần sửa MIR), mượn qua lời gọi theo `RegionSig`, quy tắc "phiên bản" của Arena, bảng nới/chặt so với Rust, corpus ≥155 xấu + ≥155 đúng theo nhóm, mã lỗi cần chốt (Q30–Q33).
 
 ## M6-mir: reborrow ngầm (ADR-023 §0.1, Q30) — commit riêng
 - Bước hạ MIR chèn `Ref(Unique, (*r))` khi một CHỖ kiểu `&!T` đứng ở đối số (kể cả đối số phương thức, trừ người nhận đã autoref), `≔` có chú thích kiểu, hoặc `⏎`; tail của hàm vẫn move. Golden `tests/golden/mir/reborrow.{gt,mir}` + test cấu trúc (3 reborrow, 1 move). Không đổi golden cũ.
 - Cổng chạy lại: fmt sạch; clippy workspace `-D warnings` sạch; `cargo test --workspace` 415 passed, 0 failed.
 
+
+## M6 — corpus 169 xấu / 187 đúng, tài liệu E0401–E0407 (commit "M6: corpus …")
+Checker `gt-borrowck` (NLL 2018: liveness + ràng buộc region + khoản vay hiệu lực) đã chạy được; commit này đưa vào cả mã checker vì corpus không chạy được nếu thiếu nó.
+
+### Số mẫu theo nhóm của bảng ADR-023 §7 (mỗi mẫu `bc` mang dòng `// group: Gn`; test `every_group_of_adr_023_table_meets_its_minimum`)
+| Nhóm | Tối thiểu (xấu/đúng) | Xấu | Đúng |
+|---|---|---|---|
+| G1 dùng sau move | 30 / 30 | 31 (E0401) | 32 |
+| G2 hai `&!` chồng | 20 / 20 | 21 (E0402) | 20 |
+| G3 `&!` chồng `&` | 20 / 20 | 21 (E0403) | 23 |
+| G4 trả tham chiếu tới local/tạm/tham số theo giá trị | 15 / 15 | 16 (E0404) | 16 |
+| G5 Arena thoát | 20 / 20 | 21 (E0405) | 22 |
+| G6 gán/move khi đang mượn | 20 / 20 | 21 (E0406) | 22 |
+| G7 sống không đủ lâu (không trả về) + move ra khỏi tham chiếu | 15 / 15 | 21 (E0404 ×5 + E0407 ×16) | 17 |
+| G8 mượn qua lời gọi theo `RegionSig` | 15 / 15 | 17 (mã E0402–E0406) | 35 |
+| **Tổng** | **155 / 155** | **169** | **187** |
+Mỗi mẫu thuộc đúng một nhóm. Cộng 5 mẫu xấu cũ (E0401–E0405 từ M0) và 77 mẫu đúng cũ: `tests/fail` có 325 tệp, `tests/pass` 264. Mọi mẫu xấu bị chặn ĐÚNG mã và CHỈ mã đó (`every_bad_sample_is_rejected_with_exactly_its_code`); mọi mẫu đúng (kể cả 77 mẫu cũ) qua sạch ⇒ **0 dương tính giả trên corpus đúng** (187 + 77 chương trình). `docs/errors/E0401..E0407.md` liệt kê toàn bộ mẫu fail của từng mã và ≥5 mẫu pass.
+
+### Lỗi thật của MIR M5 tìm thấy khi viết corpus (đã sửa ở commit riêng `M5-fix`)
+Toán hạng là một CHỖ được đọc/move lúc dùng chứ không phải lúc đánh giá: `g(x, { x ← 2; 3 })` đọc `x = 2`; `both(b, &b)` bị báo E0406 thay vì E0401. **400 chương trình ngẫu nhiên của M5 không phủ trường hợp này** vì bộ sinh cũ không có biểu thức có tác dụng phụ. Nay bộ sinh có `{ x ← e; e' }` và sinh "chỗ rồi tác-dụng-phụ"; tắt bản sửa thì bộ sinh TỰ phát hiện (chương trình #41), không cần test viết tay. Trong lúc sửa tôi suýt làm hỏng ADR-022 §5 (người nhận theo giá trị bị tiêu thụ SAU đối số): đã hoàn nguyên, có test ghim (`by_value_receiver_is_consumed_after_the_arguments`) và mẫu `call_by_value_receiver_arg_uses_receiver`.
+
+### Mẫu ĐÃ DUYỆT bị sửa để checker qua — danh sách đầy đủ (điều kiện 3 của Giang)
+1. **`tests/pass/39_impl_generic.gt`**: `⊐ <T> W<T> { ƒ get(&self) → T … { self.v } }` → `⊐ <T: Copy> W<T> { … }`.
+   - *Lý do:* thân hàm move `self.v` (kiểu `T` không ràng buộc, không `Copy`) ra khỏi `&self` — "move ra khỏi chỗ đi qua `*`" bị cấm bởi ADR-023 §3 (đã duyệt) và là **E0407**. M4 không kiểm move nên mẫu đã qua ở các milestone trước.
+   - *Vì sao không phải dương tính/âm tính giả:* đây không phải sở thích của checker mà là luật ngôn ngữ đã duyệt (tương đương E0507 của Rust). Ý đồ của mẫu (impl generic + hàm kết hợp) giữ nguyên. **Văn bản gốc được giữ vĩnh viễn làm mẫu xấu** `fail/E0407_generic_field_through_ref` (nhóm G7) để hành vi trên bản gốc luôn được kiểm. Tôi chắc về lý do ngôn ngữ nên không đưa vào OPEN_QUESTIONS; nếu Giang muốn `T` không ràng buộc vẫn move được qua `&self` thì đó là thay đổi ADR-023 §3.
+2. Không mẫu đã duyệt nào khác bị sửa (kiểm bằng `git status`: chỉ 39 ở trạng thái `M` trong `tests/`; mọi tệp còn lại là mới).
+
+### Thay đổi fixture dùng chung (không phải mẫu đã duyệt)
+- Prelude của gt-types (`tests/common/mod.rs`): thêm `Guard { ◈ inner: Buf, ◈ n: i32 }` + `⊐ Drop for Guard` + `mk_guard()` (mẫu E0407 cho kiểu có Drop) và `Arena::reset(&!self)` (mẫu E0405 reset). Prelude của gt-resolve: thêm `Guard`, `mk_guard` (corpus pass phải qua M3). Hai thay đổi này chỉ THÊM tên; `Buf.n` KHÔNG đổi (tôi từng làm nó công khai rồi hoàn nguyên: sửa mẫu thay vì sửa fixture).
+
+### Checker: `Len` của mảng
+`Len` của MẢNG không còn là "đọc chỗ"; `Len` của lát vẫn là một lần đọc. Ghi chú kỹ thuật: ở Grit mọi mảng đều có độ dài biết lúc biên dịch (`Ty::Array(_, u64)`), nên "mảng kích thước biết lúc biên dịch" = mọi mảng; điều kiện của Giang được thoả bằng cách phân biệt theo `Ty::Array` vs `Ty::Slice`. Test hai chiều `tests/len_reads.rs`: mảng chỉ báo E0402, lát báo E0402+E0403; đọc `s.len()` khi reborrow `&!*s` còn dùng là E0403; hợp lệ khi reborrow đã hết.
+
+### Công cụ
+- `tools/check_expectations.py`: mẫu fail không bị coi là mồ côi nếu nằm trong `docs/errors/<mã>.md`; kiểm ngược (mẫu được liệt kê phải tồn tại, header khớp mã, mỗi mã ≥3 fail + ≥3 pass) đã có từ trước và giữ nguyên. **`tools/test_check_expectations.py` (9 test)**: sao chép corpus vào thư mục tạm, áp một đột biến, script PHẢI thất bại — thêm mẫu mồ côi, đổi mã trong header, pass→fail, xoá mẫu được liệt kê, dòng docs trỏ vào hư không, <3 mẫu fail, <3 mẫu pass, liệt kê sai tài liệu mã; cộng baseline sạch.
+- `tools/gate.sh` (cổng đầy đủ), `t.sh` (cargo có thử lại, TEMP→D:). Môi trường: xem KNOWN_LIMITATIONS "Môi trường build trên Windows".
+
+### Cổng chạy lại ngay trước commit (2026-10-06, kết quả thật, `tools/gate.sh`)
+- `cargo fmt --all --check`: sạch.
+- `cargo clippy --workspace --all-targets -- -D warnings`: exit 0 (lần đầu gt-borrowck có 3 lỗi — import thừa, `or_insert_with(Vec::new)`, tham số chỉ dùng trong đệ quy — đã sửa).
+- `cargo audit`: exit 0.
+- `cargo test --workspace`: **424 passed, 0 failed**.
+- `python tools/check_expectations.py`: OK (616 tệp .gt: fail=325, warn=1, pass=264, lexer=8; 55 mã; 159 tham chiếu).
+- `python -m unittest tools/test_check_expectations.py`: 9 test, OK.
+- Cổng của commit `M5-fix` chạy riêng trên cây sạch (HEAD + 3 tệp): fmt sạch, clippy exit 0, audit exit 0, 417 passed 0 failed, check_expectations OK.

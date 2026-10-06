@@ -20,6 +20,9 @@ pub const PRELUDE_SRC: &str = "\
 ▢ Buf { n: i32 }
 ⊐ Drop for Buf { ƒ drop(&!self) ! ∅ { } }
 ƒ mk_buf() → Buf ! ∅ { }
+▢ Guard { ◈ inner: Buf, ◈ n: i32 }
+⊐ Drop for Guard { ƒ drop(&!self) ! ∅ { } }
+ƒ mk_guard() → Guard ! ∅ { }
 #lang(secret)
 ▢ Secret<T> { v: T }
 #lang(cap)
@@ -44,7 +47,7 @@ pub const PRELUDE_SRC: &str = "\
 ⊐ Cap<Clock> { ƒ now(&self) → u64 ! {io} { } }
 ⊐ Cap<Alloc> { ƒ arena(&self) → Arena ! {mem} { } }
 ⊐ Host { ƒ fs() → Cap<Fs> ! {io} { } }
-⊐ Arena { ƒ new() → Arena ! {mem} { } ƒ alloc<T>(&self, v: T) → &T ! {mem} { } }
+⊐ Arena { ƒ new() → Arena ! {mem} { } ƒ alloc<T>(&self, v: T) → &T ! {mem} { } ƒ reset(&!self) ! {mem} { } }
 ▦ core { ◈ ƒ abort(msg: &str) → ! ! {div} { } }
 ƒ root_fs() → Cap<Fs> ! ∅ { }
 ƒ root_net() → Cap<Net> ! ∅ { }

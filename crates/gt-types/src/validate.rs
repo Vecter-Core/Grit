@@ -70,10 +70,76 @@ impl Env<'_> {
                             m.span,
                             format!("hàm `{}` trong `⊐ {tname}` không khớp chữ ký của trait (nhận được `{sname}`)", m.name),
                         );
+                    } else if !self.regions_compatible(t.node, m.node) {
+                        self.err(
+                            "E0311",
+                            m.node,
+                            m.span,
+                            format!("hàm `{}` trong `⊐ {tname}` hứa về lifetime ít hơn trait: region của kết quả phụ thuộc vào đầu vào khác với chữ ký của trait", m.name),
+                        );
                     }
                 }
             }
         }
+    }
+
+    /// Chữ ký REGION của impl không được hứa ít hơn trait (ADR-023 §4): với mỗi vị trí kết quả, tập đầu vào mà region của nó
+    /// ràng buộc theo impl phải là tập con của tập theo trait (người gọi qua trait tin chữ ký trait). Không tính vị trí của `Self`.
+    fn regions_compatible(
+        &self,
+        trait_member: gt_ast::NodeId,
+        impl_member: gt_ast::NodeId,
+    ) -> bool {
+        use crate::region::RegionRef;
+        let (Some(ts), Some(is)) = (
+            self.region_sigs.get(&trait_member),
+            self.region_sigs.get(&impl_member),
+        ) else {
+            return true;
+        };
+        let flat = |s: &crate::region::RegionSig| -> Vec<RegionRef> {
+            s.inputs
+                .iter()
+                .zip(&s.input_self)
+                .flat_map(|(rs, fs)| {
+                    rs.iter()
+                        .zip(fs)
+                        .filter(|(_, f)| !**f)
+                        .map(|(r, _)| r.clone())
+                })
+                .collect()
+        };
+        let outs = |s: &crate::region::RegionSig| -> Vec<RegionRef> {
+            s.output
+                .iter()
+                .zip(&s.output_self)
+                .filter(|(_, f)| !**f)
+                .map(|(r, _)| r.clone())
+                .collect()
+        };
+        let (ti, ii, to, io) = (flat(ts), flat(is), outs(ts), outs(is));
+        if ti.len() != ii.len() || to.len() != io.len() {
+            return false;
+        }
+        let rel = |ins: &[RegionRef], o: &RegionRef| -> Option<Vec<usize>> {
+            if *o == RegionRef::Static {
+                return None;
+            }
+            Some(
+                ins.iter()
+                    .enumerate()
+                    .filter(|(_, r)| *r == o)
+                    .map(|(i, _)| i)
+                    .collect(),
+            )
+        };
+        to.iter()
+            .zip(&io)
+            .all(|(a, b)| match (rel(&ti, a), rel(&ii, b)) {
+                (_, None) => true,
+                (None, Some(_)) => false,
+                (Some(rt), Some(ri)) => ri.iter().all(|x| rt.contains(x)),
+            })
     }
 
     fn render_sig(&self, m: &FnSigInfo) -> String {
