@@ -107,6 +107,8 @@ pub(crate) struct Checker<'e, 'a> {
     /// Hàm này là `main` (nguồn duy nhất của capability gốc, D29).
     pub entry: bool,
     pub in_unsafe: u32,
+    /// đang kiểm một biểu thức hợp đồng (`⊳ ⊲ ↓ ⋈`): chỗ DUY NHẤT `∀/∃` hợp lệ (E0316)
+    pub in_contract: u32,
     pub unresolved_reported: bool,
 }
 
@@ -138,6 +140,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             sites: Vec::new(),
             entry: false,
             in_unsafe: 0,
+            in_contract: 0,
             unresolved_reported: false,
         }
     }
@@ -422,6 +425,12 @@ impl<'e, 'a> Checker<'e, 'a> {
     }
 
     fn contract(&mut self, c: &Contract) {
+        self.in_contract += 1;
+        self.contract_inner(c);
+        self.in_contract -= 1;
+    }
+
+    fn contract_inner(&mut self, c: &Contract) {
         match c.kind {
             ContractKind::Post => {
                 // `result` ngầm (Q18)

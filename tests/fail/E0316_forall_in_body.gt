@@ -1,0 +1,3 @@
+// expect: fail E0316
+// note: ∀ trong biểu thức thường của thân hàm
+ƒ f(n: i32) → bool ! ∅ { ∀ i ∈ 0..n : i < n }

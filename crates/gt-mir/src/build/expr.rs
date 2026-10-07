@@ -1443,11 +1443,13 @@ impl Builder<'_> {
         for inv in invs {
             let t = self.decl_temp_unregistered(Ty::Bool);
             self.push(StatementKind::StorageLive(t));
+            self.in_contract += 1;
             self.in_stmt(|b| {
                 let o = b.as_operand(inv)?;
                 b.assign(Place::local(t), Rvalue::Use(o));
                 Ok(())
             })?;
+            self.in_contract -= 1;
             self.assert(Operand::Copy(Place::local(t)), true, AssertKind::Invariant)?;
             self.push(StatementKind::StorageDead(t));
         }
@@ -1643,10 +1645,9 @@ impl Builder<'_> {
         domain: &Expr,
         body: &Expr,
     ) -> R<()> {
-        if !matches!(self.body.kind, BodyKind::Pre | BodyKind::Post) {
-            return ice(
-                "lượng từ ∀/∃ ngoài hợp đồng ⊳/⊲ chưa hạ (bất biến ⋈ chứa lượng từ: giới hạn đã biết, M7)",
-            );
+        // chốt phòng thủ: M4 (E0316) đã chặn mọi lượng từ ngoài hợp đồng, nên nhánh này không với tới được
+        if self.in_contract == 0 {
+            return ice("lượng từ ∀/∃ ngoài hợp đồng (đáng lẽ M4 đã báo E0316)");
         }
         let Some(&vid) = self.t.resolve.decls.get(&var.id) else {
             return ice("biến lượng từ không có định danh");

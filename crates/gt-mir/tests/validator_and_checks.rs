@@ -162,20 +162,19 @@ fn literal_true_and_false_conditions_are_folded_but_nothing_else() {
 }
 
 #[test]
-fn ice_on_unsupported_constructs_is_reported_not_skipped() {
-    // lượng từ ngoài hợp đồng: chưa hạ (M7) — phải là ICE, không lặng lẽ bỏ hàm
+fn quantifier_outside_a_contract_is_a_type_error_not_an_ice() {
+    // lượng từ ngoài hợp đồng là lỗi của chương trình người dùng (E0316, M4); ICE chỉ còn là chốt phòng thủ không với tới được
     let t = run(&[("main.gt", "ƒ f(n: u32) → bool ! ∅ { ∀ i ∈ (0..n) : i < n }")]);
-    assert!(t.report.diagnostics.is_empty(), "{:?}", show(&t));
-    {
-        let m = gt_mir::lower_program(&t);
-        let codes: Vec<&str> = m
-            .report
-            .diagnostics
-            .iter()
-            .map(|d| d.code.as_str())
-            .collect();
-        assert_eq!(codes, ["E9901"]);
-    }
+    let codes: Vec<&str> = t
+        .report
+        .diagnostics
+        .iter()
+        .map(|d| d.code.as_str())
+        .collect();
+    assert_eq!(codes, ["E0316"], "{:?}", show(&t));
+    // MIR không chạy trên chương trình sai kiểu (fail-closed): không có thân, không có ICE
+    let m = gt_mir::lower_program(&t);
+    assert!(m.bodies.is_empty() && m.report.diagnostics.is_empty());
 }
 
 #[test]

@@ -119,6 +119,14 @@ impl<'e, 'a> Checker<'e, 'a> {
             ExprKind::Quantifier {
                 var, domain, body, ..
             } => {
+                if self.in_contract == 0 {
+                    self.err(
+                        "E0316",
+                        e.id,
+                        e.span,
+                        "lượng từ `∀`/`∃` chỉ hợp lệ trong hợp đồng (`⊳ ⊲ ↓ ⋈`), không dùng trong biểu thức thường".to_string(),
+                    );
+                }
                 let dt = self.expr(domain, None);
                 let elem = self.range_elem(&dt, domain.id, domain.span);
                 self.declare_local(var, elem, false);
@@ -784,6 +792,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                 self.declare_local(var, elem, false);
             }
         }
+        self.in_contract += 1;
         if let Some(v) = &l.variant {
             let t = self.expr(v, None);
             let ok = self.is_int(&t) || matches!(self.infer.shallow(&t), Ty::Err);
@@ -800,6 +809,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         for i in &l.invariants {
             self.expr_expect(i, &Ty::Bool);
         }
+        self.in_contract -= 1;
         self.loops.push(false);
         let bt = self.block(&l.body, None);
         let broke = self.loops.pop().unwrap_or(false);

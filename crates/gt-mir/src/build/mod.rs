@@ -57,6 +57,8 @@ pub(crate) struct Builder<'t> {
     bounds: Vec<Bound>,
     /// literal nguyên ngoài phạm vi kiểu gặp khi hạ (ghi qua `&self`)
     pub(crate) bad_lits: std::cell::RefCell<Vec<BadLiteral>>,
+    /// đang hạ một biểu thức hợp đồng (thân `⊳`/`⊲` hay `⋈`): `∀/∃` chỉ hạ được ở đây
+    pub(crate) in_contract: u32,
     /// Nút AST đang hạ (cho `SourceInfo`).
     pub(crate) at: (Span, NodeId),
 }
@@ -96,6 +98,7 @@ impl<'t> Builder<'t> {
             vars: BTreeMap::new(),
             bounds: t.scope_of(node),
             bad_lits: std::cell::RefCell::new(Vec::new()),
+            in_contract: 0,
             at: (span, node),
         }
     }
@@ -526,7 +529,9 @@ pub(crate) fn build_contract(
         }
     }
     b.body.arg_count = b.body.locals.len() - 1;
+    b.in_contract += 1;
     b.in_stmt(|b| b.expr_into(&Place::local(RETURN_PLACE), &c.expr))?;
+    b.in_contract -= 1;
     b.exit_to(0)?;
     b.terminate(TerminatorKind::Return)?;
     b.diverge();
