@@ -46,12 +46,14 @@ pub const PRELUDE: &str = "\
 ƒ pick2<'a, 'b>(x: &'a i32, y: &'b i32) → &'a i32 ! ∅ { x }
 ƒ first(a: &[i32]) → &i32 ! ∅ { &a[0] }
 ƒ use_i(x: i32) ! ∅ { }
+▢ Hm<'a> { r: &!'a i32 }
+ƒ idg<T>(x: T) → T ! ∅ { x }
 ƒ takes(r: &!i32) ! ∅ { *r ← 1; }
 ƒ look(r: &i32) ! ∅ { use_i(*r); }
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
-pub const KINDS: [&str; 8] = [
+pub const KINDS: [&str; 9] = [
     "move",
     "reborrow",
     "borrow_in_loop",
@@ -60,6 +62,7 @@ pub const KINDS: [&str; 8] = [
     "arena_reset",
     "call_regionsig",
     "nested_struct",
+    "ref_flow",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -239,10 +242,89 @@ impl Gen {
             32..=47 => self.moves(),
             48..=55 => self.partial_move_nested(),
             56..=65 => self.match_scenario(),
-            66..=79 => self.arena(),
-            80..=91 => self.calls(),
-            _ => self.holder(),
+            66..=76 => self.arena(),
+            77..=86 => self.calls(),
+            87..=92 => self.holder(),
+            _ => self.flow(),
         }
+    }
+
+    /// Tham chiếu CHẢY qua vật chứa (tuple, mảng, `Option`, `Hs`, `Hm` giữ `&!`, `&&`) bằng sao chép/di chuyển/dựng lại/hàm generic,
+    /// rồi hành động xung đột theo thứ tự ngẫu nhiên. Phủ các ràng buộc `relate`/`walk` của borrowck (hai chiều: thiếu ràng buộc
+    /// ⇒ âm tính giả; thừa ràng buộc ⇒ ứng viên dương tính giả "KHÁC").
+    fn flow(&mut self) -> Vec<St> {
+        self.tags.insert("ref_flow");
+        let x = self.fresh("x");
+        let y = self.fresh("y");
+        let chain = self.fresh("ch");
+        let (kx, ky) = (self.k(), self.k());
+        let kind = self.rng.below(6);
+        let c0 = self.fresh("c");
+        let unique = kind == 4;
+        let mut out = vec![raw(format!("μ{x} ≔ {kx};")), raw(format!("μ{y} ≔ {ky};"))];
+        let make = match kind {
+            0 => format!("{c0} ≔ (&{x}, &{y});"),
+            1 => format!("{c0} ≔ [&{x}, &{y}];"),
+            2 => format!("{c0} ≔ Some(&{x});"),
+            3 => format!("{c0} ≔ Hs {{ r: &{x} }};"),
+            4 => format!("{c0} ≔ Hm {{ r: &!{x} }};"),
+            _ => format!("{c0}r ≔ &{x}; {c0} ≔ &{c0}r;"),
+        };
+        out.push(raw_r(
+            make,
+            Role::MakeRef {
+                var: chain.clone(),
+                base: x.clone(),
+                unique,
+            },
+        ));
+        let mut cur = c0;
+        for _ in 0..self.rng.below(3) {
+            let next = self.fresh("c");
+            let st = match (kind, self.rng.below(3)) {
+                (_, 2) => format!("{next} ≔ idg({cur});"),
+                (0, 0) => format!("{next} ≔ {cur};"),
+                (0, _) => format!("{next} ≔ ({cur}.0, {cur}.1);"),
+                (1, 0) => format!("{next} ≔ {cur};"),
+                (1, _) => format!("{next} ≔ [{cur}[0], {cur}[1]];"),
+                (2, 0) => format!("{next} ≔ {cur};"),
+                (2, _) => format!("{next} ≔ ⌥ {cur} {{ Some(q) ↦ Some(q), None ↦ None }};"),
+                (3, 0) => format!("{next} ≔ {cur};"),
+                (3, _) => format!("{next} ≔ Hs {{ r: {cur}.r }};"),
+                (4, 0) => format!("{next} ≔ {cur};"),
+                (4, _) => format!("{next} ≔ Hm {{ r: {cur}.r }};"),
+                (_, 0) => format!("{next} ≔ {cur};"),
+                (_, _) => format!("{next} ≔ &*{cur};"),
+            };
+            out.push(raw(st));
+            cur = next;
+        }
+        let read = match kind {
+            0 => format!("use_i(*{cur}.0);"),
+            1 => format!("use_i(*{cur}[0]);"),
+            2 => format!("⌥ {cur} {{ Some(q) ↦ {{ use_i(*q); }}, None ↦ {{ }} }};"),
+            3 => format!("use_i(*{cur}.r);"),
+            4 => format!("*{cur}.r ← 3;"),
+            _ => format!("use_i(**{cur});"),
+        };
+        // đọc phần tử thứ HAI (trỏ vào `y`): không phải lần dùng của khoản vay trên `x` nên KHÔNG mang vai `UseRef`
+        let read_y = match kind {
+            0 => Some(format!("use_i(*{cur}.1);")),
+            1 => Some(format!("use_i(*{cur}[1]);")),
+            _ => None,
+        };
+        for _ in 0..1 + self.rng.below(4) {
+            let k = self.k();
+            out.push(match self.rng.below(6) {
+                5 if read_y.is_some() => raw(read_y.clone().unwrap_or_default()),
+                5 => raw(format!("use_i({y});")),
+                0 | 1 => raw_r(read.clone(), Role::UseRef { var: chain.clone() }),
+                2 => raw(format!("{x} ← {k};")),
+                3 => raw(format!("{y} ← {k};")),
+                _ => raw(format!("use_i({x});")),
+            });
+        }
+        out
     }
 
     // ---------------------------------------------------------------- kịch bản

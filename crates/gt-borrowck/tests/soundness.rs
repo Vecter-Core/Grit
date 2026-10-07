@@ -208,29 +208,29 @@ fn alias_through_function_calls_and_returned_references() {
 
 #[test]
 fn alias_through_generics() {
-    let id = "ƒ idg<T>(x: T) → T ! ∅ { x }";
+    let id = "ƒ idg2<T>(x: T) → T ! ∅ { x }";
     attack(
         "generic trả lại tham chiếu mượn",
         id,
-        "μx ≔ 1; r ≔ idg(&x); x ← 2; use_i(*r);",
+        "μx ≔ 1; r ≔ idg2(&x); x ← 2; use_i(*r);",
         "E0406",
     );
     attack(
         "generic với &!",
         id,
-        "μx ≔ 1; r ≔ idg(&!x); use_i(x); *r ← 1;",
+        "μx ≔ 1; r ≔ idg2(&!x); use_i(x); *r ← 1;",
         "E0403",
     );
     attack(
         "generic move rồi dùng",
         id,
-        "b ≔ mk(); k2 ≔ idg(b); use_i(b.v);",
+        "b ≔ mk(); k2 ≔ idg2(b); use_i(b.v);",
         "E0401",
     );
     fine(
         "generic với tham chiếu dùng xong",
         id,
-        "μx ≔ 1; r ≔ idg(&x); use_i(*r); x ← 2;",
+        "μx ≔ 1; r ≔ idg2(&x); use_i(*r); x ← 2;",
     );
     let wrap = "▢ Wr<T> { t: T }\nƒ wr<T>(x: T) → Wr<T> ! ∅ { Wr { t: x } }";
     attack(
@@ -411,6 +411,25 @@ fn arena_versions_are_invalidated_by_every_operation() {
 }
 
 // ----------------------------------------------------------------------------- struct giữ tham chiếu, region trong ADT
+
+#[test]
+fn invariance_survives_adt_construction() {
+    // ADT giữ `&!` của một tham chiếu: DỰNG ADT từ `&!p` phải đồng nhất region trong (bất biến), nếu không ghi một tham chiếu
+    // ngắn qua ADT làm `p` treo (lỗ hổng tìm thấy khi đột biến `adt_invariant` sống sót)
+    let sl = "▢ Sl<'a> { s: &!'a &'a i32 }
+ƒ put2<'a>(sl: Sl<'a>, v: &'a i32) ! ∅ { *sl.s ← v; }";
+    attack(
+        "dựng Sl từ &!p rồi ghi tham chiếu ngắn",
+        sl,
+        "z ≔ 1; μp ≔ &z; { y ≔ 7; sl ≔ Sl { s: &!p }; put2(sl, &y); }; use_i(*p);",
+        "E0404",
+    );
+    fine(
+        "dựng Sl, không dùng p sau đó (Rust cũng từ chối dùng p: &!'a &'a ghim p suốt 'a)",
+        sl,
+        "z ≔ 1; y ≔ 7; μp ≔ &z; sl ≔ Sl { s: &!p }; put2(sl, &y);",
+    );
+}
 
 #[test]
 fn references_stored_in_structs_and_collections() {

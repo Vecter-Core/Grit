@@ -12,6 +12,7 @@ use gt_mir::{Body, MirOutput};
 use gt_span::Span;
 use gt_types::{RegionRef, TypesOutput};
 use regions::Gen;
+pub use regions::defensive_counters;
 use std::collections::BTreeSet;
 
 const LIMIT: usize = 100;

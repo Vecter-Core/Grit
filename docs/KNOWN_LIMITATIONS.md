@@ -115,3 +115,9 @@
 - Kèm `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1` (Windows hết commit bộ nhớ khi build song song). Không chạy hai `cargo` cùng lúc (tranh chấp khoá `target/` và bộ nhớ).
 - Khi C: đầy mà shell không chạy được: giải phóng chỗ ở `%TEMP%` (thư mục cài đặt .NET/VS cũ). 2026-10-06 đã xoá `%TEMP%\meaphhtb` (4,2 GB, 16 ngày tuổi, là tệp tạm của cài đặt workload .NET — sinh lại được).
 - Python in tiếng Việt ra ống/tệp cần `PYTHONIOENCODING=utf-8` (mặc định cp1252 làm script chết giữa chừng); không dùng `\` trong chuỗi Python gửi qua heredoc shell (xem `env-gotchas`).
+
+## gt-borrowck (M6, ADR-023/024)
+- **NLL 2018, sound nhưng không complete (ADR-023 §1):** chặn nhầm (dương tính giả) gồm: `RegionSig` mô-đun hoá (kết quả `pick(&x,&y)` buộc với CẢ HAI đối số dù thân chỉ trả một); liveness theo BIẾN (vật chứa giữ nhiều tham chiếu: mọi region trong kiểu cùng sống); chỉ số mảng coi mọi chỉ số chồng lấn; "problem case #3". Đo trên 20 000 chương trình ngẫu nhiên: 0,92% chương trình oracle-sạch bị từ chối, 100% thuộc hai nguyên nhân đầu.
+- **Dựng ADT bất biến kéo dài khoản vay (sound, chặt hơn):** `Sl { s: &!p }` với `Sl<'a> { s: &!'a &'a i32 }` giữ `p` bị mượn suốt `'a` (Rust cũng vậy); xem ADR-024 §7.
+- **Oracle động chỉ là bằng chứng kiểm thử:** thấy vi phạm trên đường đã chạy, và chỉ với cấu trúc bộ sinh sinh ra; quy tắc tĩnh Drop (E0407 cho kiểu có Drop) không được mô hình hoá; xem ADR-024 §6.
+- **10 đột biến sống sót chưa giải quyết** (PROGRESS "đột biến gt-borrowck"); các đột biến tương đương/phòng thủ đã ghi lý do.

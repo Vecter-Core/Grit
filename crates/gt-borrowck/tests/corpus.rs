@@ -56,6 +56,11 @@ fn every_bad_sample_is_rejected_with_exactly_its_code() {
         *per_code.entry(code).or_default() += 1;
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
+    assert_eq!(
+        gt_borrowck::defensive_counters(),
+        (0, 0),
+        "đường dự phòng của regions.rs bị dùng"
+    );
     let total: usize = per_code.values().sum();
     assert!(
         total >= 155,
@@ -93,6 +98,11 @@ fn every_good_sample_is_accepted() {
         n += 1;
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
+    assert_eq!(
+        gt_borrowck::defensive_counters(),
+        (0, 0),
+        "đường dự phòng của regions.rs bị dùng"
+    );
     assert!(n >= 155 + 77, "corpus đúng chỉ có {n} mẫu");
 }
 

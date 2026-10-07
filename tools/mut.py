@@ -145,6 +145,10 @@ class Worker:
                 shutil.rmtree(dst, ignore_errors=True)
                 shutil.copytree(src, dst, ignore=shutil.ignore_patterns("target", "fuzz", "mutants.out"))
         os.makedirs(f"{self.dir}/tmp", exist_ok=True)
+        for root, _, files in os.walk(f"{self.dir}/crates"):
+            for fn in files:
+                if fn.endswith(".rs"):
+                    os.utime(os.path.join(root, fn), None)
 
     def env(self):
         e = dict(os.environ)
@@ -160,14 +164,21 @@ class Worker:
         )
         return e
 
-    def run_tests(self):
+    def run_tests(self, timeout=None):
         for attempt in range(4):
+            proc = subprocess.Popen(TEST_CMD, cwd=self.dir, env=self.env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, encoding="utf-8", errors="replace")
             try:
-                r = subprocess.run(TEST_CMD, cwd=self.dir, env=self.env(), capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=TIMEOUT)
+                so, se = proc.communicate(timeout=timeout or TIMEOUT)
             except subprocess.TimeoutExpired:
+                # treo = bị bắt; giết CẢ CÂY (tệp thực thi test mồ côi vẫn chạy và khoá `target/`)
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+                proc.communicate()
                 return "killed", "timeout"
-            out = r.stdout + r.stderr
+            out = so + se
+
+            class r:  # noqa: N801 — giữ tên cũ của kết quả
+                returncode = proc.returncode
             if re.search(r"LNK1104|LNK1108|os error 1455|os error 32\b", out):
                 continue
             if r.returncode == 0:
@@ -200,6 +211,7 @@ class Worker:
             finally:
                 with open(target, "w", encoding="utf-8", newline="") as f:
                     f.write(orig)
+                os.utime(target, None)  # mtime MỚI để cargo biên dịch lại bản gốc (tránh artifact cũ của đột biến)
         return {"id": mid(path, ln, new), "file": os.path.relpath(path, ROOT).replace("\\", "/"), "line": ln + 1,
                 "rule": name, "old": old.strip(), "new": new.strip(), "status": status, "note": note}
 
@@ -221,11 +233,18 @@ def cmd_run(args):
             for ln in f:
                 if ln.strip():
                     done.add(json.loads(ln)["id"])
+    only = None
+    if args.only_survivors:
+        # khoá theo (tệp, văn bản đã đột biến): số dòng/ID đổi khi mã nguồn dịch chuyển
+        only = {(r["file"], r["new"]) for r in map(json.loads, open(args.only_survivors, encoding="utf-8"))
+                if r["status"] == "survived"}
     todo = []
     for p in args.files:
         ms, crlf = gen_file(p)
         for m in ms:
-            if mid(m[0], m[1], m[4]) not in done:
+            i = mid(m[0], m[1], m[4])
+            key = (os.path.relpath(m[0], ROOT).replace("\\", "/"), m[4].strip())
+            if i not in done and (only is None or key in only):
                 todo.append((m, crlf))
     if args.limit:
         todo = todo[: args.limit]
@@ -233,6 +252,13 @@ def cmd_run(args):
     workers = [Worker(i) for i in range(args.workers)]
     for w in workers:
         w.prepare()
+    # BASELINE: bộ test phải XANH trên mã chưa đột biến, nếu không mọi đột biến đều "bị bắt" một cách giả tạo
+    with cf.ThreadPoolExecutor(max_workers=len(workers)) as ex:
+        base = list(ex.map(lambda w: w.run_tests(timeout=3600), workers))
+    for w, (st, note) in zip(workers, base):
+        if st != "survived":
+            sys.exit(f"BASELINE ĐỎ ở worker {w.n} ({st}): {note} — không chạy đột biến.")
+    print("baseline xanh ở mọi worker", flush=True)
     q = list(reversed(todo))
     qlock = threading.Lock()
     wlock = threading.Lock()
@@ -276,6 +302,7 @@ def main():
     b.add_argument("--workers", type=int, default=2)
     b.add_argument("--out", required=True)
     b.add_argument("--limit", type=int, default=0)
+    b.add_argument("--only-survivors", help="chỉ chạy lại các đột biến đang SỐNG SÓT trong tệp .jsonl này (đã sửa mã/test từ lần trước)")
     b.add_argument("files", nargs="+")
     c = sub.add_parser("report")
     c.add_argument("file")

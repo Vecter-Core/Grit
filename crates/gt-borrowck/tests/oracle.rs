@@ -372,6 +372,8 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
                     || body.contains("first(")
                 {
                     "chữ ký RegionSig (kết quả buộc với MỌI đối số cùng tên region; oracle chỉ thấy thân thật)"
+                } else if body.contains("≔ (&") || body.contains("≔ [&") {
+                    "liveness theo BIẾN: vật chứa giữ nhiều tham chiếu, mọi region trong kiểu của nó cùng sống (NLL, Rust cũng vậy)"
                 } else if body.contains("[0] ←") || body.contains("[1] ←") {
                     "chỉ số mảng (borrowck coi mọi chỉ số chồng lấn)"
                 } else {
@@ -424,6 +426,31 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
         }
         std::fs::write(Path::new(&dir).join("fp_examples.txt"), all).expect("ghi");
     }
+
+    // mọi ứng viên dương tính giả phải thuộc một nguyên nhân KHÔNG-ĐẦY-ĐỦ đã biết (nhóm "KHÁC" = ứng viên lỗi)
+    let other = rej_clean_cat
+        .iter()
+        .find(|(c, _)| c.starts_with("KHÁC"))
+        .map_or(0, |(_, n)| *n);
+    assert_eq!(
+        other,
+        0,
+        "ứng viên dương tính giả CHƯA giải thích được:
+{}",
+        rej_clean_examples
+            .iter()
+            .take(3)
+            .map(|(s, c)| format!(
+                "{c:?}
+{s}"
+            ))
+            .collect::<Vec<_>>()
+            .join(
+                "
+====
+"
+            )
+    );
     assert!(
         harness.is_empty(),
         "{}",
@@ -445,6 +472,8 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
             .collect::<Vec<_>>()
             .join("\n====\n")
     );
+    // đường dự phòng (chốt chặn phòng thủ trong regions.rs) không bao giờ được dùng cho chương trình qua M4
+    assert_eq!(gt_borrowck::defensive_counters(), (0, 0));
     for k in KINDS.iter().filter(|_| !quick()) {
         let c = cov[k];
         assert!(

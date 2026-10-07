@@ -8,6 +8,23 @@ use gt_mir::*;
 use gt_span::Span;
 use gt_types::{AdtKind, GParam, ParamId, RegionRef, SELF_INDEX, Ty, TypeDb, TypesOutput};
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// BỘ ĐẾM ĐO ĐẠC cho test (không ảnh hưởng kết quả): số lần đường "bảo thủ" dự phòng được dùng cho lời gọi `Fn`/`TraitMethod`
+/// (chữ ký không ánh xạ được) và số lần `relate` gặp số vị trí region không khớp. Với chương trình qua M4 cả hai phải bằng 0 —
+/// các nhánh `return false`/kiểm độ dài trong `call_sig`/`walk`/`relate` chỉ là chốt chặn phòng thủ (xem ADR-023 §10a, đột biến).
+static FALLBACKS: AtomicUsize = AtomicUsize::new(0);
+static RELATE_MISMATCHES: AtomicUsize = AtomicUsize::new(0);
+
+/// `(số lần dùng đường dự phòng cho Fn/TraitMethod, số lần relate lệch độ dài)` từ đầu tiến trình.
+#[doc(hidden)]
+#[must_use]
+pub fn defensive_counters() -> (usize, usize) {
+    (
+        FALLBACKS.load(Ordering::Relaxed),
+        RELATE_MISMATCHES.load(Ordering::Relaxed),
+    )
+}
 
 pub(crate) type Slots = Vec<Vec<usize>>;
 
@@ -228,6 +245,7 @@ impl<'a> Gen<'a> {
     /// `src` → `dst` (src outlives dst ở vị trí hiệp biến; hai chiều ở vị trí bất biến).
     fn relate(&mut self, ty: &Ty, src: &[Vec<usize>], dst: &[Vec<usize>], inv: bool) {
         if src.len() != dst.len() {
+            RELATE_MISMATCHES.fetch_add(1, Ordering::Relaxed);
             let (a, b) = (flat(&src.to_vec()), flat(&dst.to_vec()));
             self.outl(&a, &b);
             return;
@@ -363,11 +381,18 @@ impl<'a> Gen<'a> {
                         self.relate(el, &s, &dslots, false);
                     }
                 }
-                AggregateKind::Adt(..) => {
+                AggregateKind::Adt(d, ..) => {
                     let all = flat(&dslots);
+                    // ADT chứa `&!`/con trỏ thô/kiểu hàm là BẤT BIẾN (ADR-023 §11): dựng nó phải đồng nhất region trong của đối số với
+                    // bó region của ADT (hai chiều); chỉ hiệp biến thì `Sl { s: &!p }` cho phép thu hẹp region của `p` (âm tính giả
+                    // tìm thấy khi đột biến `adt_invariant` sống sót)
+                    let invariant = self.adt_invariant(*d);
                     for op in ops {
                         let s = flat(&self.operand_slots(op));
                         self.outl(&s, &all);
+                        if invariant {
+                            self.outl(&all, &s);
+                        }
                     }
                 }
             },
@@ -421,6 +446,9 @@ impl<'a> Gen<'a> {
             gt_mir::Callee::Value(_) => false,
         };
         if !mapped {
+            if !matches!(callee, gt_mir::Callee::Value(_)) {
+                FALLBACKS.fetch_add(1, Ordering::Relaxed);
+            }
             // bảo thủ: mọi region đầu vào (và của callee) outlive nhau và outlive mọi region của đích
             let mut all: Vec<usize> = arg_slots.iter().flat_map(flat_ref).collect();
             all.extend(extra);
