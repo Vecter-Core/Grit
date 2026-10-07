@@ -250,6 +250,9 @@ def cmd_run(args):
         for m in ms:
             i = mid(m[0], m[1], m[4])
             key = (os.path.relpath(m[0], ROOT).replace("\\", "/"), m[4].strip())
+            lines_env = os.environ.get("GRIT_MUT_LINES")  # vd: prover.rs:226,env.rs:88 (chỉ các dòng này)
+            if lines_env and f"{os.path.basename(m[0])}:{m[1] + 1}" not in lines_env.split(","):
+                continue
             if i not in done and (only is None or key in only):
                 todo.append((m, crlf))
     if args.limit:

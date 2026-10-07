@@ -293,3 +293,74 @@ fn exhaustive_prover_enumerates_every_atom_assignment_and_reports_the_first_witn
         other => panic!("{other:?}"),
     }
 }
+
+#[test]
+fn negative_finite_times_infinite_flips_the_infinity() {
+    let pos_inf = |lo: i128| Interval::new(B::from_i128(lo), B::PosInf);
+    // [-3,-2] × [1,+∞) = (-∞,-2]
+    let a = iv(-3, -2).mul(pos_inf(1));
+    assert_eq!((a.lo, a.hi), (B::NegInf, B::from_i128(-2)));
+    // [-3,2] × [1,+∞) = (-∞,+∞)
+    let b = iv(-3, 2).mul(pos_inf(1));
+    assert_eq!((b.lo, b.hi), (B::NegInf, B::PosInf));
+    // [-2,-1] × (-∞,-1] = [1,+∞)
+    let c = iv(-2, -1).mul(Interval::new(B::NegInf, B::from_i128(-1)));
+    assert_eq!((c.lo, c.hi), (B::from_i128(1), B::PosInf));
+    // 0 × ∞ = 0, kể cả khi một vế âm
+    let d = iv(-4, 0).mul(pos_inf(0));
+    assert_eq!((d.lo, d.hi), (B::NegInf, B::from_i128(0)));
+}
+
+#[test]
+fn exhaustive_prover_visits_every_mixed_assignment_of_vars_and_atoms() {
+    let mut p = ExhaustiveProver::default();
+    let u2 = Ty::new(2, false);
+    // sai CHỈ ở một cặp (v1 = k, a = đúng), với MỌI k: bộ đếm hỗn hợp không được bỏ sót cặp nào
+    for k in 0..4 {
+        let g = Prop::And(vec![Prop::Eq(Term::var(1), Term::int(k)), Prop::Atom(1)]).not();
+        match p.prove(&ob(&[(1, u2)], g, vec![], &[1]), &mut budget()) {
+            Verdict::Refuted {
+                witness,
+                everywhere,
+            } => {
+                assert!(!everywhere);
+                assert_eq!(witness.0, vec![(1, I256::from_i128(k))]);
+            }
+            other => panic!("k = {k}: {other:?}"),
+        }
+        // và sai CHỈ ở (v1 = k, a = sai)
+        let g = Prop::And(vec![
+            Prop::Eq(Term::var(1), Term::int(k)),
+            Prop::Atom(1).not(),
+        ])
+        .not();
+        assert!(
+            matches!(
+                p.prove(&ob(&[(1, u2)], g, vec![], &[1]), &mut budget()),
+                Verdict::Refuted {
+                    everywhere: false,
+                    ..
+                }
+            ),
+            "k = {k}"
+        );
+    }
+    // hai nguyên tử: sai CHỈ ở (a = sai, b = đúng)
+    let g2 = Prop::Or(vec![Prop::Atom(1), Prop::Atom(2).not()]);
+    match p.prove(&ob(&[], g2, vec![], &[1, 2]), &mut budget()) {
+        Verdict::Refuted { everywhere, .. } => assert!(!everywhere),
+        other => panic!("{other:?}"),
+    }
+    // sai CHỈ ở (a = đúng, b = đúng)
+    let g3 = Prop::And(vec![Prop::Atom(1), Prop::Atom(2)]).not();
+    match p.prove(&ob(&[], g3, vec![], &[1, 2]), &mut budget()) {
+        Verdict::Refuted { everywhere, .. } => assert!(!everywhere),
+        other => panic!("{other:?}"),
+    }
+    // ba nguyên tử, sai chỉ ở (đúng, sai, đúng)
+    let g4 = Prop::And(vec![Prop::Atom(1), Prop::Atom(2).not(), Prop::Atom(3)]).not();
+    match p.prove(&ob(&[], g4, vec![], &[1, 2, 3]), &mut budget()) {
+        Verdict::Refuted { everywhere, .. } => assert!(!everywhere),
+        other => panic!("{other:?}"),
+    }
+}
