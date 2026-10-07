@@ -78,8 +78,13 @@ fn every_pass_case_lowers_validates_and_is_complete() {
         if !m.report.diagnostics.is_empty() {
             bad.push(format!("{}: {:?}", name(&p), mir_codes(&m)));
         }
-        assert_eq!(m.bodies.len(), t.bodies.len(), "{}", name(&p));
-        bodies += m.bodies.len();
+        let fns = m
+            .bodies
+            .iter()
+            .filter(|b| !matches!(b.kind, gt_mir::BodyKind::Pre | gt_mir::BodyKind::Post))
+            .count();
+        assert_eq!(fns, t.bodies.len(), "{}", name(&p));
+        bodies += fns;
     }
     assert!(n >= 70, "chỉ {n} ca pass");
     assert!(bodies >= 100, "chỉ {bodies} thân");

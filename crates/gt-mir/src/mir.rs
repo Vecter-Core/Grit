@@ -48,6 +48,10 @@ pub enum BodyKind {
     Fn,
     Const,
     Static,
+    /// thân của một hợp đồng `⊳` (tiền điều kiện): hàm thuần `(tham số) → bool`
+    Pre,
+    /// thân của một hợp đồng `⊲`: `(tham số, result) → bool`
+    Post,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,6 +75,16 @@ pub struct Body {
     /// Literal nguyên ngoài phạm vi kiểu của nó (ADR-025 Q39): M5 cắt bit nên thông tin này sẽ mất; M7 báo E0601 từ đây, KHÔNG phụ
     /// thuộc đường tới được. Sắp theo vị trí, không trùng nút.
     pub bad_literals: Vec<BadLiteral>,
+    /// nghĩa vụ trong hợp đồng mà M5 không hạ được thành kiểm lúc chạy (vd lượng từ không biên): M7 báo E0902 (D25)
+    pub uncheckable: Vec<Uncheckable>,
+}
+
+/// Một thành phần hợp đồng không kiểm được lúc chạy.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Uncheckable {
+    pub node: NodeId,
+    pub span: Span,
+    pub why: String,
 }
 
 /// Một literal nguyên không vừa kiểu.
@@ -375,6 +389,12 @@ pub enum AssertKind {
         value: Operand,
         to: Ty,
     },
+    /// kiểm `⊳` tại điểm gọi (M7 chèn khi không chứng minh được; M5 không phát)
+    Precondition,
+    /// kiểm `⊲` ở điểm thoát (M7 chèn)
+    Postcondition,
+    /// `⋈ P` ở đầu vòng lặp (M5 phát; chỉ runtime ở Phase 1, M7 xoá nếu chứng minh được)
+    Invariant,
 }
 
 impl AssertKind {
@@ -388,6 +408,9 @@ impl AssertKind {
             AssertKind::IndexOutOfBounds { .. } => "index_out_of_bounds",
             AssertKind::SliceRange { .. } => "slice_range",
             AssertKind::CastLossy { .. } => "cast_lossy",
+            AssertKind::Precondition => "precondition",
+            AssertKind::Postcondition => "postcondition",
+            AssertKind::Invariant => "invariant",
         }
     }
 }

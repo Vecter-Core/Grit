@@ -71,6 +71,8 @@ pub struct TypesOutput {
     pub def_by_node: BTreeMap<NodeId, DefId>,
     /// Mọi thân cần hạ MIR (không gồm prelude), theo thứ tự tất định.
     pub bodies: Vec<BodyRef>,
+    /// Hàm của PRELUDE có hợp đồng `⊳`/`⊲` (chỉ hợp đồng được kiểm kiểu và hạ MIR, không phải thân hàm): ADR-025 §6.
+    pub prelude_contracts: Vec<BodyRef>,
     /// Tên tệp theo `FileId` (cho chẩn đoán của các pass sau).
     pub file_names: Vec<String>,
 }
@@ -197,6 +199,7 @@ fn ice(msg: &str, resolve: ResolveOutput) -> TypesOutput {
         sites: BTreeMap::new(),
         def_by_node: BTreeMap::new(),
         bodies: Vec::new(),
+        prelude_contracts: Vec::new(),
         file_names: Vec::new(),
     }
 }
@@ -219,6 +222,7 @@ pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesO
             sites: BTreeMap::new(),
             def_by_node: BTreeMap::new(),
             bodies: Vec::new(),
+            prelude_contracts: Vec::new(),
             file_names: Vec::new(),
         });
     }
@@ -240,6 +244,7 @@ pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesO
             sites: o.sites,
             def_by_node: o.def_by_node,
             bodies: o.bodies,
+            prelude_contracts: o.prelude_contracts,
             file_names,
         }),
         Err(e) => Ok(ice(&e.to_string(), resolve)),
@@ -258,6 +263,7 @@ struct Outputs {
     sites: BTreeMap<NodeId, CallSite>,
     def_by_node: BTreeMap<NodeId, DefId>,
     bodies: Vec<BodyRef>,
+    prelude_contracts: Vec<BodyRef>,
 }
 
 fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
@@ -266,7 +272,30 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
     env.collect();
     env.validate_impls();
     let bodies = std::mem::take(&mut env.fn_items);
+    let mut prelude_contracts: Vec<BodyRef> = Vec::new();
     for f in &bodies {
+        if env.is_prelude(f.node.file())
+            && f.body.is_some()
+            && f.ast_sig
+                .contracts
+                .iter()
+                .any(|c| c.kind != gt_ast::ContractKind::Variant)
+        {
+            let (impl_gens, self_ty) = match f.impl_idx {
+                Some(i) => (
+                    env.db.impls[i].generics.clone(),
+                    Some(env.db.impls[i].self_ty.clone()),
+                ),
+                None => (Vec::new(), None),
+            };
+            check::Checker::check_fn_contracts(&mut env, f, &impl_gens, self_ty);
+            prelude_contracts.push(BodyRef {
+                node: f.node,
+                key: f.key.clone(),
+                kind: BodyKind::Fn,
+                impl_node: f.impl_idx.map(|i| env.db.impls[i].node),
+            });
+        }
         if env.is_prelude(f.node.file()) || f.body.is_none() {
             continue;
         }
@@ -356,5 +385,6 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
         sites: env.out_sites,
         def_by_node: env.def_by_node,
         bodies: out_bodies,
+        prelude_contracts,
     }
 }

@@ -171,6 +171,8 @@ pub enum ObKind {
     Pre,
     /// hậu điều kiện `⊲` ở điểm thoát
     Post,
+    /// bất biến `⋈` ở đầu vòng lặp
+    Invariant,
 }
 
 impl ObKind {
@@ -188,6 +190,7 @@ impl ObKind {
             ObKind::LiteralRange => "literal_range",
             ObKind::Pre => "pre",
             ObKind::Post => "post",
+            ObKind::Invariant => "invariant",
         }
     }
 }

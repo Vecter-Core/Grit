@@ -385,6 +385,31 @@ impl<'e, 'a> Checker<'e, 'a> {
         c.finish(&f.sig);
     }
 
+    /// Chỉ kiểm kiểu CÁC HỢP ĐỒNG của một hàm prelude (thân của prelude không được kiểm; ADR-025 §6).
+    pub(crate) fn check_fn_contracts(
+        env: &'e mut Env<'a>,
+        f: &FnBody<'a>,
+        impl_gens: &[GParam],
+        self_ty: Option<Ty>,
+    ) {
+        let mut c = Checker::new(env, f.module, f.node, f.key.clone());
+        c.ret = f.sig.ret.clone();
+        c.cx = LowerCx {
+            self_ty,
+            lts: f.lts.clone(),
+            no_elide: false,
+            self_slots: Vec::new(),
+        };
+        c.self_kind = f.sig.self_kind;
+        let all: Vec<&GParam> = impl_gens.iter().chain(f.sig.generics.iter()).collect();
+        c.scope = scope_bounds(&all);
+        c.bind_params(f);
+        for ct in &f.ast_sig.contracts {
+            c.contract(ct);
+        }
+        c.finish(&f.sig);
+    }
+
     fn bind_params(&mut self, f: &FnBody<'a>) {
         let mut i = 0usize;
         for p in &f.ast_sig.params {

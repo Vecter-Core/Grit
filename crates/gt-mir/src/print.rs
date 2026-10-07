@@ -37,6 +37,8 @@ pub fn print_body(cx: &PrintCx<'_>, b: &Body) -> String {
         BodyKind::Fn => "fn",
         BodyKind::Const => "const",
         BodyKind::Static => "static",
+        BodyKind::Pre => "pre",
+        BodyKind::Post => "post",
     };
     let _ = writeln!(
         s,
@@ -63,7 +65,11 @@ pub fn print_body(cx: &PrintCx<'_>, b: &Body) -> String {
         let _ = writeln!(s, "    let {m}_{i}: {}; // {what}{regions}", cx.ty(&l.ty));
     }
     if !b.contracts.is_empty() {
-        let _ = writeln!(s, "    // hợp đồng chưa hạ (M7): {}", b.contracts.len());
+        let _ = writeln!(
+            s,
+            "    // hợp đồng ghi nhận (⊳⊲ thân riêng, ⋈ là Assert, ↓ thuộc M8): {}",
+            b.contracts.len()
+        );
     }
     for (i, bb) in b.blocks.iter().enumerate() {
         let _ = writeln!(s, "    bb{i}: {{");
@@ -297,6 +303,9 @@ fn assert_kind(cx: &PrintCx<'_>, k: &AssertKind) -> String {
         AssertKind::CastLossy { value, to } => {
             format!("cast_lossy({} as {})", operand(cx, value), cx.ty(to))
         }
+        AssertKind::Precondition => "precondition".to_string(),
+        AssertKind::Postcondition => "postcondition".to_string(),
+        AssertKind::Invariant => "invariant".to_string(),
     }
 }
 

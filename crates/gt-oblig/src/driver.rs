@@ -3,12 +3,18 @@
 //!
 //! Chính sách (D24/D25): `Discharged` → xoá `Assert`; `DefinitelyFalse` → ĐỎ E060x; `Lowered` → giữ `Assert` + GHI CHÚ N06xx;
 //! `Rejected` (không kiểm được lúc chạy mà chưa giải) → ĐỎ E0902.
-use crate::analysis::{BodyReport, Status, analyze_body};
+use crate::analysis::{
+    BodyReport, ContractProp, Insert, ProgInfo, Status, analyze_body, extract_contract,
+};
 use crate::ir::{ObKind, Prover, esc};
 use gt_diag::{Code, Diagnostic, Diagnostics, Report};
-use gt_mir::{Body, MirOutput, TerminatorKind};
+use gt_mir::{
+    AssertKind, BasicBlock, BlockData, Body, BodyKind, Callee, Const, Local, LocalDecl, LocalKind,
+    MirOutput, Operand, Place, Rvalue, Statement, StatementKind, Terminator, TerminatorKind,
+};
 use gt_span::Span;
 use gt_types::TypesOutput;
+use std::collections::{BTreeMap, BTreeSet};
 
 const LIMIT: usize = 200;
 
@@ -77,6 +83,7 @@ fn definite_msg(k: &ObKind) -> &'static str {
         ObKind::LiteralRange => "literal ngoài phạm vi kiểu",
         ObKind::Pre => "tiền điều kiện luôn sai tại điểm gọi",
         ObKind::Post => "hậu điều kiện luôn sai",
+        ObKind::Invariant => "bất biến vòng lặp luôn sai khi tới đầu vòng",
     }
 }
 
@@ -90,6 +97,8 @@ fn note_msg(code: &str) -> &'static str {
         "N0604" => "không chứng minh được phép ép kiểu không mất thông tin: giữ kiểm tra lúc chạy",
         "N0901" => "không chứng minh được tiền điều kiện: kiểm tra lúc chạy tại điểm gọi",
         "N0902" => "không chứng minh được hậu điều kiện: kiểm tra lúc chạy ở mọi điểm thoát",
+        "N0903" => "lượng từ có biên được kiểm lúc chạy bằng vòng lặp",
+        "N0904" => "không chứng minh được bất biến vòng lặp: kiểm tra lúc chạy ở đầu mỗi vòng",
         _ => "kiểm tra giữ lại lúc chạy",
     }
 }
@@ -110,10 +119,11 @@ pub fn analyze_program(
             stats,
         };
     }
+    let info = build_prog_info(t, m);
     let mut bodies = Vec::with_capacity(m.bodies.len());
     let mut per_body = Vec::with_capacity(m.bodies.len());
     for b in &m.bodies {
-        let rep = gt_stack::run_with_big_stack(|| analyze_body(b, &m.keys, &mut *prover));
+        let rep = gt_stack::run_with_big_stack(|| analyze_body(b, &info, &mut *prover));
         let rep = match rep {
             Ok(r) => r,
             Err(_) => {
@@ -147,6 +157,19 @@ pub fn analyze_program(
                     "literal `{sign}{}` ngoài phạm vi của `{}`",
                     bl.magnitude,
                     bl.ty.name()
+                ),
+            ));
+        }
+        for u in &b.uncheckable {
+            stats.rejected += 1;
+            bag.push(mk(
+                t,
+                "E0902",
+                u.node,
+                u.span,
+                format!(
+                    "nghĩa vụ không kiểm được lúc chạy mà chưa chứng minh được: {}",
+                    u.why
                 ),
             ));
         }
@@ -218,12 +241,32 @@ pub fn analyze_program(
                 }
             }
         }
+        // chèn kiểm hợp đồng lúc chạy (`⊳` trước lời gọi, `⊲` trước `Return`)
+        let mut tails: BTreeMap<u32, usize> = BTreeMap::new();
+        for j in &rep.judged {
+            if let Some(ins) = &j.insert {
+                apply_insert(t, &mut ob, ins, &mut tails);
+            }
+        }
         for blk in &rep.discharged_blocks {
             if let Some(term) = ob.blocks[*blk as usize].terminator.as_mut()
                 && let TerminatorKind::Assert { target, .. } = &term.kind
             {
                 term.kind = TerminatorKind::Goto(*target);
             }
+        }
+        if let Err(errs) = gt_mir::validate::validate(&ob, &t.db) {
+            bag.push(mk(
+                t,
+                "E9901",
+                b.node,
+                b.span,
+                format!(
+                    "lỗi nội bộ: MIR sau M7 của `{}` không hợp lệ: {}",
+                    b.key,
+                    errs.join("; ")
+                ),
+            ));
         }
         stats.asserts_after += count_asserts(&ob);
         bodies.push(ob);
@@ -286,4 +329,291 @@ pub fn remaining_checks_json(out: &OblOutput) -> String {
     }
     s.push_str("]}");
     s
+}
+
+// ====================================================================== thông tin hợp đồng toàn chương trình
+
+fn escaped_fns(m: &MirOutput) -> BTreeSet<gt_ast::NodeId> {
+    let mut out = BTreeSet::new();
+    let mut visit = |o: &Operand| {
+        if let Operand::Const(Const::FnItem { node, .. }) = o {
+            out.insert(*node);
+        }
+    };
+    for b in &m.bodies {
+        for bb in &b.blocks {
+            for st in &bb.statements {
+                if let StatementKind::Assign(_, rv) = &st.kind {
+                    match rv {
+                        Rvalue::Use(o)
+                        | Rvalue::Repeat(o, _)
+                        | Rvalue::Cast(o, _)
+                        | Rvalue::CastFits(o, _)
+                        | Rvalue::UnaryOp(_, o) => visit(o),
+                        Rvalue::BinaryOp(_, a, c) | Rvalue::CheckedBinaryOp(_, a, c) => {
+                            visit(a);
+                            visit(c);
+                        }
+                        Rvalue::Aggregate(_, v) => v.iter().for_each(&mut visit),
+                        _ => {}
+                    }
+                }
+            }
+            match bb.terminator.as_ref().map(|t| &t.kind) {
+                Some(TerminatorKind::Call { callee, args, .. }) => {
+                    args.iter().for_each(&mut visit);
+                    if let Callee::Value(o) = callee {
+                        visit(o);
+                    }
+                }
+                Some(TerminatorKind::SwitchInt { discr, .. }) => visit(discr),
+                Some(TerminatorKind::Assert { cond, .. }) => visit(cond),
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
+/// Gom hợp đồng: trích mệnh đề từng thân `⊳`/`⊲`, chọn hàm có `⊳` được phép làm giả thiết (ADR-025 §6 + §12).
+#[must_use]
+pub fn build_prog_info(t: &TypesOutput, m: &MirOutput) -> ProgInfo {
+    let mut info = ProgInfo {
+        keys: m.keys.clone(),
+        ..ProgInfo::default()
+    };
+    // khoá → NodeId của MỌI hàm (kể cả prelude, vốn chỉ có hợp đồng được hạ)
+    let fn_by_key: BTreeMap<&str, gt_ast::NodeId> =
+        m.keys.iter().map(|(n, k)| (k.as_str(), *n)).collect();
+    // vị từ thuần một đối số trả `bool`, hiệu ứng `∅`, không nhận `&!`: mô hình hoá như nguyên tử không diễn giải
+    for (node, _) in m.keys.iter() {
+        if let Some(sig) = t.db.sig_by_node(*node) {
+            let n_args = sig.params.len() + usize::from(sig.self_kind.is_some());
+            let mut_arg = matches!(sig.self_kind, Some(gt_ast::SelfKind::RefMut))
+                || sig
+                    .params
+                    .iter()
+                    .any(|p| matches!(p, gt_types::Ty::Ref(true, _)));
+            if n_args == 1 && sig.ret == gt_types::Ty::Bool && sig.effects.is_empty() && !mut_arg {
+                let idx = info.pure_preds.len() as u32;
+                info.pure_preds.insert(*node, idx);
+            }
+        }
+    }
+    for b in &m.bodies {
+        let scope_node = match b.key.rsplit_once(['⊳', '⊲']) {
+            Some((owner, _)) => fn_by_key.get(owner).copied().unwrap_or(b.node),
+            None => b.node,
+        };
+        let scope = t.scope_of(scope_node);
+        info.local_copy.insert(
+            b.key.clone(),
+            b.locals
+                .iter()
+                .map(|d| t.db.is_copy_resolved(&d.ty, &scope))
+                .collect(),
+        );
+    }
+    let mut counter = 0u32;
+    let base = ProgInfo {
+        keys: info.keys.clone(),
+        pure_preds: info.pure_preds.clone(),
+        ..ProgInfo::default()
+    };
+    for b in &m.bodies {
+        if !matches!(b.kind, BodyKind::Pre | BodyKind::Post) {
+            continue;
+        }
+        let mark = if b.kind == BodyKind::Pre {
+            '⊳'
+        } else {
+            '⊲'
+        };
+        let Some((owner_key, _)) = b.key.rsplit_once(mark) else {
+            continue;
+        };
+        let Some(&fnode) = fn_by_key.get(owner_key) else {
+            continue;
+        };
+        let unchecked = b.uncheckable.first().map(|u| u.why.clone());
+        let prop = if unchecked.is_some() {
+            None
+        } else {
+            extract_contract(b, &base, &mut counter)
+        };
+        let cp = ContractProp {
+            node: b.node,
+            key: b.key.clone(),
+            prop,
+            arg_count: b.arg_count,
+            arg_copy: (1..=b.arg_count)
+                .map(|i| info.local_copy.get(&b.key).is_some_and(|v| v[i]))
+                .collect(),
+            unchecked,
+            has_loop: has_cycle(b),
+        };
+        if b.kind == BodyKind::Pre {
+            info.pre.entry(fnode).or_default().push(cp);
+        } else {
+            info.post.entry(fnode).or_default().push(cp);
+        }
+    }
+    info.contract_atoms = counter;
+    // `⊳` chỉ làm giả thiết cho hàm CHỈ bị gọi trực tiếp: không thoát qua `FnItem`, không là thành viên của `⊐ Trait for`
+    let escaped = escaped_fns(m);
+    let trait_member: BTreeSet<gt_ast::NodeId> = t
+        .bodies
+        .iter()
+        .filter(|br| {
+            br.impl_node.is_some_and(|n| {
+                t.db.impls
+                    .iter()
+                    .any(|i| i.node == n && i.trait_ref.is_some())
+            })
+        })
+        .map(|br| br.node)
+        .collect();
+    for f in info.pre.keys() {
+        if !escaped.contains(f) && !trait_member.contains(f) {
+            info.assume_pre.insert(*f);
+        }
+    }
+    info
+}
+
+// ====================================================================== chèn kiểm lúc chạy
+
+fn identity_generics(t: &TypesOutput, node: gt_ast::NodeId) -> Vec<gt_types::Ty> {
+    t.db.sig_by_node(node)
+        .map(|s| {
+            s.generics
+                .iter()
+                .map(|g| gt_types::Ty::Param(g.id))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn apply_insert(t: &TypesOutput, ob: &mut Body, ins: &Insert, tails: &mut BTreeMap<u32, usize>) {
+    let (block, contract, generics, args, kind) = match ins {
+        Insert::Pre {
+            block,
+            contract,
+            generics,
+            args,
+        } => (
+            *block,
+            *contract,
+            generics.clone(),
+            args.clone(),
+            AssertKind::Precondition,
+        ),
+        Insert::Post {
+            block,
+            contract,
+            params,
+        } => {
+            let mut a: Vec<Operand> = (1..*params)
+                .map(|i| Operand::Copy(Place::local(Local(i as u32))))
+                .collect();
+            a.push(Operand::Copy(Place::local(Local(0))));
+            (
+                *block,
+                *contract,
+                identity_generics(t, ob.node),
+                a,
+                AssertKind::Postcondition,
+            )
+        }
+    };
+    let cur = *tails.get(&block).unwrap_or(&(block as usize));
+    let Some(orig) = ob.blocks[cur].terminator.take() else {
+        return;
+    };
+    let src = orig.source.clone();
+    let span = src.span;
+    // bản sao các đối số (Move của kiểu Copy ⇒ Copy)
+    let args: Vec<Operand> = args
+        .into_iter()
+        .map(|o| match o {
+            Operand::Move(p) => Operand::Copy(p),
+            o => o,
+        })
+        .collect();
+    let tmp = Local(ob.locals.len() as u32);
+    ob.locals.push(LocalDecl {
+        ty: gt_types::Ty::Bool,
+        regions: Vec::new(),
+        kind: LocalKind::Temp,
+        mutable: false,
+        span,
+    });
+    let mid = BasicBlock(ob.blocks.len() as u32);
+    let tail = BasicBlock(ob.blocks.len() as u32 + 1);
+    ob.blocks[cur].statements.push(Statement {
+        kind: StatementKind::StorageLive(tmp),
+        source: src.clone(),
+    });
+    ob.blocks[cur].terminator = Some(Terminator {
+        kind: TerminatorKind::Call {
+            callee: Callee::Fn {
+                node: contract,
+                generics,
+            },
+            arg_spans: vec![span; args.len()],
+            args,
+            dest: Place::local(tmp),
+            target: Some(mid),
+        },
+        source: src.clone(),
+    });
+    ob.blocks.push(BlockData {
+        statements: Vec::new(),
+        terminator: Some(Terminator {
+            kind: TerminatorKind::Assert {
+                cond: Operand::Copy(Place::local(tmp)),
+                expected: true,
+                kind,
+                target: tail,
+            },
+            source: src.clone(),
+        }),
+    });
+    ob.blocks.push(BlockData {
+        statements: vec![Statement {
+            kind: StatementKind::StorageDead(tmp),
+            source: src,
+        }],
+        terminator: Some(orig),
+    });
+    tails.insert(block, tail.index());
+}
+
+/// Đồ thị khối có chu trình (thân hợp đồng có lượng từ)?
+fn has_cycle(b: &Body) -> bool {
+    let n = b.blocks.len();
+    let mut state = vec![0u8; n]; // 0 chưa thăm, 1 đang thăm, 2 xong
+    let mut stack: Vec<(usize, usize)> = vec![(0, 0)];
+    state[0] = 1;
+    while let Some((bb, i)) = stack.pop() {
+        let succ = b.blocks[bb]
+            .terminator
+            .as_ref()
+            .map_or_else(Vec::new, |t| t.kind.successors());
+        if i < succ.len() {
+            stack.push((bb, i + 1));
+            let s = succ[i].index();
+            match state[s] {
+                1 => return true,
+                0 => {
+                    state[s] = 1;
+                    stack.push((s, 0));
+                }
+                _ => {}
+            }
+        } else {
+            state[bb] = 2;
+        }
+    }
+    false
 }

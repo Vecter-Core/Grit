@@ -1091,9 +1091,12 @@ impl Builder<'_> {
                 lhs,
                 rhs,
             } => b.checked_option(dest, *op, lhs, rhs, e),
-            ExprKind::Quantifier { .. } => {
-                ice("lượng từ ∀/∃ ngoài hợp đồng chưa hạ ở M5 (hoãn M7, Q29)")
-            }
+            ExprKind::Quantifier {
+                kind,
+                var,
+                domain,
+                body,
+            } => b.quantifier_into(dest, *kind, var, domain, body),
             _ => {
                 let rv = b.as_rvalue(e)?;
                 b.assign(dest.clone(), rv);
@@ -1385,6 +1388,7 @@ impl Builder<'_> {
                 let head = self.new_block();
                 let exit = self.new_block();
                 self.goto(head)?;
+                self.invariants_at_head(&l.invariants)?;
                 self.enter_loop(exit, head);
                 self.lower_block(&scr, &l.body)?;
                 self.terminate(TerminatorKind::Goto(head))?;
@@ -1405,6 +1409,7 @@ impl Builder<'_> {
                 };
                 let cv = self.temp(Ty::Bool);
                 self.goto(head)?;
+                self.invariants_at_head(&l.invariants)?;
                 match lit {
                     Some(true) => self.terminate(TerminatorKind::Goto(body_bb))?,
                     Some(false) => self.terminate(TerminatorKind::Goto(exit))?,
@@ -1429,11 +1434,34 @@ impl Builder<'_> {
                 self.cur = exit;
                 Ok(())
             }
-            LoopKind::ForIn { var, iter } => self.for_in(var, iter, &l.body, &scr),
+            LoopKind::ForIn { var, iter } => self.for_in(var, iter, &l.body, &scr, &l.invariants),
         }
     }
 
-    fn for_in(&mut self, var: &gt_ast::Ident, iter: &Expr, body: &Block, scr: &Place) -> R<()> {
+    /// `⋈ P` (ADR-025 §6): kiểm `P` mỗi khi điều khiển tới đầu vòng lặp (kể cả lần thoát). Chỉ là `Assert`: M7 có thể xoá nếu chứng minh được.
+    fn invariants_at_head(&mut self, invs: &[Expr]) -> R<()> {
+        for inv in invs {
+            let t = self.decl_temp_unregistered(Ty::Bool);
+            self.push(StatementKind::StorageLive(t));
+            self.in_stmt(|b| {
+                let o = b.as_operand(inv)?;
+                b.assign(Place::local(t), Rvalue::Use(o));
+                Ok(())
+            })?;
+            self.assert(Operand::Copy(Place::local(t)), true, AssertKind::Invariant)?;
+            self.push(StatementKind::StorageDead(t));
+        }
+        Ok(())
+    }
+
+    fn for_in(
+        &mut self,
+        var: &gt_ast::Ident,
+        iter: &Expr,
+        body: &Block,
+        scr: &Place,
+        invs: &[Expr],
+    ) -> R<()> {
         let Some(&vid) = self.t.resolve.decls.get(&var.id) else {
             return ice("biến lặp không có định danh");
         };
@@ -1464,6 +1492,7 @@ impl Builder<'_> {
                 let step = self.new_block();
                 let exit = self.new_block();
                 self.goto(head)?;
+                self.invariants_at_head(invs)?;
                 self.branch_bool(
                     Rvalue::BinaryOp(
                         BinOp::Lt,
@@ -1550,9 +1579,11 @@ impl Builder<'_> {
                     )?;
                     self.cur = pre;
                     self.goto(head)?;
+                    self.invariants_at_head(invs)?;
                     self.terminate(TerminatorKind::Goto(body_bb))?;
                 } else {
                     self.goto(head)?;
+                    self.invariants_at_head(invs)?;
                     self.branch_bool(
                         Rvalue::BinaryOp(
                             BinOp::Lt,
@@ -1600,5 +1631,139 @@ impl Builder<'_> {
             }
             _ => ice(format!("⟳ in trên kiểu {ity:?}")),
         }
+    }
+
+    /// `∀/∃ x ∈ a..b : P` có biên: vòng lặp thuần (ADR-025 §6). Miền không phải khoảng nguyên ⇒ KHÔNG kiểm được lúc chạy:
+    /// ghi `Body.uncheckable` (M7 báo E0902) và dùng hằng thay thế (fail-closed ở M7, không phải ở đây).
+    fn quantifier_into(
+        &mut self,
+        dest: &Place,
+        qk: gt_ast::QuantifierKind,
+        var: &gt_ast::Ident,
+        domain: &Expr,
+        body: &Expr,
+    ) -> R<()> {
+        if !matches!(self.body.kind, BodyKind::Pre | BodyKind::Post) {
+            return ice(
+                "lượng từ ∀/∃ ngoài hợp đồng ⊳/⊲ chưa hạ (bất biến ⋈ chứa lượng từ: giới hạn đã biết, M7)",
+            );
+        }
+        let Some(&vid) = self.t.resolve.decls.get(&var.id) else {
+            return ice("biến lượng từ không có định danh");
+        };
+        let forall = qk == gt_ast::QuantifierKind::ForAll;
+        let (lo_e, hi_e, incl, eit) = match (&domain.kind, self.ty_of(domain)?) {
+            (
+                ExprKind::Range {
+                    start: Some(s),
+                    end: Some(e),
+                    inclusive,
+                },
+                Ty::Adt(_, args),
+            ) if matches!(args.first(), Some(Ty::Int(_))) => {
+                let Some(Ty::Int(it)) = args.first().cloned() else {
+                    return ice("miền lượng từ");
+                };
+                (s, e, *inclusive, it)
+            }
+            _ => {
+                self.body.uncheckable.push(Uncheckable {
+                    node: domain.id,
+                    span: domain.span,
+                    why: "lượng từ không có biên số nguyên `a..b`".to_string(),
+                });
+                self.assign(
+                    dest.clone(),
+                    Rvalue::Use(Operand::Const(Const::Bool(forall))),
+                );
+                return Ok(());
+            }
+        };
+        let el = Ty::Int(eit);
+        let lo = self.as_operand(lo_e)?;
+        let hi = self.as_operand(hi_e)?;
+        self.assign(
+            dest.clone(),
+            Rvalue::Use(Operand::Const(Const::Bool(forall))),
+        );
+        let hi_t = self.temp(el.clone());
+        self.assign(Place::local(hi_t), Rvalue::Use(hi));
+        let i = self.temp(el.clone());
+        self.assign(Place::local(i), Rvalue::Use(lo));
+        let v = self.temp(Ty::Bool);
+        let head = self.new_block();
+        let body_bb = self.new_block();
+        let step = self.new_block();
+        let exit = self.new_block();
+        let cmp = if incl { BinOp::Le } else { BinOp::Lt };
+        self.goto(head)?;
+        self.branch_bool(
+            Rvalue::BinaryOp(
+                cmp,
+                Operand::Copy(Place::local(i)),
+                Operand::Copy(Place::local(hi_t)),
+            ),
+            body_bb,
+            exit,
+        )?;
+        self.cur = body_bb;
+        self.in_block(|b| {
+            let x = b.user_var(vid, false, var.span)?;
+            b.assign(Place::local(x), Rvalue::Use(Operand::Copy(Place::local(i))));
+            b.in_stmt(|b| {
+                let o = b.as_operand(body)?;
+                b.assign(Place::local(v), Rvalue::Use(o));
+                Ok(())
+            })
+        })?;
+        // ∀: v sai ⇒ kết quả sai, thoát; ∃: v đúng ⇒ kết quả đúng, thoát
+        let decided = self.new_block();
+        let (to_decided, to_step) = if forall { (0, step) } else { (1, step) };
+        let _ = to_step;
+        if forall {
+            self.terminate(TerminatorKind::SwitchInt {
+                discr: Operand::Copy(Place::local(v)),
+                targets: vec![(0, decided)],
+                otherwise: step,
+            })?;
+        } else {
+            self.terminate(TerminatorKind::SwitchInt {
+                discr: Operand::Copy(Place::local(v)),
+                targets: vec![(0, step)],
+                otherwise: decided,
+            })?;
+        }
+        let _ = to_decided;
+        self.cur = decided;
+        self.assign(
+            dest.clone(),
+            Rvalue::Use(Operand::Const(Const::Bool(!forall))),
+        );
+        self.terminate(TerminatorKind::Goto(exit))?;
+        self.cur = step;
+        if incl {
+            let inc = self.new_block();
+            self.branch_bool(
+                Rvalue::BinaryOp(
+                    BinOp::Eq,
+                    Operand::Copy(Place::local(i)),
+                    Operand::Copy(Place::local(hi_t)),
+                ),
+                exit,
+                inc,
+            )?;
+            self.cur = inc;
+        }
+        self.assign(
+            Place::local(i),
+            Rvalue::BinaryOp(
+                BinOp::AddWrap,
+                Operand::Copy(Place::local(i)),
+                Operand::Const(int_const(1, eit)),
+            ),
+        );
+        self.terminate(TerminatorKind::Goto(head))?;
+        self.cur = exit;
+        Ok(())
     }
 }

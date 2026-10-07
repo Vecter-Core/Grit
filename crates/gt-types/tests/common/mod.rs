@@ -38,6 +38,12 @@ pub const PRELUDE_SRC: &str = "\
 ▢ File { x: i32 }
 ⊐ <T> [T] { ƒ len(&self) → usize ! ∅ { } }
 ⊐ File { ƒ len(&self) → usize ! ∅ { } }
+⊐ <T> Option<T> {
+  ƒ is_some(&self) → bool ! ∅ { }
+  ƒ unwrap(self) → T ! ∅ ⊳ self.is_some() { }
+}
+ƒ shl(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
+ƒ shr(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
 ⊐ Cap<Fs> {
   ƒ read(&self, p: &str) → File ! {io} { }
   ƒ sub(&self, p: &str) → Cap<Fs> ! {io} { }

@@ -83,6 +83,7 @@ impl<'t> Builder<'t> {
             fall_off: None,
             span,
             bad_literals: Vec::new(),
+            uncheckable: Vec::new(),
         };
         Builder {
             t,
@@ -397,18 +398,26 @@ impl<'t> Builder<'t> {
 }
 
 /// Hạ một hàm (tự do hoặc thành viên impl).
-pub(crate) fn build_fn(
-    t: &TypesOutput,
+fn start_fn<'t>(
+    t: &'t TypesOutput,
     key: &str,
     node: NodeId,
     f: &FnItem,
     self_ty: Option<Ty>,
-) -> R<Body> {
-    let Some(sig) = t.db.sig_by_node(node).cloned() else {
+    sig_node: NodeId,
+    kind: BodyKind,
+    ret_ty: Option<Ty>,
+) -> R<(Builder<'t>, Ty)> {
+    let Some(sig) = t.db.sig_by_node(sig_node).cloned() else {
         return ice(format!("thiếu chữ ký của {key}"));
     };
-    let mut b = Builder::new(t, key.to_string(), node, BodyKind::Fn, f.body.span);
-    b.decl(sig.ret.clone(), LocalKind::Return, true, f.body.span);
+    let mut b = Builder::new(t, key.to_string(), node, kind, f.body.span);
+    b.decl(
+        ret_ty.unwrap_or_else(|| sig.ret.clone()),
+        LocalKind::Return,
+        true,
+        f.body.span,
+    );
     // tham số: `self` trước (nếu có), rồi các tham số có tên theo thứ tự
     b.push_frame(FrameKind::Args);
     let mut named = sig.params.iter();
@@ -445,11 +454,22 @@ pub(crate) fn build_fn(
             }
         }
     }
+    Ok((b, sig.ret.clone()))
+}
+
+/// Hạ một hàm (tự do hoặc thành viên impl).
+pub(crate) fn build_fn(
+    t: &TypesOutput,
+    key: &str,
+    node: NodeId,
+    f: &FnItem,
+    self_ty: Option<Ty>,
+) -> R<Body> {
+    let (mut b, ret) = start_fn(t, key, node, f, self_ty, node, BodyKind::Fn, None)?;
     b.body.arg_count = b.body.locals.len() - 1;
     for c in &f.sig.contracts {
         b.body.contracts.push(c.id);
     }
-    let ret = sig.ret.clone();
     let body_block = &f.body;
     // thân không có đuôi (hoặc đuôi là `⎇` thiếu `⇝`) mà kiểu trả về ≠ `()`: lối rơi cuối là E0307 nếu tới được
     let open_end = body_block.tail.as_ref().is_none_or(|t| {
@@ -478,6 +498,38 @@ pub(crate) fn build_fn(
         b.terminate(TerminatorKind::Return)?;
         b.diverge();
     }
+    b.finish()
+}
+
+/// Hạ một hợp đồng `⊳`/`⊲` thành thân hàm thuần trả `bool` (ADR-025 §6): tham số = tham số của hàm (cùng chỉ số local),
+/// riêng `⊲` có thêm tham số cuối `result` (giá trị trả về). Thân là chính biểu thức hợp đồng.
+pub(crate) fn build_contract(
+    t: &TypesOutput,
+    key: &str,
+    fn_node: NodeId,
+    f: &FnItem,
+    self_ty: Option<Ty>,
+    c: &gt_ast::Contract,
+) -> R<Body> {
+    let kind = if c.kind == gt_ast::ContractKind::Post {
+        BodyKind::Post
+    } else {
+        BodyKind::Pre
+    };
+    let (mut b, ret) = start_fn(t, key, c.id, f, self_ty, fn_node, kind, Some(Ty::Bool))?;
+    if c.kind == gt_ast::ContractKind::Post {
+        let nd = b.needs_drop(&ret);
+        let l = b.decl(ret, LocalKind::Arg(Some("result".into())), false, c.span);
+        b.register(l, nd, FrameKind::Args);
+        if let Some(&id) = t.resolve.decls.get(&c.id) {
+            b.vars.insert(id, l);
+        }
+    }
+    b.body.arg_count = b.body.locals.len() - 1;
+    b.in_stmt(|b| b.expr_into(&Place::local(RETURN_PLACE), &c.expr))?;
+    b.exit_to(0)?;
+    b.terminate(TerminatorKind::Return)?;
+    b.diverge();
     b.finish()
 }
 

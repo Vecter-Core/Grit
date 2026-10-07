@@ -12,7 +12,8 @@ fn render(src: &str) -> String {
     let (t, m) = mir(src);
     assert!(m.report.diagnostics.is_empty(), "{:?}", mir_codes(&m));
     let mut s = String::new();
-    for b in &m.bodies {
+    // thân hợp đồng của PRELUDE (M7) không thuộc chương trình đang xét
+    for b in m.bodies.iter().filter(|b| !b.key.starts_with("$prelude")) {
         s.push_str(&text(&t, &m, &b.key));
         s.push('\n');
     }

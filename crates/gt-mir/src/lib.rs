@@ -106,6 +106,11 @@ pub fn lower_program(t: &TypesOutput) -> MirOutput {
             .collect(),
         ),
     };
+    for b in &bodies {
+        if matches!(b.kind, BodyKind::Pre | BodyKind::Post) {
+            keys.insert(b.node, b.key.clone());
+        }
+    }
     for d in diags {
         bag.push(d);
     }
@@ -121,8 +126,16 @@ fn lower_all(t: &TypesOutput) -> (Vec<Body>, Vec<Diagnostic>) {
     for p in &t.resolve.programs {
         index_items(&p.items, &mut srcs);
     }
+    if let Some(pp) = &t.resolve.prelude_program {
+        index_items(&pp.items, &mut srcs);
+    }
     let mut bodies = Vec::new();
     let mut diags = Vec::new();
+    for br in &t.prelude_contracts {
+        if let Some(Src::Fn(f)) = srcs.get(&br.node) {
+            lower_contracts(t, br, f, &mut bodies, &mut diags);
+        }
+    }
     for br in &t.bodies {
         let built = match (srcs.get(&br.node), br.kind) {
             (Some(Src::Fn(f)), TBodyKind::Fn) => {
@@ -170,6 +183,9 @@ fn lower_all(t: &TypesOutput) -> (Vec<Body>, Vec<Diagnostic>) {
                 }
                 diags.extend(completeness(t, &b));
                 bodies.push(b);
+                if let (Some(Src::Fn(f)), TBodyKind::Fn) = (srcs.get(&br.node), br.kind) {
+                    lower_contracts(t, br, f, &mut bodies, &mut diags);
+                }
             }
             Err(build::BuildError(m)) => {
                 diags.extend(diag(
@@ -183,6 +199,56 @@ fn lower_all(t: &TypesOutput) -> (Vec<Body>, Vec<Diagnostic>) {
         }
     }
     (bodies, diags)
+}
+
+/// Hạ các hợp đồng `⊳`/`⊲` của một hàm thành thân thuần (ADR-025 §6). Khoá: `<khoá hàm>⊳<i>` / `<khoá hàm>⊲<i>`.
+fn lower_contracts(
+    t: &TypesOutput,
+    br: &gt_types::BodyRef,
+    f: &gt_ast::FnItem,
+    bodies: &mut Vec<Body>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    let self_ty = br.impl_node.and_then(|n| {
+        t.db.impls
+            .iter()
+            .find(|i| i.node == n)
+            .map(|i| i.self_ty.clone())
+    });
+    for (i, c) in f.sig.contracts.iter().enumerate() {
+        let mark = match c.kind {
+            gt_ast::ContractKind::Pre => "⊳",
+            gt_ast::ContractKind::Post => "⊲",
+            gt_ast::ContractKind::Variant => continue,
+        };
+        let key = format!("{}{mark}{i}", br.key);
+        match build::build_contract(t, &key, br.node, f, self_ty.clone(), c) {
+            Ok(b) => {
+                if let Err(errs) = validate::validate(&b, &t.db) {
+                    diags.extend(diag(
+                        t,
+                        "E9901",
+                        c.id,
+                        b.span,
+                        format!(
+                            "lỗi nội bộ của compiler (ICE): MIR của hợp đồng `{key}` không hợp lệ: {}",
+                            errs.join("; ")
+                        ),
+                    ));
+                }
+                bodies.push(b);
+            }
+            Err(build::BuildError(m)) => {
+                diags.extend(diag(
+                    t,
+                    "E9901",
+                    c.id,
+                    c.span,
+                    format!("lỗi nội bộ của compiler (ICE) khi hạ hợp đồng `{key}`: {m}"),
+                ));
+            }
+        }
+    }
 }
 
 /// Kiểm đầy đủ (ADR-020 §4): E0307 khi lối rơi cuối hàm tới được; hàm `→ !` có `Return` tới được.

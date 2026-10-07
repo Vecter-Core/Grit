@@ -12,6 +12,13 @@ pub const PRELUDE_SRC: &str = "\
 ƒ mk_buf() → Buf ! ∅ { }
 ▢ Guard { ◈ inner: Buf, ◈ n: i32 }
 ƒ mk_guard() → Guard ! ∅ { }
+▢ Range<T> { start: T, end: T }
+⊐ <T> Option<T> {
+  ƒ is_some(&self) → bool ! ∅ { }
+  ƒ unwrap(self) → T ! ∅ ⊳ self.is_some() { }
+}
+ƒ shl(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
+ƒ shr(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
 ▢ Secret<T> { v: T }
 ▢ Cap<T> { v: T }
 ▢ Fs { x: i32 }

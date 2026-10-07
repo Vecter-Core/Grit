@@ -158,6 +158,11 @@ impl Env {
         self.atoms.remove(&a);
     }
 
+    /// Giữ lại chỉ các nguyên tử thoả `keep`.
+    pub fn retain_atoms(&mut self, keep: impl Fn(VarId) -> bool) {
+        self.atoms.retain(|a, _| keep(*a));
+    }
+
     #[must_use]
     pub fn zone_bound(&self, x: VarId, y: VarId) -> Option<i128> {
         let (i, j) = (*self.zv.get(&x)?, *self.zv.get(&y)?);

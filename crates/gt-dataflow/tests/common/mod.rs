@@ -87,6 +87,7 @@ pub fn body(locals: Vec<Ty>, args: usize, blocks: Vec<(Vec<Statement>, Terminato
         contracts: Vec::new(),
         fall_off: None,
         bad_literals: Vec::new(),
+        uncheckable: Vec::new(),
         span: Span::new(0, 0),
     }
 }

@@ -5,14 +5,18 @@ use gt_oblig::analysis::{Status, analyze_body, summarize};
 use gt_oblig::prover::ZoneProver;
 
 fn report(src: &str, key: &str) -> gt_oblig::analysis::BodyReport {
-    let (_t, m) = common::mir(src);
+    let (t, m) = common::mir(src);
     assert!(
         m.report.diagnostics.is_empty(),
         "{:?}",
         common::mir_codes(&m)
     );
     let b = m.body(key).unwrap_or_else(|| panic!("no body {key}"));
-    analyze_body(b, &m.keys, &mut ZoneProver::new(24))
+    analyze_body(
+        b,
+        &gt_oblig::driver::build_prog_info(&t, &m),
+        &mut ZoneProver::new(24),
+    )
 }
 
 fn show(r: &gt_oblig::analysis::BodyReport) -> String {

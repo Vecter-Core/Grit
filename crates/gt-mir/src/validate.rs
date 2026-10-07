@@ -77,6 +77,7 @@ fn assert_operands(k: &AssertKind) -> Vec<&Operand> {
         AssertKind::IndexOutOfBounds { len, index } => vec![len, index],
         AssertKind::SliceRange { from, to, len } => vec![from, to, len],
         AssertKind::CastLossy { value, .. } => vec![value],
+        AssertKind::Precondition | AssertKind::Postcondition | AssertKind::Invariant => vec![],
     }
 }
 

@@ -8,7 +8,7 @@ fn main::sum_range(_1: u32) -> u32 {
     let mut _6: u32; // temp
     let mut _7: bool; // temp
     let _8: u32; // user `i`
-    // hợp đồng chưa hạ (M7): 1
+    // hợp đồng ghi nhận (⊳⊲ thân riêng, ⋈ là Assert, ↓ thuộc M8): 1
     bb0: {
         StorageLive(_2);
         _2 = const 0_u32;
@@ -206,7 +206,7 @@ fn main::count(_1: u32) -> u32 {
     let mut _5: bool; // temp
     let mut _6: bool; // temp
     let mut _7: (u32, bool); // temp
-    // hợp đồng chưa hạ (M7): 1
+    // hợp đồng ghi nhận (⊳⊲ thân riêng, ⋈ là Assert, ↓ thuộc M8): 1
     bb0: {
         StorageLive(_2);
         _2 = const 0_u32;
