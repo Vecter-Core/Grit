@@ -45,8 +45,8 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0703 | Đệ quy thiếu `↓` | M8 | — |
 | E0801 | Hiệu ứng suy ra ⊄ khai báo | M8 | E0801_effect_undeclared |
 | E0802 | Hàm `∅` gọi hàm có hiệu ứng | M8 | — |
-| E0901 | Tiền điều kiện chắc chắn sai | M7 | E0901_precondition_false |
-| E0902 | Obligation không kiểm lúc chạy được mà chưa giải (D25) | M7 | — |
+| E0901 | Hợp đồng chắc chắn sai: `⊳` tại lời gọi, `⊲` ở điểm thoát, `⋈` ở đầu vòng lặp (ADR-025 §6) | M7 | E0901_precondition_false, E0901_shift_too_far, E0901_postcondition_false, E0901_invariant_false |
+| E0902 | Obligation không kiểm lúc chạy được mà chưa giải (D25): lượng từ không có biên `a..b`; `⊳` cần gọi lúc chạy mà đối số không `Copy`; `⊲` nhắc tham số bị gán lại | M7 | E0902_quantifier_over_range_value, E0902_noncopy_argument_unproven_pre, E0902_post_names_reassigned_param |
 | E1001 | Nghĩa vụ `⚠` chưa giải (D21); con trỏ thô `*□ T`/`*μ T` hoặc `#noreturn` dùng ngoài phạm vi cho phép (Q12, Q13) | M7 | E1001_unsafe_unproven, E1001_raw_ptr_outside_unsafe |
 | E1002 | Thuộc tính `#lang` dùng ngoài `lib/core`/prelude (ADR-018 §5, Q21) | M4 | E1002_lang_on_fn, E1002_lang_on_struct, E1002_lang_on_trait |
 | E1101 | IR Guard: attestation lệch | M10 | — |

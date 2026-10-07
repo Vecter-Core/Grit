@@ -1,0 +1,3 @@
+// expect: pass
+// note: -128i8 hợp lệ
+ƒ f() → i8 ! ∅ { -128i8 }

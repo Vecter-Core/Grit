@@ -1,0 +1,4 @@
+// expect: pass
+// note: đối số Copy: ⊳ hạ runtime (N0901)
+ƒ pos(n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ g(x: i32) → i32 ! ∅ { pos(x) }

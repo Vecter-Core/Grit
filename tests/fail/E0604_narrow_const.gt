@@ -1,0 +1,3 @@
+// expect: fail E0604
+// note: 300 as u8
+ƒ f() → u8 ! ∅ { 300 as u8 }

@@ -1,0 +1,4 @@
+// expect: fail E0901
+// note: pos(-3) vi phạm ⊳ n > 0
+ƒ pos(n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ f() → i32 ! ∅ { pos(-3) }

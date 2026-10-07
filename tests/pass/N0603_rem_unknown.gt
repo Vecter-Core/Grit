@@ -1,0 +1,3 @@
+// expect: pass
+// note: N0603: a % b
+ƒ f(a: u32, b: u32) → u32 ! ∅ { a % b }

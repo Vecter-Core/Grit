@@ -1,0 +1,3 @@
+// expect: fail E0601
+// note: MIN / -1 luôn tràn (E0601, không phải E0602)
+ƒ f() → i32 ! ∅ { m: i32 ≔ -2147483648; m / -1 }

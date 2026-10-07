@@ -1,0 +1,3 @@
+// expect: pass
+// note: N0604: i32 → u32
+ƒ f(a: i32) → u32 ! ∅ { a as u32 }

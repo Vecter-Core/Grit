@@ -1,0 +1,3 @@
+// expect: fail E0601
+// note: -x với x = i8::MIN luôn tràn
+ƒ f() → i8 ! ∅ { x: i8 ≔ -128; -x }

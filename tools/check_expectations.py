@@ -34,6 +34,11 @@ DOC_REQUIRED = [
     "E0301", "E0302", "E0303", "E0304", "E0305", "E0307", "E0308", "E0309",
     "E0310", "E0311", "E0312", "E0313", "E0314", "E0315", "E1002",
     "E0401", "E0402", "E0403", "E0404", "E0405", "E0406", "E0407",
+    "E0601", "E0602", "E0603", "E0604", "E0901", "E0902",
+]
+# Ghi chú (N) của M7: docs/errors/<mã>.md với >=3 mẫu `pass` (mỗi mẫu PHẢI phát đúng ghi chú đó: kiểm bằng gt-oblig/tests/corpus.rs).
+NOTE_DOC_REQUIRED = [
+    "N0601", "N0602", "N0603", "N0604", "N0605", "N0901", "N0902", "N0903", "N0904",
 ]
 DOC_LINE_RE = re.compile(r"^- (fail|pass): (\S+)\s*$")
 
@@ -182,6 +187,23 @@ def check_error_docs():
                     err(f"{rel}: '{ref}' có expect '{exp}', cần '{want}'")
 
 
+def check_note_docs():
+    """docs/errors/<N-mã>.md: có tệp, >=3 `- pass:` tồn tại và đúng kỳ vọng `pass`."""
+    for code in NOTE_DOC_REQUIRED:
+        path = os.path.join(ROOT, "docs", "errors", code + ".md")
+        rel = f"docs/errors/{code}.md"
+        if not os.path.isfile(path):
+            err(f"{rel}: thiếu tài liệu ghi chú")
+            continue
+        with open(path, encoding="utf-8") as f:
+            refs = [m.group(2) for m in (DOC_LINE_RE.match(ln) for ln in f.read().split("\n")) if m and m.group(1) == "pass"]
+        if len(refs) < 3:
+            err(f"{rel}: cần >=3 dòng '- pass: <tham chiếu>', có {len(refs)}")
+        for ref in refs:
+            if read_expect_of(ref) != "pass":
+                err(f"{rel}: tham chiếu '{ref}' không tồn tại hoặc không phải 'expect: pass'")
+
+
 def check_unicode(name, text, rel):
     allow_bidi, allow_inv, allow_non_nfc = UNICODE_EXEMPT.get(name, (False, False, False))
     for ch in text:
@@ -260,6 +282,7 @@ def main():
         multi_files += check_case_dir(kind, name, path, codes)
     total += multi_files
     check_error_docs()
+    check_note_docs()
 
     # mỗi mục tham chiếu trong bảng mã lỗi phải trỏ tới file có thật; mỗi mã đó khớp tiền tố
     cited = set()

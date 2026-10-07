@@ -1,0 +1,4 @@
+// expect: pass
+// note: ⎇ x > 0 chứng minh ⊳
+ƒ pos(n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ g(x: i32) → i32 ! ∅ { ⎇ x > 0 { pos(x) } ⇝ { 1 } }

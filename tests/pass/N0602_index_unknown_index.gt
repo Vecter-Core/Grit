@@ -1,0 +1,3 @@
+// expect: pass
+// note: N0602: a[i] với i chưa biết
+ƒ f(i: usize) → i32 ! ∅ { a ≔ [1, 2, 3]; a[i] }

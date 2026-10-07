@@ -1,0 +1,4 @@
+// expect: pass
+// note: N0901: pos(x - y) không chứng minh được
+ƒ pos(n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ g(x: i32, y: i32) → i32 ! ∅ { pos(x -% y) }

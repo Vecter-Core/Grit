@@ -1,0 +1,3 @@
+// expect: pass
+// note: N0904: ⋈ i <= n không chứng minh được ⇒ kiểm ở đầu mỗi vòng
+ƒ f(n: u32) → u32 ! ∅ { μi ≔ 0u32; ⟳ i < 10 ↓ 10 - i ⋈ i <= n { i ← i + 1; } i }

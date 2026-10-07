@@ -1,0 +1,4 @@
+// expect: pass
+// note: N0901: ⊳ chưa chứng minh ⇒ kiểm lúc chạy tại điểm gọi
+ƒ pos(n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ g(x: i32) → i32 ! ∅ { pos(x) }

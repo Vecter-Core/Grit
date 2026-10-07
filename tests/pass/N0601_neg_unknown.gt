@@ -1,0 +1,3 @@
+// expect: pass
+// note: N0601: -x với x bất kỳ
+ƒ f(x: i32) → i32 ! ∅ { -x }

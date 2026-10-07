@@ -1,0 +1,3 @@
+// expect: fail E0901
+// note: ⊲ result > 5 nhưng luôn trả 1
+ƒ f() → i32 ! ∅ ⊲ result > 5 { 1 }

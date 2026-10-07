@@ -1,0 +1,3 @@
+// expect: fail E0901
+// note: shl(x, 40) vi phạm ⊳ n < 32
+ƒ f(x: u32) → u32 ! ∅ { shl(x, 40) }

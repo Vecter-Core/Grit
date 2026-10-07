@@ -1,0 +1,3 @@
+// expect: fail E0901
+// note: ⋈ i > 100 sai ngay lần đầu tới đầu vòng
+ƒ f() → u32 ! ∅ { μi ≔ 0u32; ⟳ i < 3 ↓ 3 - i ⋈ i > 100 { i ← i + 1; } i }

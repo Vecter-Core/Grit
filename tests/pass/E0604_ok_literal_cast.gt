@@ -1,0 +1,3 @@
+// expect: pass
+// note: 200 as u8 vừa
+ƒ f() → u8 ! ∅ { 200 as u8 }

@@ -1,0 +1,3 @@
+// expect: fail E0902
+// note: unwrap(Option) chưa biết is_some mà Option không Copy nên không kiểm lúc chạy được
+ƒ f(o: Option<i32>) → i32 ! ∅ { o.unwrap() }

@@ -1,0 +1,3 @@
+// expect: fail E0604
+// note: -1 as u32
+ƒ f() → u32 ! ∅ { x: i32 ≔ -1; x as u32 }

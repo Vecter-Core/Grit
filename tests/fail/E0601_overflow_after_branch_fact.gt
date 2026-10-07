@@ -1,0 +1,3 @@
+// expect: fail E0601
+// note: a ≥ 200 nên a + 100 (u8) luôn tràn
+ƒ f(a: u8) → u8 ! ∅ { ⎇ a >= 200 { a + 100 } ⇝ { 0 } }

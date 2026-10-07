@@ -1,0 +1,3 @@
+// expect: pass
+// note: ⊲ result == 1 chứng minh được
+ƒ one() → i32 ! ∅ ⊲ result == 1 { 1 }

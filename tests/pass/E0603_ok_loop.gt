@@ -1,0 +1,3 @@
+// expect: pass
+// note: duyệt đến len
+ƒ f(xs: &[i32]) → i32 ! ∅ { μi ≔ 0; μt ≔ 0; ⟳ i < xs.len() ↓ xs.len() - i { t ← t +% xs[i]; i ← i + 1; } t }

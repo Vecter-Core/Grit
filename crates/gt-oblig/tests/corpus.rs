@@ -97,8 +97,7 @@ fn every_pass_case_has_no_obligation_errors() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
-// E0901/E0902 thuộc bước hợp đồng (v)
-const OWNED: &[&str] = &["E0601", "E0602", "E0603", "E0604"];
+const OWNED: &[&str] = &["E0601", "E0602", "E0603", "E0604", "E0901", "E0902"];
 
 #[test]
 fn fail_cases_of_m7_give_exactly_their_code() {
@@ -121,7 +120,7 @@ fn fail_cases_of_m7_give_exactly_their_code() {
             "{n}: kỳ vọng chỉ {code}, có {errs:?}"
         );
     }
-    assert!(owned >= 4, "chỉ {owned} mẫu thuộc M7");
+    assert!(owned >= 20, "chỉ {owned} mẫu thuộc M7");
 }
 
 #[test]
@@ -147,4 +146,47 @@ fn dump_kept() {
             }
         }
     }
+}
+
+const NOTE_CODES: &[&str] = &[
+    "N0601", "N0602", "N0603", "N0604", "N0605", "N0901", "N0902", "N0903", "N0904",
+];
+
+/// Mẫu `pass/N0xxx_*` phải phát ĐÚNG ghi chú mang tên nó; mẫu `pass/E06xx_ok_*`/`E09xx_ok_*` không được có lỗi
+/// (đã kiểm ở test trên) — và mẫu "ok" của mã nào thì mã đó không được xuất hiện.
+#[test]
+fn note_samples_emit_their_note() {
+    let mut n = 0;
+    for p in entries("pass") {
+        let nm = name(&p);
+        let Some(code) = NOTE_CODES.iter().find(|c| nm.starts_with(&format!("{c}_"))) else {
+            continue;
+        };
+        n += 1;
+        let (o, _t) = run_all(&p).unwrap_or_else(|| panic!("{nm}: phải qua M4/M5"));
+        assert!(
+            codes(&o).iter().any(|c| c == code),
+            "{nm}: thiếu ghi chú {code}: {:?}",
+            codes(&o)
+        );
+    }
+    assert!(n >= 27, "chỉ {n} mẫu ghi chú");
+}
+
+#[test]
+fn ok_samples_do_not_emit_their_own_code() {
+    let mut n = 0;
+    for p in entries("pass") {
+        let nm = name(&p);
+        let Some(code) = OWNED.iter().find(|c| nm.starts_with(&format!("{c}_ok_"))) else {
+            continue;
+        };
+        n += 1;
+        let (o, _t) = run_all(&p).unwrap_or_else(|| panic!("{nm}: phải qua M4/M5"));
+        assert!(
+            !codes(&o).iter().any(|c| c == code),
+            "{nm}: không được có {code}"
+        );
+    }
+    assert!(n >= 20, "chỉ {n} mẫu ok");
 }

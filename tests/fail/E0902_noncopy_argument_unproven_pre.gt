@@ -1,0 +1,4 @@
+// expect: fail E0902
+// note: ⊳ chưa chứng minh mà đối số Buf không sao chép được để gọi hợp đồng lúc chạy
+ƒ take(b: Buf, n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ f(b: Buf, k: i32) → i32 ! ∅ { take(b, k) }

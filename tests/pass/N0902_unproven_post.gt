@@ -1,0 +1,3 @@
+// expect: pass
+// note: N0902: ⊲ chưa chứng minh ⇒ kiểm ở thoát hàm
+ƒ f(x: i32) → i32 ! ∅ ⊲ result > 0 { x }
