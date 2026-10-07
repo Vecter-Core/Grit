@@ -24,7 +24,7 @@ import threading
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORK = os.environ.get("GRIT_MUT_DIR", "D:/Grit_mut")
-TEST_CMD = ["cargo", "test", "-p", "gt-borrowck"]
+TEST_CMD = os.environ.get("GRIT_MUT_TEST", "cargo test -p gt-borrowck").split()
 TIMEOUT = int(os.environ.get("GRIT_MUT_TIMEOUT", "900"))
 
 # (regex, thay thế, tên) — áp lên MỖI lần xuất hiện trong dòng mã (không phải chú thích)
@@ -58,6 +58,12 @@ RULES = [
     (r" - 1\b", " + 1", "-1 → +1"),
     (r"\bis_some\(\)", "is_none()", "is_some → is_none"),
     (r"\bis_none\(\)", "is_some()", "is_none → is_some"),
+    (r"\.max\(", ".min(", "max → min"),
+    (r"\.min\(", ".max(", "min → max"),
+    (r"checked_add\(", "checked_sub(", "checked_add → checked_sub"),
+    (r"checked_sub\(", "checked_add(", "checked_sub → checked_add"),
+    (r"Tri::Yes\b", "Tri::Maybe", "Yes → Maybe"),
+    (r"Tri::No\b", "Tri::Maybe", "No → Maybe"),
     (r"\bis_empty\(\)", "!{X}.is_empty()", None),  # xử lý riêng bên dưới (bỏ qua)
 ]
 RULES = [r for r in RULES if r[2] is not None]
@@ -299,7 +305,7 @@ def main():
     a = sub.add_parser("list")
     a.add_argument("files", nargs="+")
     b = sub.add_parser("run")
-    b.add_argument("--workers", type=int, default=2)
+    b.add_argument("--workers", type=int, default=1)
     b.add_argument("--out", required=True)
     b.add_argument("--limit", type=int, default=0)
     b.add_argument("--only-survivors", help="chỉ chạy lại các đột biến đang SỐNG SÓT trong tệp .jsonl này (đã sửa mã/test từ lần trước)")
