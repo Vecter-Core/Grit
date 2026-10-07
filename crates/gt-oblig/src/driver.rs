@@ -298,6 +298,10 @@ pub fn remaining_checks_json(out: &OblOutput) -> String {
     );
     let mut first = true;
     for r in &out.per_body {
+        // thân hợp đồng của prelude không có nghĩa vụ nào: không đưa vào báo cáo
+        if r.key.starts_with("$prelude") && r.judged.is_empty() {
+            continue;
+        }
         if !first {
             s.push(',');
         }

@@ -151,6 +151,14 @@ class Worker:
                 shutil.rmtree(dst, ignore_errors=True)
                 shutil.copytree(src, dst, ignore=shutil.ignore_patterns("target", "fuzz", "mutants.out"))
         os.makedirs(f"{self.dir}/tmp", exist_ok=True)
+        if os.environ.get("GRIT_MUT_NO_OPT") == "1":
+            # bản sao làm việc biên dịch gt-oblig ở opt-level 0 (nhanh hơn nhiều; chỉ dùng với bộ test nhỏ, KHÔNG với vét cạn/oracle)
+            cp = os.path.join(self.dir, "Cargo.toml")
+            with open(cp, encoding="utf-8", newline="") as f:
+                t = f.read()
+            t = t.replace("opt-level = 2", "opt-level = 0")
+            with open(cp, "w", encoding="utf-8", newline="") as f:
+                f.write(t)
         for root, _, files in os.walk(f"{self.dir}/crates"):
             for fn in files:
                 if fn.endswith(".rs"):

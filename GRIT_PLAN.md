@@ -263,14 +263,20 @@ grit/
   crates/
     gt-span/                 bản đồ nguồn, span
     gt-diag/                 chẩn đoán, mã lỗi, mức độ, JSON
-    gt-lexer/  gt-ast/  gt-parser/
+    gt-lexer/
+    gt-ast/
+    gt-parser/
     gt-resolve/              giải tên, module
     gt-types/                kiểm kiểu, traits tĩnh, đơn hình hoá
     gt-mir/                  biểu diễn trung gian (MIR); bước hạ MIR là nơi DUY NHẤT đọc AST + bảng của gt-types
     (gt-hir/)                HOÃN, không bỏ (ADR-020 §9, Q27): chưa cần lớp HIR riêng ở Phase 1
     gt-dataflow/             khung phân tích lattice
     gt-borrowck/             sở hữu & mượn
-    gt-effects/  gt-conc/  gt-edge/  gt-term/  gt-secrets/
+    gt-effects/
+    gt-conc/
+    gt-edge/
+    gt-term/
+    gt-secrets/
     gt-oblig/                Obligation IR + bộ giải P1 (interval/const)
     gt-codegen-llvm/         MIR → LLVM IR
     gt-guard/                IR Guard + attestation
@@ -399,8 +405,9 @@ Chỉ chuyển khi đạt **tất cả**:
 6. `KNOWN_LIMITATIONS.md` và `PROGRESS.md` được xem xét bởi Giang.
 7. Có ADR chốt giao diện **Obligation IR** ở dạng ổn định (đây là "khớp nối" quan trọng nhất sang Phase 2).
 8. M13 (LSP) hoàn thành và schema JSON chẩn đoán đóng băng (đây là "khớp nối" thứ hai sang 8.E).
-10. **Điều kiện cứng về mutability bên trong (Giang, 2026-10-07):** đột biến 238/361/591/554 của `gt-borrowck/src/regions.rs` (xem `KNOWN_LIMITATIONS.md`) chỉ an toàn chừng nào ngôn ngữ chưa có mutability bên trong, nhưng M8 đưa `Mutex`/atomics vào trước M12. **Trước khi bất kỳ kiểu nào có mutability bên trong được đưa vào fixture hoặc lib**, bốn đột biến này phải được mở lại: mỗi cái hoặc bị giết bằng chương trình tấn công có dùng mutability bên trong (kèm kịch bản `interior_mut` trong bộ sinh, tắt bản sửa để kiểm), hoặc có lập luận tương đương mới tính cả mutability bên trong. Chưa xong thì M8 không được bắt đầu phần `Mutex`/atomics.
-9. **Điều kiện cứng về lỗ hổng đã biết của M4/M5 (Giang, 2026-10-06):** trước M7, literal ngoài phạm vi kiểu (`x: u8 ≔ 300`) LỌT qua M4 (E0601 thuộc M7), và thiếu đường trả về (E0307) thuộc M5. Vì vậy **M9 không được coi là xong, và `gritc` không được sinh binary**, nếu E0601 (M7) chưa được triển khai và qua test; tương tự nếu E0307 (M5) chưa triển khai. Đây là cổng chặn, không phải ghi chú.
+9. **Điều kiện cứng về mutability bên trong (Giang, 2026-10-07):** đột biến 238/361/591/554 của `gt-borrowck/src/regions.rs` (xem `KNOWN_LIMITATIONS.md`) chỉ an toàn chừng nào ngôn ngữ chưa có mutability bên trong, nhưng M8 đưa `Mutex`/atomics vào trước M12. **Trước khi bất kỳ kiểu nào có mutability bên trong được đưa vào fixture hoặc lib**, bốn đột biến này phải được mở lại: mỗi cái hoặc bị giết bằng chương trình tấn công có dùng mutability bên trong (kèm kịch bản `interior_mut` trong bộ sinh, tắt bản sửa để kiểm), hoặc có lập luận tương đương mới tính cả mutability bên trong. Chưa xong thì M8 không được bắt đầu phần `Mutex`/atomics.
+10. **Điều kiện cứng về đột biến chưa giải quyết của M7 (Giang, 2026-10-08):** M9 KHÔNG được coi là xong nếu còn đột biến của `gt-oblig/src/analysis.rs` (đường quyết định xoá/giữ) chưa giải quyết theo hướng "xoá thêm check" (làm bộ giải xoá nhiều check hơn đúng — nguy hiểm; hướng "giữ thừa check" chỉ tốn hiệu năng). Ngoài ra M9 PHẢI có chế độ **giữ mọi check** (không xoá check nào, kể cả check đã chứng minh), hoạt động đúng và có test, và chế độ này là MẶC ĐỊNH khi dùng thử Grit thật cho tới khi điều kiện trên được giải quyết. Đây là đề xuất của Giang để đánh giá trong ADR của M9 (chưa triển khai ở M7). Danh sách đột biến chưa giải quyết: `KNOWN_LIMITATIONS.md`, mục "gt-oblig".
+11. **Điều kiện cứng về lỗ hổng đã biết của M4/M5 (Giang, 2026-10-06):** trước M7, literal ngoài phạm vi kiểu (`x: u8 ≔ 300`) LỌT qua M4 (E0601 thuộc M7), và thiếu đường trả về (E0307) thuộc M5. Vì vậy **M9 không được coi là xong, và `gritc` không được sinh binary**, nếu E0601 (M7) chưa được triển khai và qua test; tương tự nếu E0307 (M5) chưa triển khai. Đây là cổng chặn, không phải ghi chú.
 
 ---
 

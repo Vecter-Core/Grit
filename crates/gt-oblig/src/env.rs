@@ -213,6 +213,10 @@ impl Env {
 
     /// Cận trên/dưới của `P = a − b` dùng zone (hai biến ngược dấu cùng trong zone).
     fn zone_diff(&self, p: &Lin) -> (Option<I256>, Option<I256>) {
+        // hai vế cùng biểu thức (các biến triệt tiêu): P = c CHÍNH XÁC (vd `x == x`, `x + 1 > x`)
+        if p.vars.is_empty() {
+            return (Some(p.c), Some(p.c));
+        }
         // P = c + (+x) + (−y)  ⇒  x − y ≤ m[x][y]  nên  P ≤ c + m[x][y];  y − x ≤ m[y][x] nên  P ≥ c − m[y][x]
         if let [(s1, v1), (s2, v2)] = p.vars.as_slice()
             && *s1 == -*s2

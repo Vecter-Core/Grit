@@ -1237,10 +1237,14 @@ impl<'a> Ctx<'a> {
             if let Some(p) = self.prop_of(st, &ret_op) {
                 props.insert(BOOL_BASE + r, p);
             }
-            let goal = cp
-                .prop
-                .as_ref()
-                .and_then(|p| self.subst_prop_k(p, &ints, &props, &keys, bb));
+            // tham số bị gán lại / mượn `&!`: giá trị lúc vào đã mất ⇒ KHÔNG chứng minh bằng giá trị hiện tại (sẽ sai nghĩa)
+            let goal = if bad_param.is_some() {
+                None
+            } else {
+                cp.prop
+                    .as_ref()
+                    .and_then(|p| self.subst_prop_k(p, &ints, &props, &keys, bb))
+            };
             let g = goal.unwrap_or(Prop::Atom(self.unrep_atom(bb, idx)));
             let params_copy = (1..self.nl.min(cp.arg_count)).all(|i| self.local_is_copy(i));
             let why = if let Some(b) = bad_param {
