@@ -75,6 +75,8 @@ pub struct Interp<'a> {
     pub mir: &'a MirOutput,
     frames: Vec<Frame>,
     fuel: u64,
+    /// vết các `Assert` đã chạy: (khoá thân, khối, đạt?) — để oracle M7 kiểm "tới được ⇒ sai"
+    pub asserts: Vec<(String, u32, bool)>,
 }
 
 enum Flow {
@@ -91,6 +93,7 @@ impl<'a> Interp<'a> {
             mir,
             frames: Vec::new(),
             fuel,
+            asserts: Vec::new(),
         }
     }
 
@@ -183,8 +186,14 @@ impl<'a> Interp<'a> {
                     kind,
                     target,
                 } => match self.operand(cond) {
-                    Ok(V::Bool(x)) if x == *expected => cur = *target,
-                    Ok(V::Bool(_)) => return Flow::Abort(kind.name().to_string()),
+                    Ok(V::Bool(x)) if x == *expected => {
+                        self.asserts.push((b.key.clone(), cur.0, true));
+                        cur = *target;
+                    }
+                    Ok(V::Bool(_)) => {
+                        self.asserts.push((b.key.clone(), cur.0, false));
+                        return Flow::Abort(kind.name().to_string());
+                    }
                     Ok(o) => return Flow::Bug(format!("assert trên {o:?}")),
                     Err(e) => return e,
                 },
@@ -219,6 +228,26 @@ impl<'a> Interp<'a> {
                         let k = self.mir.keys.get(&node).cloned().unwrap_or_default();
                         if k.ends_with("core::abort") {
                             return Flow::Abort("abort".to_string());
+                        }
+                        if k == "$prelude::[T0]::len"
+                            && let [V::Ref(fr, l, path)] = vals.as_slice()
+                        {
+                            // `<[T]>::len(&s)` của prelude (thân prelude không có MIR)
+                            let n = match self.get(*fr, *l, path) {
+                                Ok(V::Array(x)) => x.len() as i128,
+                                Ok(other) => return Flow::Bug(format!("len trên {other:?}")),
+                                Err(e) => return e,
+                            };
+                            if let Err(e) = self.write(dest, V::Int(n, IntTy::Usize)) {
+                                return e;
+                            }
+                            match target {
+                                Some(x) => {
+                                    cur = *x;
+                                    continue;
+                                }
+                                None => return Flow::Bug("len trả về `!`".to_string()),
+                            }
                         }
                         return Flow::Bug(format!("không có thân MIR cho {k}"));
                     };

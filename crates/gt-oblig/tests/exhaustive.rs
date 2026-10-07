@@ -216,7 +216,13 @@ fn check_binary(
 
 fn widths() -> Vec<(u32, bool)> {
     let mut v = Vec::new();
-    for w in 2..=8 {
+    // GT_FAST=1 (chỉ cho đột biến giai đoạn 1): độ rộng 2..=5; cổng và giai đoạn 2 chạy đủ 2..=8
+    let top = if std::env::var("GT_FAST").is_ok_and(|v| v == "1") {
+        5
+    } else {
+        8
+    };
+    for w in 2..=top {
         v.push((w, false));
         v.push((w, true));
     }
