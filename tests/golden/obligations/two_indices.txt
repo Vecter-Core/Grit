@@ -1,0 +1,13 @@
+fn main::pair: nghĩa vụ 4 | xoá 3 | giữ lúc chạy 1 | ĐỎ 0 | e0902 0 | Assert 4 → 1
+  main::pair#0 overflow       bb0   giữ N0601
+  main::pair#1 index          bb3   xoá (interval+zone)
+  main::pair#2 overflow       bb6   xoá (interval+zone)
+  main::pair#3 index          bb7   xoá (interval+zone)
+fn main::firsts: nghĩa vụ 2 | xoá 2 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 2 → 0
+  main::firsts#0 index          bb2   xoá (interval+zone)
+  main::firsts#1 index          bb5   xoá (interval+zone)
+fn main::unchecked: nghĩa vụ 3 | xoá 1 | giữ lúc chạy 2 | ĐỎ 0 | e0902 0 | Assert 3 → 2
+  main::unchecked#0 index          bb0   giữ N0602
+  main::unchecked#1 overflow       bb1   xoá (interval+zone)
+  main::unchecked#2 index          bb2   giữ N0602
+-- tổng: nghĩa vụ 9 | xoá 6 | giữ 3 | ĐỎ 0 | e0902 0 | Assert 9 → 3

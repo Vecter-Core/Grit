@@ -1,0 +1,4 @@
+ƒ narrow(a: i32) → u8 ! ∅ { ⎇ a >= 0 { ⎇ a <= 255 { a as u8 } ⇝ { 0 } } ⇝ { 0 } }
+ƒ wide(a: u8) → i64 ! ∅ { a as i64 }
+ƒ lossy(a: i64) → i16 ! ∅ { a as i16 }
+ƒ sign(a: u32) → i32 ! ∅ { ⎇ a < 100 { a as i32 } ⇝ { 0 } }

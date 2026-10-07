@@ -1,0 +1,5 @@
+fn main::sum: nghĩa vụ 3 | xoá 2 | giữ lúc chạy 1 | ĐỎ 0 | e0902 0 | Assert 3 → 1
+  main::sum#0 index          bb2   xoá (interval+zone)
+  main::sum#1 overflow       bb5   giữ N0601
+  main::sum#2 overflow       bb6   xoá (interval+zone)
+-- tổng: nghĩa vụ 3 | xoá 2 | giữ 1 | ĐỎ 0 | e0902 0 | Assert 3 → 1

@@ -1,0 +1,12 @@
+fn main::pos: nghĩa vụ 1 | xoá 0 | giữ lúc chạy 1 | ĐỎ 0 | e0902 0 | Assert 0 → 1
+  main::pos#0 post           bb0   giữ N0902
+fn main::pos⊳0: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::pos⊲1: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::q: nghĩa vụ 1 | xoá 0 | giữ lúc chạy 1 | ĐỎ 0 | e0902 0 | Assert 0 → 1
+  main::q#0 post           bb0   giữ N0903
+fn main::q⊳0: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::q⊲1: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::inv: nghĩa vụ 2 | xoá 1 | giữ lúc chạy 1 | ĐỎ 0 | e0902 0 | Assert 2 → 1
+  main::inv#0 invariant      bb1   giữ N0904
+  main::inv#1 overflow       bb2   xoá (interval+zone)
+-- tổng: nghĩa vụ 4 | xoá 1 | giữ 3 | ĐỎ 0 | e0902 0 | Assert 2 → 3

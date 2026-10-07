@@ -1,0 +1,8 @@
+fn main::narrow: nghĩa vụ 1 | xoá 1 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 1 → 0
+  main::narrow#0 cast_lossy     bb4   xoá (interval+zone)
+fn main::wide: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::lossy: nghĩa vụ 1 | xoá 0 | giữ lúc chạy 1 | ĐỎ 0 | e0902 0 | Assert 1 → 1
+  main::lossy#0 cast_lossy     bb0   giữ N0604
+fn main::sign: nghĩa vụ 1 | xoá 1 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 1 → 0
+  main::sign#0 cast_lossy     bb1   xoá (interval+zone)
+-- tổng: nghĩa vụ 3 | xoá 2 | giữ 1 | ĐỎ 0 | e0902 0 | Assert 3 → 1

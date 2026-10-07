@@ -1,0 +1,9 @@
+ƒ sum(xs: &[i64]) → i64 ! ∅ {
+  μs ≔ 0;
+  μi ≔ 0;
+  ⟳ i < xs.len() ↓ xs.len() - i {
+    s ← s + xs[i];
+    i ← i + 1;
+  }
+  s
+}

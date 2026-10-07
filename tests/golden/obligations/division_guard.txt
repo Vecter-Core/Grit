@@ -1,0 +1,11 @@
+fn main::guarded: nghĩa vụ 1 | xoá 1 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 1 → 0
+  main::guarded#0 div_zero       bb1   xoá (interval+zone)
+fn main::unguarded: nghĩa vụ 1 | xoá 0 | giữ lúc chạy 1 | ĐỎ 0 | e0902 0 | Assert 1 → 1
+  main::unguarded#0 div_zero       bb0   giữ N0603
+fn main::signed: nghĩa vụ 2 | xoá 2 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 2 → 0
+  main::signed#0 div_zero       bb1   xoá (interval+zone)
+  main::signed#1 div_overflow   bb4   xoá (interval+zone)
+fn main::rem: nghĩa vụ 2 | xoá 2 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 2 → 0
+  main::rem#0 rem_zero       bb0   xoá (interval+zone)
+  main::rem#1 div_overflow   bb1   xoá (interval+zone)
+-- tổng: nghĩa vụ 6 | xoá 5 | giữ 1 | ĐỎ 0 | e0902 0 | Assert 6 → 1

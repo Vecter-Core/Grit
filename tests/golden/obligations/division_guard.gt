@@ -1,0 +1,4 @@
+ƒ guarded(a: u32, b: u32) → u32 ! ∅ { ⎇ b != 0 { a / b } ⇝ { 0 } }
+ƒ unguarded(a: u32, b: u32) → u32 ! ∅ { a / b }
+ƒ signed(a: i32, b: i32) → i32 ! ∅ { ⎇ b > 0 { a / b } ⇝ { 0 } }
+ƒ rem(a: i32) → i32 ! ∅ { a % 7 }

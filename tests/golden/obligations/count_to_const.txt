@@ -1,0 +1,6 @@
+fn main::count: nghĩa vụ 1 | xoá 1 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 1 → 0
+  main::count#0 overflow       bb2   xoá (interval+zone)
+fn main::fixed: nghĩa vụ 2 | xoá 2 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 2 → 0
+  main::fixed#0 index          bb2   xoá (interval+zone)
+  main::fixed#1 overflow       bb4   xoá (interval+zone)
+-- tổng: nghĩa vụ 3 | xoá 3 | giữ 0 | ĐỎ 0 | e0902 0 | Assert 3 → 0
