@@ -298,39 +298,64 @@ impl OGen {
             }
             89..=99 if !self.helpers.is_empty() => {
                 let k = self.rng.below(self.helpers.len() as u64) as usize;
-                let (name, params, has_slice) = {
-                    let h = &self.helpers[k];
-                    (h.name.clone(), h.params, h.has_slice)
-                };
-                let mut args: Vec<String> = Vec::new();
-                for _ in 0..params {
-                    args.push(self.expr(sc, depth - 1));
-                }
-                if has_slice {
-                    if let Some((a, n)) = sc.arrays.first().cloned() {
-                        self.stats.slice_calls += 1;
-                        // cắt lát [0..k] với k có thể vượt độ dài (nghĩa vụ SliceRange)
-                        let k = if self.rng.chance(40) {
-                            n.to_string()
-                        } else if self.rng.chance(50) {
-                            format!("{}", n + 1)
-                        } else {
-                            // cận cắt là biến (nghĩa vụ chưa chứng minh được)
-                            let v = self.var(sc);
-                            self.index(sc, &v)
-                        };
-                        args.insert(0, format!("&{a}[0..{k}]"));
-                    } else if let Some(s) = sc.slices.first() {
-                        self.stats.slice_calls += 1;
-                        args.insert(0, s.clone());
-                    } else {
-                        return self.atom(sc);
-                    }
-                }
-                format!("{name}({})", args.join(", "))
+                self.call_helper(sc, k, depth, false)
+                    .unwrap_or_else(|| self.atom(sc))
             }
             _ => self.atom(sc),
         }
+    }
+
+    /// lời gọi hàm phụ thứ `k` với đối số ngẫu nhiên (và hai lát nếu hàm nhận lát)
+    fn call_helper(
+        &mut self,
+        sc: &Scope,
+        k: usize,
+        depth: u32,
+        valid_slices: bool,
+    ) -> Option<String> {
+        let (name, params, has_slice) = {
+            let h = &self.helpers[k];
+            (h.name.clone(), h.params, h.has_slice)
+        };
+        let mut args: Vec<String> = Vec::new();
+        for _ in 0..params {
+            args.push(self.expr(sc, depth.saturating_sub(1)));
+        }
+        if has_slice {
+            // hàm phụ có HAI tham số lát `(μxs, zs)`: truyền hai lát (cùng hoặc khác mảng)
+            let (a1, a2) = (
+                self.slice_arg(sc, valid_slices)?,
+                self.slice_arg(sc, valid_slices)?,
+            );
+            self.stats.slice_calls += 1;
+            args.insert(0, a2);
+            args.insert(0, a1);
+        }
+        Some(format!("{name}({})", args.join(", ")))
+    }
+
+    /// một biểu thức kiểu `&[T]`: cắt mảng cục bộ hoặc chuyển tiếp một tham số lát
+    fn slice_arg(&mut self, sc: &Scope, valid: bool) -> Option<String> {
+        if let Some((a, n)) = sc.arrays.first().cloned()
+            && (sc.slices.is_empty() || self.rng.chance(70))
+        {
+            // cắt lát [0..k] với k có thể vượt độ dài (nghĩa vụ SliceRange)
+            let k = if valid || self.rng.chance(60) {
+                // lát hợp lệ, độ dài tuỳ ý trong [1, n] để hai lát có thể KHÁC độ dài
+                (1 + self.rng.below(n as u64)).to_string()
+            } else if self.rng.chance(50) {
+                format!("{}", n + 1)
+            } else {
+                // cận cắt là biến (nghĩa vụ chưa chứng minh được)
+                let v = self.var(sc);
+                self.index(sc, &v)
+            };
+            return Some(format!("&{a}[0..{k}]"));
+        }
+        if sc.slices.is_empty() {
+            return None;
+        }
+        Some(sc.slices[self.rng.below(sc.slices.len() as u64) as usize].clone())
     }
 
     fn cond(&mut self, sc: &Scope, depth: u32) -> String {
@@ -420,6 +445,19 @@ impl OGen {
                     out.push_str(&format!("{a} ≔ [{}]; ", elems.join(", ")));
                     sc.arrays.push((a, n));
                 }
+                93..=96 if !sc.slices.is_empty() => {
+                    // bí danh bất biến của một lát
+                    let from = sc.slices[self.rng.below(sc.slices.len() as u64) as usize].clone();
+                    let al = self.fresh("al");
+                    out.push_str(&format!("{al} ≔ {from}; "));
+                    sc.slices.push(al);
+                }
+                97..=99
+                    if sc.slices.iter().any(|x| x == "xs")
+                        && sc.slices.iter().any(|x| x == "zs") =>
+                {
+                    out.push_str("xs ← zs; ");
+                }
                 85..=92 if in_fn_with_ret => {
                     let c = self.cond(sc, 1);
                     let e = self.expr(sc, 2);
@@ -441,7 +479,7 @@ impl OGen {
         if params.is_empty() {
             return out;
         }
-        if self.rng.chance(45) {
+        if self.rng.chance(30) {
             self.stats.pre += 1;
             let p = &params[self.rng.below(params.len() as u64) as usize];
             let k = self.lit();
@@ -485,12 +523,29 @@ impl OGen {
             };
             let mut params: Vec<String> = pnames.iter().map(|p| format!("{p}: {t}")).collect();
             if has_slice {
-                params.insert(0, format!("xs: &[{t}]"));
+                // `μxs` có thể bị gán lại (đối chứng cho chuỗi bí danh của tham số lát), `zs` thì không
+                params.insert(0, format!("zs: &[{t}]"));
+                params.insert(0, format!("μxs: &[{t}]"));
                 sc.slices.push("xs".into());
+                sc.slices.push("zs".into());
             }
             let ctr = self.contracts(&pnames, true);
             let n = 2 + self.rng.below(3) as usize;
-            let body = self.stmts(&mut sc, 2, n, true);
+            // kịch bản "bí danh rồi gán lại tham số lát" (luật bộ sinh grit-contract §3.3, lỗ hổng #3 của M7)
+            let mut pre = String::new();
+            if has_slice && self.rng.chance(40) {
+                pre.push_str("al0 ≔ xs; xs ← zs; ");
+                sc.slices.push("al0".into());
+                // truy cập `xs` (đã là `zs`) sau khi chỉ kiểm độ dài của bí danh (= xs cũ)
+                let e = self.expr(&sc, 1);
+                let ix = self.index(&sc, &e);
+                let fb = self.atom(&sc);
+                let w = self.fresh("w");
+                pre.push_str(&format!(
+                    "{w} ≔ ⎇ {ix} < al0.len() {{ xs[{ix}] }} ⇝ {{ {fb} }}; "
+                ));
+            }
+            let body = format!("{pre}{}", self.stmts(&mut sc, 2, n, true));
             let tail = self.expr(&sc, 2);
             src.push_str(&format!(
                 "ƒ {name}({}) → {t} ! ∅{ctr} {{ {body}{tail} }}\n",
@@ -512,7 +567,16 @@ impl OGen {
         };
         let params: Vec<String> = pn.iter().map(|p| format!("{p}: {t}")).collect();
         let n = 3 + self.rng.below(4) as usize;
-        let body = self.stmts(&mut sc, 3, n, true);
+        // gọi MỌI hàm phụ ngay đầu (trước các phép có thể abort), trên mảng `ar0` của đầu vào: để mọi hàm đều được chạy
+        let mut calls = format!("ar0 ≔ [{}]; ", pn.join(", "));
+        sc.arrays.push(("ar0".into(), entry_params));
+        for k in 0..self.helpers.len() {
+            if let Some(c) = self.call_helper(&sc, k, 1, true) {
+                let v = self.fresh("c");
+                calls.push_str(&format!("{v} ≔ {c}; "));
+            }
+        }
+        let body = format!("{calls}{}", self.stmts(&mut sc, 3, n, true));
         let tail = self.expr(&sc, 3);
         src.push_str(&format!(
             "ƒ entry({}) → {t} ! ∅ {{ {body}{tail} }}\n",

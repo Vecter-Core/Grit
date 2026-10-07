@@ -319,7 +319,8 @@ impl<'a> Ctx<'a> {
             let mut cur = i;
             for _ in 0..nl {
                 match reborrow.get(&cur) {
-                    Some(&r) if assigns[cur] == 1 && is_slice_ref(r) => cur = r,
+                    // tham số có thêm một lần gán ngầm (giá trị lúc vào) nên KHÔNG phải mắt xích đơn-gán
+                    Some(&r) if assigns[cur] == 1 && !is_arg(cur) && is_slice_ref(r) => cur = r,
                     _ => break,
                 }
             }
@@ -780,10 +781,11 @@ impl<'a> Ctx<'a> {
         // định nghĩa mới KHÔNG được tham chiếu chính `dst` (sau gán `Var(dst)` là giá trị mới)
         // chỉ biến TẠM mới mang định nghĩa (biến người dùng sống trong `env`); định nghĩa không được tham chiếu chính `dst`
         let new_def = new_def.filter(|d| {
-            matches!(
-                self.body.locals[dst].kind,
-                LocalKind::Temp | LocalKind::Return
-            ) && !d.locals(self).contains(&dst)
+            let decl = &self.body.locals[dst];
+            // biến tạm, giá trị trả về, và biến người dùng BẤT BIẾN (`x ≔ …`: gán đúng một lần; bị xoá khi một biến nó nhắc tới bị gán lại)
+            (matches!(decl.kind, LocalKind::Temp | LocalKind::Return)
+                || (matches!(decl.kind, LocalKind::User { .. }) && !decl.mutable))
+                && !d.locals(self).contains(&dst)
         });
         // cập nhật môi trường
         let tracked = self.tracked(dst);
