@@ -129,3 +129,6 @@ Bốn đột biến cuối của `gt-borrowck/src/regions.rs` sống sót qua m�
 - **591** (kết quả lời gọi: quan hệ hai chiều): lập luận — biến region của callee được tạo mới và cận dưới duy nhất của nó là chính kết quả, nên chiều ngược không thêm ràng buộc nào có thể quan sát. CHẶT hơn.
 - **554** (`&self` của phương thức khai báo như `&!self`): hướng CHẶT hơn (thêm bất biến cho phần trỏ tới); tôi không viết được chương trình hợp lệ bị từ chối nhầm trong giới hạn nỗ lực hợp lý.
 Ba trong bốn là hướng chặt hơn (không phải lỗ hổng an toàn nếu sai); 254 là hướng lỏng hơn và phụ thuộc vào việc ngôn ngữ chưa có mutability bên trong.
+
+### ĐIỀU KIỆN CỨNG: mutability bên trong (Giang, 2026-10-07; cũng ở GRIT_PLAN.md mục 7, điểm 10)
+Đột biến **238 (`regions.rs:254`)** chỉ an toàn chừng nào ngôn ngữ chưa có mutability bên trong, nhưng M8 đưa `Mutex`/atomics vào trước M12. **Trước khi bất kỳ kiểu nào có mutability bên trong được đưa vào fixture hoặc lib**, mở lại 238, 361, 591, 554: mỗi cái hoặc bị giết bằng chương trình tấn công dùng mutability bên trong (thêm kịch bản `interior_mut` vào bộ sinh, tắt bản sửa để kiểm), hoặc có lập luận tương đương mới tính cả mutability bên trong. **Chưa xong thì M8 không được bắt đầu phần Mutex/atomics.**

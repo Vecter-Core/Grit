@@ -69,7 +69,7 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 
 ## 8. Hợp đồng (Phase 1)
 - `⊳` (pre): người gọi phải chứng minh bằng P1; không chứng minh được → hạ runtime check (kiểm được)
-  + N0901, hoặc ĐỎ E0901 nếu **chắc chắn sai**. `⊲` (post): kiểm lúc chạy ở `dev`. Kiểm tĩnh đầy đủ = 8.A.
+  + N0901, hoặc ĐỎ E0901 nếu **chắc chắn sai**. `⊲` (post): kiểm lúc chạy ở thoát hàm trừ khi chứng minh được. **Check chưa chứng minh được được GIỮ ở MỌI hồ sơ (dev và release)** — D25/fail-closed; hồ sơ chỉ đổi sanitizer (Giang, 2026-10-07, Q36). Kiểm tĩnh đầy đủ = 8.A.
 - Lượng từ `∀ ∃` chỉ hợp lệ có biên (`∀ i ∈ 0..n : a[i] ≥ 0` — dùng `:` thay `.` vì `0..n.` mơ hồ với range/truy cập trường; Q14). Lượng từ không biên mà chưa giải → ĐỎ (D25).
 
 ## 9. Unsafe (D21)

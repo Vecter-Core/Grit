@@ -88,7 +88,7 @@ MIR(CFG)  [7] Hạ xuống MIR: basic block, place, borrow, drop
   │         [11] Kiểm đa luồng (Send/Sync-like, thứ tự khoá)
   │         [12] Kiểm biên/trường hợp biên (tràn số, chia 0, chỉ số, ép kiểu…) → sinh Obligation
   │         [13] Kiểm điều kiện dừng (termination)
-  │         [14] Bộ giải Obligation (P1: miền khoảng + hằng; P2: SMT + Kernel)
+  │         [14] Bộ giải Obligation (P1: miền khoảng + zone + hằng; P2: SMT + Kernel)
   │         [15] Kiểm bảo mật/secret (VÀNG)
   ▼
  [16] PHÁN QUYẾT: có ĐỎ hoặc ICE ⇒ dừng. Chỉ VÀNG/GHI CHÚ ⇒ đi tiếp, in cảnh báo.
@@ -332,7 +332,7 @@ grit/
 **M7 — Biên & trường hợp biên (miền khoảng)**
 
 - Sinh Obligation cho: tràn số (cộng/trừ/nhân/âm số nhỏ nhất/shift), chia 0, chỉ số mảng, ép kiểu mất thông tin, `unwrap` trên `None`…
-- Bộ giải P1: hằng số, **miền khoảng** (interval), điều kiện nhánh/vòng lặp, `⊳` của hàm hiện tại. Giải được → **xoá check**; không giải được nhưng kiểm lúc chạy được → **runtime check + GHI CHÚ** (D24/D25).
+- Bộ giải P1: hằng số, **miền khoảng** (interval) **cộng zone** (ràng buộc hiệu `x − y ≤ c` giữa các biến nguyên và độ dài lát — cần thiết để chứng minh `xs[i]` từ `i < xs.len()` như ví dụ §4.3; miền khoảng thuần không làm được vì `xs.len()` không phải hằng), điều kiện nhánh/vòng lặp (widening/narrowing), `⊳` của hàm hiện tại (ADR-025, Giang duyệt 2026-10-07). Giải được → **xoá check**; không giải được nhưng kiểm lúc chạy được → **runtime check + GHI CHÚ** (D24/D25), ở MỌI hồ sơ (dev và release). Bộ giải thứ hai (liệt kê vét cạn trên độ rộng bit nhỏ) là bắt buộc ở Phase 1 để chứng minh giao diện cắm được và làm oracle.
 - _Hoàn thành khi:_ test cả hai chiều (check bị xoá khi chứng minh được; check còn khi không); đo số check còn lại trên chương trình mẫu.
 
 **M8 — Hiệu ứng, điều kiện dừng, đa luồng**
@@ -399,6 +399,7 @@ Chỉ chuyển khi đạt **tất cả**:
 6. `KNOWN_LIMITATIONS.md` và `PROGRESS.md` được xem xét bởi Giang.
 7. Có ADR chốt giao diện **Obligation IR** ở dạng ổn định (đây là "khớp nối" quan trọng nhất sang Phase 2).
 8. M13 (LSP) hoàn thành và schema JSON chẩn đoán đóng băng (đây là "khớp nối" thứ hai sang 8.E).
+10. **Điều kiện cứng về mutability bên trong (Giang, 2026-10-07):** đột biến 238/361/591/554 của `gt-borrowck/src/regions.rs` (xem `KNOWN_LIMITATIONS.md`) chỉ an toàn chừng nào ngôn ngữ chưa có mutability bên trong, nhưng M8 đưa `Mutex`/atomics vào trước M12. **Trước khi bất kỳ kiểu nào có mutability bên trong được đưa vào fixture hoặc lib**, bốn đột biến này phải được mở lại: mỗi cái hoặc bị giết bằng chương trình tấn công có dùng mutability bên trong (kèm kịch bản `interior_mut` trong bộ sinh, tắt bản sửa để kiểm), hoặc có lập luận tương đương mới tính cả mutability bên trong. Chưa xong thì M8 không được bắt đầu phần `Mutex`/atomics.
 9. **Điều kiện cứng về lỗ hổng đã biết của M4/M5 (Giang, 2026-10-06):** trước M7, literal ngoài phạm vi kiểu (`x: u8 ≔ 300`) LỌT qua M4 (E0601 thuộc M7), và thiếu đường trả về (E0307) thuộc M5. Vì vậy **M9 không được coi là xong, và `gritc` không được sinh binary**, nếu E0601 (M7) chưa được triển khai và qua test; tương tự nếu E0307 (M5) chưa triển khai. Đây là cổng chặn, không phải ghi chú.
 
 ---
