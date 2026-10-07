@@ -311,11 +311,11 @@ fn unique_references_are_invariant_in_what_they_point_to() {
         "{cr}\nƒ f() ! ∅ {{ z ≔ 1; y ≔ 5; μc ≔ Cr {{ r: &z }}; c.put(&y); use_i(*c.r); }}"
     ));
     // ADT giữ `&!` của tham chiếu: bất biến theo cả ADT
-    let sl = "▢ Sl<'a> { s: &!'a &'a i32 }
-ƒ put2<'a>(sl: Sl<'a>, v: &'a i32) ! ∅ { *sl.s ← v; }";
+    let sl = "▢ SlT<'a> { s: &!'a &'a i32 }
+ƒ putt2<'a>(sl: SlT<'a>, v: &'a i32) ! ∅ { *sl.s ← v; }";
     let (src, r) = run(&format!(
         "{sl}
-ƒ f() ! ∅ {{ z ≔ 1; μp ≔ &z; {{ y ≔ 7; sl ≔ Sl {{ s: &!p }}; put2(sl, &y); }}; use_i(*p); }}"
+ƒ f() ! ∅ {{ z ≔ 1; μp ≔ &z; {{ y ≔ 7; sl ≔ SlT {{ s: &!p }}; putt2(sl, &y); }}; use_i(*p); }}"
     ));
     assert!(
         bc_codes(&r).iter().any(|c| c == "E0404"),
@@ -433,9 +433,9 @@ fn adts_are_invariant_exactly_when_a_field_type_is() {
         "ƒ f() ! ∅ { μx ≔ 1; h1 ≔ Hs { r: &x }; { y ≔ 2; μh ≔ Hs { r: &y }; h ← Hs { r: h1.r }; use_i(*h.r); }; use_i(*h1.r); }",
     );
     // ADT bọc ADT bất biến cũng bất biến (qua đối số kiểu)
-    let wr = "▢ Wr2<T> { t: T }\nƒ put5<'a>(x: Wr2<Sl<'a>>, v: &'a i32) ! ∅ { *x.t.s ← v; }\n▢ Sl<'a> { s: &!'a &'a i32 }";
+    let wr = "▢ Wr2<T> { t: T }\nƒ put5<'a>(x: Wr2<SlT<'a>>, v: &'a i32) ! ∅ { *x.t.s ← v; }\n▢ SlT<'a> { s: &!'a &'a i32 }";
     let (src, r) = run(&format!(
-        "{wr}\nƒ f() ! ∅ {{ z ≔ 1; μp ≔ &z; {{ y ≔ 7; x ≔ Wr2 {{ t: Sl {{ s: &!p }} }}; put5(x, &y); }}; use_i(*p); }}"
+        "{wr}\nƒ f() ! ∅ {{ z ≔ 1; μp ≔ &z; {{ y ≔ 7; x ≔ Wr2 {{ t: SlT {{ s: &!p }} }}; put5(x, &y); }}; use_i(*p); }}"
     ));
     // bị từ chối (E0403: `p` còn bị `&!` giữ tới lần dùng sau; hoặc E0404: `y` treo)
     assert!(!bc_codes(&r).is_empty(), "{src}");
@@ -463,13 +463,61 @@ fn an_adt_with_one_invariant_field_among_covariant_ones_is_invariant() {
         bc_show(&r)
     );
     // bọc trong ADT hiệp biến: bất biến truyền lên qua đối số kiểu (`||`, không phải `&&`)
-    let wr = "▢ Id1<T> { t: T }\nƒ put7<'a>(x: Id1<Sl2<'a>>, v: &'a i32) ! ∅ { *x.t.s ← v; }";
+    let wr = "▢ IdT<T> { t: T }\nƒ put7<'a>(x: IdT<Sl2<'a>>, v: &'a i32) ! ∅ { *x.t.s ← v; }";
     let (src, r) = run(&format!(
-        "{sl2}\n{wr}\nƒ f() ! ∅ {{ z ≔ 1; μp ≔ &z; {{ y ≔ 7; sl ≔ Sl2 {{ s: &!p, n: 0 }}; put7(Id1 {{ t: sl }}, &y); }}; use_i(*p); }}"
+        "{sl2}\n{wr}\nƒ f() ! ∅ {{ z ≔ 1; μp ≔ &z; {{ y ≔ 7; sl ≔ Sl2 {{ s: &!p, n: 0 }}; put7(IdT {{ t: sl }}, &y); }}; use_i(*p); }}"
     ));
     assert!(
         !bc_codes(&r).is_empty(),
         "phải bị từ chối
 {src}"
     );
+}
+
+#[test]
+fn recursive_adts_stay_covariant() {
+    // `adt_invariant` đệ quy qua `Option<&Lst<'a>>`: chốt chặn vòng phải trả `false` (hiệp biến), nếu không `Lst` thành bất biến và
+    // `y` bị mượn lây theo `t`. Hợp lệ: `h ← Lst { n: Some(t) }` rồi ghi `y` sau khi `h` hết dùng, `t` còn dùng sau.
+    expect_ok(
+        "▢ Lst<'a> { v: i32, n: Option<&'a Lst<'a>> }\nƒ f() ! ∅ { μa ≔ Lst { v: 1, n: None }; μy ≔ Lst { v: 2, n: None }; t ≔ &a; μh ≔ Lst { v: 3, n: Some(&y) }; h ← Lst { v: 4, n: Some(t) }; use_i(h.v); y.v ← 5; use_i(t.v); }",
+    );
+}
+
+#[test]
+fn raw_pointers_are_invariant_in_what_they_point_to() {
+    // không thể thu hẹp `'a` của `*μ &'a i32` (con trỏ thô bất biến): `y` ngắn hơn region phổ quát của `p`
+    expect_codes(
+        "ƒ g<'a>(p: *μ &'a i32, v: &'a i32) ! ∅ { }\nƒ f<'x>(p: *μ &'x i32) ! ∅ { y ≔ 1; g(p, &y); }",
+        "E0404",
+        1,
+    );
+}
+
+#[test]
+fn a_static_requirement_reports_every_region_the_source_fails_to_outlive() {
+    // `'static` outlive MỌI region phổ quát: trả `&'a` thay `&'static` vi phạm với `'static` VÀ với `'b`
+    let (_, r) = run("ƒ st<'a, 'b>(x: &'a i32, y: &'b i32) → &'static i32 ! ∅ { x }");
+    assert_eq!(bc_codes(&r), vec!["E0404", "E0404"], "{:?}", bc_show(&r));
+}
+
+#[test]
+fn a_covariant_wrapper_of_an_invariant_adt_is_invariant() {
+    // `IdU<T>` hiệu biến, nhưng `IdU<SlU<'a>>` bất biến theo `'a`: `sl` là THAM SỐ (region phổ quát `'a`), `y` cục bộ ngắn hơn ⇒ ĐỎ;
+    // nếu coi `IdU` hiệp biến thì `'a` bị thu hẹp xuống region của `y` và chương trình bị chấp nhận
+    let adts = "▢ SlU<'a> { s: &!'a &'a i32 }\n▢ IdU<T> { t: T }\nƒ putu<'a>(x: IdU<SlU<'a>>, v: &'a i32) ! ∅ { *x.t.s ← v; }";
+    expect_codes(
+        &format!(
+            "{adts}\nƒ attack<'a>(sl: SlU<'a>) ! ∅ {{ y ≔ 7; w ≔ IdU {{ t: sl }}; putu(w, &y); }}"
+        ),
+        "E0404",
+        1,
+    );
+}
+
+#[test]
+fn function_typed_parameters_are_mapped() {
+    let ap = "ƒ ident(x: &i32) → &i32 ! ∅ { x }\nƒ ap<'a>(fun: ƒ(&'a i32) → &'a i32 ! ∅, x: &'a i32) → &'a i32 ! ∅ { fun(x) }";
+    expect_ok(&format!(
+        "{ap}\nƒ f() ! ∅ {{ μx ≔ 1; r ≔ ap(ident, &x); use_i(*r); x ← 2; }}"
+    ));
 }

@@ -416,18 +416,18 @@ fn arena_versions_are_invalidated_by_every_operation() {
 fn invariance_survives_adt_construction() {
     // ADT giữ `&!` của một tham chiếu: DỰNG ADT từ `&!p` phải đồng nhất region trong (bất biến), nếu không ghi một tham chiếu
     // ngắn qua ADT làm `p` treo (lỗ hổng tìm thấy khi đột biến `adt_invariant` sống sót)
-    let sl = "▢ Sl<'a> { s: &!'a &'a i32 }
-ƒ put2<'a>(sl: Sl<'a>, v: &'a i32) ! ∅ { *sl.s ← v; }";
+    let sl = "▢ SlT<'a> { s: &!'a &'a i32 }
+ƒ putt2<'a>(sl: SlT<'a>, v: &'a i32) ! ∅ { *sl.s ← v; }";
     attack(
-        "dựng Sl từ &!p rồi ghi tham chiếu ngắn",
+        "dựng SlT từ &!p rồi ghi tham chiếu ngắn",
         sl,
-        "z ≔ 1; μp ≔ &z; { y ≔ 7; sl ≔ Sl { s: &!p }; put2(sl, &y); }; use_i(*p);",
+        "z ≔ 1; μp ≔ &z; { y ≔ 7; sl ≔ SlT { s: &!p }; putt2(sl, &y); }; use_i(*p);",
         "E0404",
     );
     fine(
-        "dựng Sl, không dùng p sau đó (Rust cũng từ chối dùng p: &!'a &'a ghim p suốt 'a)",
+        "dựng SlT, không dùng p sau đó (Rust cũng từ chối dùng p: &!'a &'a ghim p suốt 'a)",
         sl,
-        "z ≔ 1; y ≔ 7; μp ≔ &z; sl ≔ Sl { s: &!p }; put2(sl, &y);",
+        "z ≔ 1; y ≔ 7; μp ≔ &z; sl ≔ SlT { s: &!p }; putt2(sl, &y);",
     );
 }
 

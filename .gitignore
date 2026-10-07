@@ -7,3 +7,4 @@ crates/*/fuzz/artifacts
 crates/*/fuzz/logs
 mutants.out
 mutants.out.old
+__pycache__/

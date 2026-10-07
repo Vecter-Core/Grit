@@ -477,4 +477,105 @@ Chỉ thấy vi phạm trên đường đã chạy; chương trình bộ sinh kh
 ### 7. Bổ sung sau đột biến và săn soundness (ghi để review)
 - **Lỗ hổng #1 (E0401):** ghi qua con trỏ/mảng đã move không bị báo (`check_uses` chỉ kiểm đọc). Sửa + `soundness.rs` + 3 mẫu corpus + hành động bộ sinh; tắt bản sửa thì oracle tự bắt 14/5 000.
 - **Lỗ hổng #2 (E0404/E0403):** DỰNG một ADT bất biến (`Sl<'a> { s: &!'a &'a i32 }`) từ `&!p` chỉ ràng buộc hiệp biến ⇒ thu hẹp được region trong của `p` ⇒ ghi một tham chiếu ngắn qua ADT làm `p` treo, borrowck chấp nhận. Sửa: `Aggregate(Adt)` của ADT bất biến ràng buộc hai chiều với bó region của ADT. **Chi phí độ chính xác (sound, chặt hơn):** khoản vay `&!p` bị kéo dài bằng vòng đời của vùng tham chiếu bên trong (`use_i(*p)` sau khi dựng `Sl` là E0403 — Rust cũng từ chối `&'a mut &'a i32`). Do đột biến `adt_invariant` sống sót tìm ra; oracle không bắt được lúc đó vì bộ sinh chưa có ADT như vậy (bài học: oracle chỉ phủ cấu trúc bộ sinh sinh ra).
-- **Bộ đếm phòng thủ:** `gt_borrowck::defensive_counters()` đếm số lần đường "bảo thủ" dự phòng của lời gọi `Fn`/`TraitMethod` và số lần `relate` lệch độ dài. Mọi test (corpus, 20 000 chương trình ngẫu nhiên) khẳng định cả hai bằng 0 — bằng chứng (không phải chứng minh) rằng các nhánh `return false`/kiểm độ dài trong `call_sig`/`walk`/`relate` là chốt chặn phòng thủ không với tới được bằng chương trình qua M4.
+- **Bộ đếm phòng thủ (và fail-closed, M6-close):** mỗi chốt chặn phòng thủ trong `call_sig`/`walk`/`relate`/`setup_universals` khi bị chạm nay ghi ICE (`Gen::defend` ⇒ `check_body` trả E9901, nguyên tắc P3) — KHÔNG còn âm thầm rơi về đường bảo thủ hay bỏ qua quan hệ. `gt_borrowck::defensive_counters()` đếm số lần chạm; mọi test (corpus xấu/đúng, 20 000 chương trình ngẫu nhiên) khẳng định bằng (0, 0). **Bằng chứng kiểm thử, không phải chứng minh** rằng các chốt không với tới được bằng chương trình qua M4.
+- **Luật bộ sinh (grit-contract §3.3, M6-close):** lỗ hổng #2 giờ có kịch bản riêng `adt_invariant` (loại thứ 10 của bảng độ phủ, ngưỡng ≥ 300 mỗi cột); tắt bản sửa ⇒ bộ sinh tự phát hiện 151 âm tính giả/5 000 chương trình. Dựng ADT dùng `ty_invariant` của kiểu ĐÃ THẾ (vd `Id1<Sl<'a>>` bất biến dù `Id1` hiệp biến).
+
+
+## ADR-025 — M7: Obligation IR và bộ giải P1 (DỰ THẢO viết TRƯỚC khi code, 2026-10-07; CHỜ GIANG DUYỆT — chưa có dòng mã M7 nào)
+**Phạm vi:** crate mới `gt-bounds` (đề xuất tên) đọc MIR của M5 (`Assert`, `Body.contracts`, literal) + dataflow; sinh **Obligation**, chạy bộ giải P1, xoá check chứng minh được, giữ check còn lại kèm ghi chú N06xx/N09xx hoặc báo ĐỎ E06xx/E09xx. Đây là **giao diện ổn định** sang Phase 2 (điều kiện 7 của cổng chuyển giai đoạn, GRIT_PLAN §7). Mọi đoạn "Đề xuất" bên dưới là ý kiến của tôi, KHÔNG phải quyết định.
+
+### 0. Những chỗ nói thẳng trước khi duyệt (plan sai/thiếu/mâu thuẫn)
+1. **Ví dụ `sum` ở GRIT_PLAN §4.3 (`xs[i]` được chứng minh từ `i < xs.len()`) KHÔNG làm được bằng miền khoảng thuần**, đúng như lệnh nhận xét: `xs.len()` không phải hằng, nên từ `i ∈ [0, MAX−1]` và `len ∈ [0, MAX]` không suy ra `i < len`. Cần **quan hệ giữa hai biến**. Đề xuất §3: miền khoảng + **zone** (ràng buộc hiệu `x − y ≤ c`). Với zone, ví dụ làm được đúng như plan viết (xoá check `xs[i]`; `i + 1` cũng xoá được vì `i < len ≤ MAX`; `s + xs[i]` còn check N0601). Hệ quả: plan §6.2 M7 ghi "miền khoảng" cần sửa thành "miền khoảng + zone (ràng buộc hiệu)"; ví dụ §4.3 giữ nguyên. (Cần Giang duyệt vì plan là nguồn sự thật.)
+2. **"shift" và "unwrap trên None" của plan M7 chưa có cú pháp/lõi để sinh Obligation:** `docs/spec/symbols.md` (Q9) bỏ toán tử bit/dịch bit, chỉ có hàm `shl shr band …` trong `lib/core` (M12); `unwrap` cũng là hàm của `lib/core`. Hai nghĩa vụ này vì vậy là **tiền điều kiện `⊳` của hàm thư viện** (`⊳ n < bits`, `⊳ self là Some`) và đi qua cơ chế hợp đồng (§7). M7 cài cơ chế và test bằng hàm người dùng có `⊳ n < 32`; nối vào `shl/shr/unwrap` thật xảy ra ở M12. Plan M7 không sai nhưng dễ bị hiểu là M7 tự sinh chúng.
+3. **Mâu thuẫn nhỏ semantics §8 vs D25:** §8 nói `⊲` "kiểm lúc chạy ở `dev`"; D25/fail-closed đòi nghĩa vụ chưa chứng minh mà kiểm được phải GIỮ ở mọi hồ sơ (nếu release bỏ thì lời hứa chưa chứng minh được tin cậy). Đề xuất: giữ ở mọi hồ sơ; hồ sơ chỉ đổi sanitizer. Cần xác nhận (Q36).
+4. **Chưa có định nghĩa chính thức** của làm tròn `/` `%` trên số nguyên có dấu (thông dịch M5 dùng chia cắt về 0, dấu của `%` theo số bị chia). Đề xuất ghi vào semantics §2: cắt về 0, `%` cùng dấu số bị chia, `MIN / -1` và `MIN % -1` là tràn (Obligation `x ≠ MIN ∨ y ≠ −1`). Cần xác nhận (Q37).
+5. **Không dùng tiên đề thêm về độ dài:** chỉ `len ≤ usize::MAX` (hiển nhiên theo kiểu). Không giả định `len ≤ isize::MAX` dù Rust có: đó là tiên đề về runtime phải nằm trong TCB; chưa cần cho `sum` (xem 1).
+6. **Cổng cứng mục 7 điểm 9:** E0601 (literal ngoài phạm vi kiểu) là việc của M7 và chặn M9/`gritc build`; xem §6.
+
+### 1. Cấu trúc Obligation (a)
+```
+Obligation {
+  id:       ObId,          // ổn định: (khoá thân hàm, thứ tự sinh trong thân theo RPO + chỉ số trong câu lệnh); không phụ thuộc băm
+  kind:     ObKind,        // Overflow{op,ty} | NegMin{ty} | DivZero | RemZero | DivOverflow{ty} (MIN/−1)
+                           // | Index{len_atom} | SliceRange | CastLossy{from,to} | LiteralRange{ty}
+                           // | Pre{callee} | Post | Invariant | QuantBounded | Custom(lib) ; mở rộng được, `#[non_exhaustive]`
+  span, node, body,        // vị trí nguồn + NodeId + khoá thân (chẩn đoán, `--json`)
+  at:       Location,      // điểm MIR (khối, chỉ số) — để Phase 2 đối chiếu đúng chỗ
+  goal:     Prop,          // công thức cần chứng minh (xem dưới)
+  hyps:     Vec<Prop>,     // GIẢ THIẾT tại điểm đó (điều kiện nhánh/vòng lặp, ⊳ của hàm này, bất biến suy ra), cùng ngôn ngữ Prop
+  runtime:  Checkability,  // Checkable{via: AssertKind} | NotCheckable{why} (D25)
+  status:   Status,        // Open | Discharged{by: Prover, cert: Cert} | DefinitelyFalse{witness} | Lowered{note: NCode}
+}
+Term = Int(ty, I256) | Var(VarId) | Len(Term)  // `len` của slice/mảng bất biến là nguyên tử thuần
+     | Add|Sub|Mul|Div|Rem|Neg(Term..) | Cast(ty, Term) | Ite(Prop, Term, Term)
+Prop = Le|Lt|Eq|Ne(Term, Term) | And|Or|Not|Implies | ForallB(var, lo, hi, Prop) | ExistsB(..)  // lượng từ CÓ BIÊN
+```
+`Var` là biến SSA-hoá theo điểm MIR (không phải `Local` thô) để `hyps` và `goal` cùng nghĩa; công thức KHÔNG chứa đối tượng của miền trừu tượng nên **bất kỳ bộ giải nào cũng đọc được** (SMT-LIB hoá trực tiếp: `Term` → bit-vector/integer, `Prop` → boolean). Đề xuất: số nguyên toán học (không modular) trong `Prop`; phép quấn vòng `+% -% *%` biểu diễn bằng `Cast`/`Rem` tường minh, không có ký hiệu riêng.
+**Ranh giới Phase 1 / Phase 2:** Phase 1 sở hữu (i) sinh Obligation từ MIR, (ii) trích `hyps` từ dataflow, (iii) `trait Prover { fn prove(&mut self, ob: &Obligation, budget: Budget) -> Verdict }` với `Verdict = Proved(Cert) | Refuted(Witness) | Unknown`, (iv) bộ giải P1 là MỘT cài đặt của `Prover`, (v) chính sách hạ/xoá/báo. Phase 2 chỉ thay/chồng `Prover` (SMT, kernel chứng minh) và thêm giả thiết (bất biến vòng lặp `⋈`, hợp đồng), KHÔNG đổi `Obligation`/`Verdict`/chính sách. `Cert` ở Phase 1 là bản ghi nhỏ ("khoảng của x là [a,b] tại điểm P", "zone: x−y ≤ c") để một bộ kiểm độc lập kiểm lại; ở Phase 2 là chứng cứ SMT/kernel. `budget` đo bằng BƯỚC (D20), không phải giây.
+**Đánh đổi:** công thức trung lập (+) chặn phụ thuộc vào miền, dễ nối SMT; (−) lặp lại một phần thông tin mà miền đã có, và phải dịch miền → `hyps` (làm một lần, kiểm bằng test "hyps ⊢ goal" ngược lại với bộ giải). Phương án thay thế "chuyển trực tiếp trạng thái miền sang Phase 2" gắn chặt giao diện vào zone — bị loại.
+
+### 2. Mức mạnh của bộ giải P1 (b) — sẽ và KHÔNG chứng minh
+**Đề xuất:** mỗi biến nguyên có (i) khoảng `[lo, hi]` bằng `I256` (§5), (ii) tập **zone** `x − y ≤ c` giữa biến nguyên và nguyên tử `len(·)`, đóng bao Floyd–Warshall (zone/DBM, Miné 2001), (iii) sự kiện nhánh/vòng lặp được cộng vào cả hai; (iv) `⊳` của hàm hiện tại là giả thiết.
+**Sẽ chứng minh:** các Obligation `x < len`, `x + c < len`, `x ≤ y + c` khi suy ra được từ điều kiện nhánh/vòng lặp bằng bắc cầu và cộng hằng (ví dụ `sum`; hai biến chỉ số `i < j < len`; `n == len ∧ n > 0 ⇒ n−1 < len`); tràn của `i + 1` khi `i < len ≤ MAX`; phép toán trên hằng và khoảng nhỏ; `x − y` không âm khi `y ≤ x`; chỉ số của vòng đếm tới hằng `0..N` với mảng `[T; N]`.
+**KHÔNG chứng minh (⇒ check còn lại + N06xx):** phụ thuộc dữ liệu (`s + xs[i]`); phi tuyến (`i*j < n`, `i*i`); quan hệ qua bộ nhớ/tham chiếu thay đổi được (`*p` đổi giữa hai điểm: nguyên tử coi là không biết); chỉ số tính từ nhiều biến ngoài zone (`xs[2*i + 1]`); đa thức/modulo (`i % 2`) ngoài khoảng; mọi thứ phụ thuộc bất biến vòng lặp phải ĐOÁN (cần SMT/`⋈`, 8.A). Với mỗi loại nghĩa vụ ADR liệt kê ví dụ "xoá được/không xoá được" và chúng trở thành test hai chiều (§9).
+**Đánh đổi:** chỉ khoảng: rẻ, nhưng không làm được ví dụ chủ đạo của plan. Khoảng + sự kiện nhánh khớp cú pháp (so `goal` với điều kiện): làm được `sum` nhưng dễ vỡ (`i < len` viết `len > i`, hay qua biến phụ). Zone: bắc cầu chuẩn, độ phức tạp `O(n³)` mỗi đóng bao (n = số biến trong hàm; chặn bằng ngân sách bước, quá ngân sách ⇒ bỏ hết ràng buộc quan hệ, sound). Octagon/đa diện: mạnh hơn, đắt hơn, để Phase 2. **Đề xuất: zone.**
+
+### 3. Phân tích vòng lặp: dừng và sound (c)
+**Đề xuất:** lặp điểm cố định theo RPO; **widening** tại đầu vòng lặp (đích của cạnh lùi): khoảng nhảy tới ngưỡng tiếp theo trong tập {0, ±1, hằng xuất hiện trong hàm, MIN/MAX của kiểu} rồi ±∞∩kiểu; zone dùng widening chuẩn (bỏ ràng buộc không ổn định); sau đó **hai lượt narrowing** dùng lại điều kiện nhánh. **Dừng:** dàn có chiều cao hữu hạn sau widening (mọi cận lấy từ tập ngưỡng hữu hạn + kiểu; ràng buộc zone dùng hằng từ tập hữu hạn), cộng thêm **ngân sách bước** (D20) — hết ngân sách ⇒ trạng thái của hàm = ⊤ cho mọi Obligation chưa chứng minh (sound, nhiều check hơn).
+**Sound:** (1) widening ⊒ join nên kết quả là hậu-điểm-cố-định; (2) narrowing chỉ áp dụng khi kết quả vẫn ⊒ lfp: mỗi bước `S' = F(S) ⊓ S`, giữ `F(S') ⊑ S'`; (3) **bộ kiểm hậu-điểm-cố-định độc lập** (cùng tinh thần validator của M5): sau khi chốt, kiểm lại `F(S_b) ⊑ S_b` tại MỌI khối bằng một hàm viết riêng, không dùng đường widening; kiểm hỏng ⇒ coi cả hàm là ⊤ và báo ICE E99xx (không âm thầm tin kết quả). Chứng minh bằng test: §9.
+**Đánh đổi:** chỉ widening (nhanh, rẻ, mất chính xác ở vòng đếm); thêm narrowing + ngưỡng (đủ cho `0..n`, đếm lên/xuống); unrolling/phân tích đệ quy (để Phase 2). Đề xuất như trên; số lượt narrowing = 2 là ngưỡng thực nghiệm sẽ đo.
+
+### 4. Ngữ nghĩa chính xác của số học trên miền (d)
+**Kiểu:** `i8 i16 i32 i64 i128 isize`, `u8 u16 u32 u64 u128 usize`; `isize/usize` = 64 bit (x86-64, spec §1). Cận khoảng là **`I256`** (số nguyên có dấu 256 bit, cài trong crate, KHÔNG phụ thuộc ngoài): đủ chứa chính xác tích hai giá trị 128 bit để không phải tràn khi tính cận (đề xuất; thay thế `i128` + "+∞" cho `u128` gây mất chính xác ở `u128::MAX` và dễ sai ở biên — loại).
+- `+ - *` (kiểm tràn, D2): kết quả toán học `[a,b]`; Obligation `a ≥ MIN ∧ b ≤ MAX` (đúng cho MỌI giá trị trong khoảng). **Sau** phép (nếu check giữ hoặc đã chứng minh), trạng thái tiếp tục với `[a,b] ∩ [MIN,MAX]` (đường tràn đã abort). `*` dùng 4 tích góc (có dấu) hoặc 2 góc (không dấu).
+- `/ %`: Obligation `y ≠ 0`; có dấu thêm `¬(x = MIN ∧ y = −1)`. Cắt về 0; `x / y` trên khoảng: tách khoảng của y theo dấu, bỏ 0; `%` có `|kết quả| < |y|` và dấu theo `x`.
+- `-x` có dấu: Obligation `x ≠ MIN`; kết quả `[−hi, −lo]`.
+- `+% -% *%` (quấn vòng, không Obligation): nếu cả khoảng kết quả toán học nằm trong MỘT chu kỳ `2^bits` ⇒ dịch về đúng khoảng modulo; ngược lại ⇒ toàn kiểu `[MIN, MAX]`.
+- `+^ -^ *^` (bão hoà): kẹp cận vào `[MIN,MAX]` chính xác (hàm đơn điệu theo từng cận).
+- `+? -? *?` (trả `Option<T>`): miền cặp `{may_none, may_some, khoảng của Some}`: `may_none ⇔ khoảng toán học vượt kiểu`, `may_some ⇔ giao khác rỗng`; khoảng của `Some` = giao với kiểu.
+- Dịch bit/AND/OR/XOR: hàm `lib/core` + `⊳ n < bits` (xem §0.2); kết quả khoảng bảo thủ (`shl`: nhân `2^n` nếu không tràn bit, nếu không toàn kiểu; `band` với hằng không âm: `[0, hằng]`).
+- Ép kiểu `as` giữa nguyên: Obligation `giá trị ∈ [MIN',MAX']` của kiểu đích (D1); kết quả giao với khoảng đích. `bool→nguyên`: `[0,1]`. `char→nguyên`: `[0, 0x10FFFF] ∖ surrogate`, bảo thủ khoảng liền.
+- So sánh nguyên `< <= > >= == ≠`: dùng làm sự kiện nhánh trên cả hai khoảng và zone (cả hai nhánh, nhánh sai dùng phủ định). **Số thực** (`f32/f64`): KHÔNG theo dõi (miền ⊤ cho giá trị); so sánh số thực (`<`, … và hàm `total_cmp`) cho `bool` không biết ⇒ không sinh sự kiện nhánh (sound; NaN làm mọi so sánh trừ `≠` sai); `==` đã bị cấm (D4).
+- Phép chia/số học không sinh Obligation cho số thực (semantics §2); ép số thực→nguyên là một Obligation mất thông tin (bão hoà/NaN) — **chưa định nghĩa trong semantics**, đề xuất cấm `as` thực→nguyên ở Phase 1 (dùng hàm `lib/core` có `⊳`), cần Giang xác nhận (Q38).
+
+### 5. Hạ xuống runtime check (e)
+- **Có sẵn từ M5:** mỗi nghĩa vụ số nguyên đã là một terminator `Assert{kind}` (Overflow, OverflowNeg, DivisionByZero, RemainderByZero, IndexOutOfBounds, SliceRange, CastLossy). M7 KHÔNG tạo check mới: nó **xoá** `Assert` chứng minh được (thay bằng `Goto`, ghi `Discharged` + chứng cứ) hoặc **giữ** và ghi `Lowered`.
+- **Chính sách một nghĩa vụ:** `Discharged` (xoá) | `DefinitelyFalse` ⇒ ĐỎ | `Open` & `Checkable` ⇒ giữ `Assert` + GHI CHÚ N06xx/N09xx (D24) | `Open` & `NotCheckable` ⇒ ĐỎ E0902 (D25). Trong M7 chỉ có hai nguồn "không kiểm được": lượng từ không biên (§7) và mệnh đề tham chiếu bộ nhớ không thuần.
+- **"Chắc chắn sai" (E060x) nghĩa là:** nghĩa vụ sai trên MỌI thực thi tới điểm đó **và điểm đó tới được** (trạng thái ≠ ⊥). Mã chết (⊥) không báo gì. Phân loại: E0601 tràn chắc chắn (cả `+ - *`, `-MIN`, ngoài kiểu), E0602 chia/% 0, E0603 chỉ số/lát ngoài biên, E0604 ép kiểu mất thông tin, E0901 tiền điều kiện chắc chắn sai. (Đề xuất giữ đúng bảng hiện có của `error_codes.md`.)
+- **E0601 cho literal ngoài phạm vi kiểu (`x: u8 ≔ 300`) — cổng cứng mục 7.9:** khác các nghĩa vụ trên, nó là nghĩa vụ HẰNG của chính literal (`LiteralRange{ty}`), kiểm trước dataflow, **không phụ thuộc đường tới được** (dù trong mã chết vẫn ĐỎ — vì chương trình đã sai kiểu). Điểm gắn: sau M4 suy luận kiểu cho literal; M7 duyệt mọi literal đã có kiểu cuối (đã có `Const::Int{bits,ty}` trong MIR nhưng M5 cắt bit theo kiểu và làm MẤT thông tin ngoài phạm vi — **M7 phải đọc literal từ AST/`TypesOutput`, không từ `Const` của MIR**; đây là một sửa nhỏ ở M5 cần xác nhận, Q39).
+- **Mã GHI CHÚ đề xuất (cần duyệt vì sửa bảng mã):** N0601 tràn số (gồm `-MIN`), N0602 chỉ số/lát, N0603 chia/% 0 (và `MIN/−1`), N0604 ép kiểu, N0901 `⊳` hạ runtime (đã có ở semantics §8), N0902 `⊲`, N0903 lượng từ có biên chạy lúc chạy, N0904 bất biến `⋈`. (Bảng hiện chỉ có N0601, N0602.)
+- Hồ sơ: check giữ ở MỌI hồ sơ (§0.3). Chi phí hiển thị bằng N-mã theo D24.
+
+### 6. Hợp đồng `⊳` `⊲` ở Phase 1 (f)
+- **`⊳` trong thân hàm đó:** giả thiết (`hyps`) cho mọi Obligation trong thân. **`⊳` của callee tại điểm gọi:** Obligation `Pre{callee}` với `goal = ⊳[đối số]`: giải bằng P1 → xoá; không giải được và biểu thức thuần/kiểm được → hạ runtime tại điểm gọi + N0901; chắc chắn sai → E0901. **`⊲`:** kiểm runtime ở MỌI điểm thoát hàm (`⏎`, cuối thân) trừ khi P1 chứng minh trên mọi đường thoát (khi đó xoá + chứng cứ); tại điểm gọi, `⊲` của callee là giả thiết cho đoạn sau (sound vì `⊲` của callee hoặc đã chứng minh hoặc được kiểm lúc chạy — vi phạm thì abort trước khi tới đoạn sau).
+- **Lượng từ có biên** `∀ i ∈ a..b : P`, `∃`: thực thi như vòng lặp thuần có chặn trên (`b − a` bước) khi hạ runtime, hoặc P1 giải trường hợp tầm thường (miền rỗng, `P` đúng với mọi `i` trong khoảng kiểm bằng khoảng). **Không biên** mà chưa giải ⇒ ĐỎ E0902 (D25).
+- **`⋈` bất biến vòng lặp:** Phase 1 chỉ kiểm lúc chạy (semantics §3, không dùng để chứng minh); Obligation `Invariant` mang cờ `Checkable`.
+- **Yêu cầu hạ tầng MIR:** `Body.contracts` hiện chỉ ghi NodeId (M5, Q29): M7 cần hạ `⊳ ⊲ ⋈` thành các biểu thức MIR thuần ("thân hợp đồng") gọi được ở điểm gọi/thoát; bước đầu tiên của M7 là mở rộng bước hạ MIR (có golden). Hợp đồng chứa hàm có hiệu ứng ⇒ ĐỎ (hợp đồng phải thuần, `! ∅`).
+- **Đánh đổi:** hạ `⊲` thành runtime ở thoát hàm làm chậm hàm nóng nếu không chứng minh được (hiển thị N0902); phương án "chỉ kiểm ở dev" nhẹ hơn nhưng mâu thuẫn fail-closed — đề xuất giữ kiểm.
+
+### 7. Biến thể `↓` (E0701) thuộc M7 hay M8 (g)
+**Xác nhận M8** (đúng như plan): phân tích dừng cần đọc khoảng/zone của biến lặp để kiểm "giảm nghiêm ngặt" và dạng mẫu `i ← i + c`. **Ranh giới:** M7 chỉ (i) **ghi nhận** biểu thức `↓` và `⋈` của mỗi vòng lặp/hàm và công bố một API `DomainQuery` (khoảng/zone của một biểu thức tại một điểm MIR) để M8 dùng; (ii) KHÔNG sinh E07xx; (iii) không dùng `↓` làm giả thiết cho Obligation số học (nó không nói gì về giá trị). Không đề xuất đổi plan. Rủi ro: M8 phải dựa vào độ chính xác M7; mitigation: test `DomainQuery` cho các mẫu `0..n`, đếm lên/xuống.
+
+### 8. Chiến lược test soundness (h) — đề xuất
+1. **Soundness của hàm chuyển trên miền (đơn vị, ngẫu nhiên + biên):** mọi phép toán × mọi kiểu × khoảng ngẫu nhiên/cận biên: lấy các giá trị cụ thể trong khoảng nguồn, tính bằng **bộ đánh giá tham chiếu độc lập** (số học chính xác riêng của test: cặp `i128` + dấu, `u128` với `checked_*`/mở rộng; KHÔNG dùng `I256` của bộ giải), kiểm kết quả cụ thể ∈ khoảng kết quả và Obligation sai ⇒ có giá trị cụ thể vi phạm. Với zone: tập ràng buộc ngẫu nhiên + gán thoả ⇒ đóng bao/join/widening/narrowing vẫn thoả. Có test CHIỀU NGƯỢC (precision): các khoảng hẹp phải chứng minh được.
+2. **Mức chương trình (oracle độc lập, như M6):** thông dịch MIR của M5 làm oracle; bộ sinh chương trình (mở rộng bộ sinh M5: mảng/lát, vòng lặp có cận, so sánh, hợp đồng) cho chương trình có `Assert`; với MỌI `Assert` mà bộ giải XOÁ, chạy thân GỐC (còn đủ `Assert`) trên đầu vào ngẫu nhiên + biên (MIN, MAX, ±1, 0, độ dài 0/1/…): `Assert` đó KHÔNG BAO GIỜ được thất bại (đây là âm tính giả). Ca ngược: Assert chắc chắn sai (E060x) phải thất bại ở mọi đầu vào tới được; Assert giữ lại không có ràng buộc.
+3. **Độ phủ bắt buộc** (cùng luật M6, ghi vào ADR khi duyệt): bảng loại phép toán (`+ - * / % -x +% +^ +? as`) × loại nghĩa vụ × độ rộng kiểu (8/16/32/64/128, có/không dấu) × kết cục (xoá / giữ / chắc chắn sai); ngưỡng đề xuất ≥ 300 chương trình ở mỗi ô **mà bộ giải XOÁ** (nơi âm tính giả lộ ra) và ≥ 300 ở ô "giữ"; ô dưới ngưỡng thì CHƯA được tính là đã kiểm. Quy tắc mới (grit-contract §3.3): mỗi lỗ hổng tìm bằng cách khác với bộ sinh phải mở rộng bộ sinh rồi tắt bản sửa để xem tự phát hiện.
+4. **Đột biến bộ giải:** ĐẦY ĐỦ cho M7 (chính sách đã cho phép, `tools/mut.py`), mọi đột biến sống sót có test hoặc lập luận tương đương cụ thể; bộ đếm phòng thủ fail-closed (ICE) như M6.
+5. **Bộ kiểm hậu-điểm-cố-định** (§3) và chứng cứ (`Cert`) có bộ kiểm riêng: test đột biến ép bộ giải trả chứng cứ sai phải bị bộ kiểm bắt.
+6. **Fuzz:** `Prover` với khoảng/zone/công thức ngẫu nhiên: không panic, không treo (ngân sách), kết quả tất định.
+
+### 9. Đo "số check còn lại" (i)
+Trên mỗi chương trình mẫu (`tests/pass`, golden riêng cho M7): bảng theo hàm và theo loại — `tổng nghĩa vụ`, `xoá được`, `giữ lại (N-mã)`, `ĐỎ`; số `Assert` trong MIR trước (M5) và sau (M7). Nguồn: `Obligation.status` + so sánh số terminator `Assert`. Khoá bằng golden `tests/golden/obligations/*.txt` (đọc tay một lần như M5) và test cả hai chiều: `sum` ⇒ `xs[i]` và `i + 1` xoá, `s + xs[i]` còn N0601; một họ chương trình nhỏ (đếm tới hằng, hai chỉ số, chia cho biến đã `≠ 0`, ép kiểu có khoảng hẹp, hợp đồng) với số kỳ vọng cố định. Chỉ số kết quả báo trong PROGRESS: tỉ lệ nghĩa vụ xoá được trên corpus mẫu và số check còn lại trên 3 chương trình thật của M12.
+
+### 10. Thứ tự làm (nếu duyệt)
+(1) `I256` + test tham chiếu; (2) miền khoảng + hàm chuyển + test soundness; (3) zone + đóng bao + widening/narrowing; (4) Obligation IR + `Prover` + hyps; (5) sinh Obligation từ `Assert` của MIR, xoá/giữ, N-mã, E060x (kể cả LiteralRange); (6) hạ hợp đồng xuống MIR + `Pre/Post`; (7) oracle động + bộ sinh + độ phủ; (8) đột biến đầy đủ; (9) golden "số check còn lại". Dừng chờ duyệt sau (3), (6), (9).
+
+### 11. Câu hỏi cần Giang quyết (đề xuất kèm lý do ở trên)
+- **Q35** Miền P1 = khoảng + **zone** (không chỉ khoảng); sửa plan §6.2 M7 (đề xuất: ĐỒNG Ý, vì ví dụ §4.3 đòi hỏi).
+- **Q36** `⊲`/mọi check chưa chứng minh được giữ ở MỌI hồ sơ (đề xuất: giữ; sửa semantics §8 "kiểm ở dev").
+- **Q37** Định nghĩa `/ %` có dấu (cắt về 0; `MIN/−1` là tràn) viết vào semantics §2.
+- **Q38** Cấm `as` số thực→nguyên ở Phase 1 (hay Obligation riêng).
+- **Q39** E0601 literal đọc từ AST/`TypesOutput`, không từ `Const` của MIR (cần một sửa nhỏ ở M5 để không cắt bit mất thông tin, hoặc hạ literal ngoài phạm vi thành ICE ở M5).
+- **Q40** Thêm mã GHI CHÚ N0603, N0604, N0902–N0904 (bảng mã) và xác nhận E0601–E0604, E0901, E0902 giữ nghĩa như `error_codes.md`.
+- **Q41** `I256` tự cài trong crate (đề xuất) hay phụ thuộc crate ngoài (cần `cargo audit/deny`).
+- **Q42** Ngưỡng độ phủ ≥ 300/ô và 2 lượt narrowing (số tôi chọn, không suy ra từ lỗi đã biết).

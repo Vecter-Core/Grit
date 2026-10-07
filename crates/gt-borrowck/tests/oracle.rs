@@ -372,6 +372,8 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
                     || body.contains("first(")
                 {
                     "chữ ký RegionSig (kết quả buộc với MỌI đối số cùng tên region; oracle chỉ thấy thân thật)"
+                } else if body.contains("Sl { s: &!") {
+                    "ADT bất biến `Sl<'a>`: `&!'a &'a` ghim `p` suốt `'a` (Rust cũng từ chối dùng `p` sau đó)"
                 } else if body.contains("≔ (&") || body.contains("≔ [&") {
                     "liveness theo BIẾN: vật chứa giữ nhiều tham chiếu, mọi region trong kiểu của nó cùng sống (NLL, Rust cũng vậy)"
                 } else if body.contains("[0] ←") || body.contains("[1] ←") {

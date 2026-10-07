@@ -12,7 +12,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// BỘ ĐẾM ĐO ĐẠC cho test (không ảnh hưởng kết quả): số lần đường "bảo thủ" dự phòng được dùng cho lời gọi `Fn`/`TraitMethod`
 /// (chữ ký không ánh xạ được) và số lần `relate` gặp số vị trí region không khớp. Với chương trình qua M4 cả hai phải bằng 0 —
-/// các nhánh `return false`/kiểm độ dài trong `call_sig`/`walk`/`relate` chỉ là chốt chặn phòng thủ (xem ADR-023 §10a, đột biến).
+/// các nhánh `return false`/kiểm độ dài trong `call_sig`/`walk`/`relate` chỉ là chốt chặn phòng thủ, và khi bị chạm chúng báo ICE E9901
+/// (fail-closed, P3) chứ không chấp nhận trong im lặng (xem ADR-023 §10a, ADR-024 §7).
 static FALLBACKS: AtomicUsize = AtomicUsize::new(0);
 static RELATE_MISMATCHES: AtomicUsize = AtomicUsize::new(0);
 
@@ -47,6 +48,8 @@ pub(crate) struct Gen<'a> {
     univ_map: BTreeMap<RegionRef, usize>,
     pub cons: Vec<Cons>,
     adt_inv: BTreeMap<gt_resolve::DefId, bool>,
+    /// Lần đầu một chốt chặn phòng thủ bị chạm tới ⇒ ICE (fail-closed, nguyên tắc P3): `check_body` báo E9901 thay vì kết luận.
+    pub ice: Option<String>,
     cur: (Option<Location>, Span),
 }
 
@@ -70,6 +73,7 @@ impl<'a> Gen<'a> {
             univ_map: BTreeMap::new(),
             cons: Vec::new(),
             adt_inv: BTreeMap::new(),
+            ice: None,
             cur: (None, body.span),
         };
         g.univ_map.insert(RegionRef::Static, n);
@@ -90,6 +94,16 @@ impl<'a> Gen<'a> {
         self.univ_map.insert(r.clone(), v);
         self.univ.push((v, r.clone()));
         v
+    }
+
+    /// Chốt chặn phòng thủ bị chạm: ghi ICE (lần đầu), đếm, và trả `false` để đường bảo thủ cũ vẫn chạy tiếp (không bao giờ
+    /// chấp nhận trong im lặng: `check_body` thấy `ice` và báo E9901).
+    fn defend(&mut self, what: &str) -> bool {
+        FALLBACKS.fetch_add(1, Ordering::Relaxed);
+        if self.ice.is_none() {
+            self.ice = Some(format!("chốt chặn phòng thủ bị chạm tới: {what}"));
+        }
+        false
     }
 
     fn alias(&mut self, a: usize, b: usize) {
@@ -130,7 +144,8 @@ impl<'a> Gen<'a> {
                 let u = match refs.get(k) {
                     Some(rr) => self.universal(rr),
                     None => {
-                        // không khớp chữ ký (không nên xảy ra): coi là một region phổ quát riêng
+                        // không khớp chữ ký (không nên xảy ra): ICE
+                        self.defend("tham số không khớp RegionSig của chính hàm");
                         let v = self.fresh();
                         self.univ.push((v, RegionRef::Anon(10_000 + v as u32)));
                         v
@@ -145,6 +160,7 @@ impl<'a> Gen<'a> {
                 match outs.get(k) {
                     Some(rr) => self.universal(rr),
                     None => {
+                        self.defend("giá trị trả về không khớp RegionSig của chính hàm");
                         let v = self.fresh();
                         self.univ.push((v, RegionRef::Anon(20_000 + v as u32)));
                         v
@@ -246,6 +262,7 @@ impl<'a> Gen<'a> {
     fn relate(&mut self, ty: &Ty, src: &[Vec<usize>], dst: &[Vec<usize>], inv: bool) {
         if src.len() != dst.len() {
             RELATE_MISMATCHES.fetch_add(1, Ordering::Relaxed);
+            self.defend("relate: số vị trí region của nguồn và đích không khớp");
             let (a, b) = (flat(&src.to_vec()), flat(&dst.to_vec()));
             self.outl(&a, &b);
             return;
@@ -253,6 +270,7 @@ impl<'a> Gen<'a> {
         match ty {
             Ty::Ref(m, inner) => {
                 if src.is_empty() {
+                    self.defend("relate: tham chiếu không có vị trí region");
                     return;
                 }
                 self.outl(&src[0], &dst[0]);
@@ -285,6 +303,8 @@ impl<'a> Gen<'a> {
                     let n = self.nslots(a);
                     if o + n <= src.len() {
                         self.relate(a, &src[o..o + n], &dst[o..o + n], invariant);
+                    } else {
+                        self.defend("relate: đối số kiểu vượt số vị trí region");
                     }
                     o += n;
                 }
@@ -371,6 +391,8 @@ impl<'a> Gen<'a> {
                         let s = self.operand_slots(op);
                         if o + n <= dslots.len() {
                             self.relate(t, &s, &dslots[o..o + n], false);
+                        } else {
+                            self.defend("tuple: phần tử vượt số vị trí region của đích");
                         }
                         o += n;
                     }
@@ -382,11 +404,12 @@ impl<'a> Gen<'a> {
                     }
                 }
                 AggregateKind::Adt(d, ..) => {
+                    // `ty_invariant(&dty)`: kiểu ĐÃ THẾ (vd `Id1<Sl<'a>>`) bất biến dù `Id1` hiệp biến
                     let all = flat(&dslots);
                     // ADT chứa `&!`/con trỏ thô/kiểu hàm là BẤT BIẾN (ADR-023 §11): dựng nó phải đồng nhất region trong của đối số với
                     // bó region của ADT (hai chiều); chỉ hiệp biến thì `Sl { s: &!p }` cho phép thu hẹp region của `p` (âm tính giả
                     // tìm thấy khi đột biến `adt_invariant` sống sót)
-                    let invariant = self.adt_invariant(*d);
+                    let invariant = self.adt_invariant(*d) || self.ty_invariant(&dty);
                     for op in ops {
                         let s = flat(&self.operand_slots(op));
                         self.outl(&s, &all);
@@ -440,7 +463,7 @@ impl<'a> Gen<'a> {
                         &arg_slots,
                         &dslots,
                     ),
-                    None => false,
+                    None => self.defend("thành viên trait không có nút khai báo"),
                 }
             }
             gt_mir::Callee::Value(_) => false,
@@ -476,10 +499,10 @@ impl<'a> Gen<'a> {
         dslots: &Slots,
     ) -> bool {
         let Some(sig) = self.db.sig_by_node(node).cloned() else {
-            return false;
+            return self.defend("call_sig/walk: chữ ký không ánh xạ được");
         };
         let Some(rsig) = self.t.regions.get(&node).cloned() else {
-            return false;
+            return self.defend("call_sig/walk: chữ ký không ánh xạ được");
         };
         // tham số kiểu: của impl chứa (nếu có) rồi của chính hàm
         let mut gps: Vec<GParam> = Vec::new();
@@ -504,7 +527,7 @@ impl<'a> Gen<'a> {
         }
         gps.extend(sig.generics.iter().cloned());
         if gps.len() != generics.len() {
-            return false;
+            return self.defend("call_sig/walk: chữ ký không ánh xạ được");
         }
         let mut inst: BTreeMap<ParamId, Ty> = BTreeMap::new();
         for (g, t) in gps.iter().zip(generics) {
@@ -523,7 +546,9 @@ impl<'a> Gen<'a> {
         // kiểu khai báo của từng tham số (self trước)
         let mut declared: Vec<Ty> = Vec::new();
         if let Some(k) = sig.self_kind {
-            let Some(sd) = &self_decl else { return false };
+            let Some(sd) = &self_decl else {
+                return self.defend("walk: thiếu vị trí region");
+            };
             declared.push(match k {
                 gt_ast::SelfKind::Value => sd.clone(),
                 gt_ast::SelfKind::Ref => Ty::Ref(false, Box::new(sd.clone())),
@@ -532,7 +557,7 @@ impl<'a> Gen<'a> {
         }
         declared.extend(sig.params.iter().cloned());
         if declared.len() != arg_slots.len() || rsig.inputs.len() != declared.len() {
-            return false;
+            return self.defend("call_sig/walk: chữ ký không ánh xạ được");
         }
         let mut names: BTreeMap<RegionRef, usize> = BTreeMap::new();
         let mut pvars: BTreeMap<ParamId, Vec<usize>> = BTreeMap::new();
@@ -545,7 +570,7 @@ impl<'a> Gen<'a> {
             if !self.walk(d, &it, &mut iter, &mut names, &mut pvars, &mut out)
                 || iter.next().is_some()
             {
-                return false;
+                return self.defend("call_sig/walk: chữ ký không ánh xạ được");
             }
             inst_params.push(it);
             lists.push(out.into_iter().map(|v| vec![v]).collect());
@@ -557,7 +582,7 @@ impl<'a> Gen<'a> {
             &sig.ret, &ret_inst, &mut iter, &mut names, &mut pvars, &mut rout,
         ) || iter.next().is_some()
         {
-            return false;
+            return self.defend("call_sig/walk: chữ ký không ánh xạ được");
         }
         for ((it, l), a) in inst_params.iter().zip(&lists).zip(arg_slots) {
             self.relate(it, a, l, false);
@@ -591,7 +616,9 @@ impl<'a> Gen<'a> {
                 true
             }
             (Ty::Ref(_, d), Ty::Ref(_, i)) => {
-                let Some(r) = pos.next() else { return false };
+                let Some(r) = pos.next() else {
+                    return self.defend("walk: thiếu vị trí region");
+                };
                 let v = self.name_var(r, names);
                 out.push(v);
                 self.walk(d, i, pos, names, pvars, out)
@@ -599,7 +626,9 @@ impl<'a> Gen<'a> {
             (Ty::Adt(dd, da), Ty::Adt(di, ia)) if dd == di && da.len() == ia.len() => {
                 let lt = self.db.adts.get(dd).map_or(0, |a| a.lt_params);
                 for _ in 0..lt {
-                    let Some(r) = pos.next() else { return false };
+                    let Some(r) = pos.next() else {
+                        return self.defend("walk: thiếu vị trí region");
+                    };
                     let v = self.name_var(r, names);
                     out.push(v);
                 }
@@ -617,7 +646,11 @@ impl<'a> Gen<'a> {
             (Ty::Fn(..), _) | (_, Ty::Fn(..)) => true,
             (d, i) => {
                 // kiểu nguyên thuỷ cùng loại: không vị trí nào
-                self.nslots(i) == 0 && self.nslots(d) == 0
+                let ok = self.nslots(i) == 0 && self.nslots(d) == 0;
+                if !ok {
+                    self.defend("walk: kiểu khai báo và kiểu đã thế không cùng dạng");
+                }
+                ok
             }
         }
     }

@@ -47,13 +47,17 @@ pub const PRELUDE: &str = "\
 ƒ first(a: &[i32]) → &i32 ! ∅ { &a[0] }
 ƒ use_i(x: i32) ! ∅ { }
 ▢ Hm<'a> { r: &!'a i32 }
+▢ Sl<'a> { s: &!'a &'a i32 }
+▢ Id1<T> { t: T }
+ƒ put2<'a>(sl: Sl<'a>, v: &'a i32) ! ∅ { *sl.s ← v; }
+ƒ putw<'a>(x: Id1<Sl<'a>>, v: &'a i32) ! ∅ { *x.t.s ← v; }
 ƒ idg<T>(x: T) → T ! ∅ { x }
 ƒ takes(r: &!i32) ! ∅ { *r ← 1; }
 ƒ look(r: &i32) ! ∅ { use_i(*r); }
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
-pub const KINDS: [&str; 9] = [
+pub const KINDS: [&str; 10] = [
     "move",
     "reborrow",
     "borrow_in_loop",
@@ -63,6 +67,7 @@ pub const KINDS: [&str; 9] = [
     "call_regionsig",
     "nested_struct",
     "ref_flow",
+    "adt_invariant",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -99,6 +104,8 @@ pub enum St {
     Raw(Raw),
     Branch(Vec<St>, Vec<St>),
     Loop(u8, Vec<St>),
+    /// khối trần `{ … };` (phạm vi riêng)
+    Block(Vec<St>),
     Match {
         scrut: String,
         pv: String,
@@ -156,6 +163,17 @@ fn print_block(b: &[St], ind: usize, depth: usize, out: &mut String) {
                     print_block(e, ind + 1, depth + 1, out);
                     out.push_str(&format!("{pad}}};\n"));
                 }
+            }
+            St::Block(body) => {
+                out.push_str(&format!(
+                    "{pad}{{
+"
+                ));
+                print_block(body, ind + 1, depth, out);
+                out.push_str(&format!(
+                    "{pad}}};
+"
+                ));
             }
             St::Loop(k, body) => {
                 out.push_str(&format!("{pad}⟳ i{ind} in 0..{k} {{\n"));
@@ -237,14 +255,15 @@ impl Gen {
 
     fn scenario(&mut self) -> Vec<St> {
         match self.rng.below(100) {
-            0..=19 => self.int_borrow(),
-            20..=31 => self.reborrow(),
-            32..=47 => self.moves(),
-            48..=55 => self.partial_move_nested(),
-            56..=65 => self.match_scenario(),
-            66..=76 => self.arena(),
-            77..=86 => self.calls(),
-            87..=92 => self.holder(),
+            0..=16 => self.int_borrow(),
+            17..=28 => self.reborrow(),
+            29..=44 => self.moves(),
+            45..=52 => self.partial_move_nested(),
+            53..=62 => self.match_scenario(),
+            63..=73 => self.arena(),
+            74..=83 => self.calls(),
+            84..=87 => self.holder(),
+            88..=94 => self.slot(),
             _ => self.flow(),
         }
     }
@@ -323,6 +342,41 @@ impl Gen {
                 3 => raw(format!("{y} ← {k};")),
                 _ => raw(format!("use_i({x});")),
             });
+        }
+        out
+    }
+
+    /// ADT bất biến `Sl<'a> { s: &!'a &'a i32 }` (và bọc trong `Id1<T>`): DỰNG từ `&!p` rồi `put2` ghi một tham chiếu có thể NGẮN
+    /// hơn vào `p`. Lỗ hổng #2 (ADT bất biến chỉ ràng buộc hiệp biến khi dựng) lọt qua mọi bộ sinh trước khi có kịch bản này.
+    fn slot(&mut self) -> Vec<St> {
+        self.tags.insert("adt_invariant");
+        let z = self.fresh("z");
+        let p = self.fresh("p");
+        let y = self.fresh("y");
+        let sl = self.fresh("sl");
+        let (kz, ky) = (self.k(), self.k());
+        let wrapped = self.rng.chance(30);
+        let call = if wrapped {
+            format!("{sl}w ≔ Id1 {{ t: {sl} }}; putw({sl}w, &{y});")
+        } else {
+            format!("put2({sl}, &{y});")
+        };
+        let mut out = vec![raw(format!("μ{z} ≔ {kz};")), raw(format!("μ{p} ≔ &{z};"))];
+        let inner = vec![
+            raw(format!("{y} ≔ {ky};")),
+            raw(format!("{sl} ≔ Sl {{ s: &!{p} }};")),
+            raw(call.clone()),
+        ];
+        if self.rng.chance(60) {
+            // `y` chết ở cuối khối: nếu `p` còn được dùng sau đó thì treo
+            out.push(St::Block(inner));
+        } else {
+            out.push(raw(format!("{y} ≔ {ky};")));
+            out.push(raw(format!("{sl} ≔ Sl {{ s: &!{p} }};")));
+            out.push(raw(call));
+        }
+        if self.rng.chance(50) {
+            out.push(raw(format!("use_i(*{p});")));
         }
         out
     }
@@ -744,7 +798,7 @@ fn has_ref_role(s: &St) -> bool {
             Role::MakeRef { .. } | Role::UseRef { .. } | Role::MakeArenaRef { .. }
         ),
         St::Branch(a, b) => a.iter().chain(b.iter()).any(has_ref_role),
-        St::Loop(_, b) => b.iter().any(has_ref_role),
+        St::Loop(_, b) | St::Block(b) => b.iter().any(has_ref_role),
         St::Match { some, none, .. } => some.iter().chain(none.iter()).any(has_ref_role),
     }
 }
@@ -847,7 +901,7 @@ fn collect(b: &[St], id: &mut usize, out: &mut Vec<Site>) {
                 collect(a, id, out);
                 collect(e, id, out);
             }
-            St::Loop(_, x) => collect(x, id, out),
+            St::Loop(_, x) | St::Block(x) => collect(x, id, out),
             St::Match { some, none, .. } => {
                 collect(some, id, out);
                 collect(none, id, out);
@@ -879,7 +933,7 @@ fn insert_at(b: &mut Vec<St>, id: &mut usize, target: usize, at: usize, text: &s
             St::Branch(a, e) => {
                 insert_at(a, id, target, at, text) || insert_at(e, id, target, at, text)
             }
-            St::Loop(_, x) => insert_at(x, id, target, at, text),
+            St::Loop(_, x) | St::Block(x) => insert_at(x, id, target, at, text),
             St::Match { some, none, .. } => {
                 insert_at(some, id, target, at, text) || insert_at(none, id, target, at, text)
             }

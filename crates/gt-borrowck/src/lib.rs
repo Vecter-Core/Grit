@@ -53,6 +53,9 @@ pub fn check_body(t: &TypesOutput, body: &Body) -> Vec<Diagnostic> {
     };
     let mut g = Gen::new(t, body);
     g.generate();
+    if let Some(e) = g.ice.take() {
+        return vec![ice(t, body, &e)];
+    }
     let values = solve::solve(&g, &pts, &live);
     let mut ck = check::Checker::new(t, body);
     if let Err(e) = ck.run(&pts, &values) {

@@ -49,6 +49,9 @@ Mỗi pass kiểm tra mới (borrow checker, hiệu ứng, biên, đa luồng...
 - Một **corpus chương trình đúng** — không được chặn nhầm.
 - Nếu sau này phát hiện một case lọt qua (false negative) — đây là **bug mức nghiêm trọng nhất có thể có** trong dự án này. Phải thêm ngay vào corpus vĩnh viễn, không chỉ sửa rồi thôi.
 
+**Luật bộ sinh (Giang, 2026-10-07, từ bài học M6):** mỗi lỗ hổng soundness (false negative) tìm ra bằng cách KHÁC với bộ sinh chương trình ngẫu nhiên (viết tay, đột biến, hunting) thì PHẢI mở rộng bộ sinh để TỰ tìm được nó, rồi kiểm bằng cách TẮT bản sửa: bộ sinh phải tự phát hiện (ghi kết quả vào PROGRESS.md), và loại cấu trúc mới phải vào bảng độ phủ có ngưỡng. Một oracle/bộ sinh chỉ phủ những cấu trúc nó sinh ra — "oracle sạch" không phải chứng minh.
+- Bộ đếm phòng thủ (nhánh `return false`/kiểm độ dài chỉ-để-phòng-thủ) phải FAIL-CLOSED (ICE E99xx), không âm thầm chấp nhận hay bỏ qua (P3), và bằng 0 trên corpus + bộ sinh ngẫu nhiên là bằng chứng KIỂM THỬ, không phải chứng minh.
+
 **Phạm vi đột biến (mutation testing) — Giang quyết 2026-10-06 (đã sửa lần hai), áp dụng từ M4:**
 - Đã làm đột biến (tay hoặc cargo-mutants; mọi đột biến sống sót phải có test mới hoặc được chứng minh tương đương): M1 lexer, M2 (gt-ast, gt-diag, gt-parser, gt-fmt), M3 (gt-resolve).
 - **KHÔNG làm đột biến TOÀN BỘ** gt-types, gt-hir, gt-mir, gt-dataflow (M4, M5).

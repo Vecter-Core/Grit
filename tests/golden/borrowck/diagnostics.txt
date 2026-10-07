@@ -1,0 +1,187 @@
+E0401_assign_field_after_move | E0401 | `b.v ← 1;` | [giá trị bị move ở đây @ `b`] | ghi vào một phần của `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_chain_moves | E0401 | `b` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_eat_then_peek | E0401 | `&b` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_enum_payload_moved_then_whole | E0401 | `g(e)` | [giá trị bị move ở đây @ `e`] | dùng `e` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_let_move_then_read | E0401 | `a.v` | [giá trị bị move ở đây @ `a`] | dùng `a` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_method_self_then_borrow | E0401 | `&b` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_method_self_twice | E0401 | `b.take()` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_arg_then_borrow_in_same_call | E0401 | `&b` | [giá trị bị move ở đây @ `both(b, &b)`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_both_branches | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_in_branch | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_in_condition | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_in_conditional_loop_branch | E0401 | `eat(b)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_in_loop | E0401 | `eat(b)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_in_loop_with_use_before | E0401 | `use_i(b.v)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_in_loop_with_use_before | E0401 | `eat(b)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_in_match_arm | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_in_nested_block | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_in_while | E0401 | `eat(b)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_into_array | E0401 | `b.v` | [giá trị bị move ở đây @ `[b]`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_into_some | E0401 | `b.v` | [giá trị bị move ở đây @ `Some(b)`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_into_struct | E0401 | `b.v` | [giá trị bị move ở đây @ `W { b: b, n: 1 }`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_into_tuple | E0401 | `b.v` | [giá trị bị move ở đây @ `(b, 1)`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_then_borrow_mut | E0401 | `&!b` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_through_generic | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_move_twice | E0401 | `eat(b)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_moved_param_in_branch_then_use | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_param_moved_twice | E0401 | `eat(b)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_partial_move_then_same_field | E0401 | `w.b.v` | [giá trị bị move ở đây @ `w.b`] | dùng `w` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_partial_move_then_whole | E0401 | `eatw(w)` | [giá trị bị move ở đây @ `w.b`] | dùng `w` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_reinit_one_branch_only | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_returned_then_used | E0401 | `use_i(b.v)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_tuple_field_moved_then_whole | E0401 | `pair(t)` | [giá trị bị move ở đây @ `t.0`] | dùng `t` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_use_after_move | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_write_field_through_moved_ref | E0401 | `a.n ← 2;` | [giá trị bị move ở đây @ `a`] | ghi qua `a` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_write_index_of_moved_array | E0401 | `a[0] ← mk();` | [giá trị bị move ở đây @ `a`] | ghi qua `a` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_write_through_moved_unique_ref | E0401 | `*a ← 2;` | [giá trị bị move ở đây @ `a`] | ghi qua `a` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0402_array_elements_conservative | E0402 | `&!a[1]` | [khoản mượn bắt đầu ở đây @ `&!a[0]`] | hai khoản mượn duy nhất `&!` chồng nhau trên `a`: khoản mượn trước còn được dùng về sau
+E0402_borrow_field_then_whole | E0402 | `&!w` | [khoản mượn bắt đầu ở đây @ `&!w.b`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
+E0402_double_unique | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_element_after_whole_in_loop | E0402 | `&!a[0]` | [khoản mượn bắt đầu ở đây @ `&!a`] | hai khoản mượn duy nhất `&!` chồng nhau trên `a`: khoản mượn trước còn được dùng về sau
+E0402_field_unique_held_across_call | E0402 | `&!w` | [khoản mượn bắt đầu ở đây @ `&!w.n`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
+E0402_in_branch | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_in_nested_block | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_loop_carried_unique | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_loop_inner_vs_outer | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_method_and_arg_unique | E0402 | `&!b` | [khoản mượn bắt đầu ở đây @ `&!b`] | hai khoản mượn duy nhất `&!` chồng nhau trên `b`: khoản mượn trước còn được dùng về sau
+E0402_param_two_unique_same_ref | E0402 | `&!*r` | [khoản mượn bắt đầu ở đây @ `&!*r`] | hai khoản mượn duy nhất `&!` chồng nhau trên `r`: khoản mượn trước còn được dùng về sau
+E0402_pass_two_live_refs | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_reborrow_twice_through_ref | E0402 | `&!*r` | [khoản mượn bắt đầu ở đây @ `&!*r`] | hai khoản mượn duy nhất `&!` chồng nhau trên `r`: khoản mượn trước còn được dùng về sau
+E0402_same_call_two_unique | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_same_field_twice | E0402 | `&!w.n` | [khoản mượn bắt đầu ở đây @ `&!w.n`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
+E0402_struct_holding_unique_then_borrow | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_three_unique_borrows | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_three_unique_borrows | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_three_unique_borrows | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_tuple_whole_then_field | E0402 | `&!t.0` | [khoản mượn bắt đầu ở đây @ `&!t`] | hai khoản mượn duy nhất `&!` chồng nhau trên `t`: khoản mượn trước còn được dùng về sau
+E0402_two_borrows_two_writes | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_two_unique_param_field | E0402 | `&!w.n` | [khoản mượn bắt đầu ở đây @ `&!w.n`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
+E0402_two_unique_same_inner_field | E0402 | `&!w.b.v` | [khoản mượn bắt đầu ở đây @ `&!w.b.v`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
+E0402_two_unique_same_struct_field | E0402 | `&!w.b` | [khoản mượn bắt đầu ở đây @ `&!w.b`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
+E0402_unique_then_unique_via_method | E0402 | `&!b` | [khoản mượn bắt đầu ở đây @ `&!b`] | hai khoản mượn duy nhất `&!` chồng nhau trên `b`: khoản mượn trước còn được dùng về sau
+E0402_whole_then_element | E0402 | `&!a[0]` | [khoản mượn bắt đầu ở đây @ `&!a`] | hai khoản mượn duy nhất `&!` chồng nhau trên `a`: khoản mượn trước còn được dùng về sau
+E0403_array_element_shared_whole_unique | E0403 | `&!a` | [khoản mượn bắt đầu ở đây @ `&a[0]`] | mượn duy nhất `&!` `a` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_array_index_read_while_unique | E0403 | `a[0]` | [khoản mượn bắt đầu ở đây @ `&!a`] | dùng/mượn chung `a` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_branch_shared_unique | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_compare_while_unique | E0403 | `x == 1` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_copy_arg_while_unique | E0403 | `use_i(x)` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_field_shared_whole_unique | E0403 | `&!w` | [khoản mượn bắt đầu ở đây @ `&w.n`] | mượn duy nhất `&!` `w` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_loop_shared_vs_unique | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_loop_unique_carried_shared_inside | E0403 | `&x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_match_scrutinee_read_while_unique | E0403 | `⌥ m { A ↦ { }, N ↦ { } }` | [khoản mượn bắt đầu ở đây @ `&!m`] | dùng/mượn chung `m` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_match_scrutinee_read_while_unique | E0403 | `A ↦ { }` | [khoản mượn bắt đầu ở đây @ `&!m`] | dùng/mượn chung `m` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_match_scrutinee_read_while_unique | E0403 | `N ↦ { }` | [khoản mượn bắt đầu ở đây @ `&!m`] | dùng/mượn chung `m` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_method_shared_then_unique_self | E0403 | `b.inc()` | [khoản mượn bắt đầu ở đây @ `b.refv()`] | mượn duy nhất `&!` `b` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_mix_call | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_nested_block | E0403 | `&x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_peek_while_bump_live | E0403 | `&b` | [khoản mượn bắt đầu ở đây @ `&!b`] | dùng/mượn chung `b` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_read_through_origin_while_reborrowed | E0403 | `*p` | [khoản mượn bắt đầu ở đây @ `&!*p`] | dùng/mượn chung `p` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_read_while_unique | E0403 | `x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_reborrow_shared_then_unique | E0403 | `&!*u` | [khoản mượn bắt đầu ở đây @ `&*u`] | mượn duy nhất `&!` `u` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_shared_held_over_loop_unique_inside | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_shared_live_then_unique | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_struct_field_read_while_unique | E0403 | `w.n` | [khoản mượn bắt đầu ở đây @ `&!w`] | dùng/mượn chung `w` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_struct_holding_shared_then_unique | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_tuple_read_while_unique | E0403 | `t.0` | [khoản mượn bắt đầu ở đây @ `&!t`] | dùng/mượn chung `t` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_unique_live_then_shared | E0403 | `&x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_unique_vs_shared | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0404_holder_region_mismatch | E0404 | `k` | [] | tham chiếu có region 'b bị dùng ở nơi cần 'a: chữ ký không hứa 'b sống lâu hơn 'a (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
+E0404_outer_option_holds_inner_ref | E0404 | `{ y ≔ 5; o ← Some(&y); }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_outer_ref_to_inner_scope | E0404 | `{ y ≔ 5; p ← &y; }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_outer_ref_to_loop_local | E0404 | `{ y ≔ i; p ← &y; }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_outer_struct_holds_inner_ref | E0404 | `{ y ≔ 5; h ← Hs { r: &y }; }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_param_holds_inner_ref | E0404 | `{ x ≔ 1; *out ← &x; }` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_conditional_locals | E0404 | `y ≔ 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_conditional_locals | E0404 | `y ≔ 2;` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_first_of_local_array | E0404 | `a ≔ [1, 2, 3];` | [khoản mượn bắt đầu ở đây @ `&a[..]`] | `a` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_idr_of_local | E0404 | `x ≔ 1;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_in_loop | E0404 | `⏎ &x;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_in_loop | E0404 | `⏎ &0;` | [khoản mượn bắt đầu ở đây @ `&0`] | một giá trị tạm không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_local_ref | E0404 | `x ≔ 1;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_local_ref_in_else_only | E0404 | `x ≔ 1;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_method_ref_of_local | E0404 | `b ≔ mk();` | [khoản mượn bắt đầu ở đây @ `b.refv()`] | `b` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_ref_through_let | E0404 | `r ≔ &x;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_ref_to_array_element | E0404 | `a ≔ [1, 2];` | [khoản mượn bắt đầu ở đây @ `&a[0]`] | `a` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_ref_to_by_value_param | E0404 | `{ &x }` | [khoản mượn bắt đầu ở đây @ `&x`] | trả về (hoặc lưu ra ngoài) tham chiếu tới `x`, thuộc khung hàm và chết khi hàm kết thúc
+E0404_return_ref_to_field | E0404 | `b ≔ mk();` | [khoản mượn bắt đầu ở đây @ `&b.v`] | `b` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_ref_to_int | E0404 | `x ≔ 1;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_ref_to_local_via_idr_chain | E0404 | `a ≔ idr(&x);` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_ref_to_param_field | E0404 | `{ &b.v }` | [khoản mượn bắt đầu ở đây @ `&b.v`] | trả về (hoặc lưu ra ngoài) tham chiếu tới `b`, thuộc khung hàm và chết khi hàm kết thúc
+E0404_return_ref_to_pattern_binding | E0404 | `Some(v) ↦ &v` | [khoản mượn bắt đầu ở đây @ `&v`] | `v` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_ref_to_pattern_binding | E0404 | `None ↦ &0` | [khoản mượn bắt đầu ở đây @ `&0`] | một giá trị tạm không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_ref_to_temp | E0404 | `{ &mk() }` | [khoản mượn bắt đầu ở đây @ `&mk()`] | một giá trị tạm không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_static_promotion_not_done | E0404 | `{ &1 }` | [khoản mượn bắt đầu ở đây @ `&1`] | một giá trị tạm không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_struct_with_local_ref | E0404 | `x ≔ 1;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_tuple_with_ref | E0404 | `x ≔ 1;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_return_unique_ref_to_local | E0404 | `μx ≔ 1;` | [khoản mượn bắt đầu ở đây @ `&!x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn duy nhất `&!` được dùng về sau
+E0404_returns_holder_of_unnamed_param | E0404 | `Hs { r: y }` | [] | tham chiếu có region (vị trí tham chiếu ẩn #0) bị dùng ở nơi cần 'a: chữ ký không hứa (vị trí tham chiếu ẩn #0) sống lâu hơn 'a (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
+E0404_returns_param_as_static | E0404 | `x` | [] | tham chiếu có region (vị trí tham chiếu ẩn #0) bị dùng ở nơi cần 'static: chữ ký không hứa (vị trí tham chiếu ẩn #0) sống lâu hơn 'static (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
+E0404_returns_unnamed_second_param | E0404 | `y` | [] | tham chiếu có region (vị trí tham chiếu ẩn #0) bị dùng ở nơi cần 'a: chữ ký không hứa (vị trí tham chiếu ẩn #0) sống lâu hơn 'a (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
+E0404_returns_wrong_param_region | E0404 | `y` | [] | tham chiếu có region 'b bị dùng ở nơi cần 'a: chữ ký không hứa 'b sống lâu hơn 'a (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
+E0404_static_return_of_local | E0404 | `x ≔ 1;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_store_param_ref_into_wrong_holder | E0404 | `h.r ← x;` | [] | tham chiếu có region 'b bị dùng ở nơi cần 'a: chữ ký không hứa 'b sống lâu hơn 'a (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
+E0405_alloc_in_loop_outer_ref | E0405 | `{ a ≔ Arena::new(); p ← a.alloc(i); }` | [khoản mượn bắt đầu ở đây @ `a.alloc(i)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_alloc_ref_stored_in_outer_option | E0405 | `{ a ≔ Arena::new(); o ← Some(a.alloc(1)); }` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_alloc_then_arena_dropped_in_branch | E0405 | `{ a ≔ Arena::new(); p ← a.alloc(1); }` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_arena_alloc_struct_returned | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(B { v: 1 })`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_arena_escape | E0405 | `p ≔ a.alloc(1);` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_arena_in_struct_moved | E0405 | `Own { a: a }` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | gán/move Arena `a` làm vô hiệu các tham chiếu đã cấp từ nó, mà chúng còn được dùng về sau
+E0405_arena_param_by_value | E0405 | `{ a.alloc(1) }` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_arena_ref_in_holder_then_reset | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_arena_ref_survives_reset_in_branch | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_arena_returned_with_ref | E0405 | `p ≔ a.alloc(1);` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_arena_returned_with_ref | E0405 | `(a, p)` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | gán/move Arena `a` làm vô hiệu các tham chiếu đã cấp từ nó, mà chúng còn được dùng về sau
+E0405_assign_over_arena | E0405 | `a ← Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | gán/move Arena `a` làm vô hiệu các tham chiếu đã cấp từ nó, mà chúng còn được dùng về sau
+E0405_assign_over_arena | E0405 | `a ← Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_move_arena_then_use | E0405 | `a` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | gán/move Arena `a` làm vô hiệu các tham chiếu đã cấp từ nó, mà chúng còn được dùng về sau
+E0405_outer_ref_to_inner_arena | E0405 | `{ a ≔ Arena::new(); p ← a.alloc(1); }` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_pass_arena_by_value_then_use | E0405 | `eata(a)` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | gán/move Arena `a` làm vô hiệu các tham chiếu đã cấp từ nó, mà chúng còn được dùng về sau
+E0405_pass_arena_unique_and_keep_ref | E0405 | `&!a` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_reset_in_loop_carried | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_reset_then_use | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_reset_through_unique_ref_param | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_return_alloc_ref | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_return_struct_holding_arena_ref | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_return_tuple_with_arena_ref | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_return_via_let | E0405 | `p ≔ a.alloc(1);` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_two_allocs_reset_between | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0406_assign_after_call_result_kept | E0406 | `a[0] ← 9;` | [khoản mượn bắt đầu ở đây @ `&a[..]`] | gán vào `a` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_after_idr_kept | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_element_while_other_borrowed | E0406 | `a[1] ← 5;` | [khoản mượn bắt đầu ở đây @ `&a[0]`] | gán vào `a` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_field_while_whole_borrowed | E0406 | `w.n ← 2;` | [khoản mượn bắt đầu ở đây @ `&w`] | gán vào `w` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_in_branch | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_in_loop_while_borrowed | E0406 | `x ← i;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_in_match_arm_while_borrowed | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_in_nested_block | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_inside_call_arg_block | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_param_while_borrowed | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_struct_while_field_borrowed | E0406 | `w ← mkw();` | [khoản mượn bắt đầu ở đây @ `&w.n`] | gán vào `w` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_tuple_field_while_borrowed | E0406 | `t.0 ← 5;` | [khoản mượn bắt đầu ở đây @ `&t.0`] | gán vào `t` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_while_loop_carried_unique | E0406 | `x ← i;` | [khoản mượn bắt đầu ở đây @ `&!x`] | gán vào `x` trong khi nó đang bị mượn (mượn duy nhất `&!`) và khoản mượn còn được dùng về sau
+E0406_assign_while_method_ref_kept | E0406 | `b.v ← 2;` | [khoản mượn bắt đầu ở đây @ `b.refv()`] | gán vào `b` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_while_shared | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_while_struct_holds_ref | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_assign_while_unique | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&!x`] | gán vào `x` trong khi nó đang bị mượn (mượn duy nhất `&!`) và khoản mượn còn được dùng về sau
+E0406_increment_while_borrowed | E0406 | `x ← x +% 1;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_move_arg_while_unique_live | E0406 | `eat(b)` | [khoản mượn bắt đầu ở đây @ `&!b`] | move `b` ra trong khi nó đang bị mượn (mượn duy nhất `&!`) và khoản mượn còn được dùng về sau
+E0406_move_field_while_borrowed | E0406 | `w.b` | [khoản mượn bắt đầu ở đây @ `&w.b`] | move `w` ra trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_move_in_branch_while_borrowed | E0406 | `eat(b)` | [khoản mượn bắt đầu ở đây @ `&b`] | move `b` ra trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_move_via_method_self_while_borrowed | E0406 | `b.take()` | [khoản mượn bắt đầu ở đây @ `&b`] | move `b` ra trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_move_while_borrowed | E0406 | `eat(b)` | [khoản mượn bắt đầu ở đây @ `&b`] | move `b` ra trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0406_write_through_origin_while_reborrowed | E0406 | `*p ← 1;` | [khoản mượn bắt đầu ở đây @ `&*p`] | gán vào `p` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
+E0407_array_element | E0407 | `eat(a[0])` | [] | không thể move ra khỏi `a`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_array_element_in_let | E0407 | `a[1]` | [] | không thể move ra khỏi `a`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_deref_in_let | E0407 | `*r` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_deref_in_struct_literal | E0407 | `W { b: *r, n: 0 }` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_deref_shared_ref | E0407 | `*r` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_deref_unique_ref_to_call | E0407 | `eat(*r)` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_drop_type_field | E0407 | `g.inner` | [] | không thể move một trường ra khỏi `g`: kiểu của nó có `Drop` (hoặc là `Arena`), cần drop nguyên giá trị
+E0407_drop_type_field_let | E0407 | `g.inner` | [] | không thể move một trường ra khỏi `g`: kiểu của nó có `Drop` (hoặc là `Arena`), cần drop nguyên giá trị
+E0407_field_of_shared_ref | E0407 | `r.b` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_field_of_unique_ref | E0407 | `r.b` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_generic_field_through_ref | E0407 | `self.v` | [] | không thể move ra khỏi `self`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_match_binding_through_ref_field | E0407 | `A(b) ↦ eat(b)` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_match_on_deref | E0407 | `Some(b) ↦ eat(b)` | [] | không thể move ra khỏi `o`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_nested_deref_field | E0407 | `o.w.b` | [] | không thể move ra khỏi `o`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_slice_element | E0407 | `eat(s[0])` | [] | không thể move ra khỏi `s`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_tuple_field_via_ref | E0407 | `t.0` | [] | không thể move ra khỏi `t`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
