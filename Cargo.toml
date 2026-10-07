@@ -1,7 +1,7 @@
 # Workspace gốc của Grit (Phase 1 — Seed). Crate được thêm vào `members` ở đúng milestone của nó (crates/TASK.md).
 [workspace]
 resolver = "3"
-members = ["crates/gt-span", "crates/gt-lexer", "crates/gt-diag", "crates/gt-ast", "crates/gt-parser", "crates/gt-stack", "crates/gt-fmt", "crates/gt-resolve", "crates/gt-types", "crates/gt-mir", "crates/gt-dataflow", "crates/gt-borrowck"]
+members = ["crates/gt-span", "crates/gt-lexer", "crates/gt-diag", "crates/gt-ast", "crates/gt-parser", "crates/gt-stack", "crates/gt-fmt", "crates/gt-resolve", "crates/gt-types", "crates/gt-mir", "crates/gt-dataflow", "crates/gt-borrowck", "crates/gt-oblig"]
 
 [workspace.package]
 edition = "2024"
@@ -13,3 +13,7 @@ unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
+
+# Test vét cạn của gt-oblig (ADR-025 §12) chạy hàng chục triệu phép: tối ưu cho riêng crate này (giữ kiểm tràn của dev).
+[profile.dev.package.gt-oblig]
+opt-level = 2

@@ -1,0 +1,22 @@
+[package]
+name = "gt-oblig"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Grit: Obligation IR + bộ giải P1 (M7, ADR-025) — khoảng + zone, bộ giải vét cạn thứ hai, xoá/hạ check trên MIR"
+
+[dependencies]
+gt-span = { path = "../gt-span" }
+gt-ast = { path = "../gt-ast" }
+gt-diag = { path = "../gt-diag" }
+gt-resolve = { path = "../gt-resolve" }
+gt-types = { path = "../gt-types" }
+gt-mir = { path = "../gt-mir" }
+gt-stack = { path = "../gt-stack" }
+
+[dev-dependencies]
+gt-parser = { path = "../gt-parser" }
+
+[lints]
+workspace = true

@@ -55,6 +55,8 @@ pub(crate) struct Builder<'t> {
     loops: Vec<LoopCx>,
     pub(crate) vars: BTreeMap<LocalId, Local>,
     bounds: Vec<Bound>,
+    /// literal nguyên ngoài phạm vi kiểu gặp khi hạ (ghi qua `&self`)
+    pub(crate) bad_lits: std::cell::RefCell<Vec<BadLiteral>>,
     /// Nút AST đang hạ (cho `SourceInfo`).
     pub(crate) at: (Span, NodeId),
 }
@@ -80,6 +82,7 @@ impl<'t> Builder<'t> {
             contracts: Vec::new(),
             fall_off: None,
             span,
+            bad_literals: Vec::new(),
         };
         Builder {
             t,
@@ -91,6 +94,7 @@ impl<'t> Builder<'t> {
             loops: Vec::new(),
             vars: BTreeMap::new(),
             bounds: t.scope_of(node),
+            bad_lits: std::cell::RefCell::new(Vec::new()),
             at: (span, node),
         }
     }
@@ -358,6 +362,10 @@ impl<'t> Builder<'t> {
 
     /// Đóng các khối còn mở bằng `Unreachable` — chỉ hợp lệ nếu chúng KHÔNG tới được (nếu tới được: lỗi nội bộ).
     fn finish(mut self) -> R<Body> {
+        let mut bad = std::mem::take(&mut *self.bad_lits.borrow_mut());
+        bad.sort_by_key(|b| (b.span.start, b.span.end, b.node));
+        bad.dedup_by_key(|b| b.node);
+        self.body.bad_literals = bad;
         let open: Vec<usize> = self
             .body
             .blocks

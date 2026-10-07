@@ -68,6 +68,20 @@ pub struct Body {
     pub fall_off: Option<(BasicBlock, Span)>,
     /// Vị trí thân hàm (cho chẩn đoán).
     pub span: Span,
+    /// Literal nguyên ngoài phạm vi kiểu của nó (ADR-025 Q39): M5 cắt bit nên thông tin này sẽ mất; M7 báo E0601 từ đây, KHÔNG phụ
+    /// thuộc đường tới được. Sắp theo vị trí, không trùng nút.
+    pub bad_literals: Vec<BadLiteral>,
+}
+
+/// Một literal nguyên không vừa kiểu.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BadLiteral {
+    pub node: NodeId,
+    pub span: Span,
+    pub ty: gt_types::IntTy,
+    pub negative: bool,
+    /// độ lớn (không dấu) của literal
+    pub magnitude: u128,
 }
 
 impl Body {

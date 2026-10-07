@@ -81,6 +81,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "gt-oblig"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-mir",
+ "gt-parser",
+ "gt-resolve",
+ "gt-span",
+ "gt-stack",
+ "gt-types",
+]
+
+[[package]]
 name = "gt-parser"
 version = "0.1.0"
 dependencies = [

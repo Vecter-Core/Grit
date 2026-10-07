@@ -383,3 +383,11 @@ Thông dịch MIR có theo dõi khoản vay/move/Arena, độc lập với mã p
 - Hiệu chuẩn: 114 mẫu đúng → 0 vi phạm; 129/136 mẫu xấu được oracle thấy.
 - Dung lượng: `target/` 1,1 GB, `.git/` 1,5 MB.
 - **Cổng chạy lại ngay trước commit (kết quả thật, `tools/gate.sh`):** fmt sạch; clippy `-D warnings` exit 0; `cargo audit` exit 0; `cargo test --workspace` **465 passed, 0 failed**; check_expectations OK (619 tệp .gt); test script 9/9.
+
+## M7 (2026-10-07) — tiến độ (i)–(iv): IR nghĩa vụ, hai bộ giải, phân tích khoảng+zone, sinh/xoá/hạ nghĩa vụ
+- **(i)** `gt-oblig`: `I256`, `Interval` (độ rộng tham số hoá), `Zone` (DBM, hằng `i128` kiểm tràn), `Env`, IR `Term/Prop/Obligation` tuần tự hoá JSON (schema v1, id tất định), trait `Prover` với **hai** cài đặt: `ZoneProver` (khoảng+zone) và `ExhaustiveProver` (vét cạn, độc lập, không dùng `Env`).
+- **(ii)** Soundness hàm chuyển: `tests/exhaustive.rs` (mọi cặp hộp ở độ rộng 2..7, 8 lấy mẫu phân tầng; 8 đầy đủ với `GT_FULL8=1`), `tests/provers.rs` (67 016 + 81 000 + 6 000 nghĩa vụ so chính vs vét cạn: 0 chứng minh sai; 0 'chắc chắn sai' sai; chính xác tuyệt đối với giả thiết dạng hộp; 3 ca giả thiết mâu thuẫn chưa bị phát hiện → chỉ mất chính xác).
+- **(iii)(iv)** `analysis.rs` + `driver.rs`: phân tích luồng trên MIR, widening/narrowing, kiểm hậu-điểm-cố-định (narrowing bị bỏ nếu không qua), định nghĩa biến tạm (`defs`) bị xoá ngay khi biến nó tham chiếu bị gán lại, local bị mượn `&!` không theo dõi, `ZONE_MAX_VARS=24` + N0605, gốc tái mượn của `&[T]` tĩnh cho nguyên tử độ dài, `<[T]>::len` mô hình hoá; chính sách xoá/giữ/ĐỎ; literal ngoài phạm vi → E0601 độc lập đường tới (M5: `Body.bad_literals`); báo cáo JSON "check còn lại".
+- Mã mới trong bảng: N0603, N0604, N0605, N0902, N0903, N0904.
+- Corpus: 264 ca pass → 237 nghĩa vụ: 24 xoá, 213 giữ (N-mã), 0 lỗi E; E0601/E0602/E0603 (4 mẫu fail) ra đúng mã. `sum`: `xs[i]` và `i+1` xoá, `s + xs[i]` giữ N0601.
+- **Cổng chạy lại ngay trước commit (kết quả thật, `tools/gate.sh`, 37 phút do `CARGO_BUILD_JOBS=1`):** fmt sạch; clippy `-D warnings` exit 0; `cargo audit` exit 0; `cargo test --workspace` **495 passed, 0 failed**; check_expectations OK.

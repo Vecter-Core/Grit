@@ -60,7 +60,13 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | S201 | `declassify` / Secret chảy ra sink | M9 | — |
 | N0601 | Check tràn hạ thành runtime | M7 | pass/02_sum_loop |
 | N0602 | Check biên mảng hạ thành runtime | M7 | — |
+| N0603 | Check chia/% (mẫu số ≠ 0, `MIN / -1`) hạ thành runtime | M7 | — |
+| N0604 | Check ép kiểu mất thông tin hạ thành runtime | M7 | — |
+| N0605 | Phân tích bị giảm độ chính xác: vượt `ZONE_MAX_VARS` biến cho miền quan hệ, hoặc hết ngân sách bước (D20) | M7 | — |
 | N0901 | Tiền điều kiện hạ thành runtime | M7 | — |
+| N0902 | Hậu điều kiện `⊲` hạ thành runtime ở mọi điểm thoát | M7 | — |
+| N0903 | Lượng từ có biên hạ thành vòng lặp lúc chạy | M7 | — |
+| N0904 | Bất biến `⋈` hạ thành runtime | M7 | — |
 
 Ghi chú: plan ghi match-đầy-đủ và capability thuộc "E01xx/E03xx/E06xx" / "E03xx/E08xx" mơ hồ → đề xuất
 E0305/E0310 (xem OPEN_QUESTIONS Q4). Các test `—` do milestone sở hữu viết (cần đa file/pass chưa có).

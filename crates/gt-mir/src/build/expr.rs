@@ -486,6 +486,27 @@ impl Builder<'_> {
                     return ice("literal nguyên hỏng sau M4");
                 };
                 let bits = if l.negative { 0u128.wrapping_sub(v) } else { v };
+                // ngoài phạm vi kiểu: ghi lại (E0601 ở M7) trước khi cắt bit làm mất thông tin
+                let half = if it.bits() == 128 {
+                    1u128 << 127
+                } else {
+                    1u128 << (it.bits() - 1)
+                };
+                let fits = match (it.signed(), l.negative) {
+                    (true, true) => v <= half,
+                    (true, false) => v < half,
+                    (false, true) => v == 0,
+                    (false, false) => it.bits() == 128 || v <= mask(*it),
+                };
+                if !fits {
+                    self.bad_lits.borrow_mut().push(BadLiteral {
+                        node: l.id,
+                        span: l.span,
+                        ty: *it,
+                        negative: l.negative,
+                        magnitude: v,
+                    });
+                }
                 Const::Int {
                     bits: bits & mask(*it),
                     ty: *it,
