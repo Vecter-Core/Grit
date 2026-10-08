@@ -15,6 +15,9 @@ pub const PRELUDE_SRC: &str = "\
 ▢ RangeInclusive<T> { start: T, end: T }
 #lang(copy)
 ⊏ Copy { }
+#lang(send)
+⊏ Send { }
+ƒ spawn<Arg: Send>(f: ƒ(Arg) ! ∅, arg: Arg) ! ∅ { }
 #lang(drop)
 ⊏ Drop { ƒ drop(&!self) ! ∅; }
 ▢ Buf { n: i32 }

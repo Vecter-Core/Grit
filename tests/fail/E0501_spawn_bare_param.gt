@@ -1,0 +1,4 @@
+// expect: fail E0501
+// note: tham số kiểu không có ràng buộc Send
+ƒ w<T>(x: T) ! ∅ { }
+ƒ run<T>(x: T) ! ∅ { spawn(w, x); }

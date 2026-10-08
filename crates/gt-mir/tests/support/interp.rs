@@ -249,6 +249,30 @@ impl<'a> Interp<'a> {
                                 None => return Flow::Bug("len trả về `!`".to_string()),
                             }
                         }
+                        if k == "$prelude::spawn"
+                            && let [V::Fn(fnode), arg] = vals.as_slice()
+                        {
+                            // `spawn(f, a)` (công cụ test, NGOÀI TCB; M10 phải cài bằng luồng thật): chạy `f(a)` ngay, tuần tự và tất định
+                            let Some(wb) = self.mir.bodies.iter().find(|x| x.node == *fnode) else {
+                                return Flow::Bug("spawn: không có thân MIR của hàm".to_string());
+                            };
+                            match self.run(wb, vec![arg.clone()]) {
+                                Outcome::Value(_) => {}
+                                Outcome::Abort(k) => return Flow::Abort(k),
+                                Outcome::Bug(m) => return Flow::Bug(m),
+                                Outcome::OutOfFuel => return Flow::Fuel,
+                            }
+                            if let Err(e) = self.write(dest, V::Unit) {
+                                return e;
+                            }
+                            match target {
+                                Some(x) => {
+                                    cur = *x;
+                                    continue;
+                                }
+                                None => return Flow::Bug("spawn trả về `!`".to_string()),
+                            }
+                        }
                         return Flow::Bug(format!("không có thân MIR cho {k}"));
                     };
                     match self.run(cb, vals) {

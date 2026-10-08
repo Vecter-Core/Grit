@@ -539,6 +539,20 @@ impl<'e, 'a> Checker<'e, 'a> {
                 continue;
             }
             let scope = self.scope.clone();
+            if self.env.db.lang.get(&crate::collect::Lang::Send) == Some(&o.trait_def) {
+                if let Err(why) = self.env.send_like(&ty, &scope) {
+                    let s = self.show(&ty);
+                    self.err(
+                        "E0501",
+                        o.node,
+                        o.span,
+                        format!(
+                            "kiểu `{s}` không `Send` nên không chuyển được sang luồng khác: {why}"
+                        ),
+                    );
+                }
+                continue;
+            }
             if !self
                 .env
                 .db

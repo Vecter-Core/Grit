@@ -23,6 +23,8 @@ pub enum Lang {
     Drop,
     /// `Arena`: vùng nhớ; mượn `&Arena` sinh region "gốc Arena" cho M6 (E0405 khác E0404).
     Arena,
+    /// `Send` (M8): trait TỰ ĐỘNG — kiểu có thể chuyển sang luồng khác; suy cấu trúc (send.rs), cấm viết `⊐ Send for`.
+    Send,
 }
 
 impl Lang {
@@ -36,6 +38,7 @@ impl Lang {
             "cap" => Lang::Cap,
             "arena" => Lang::Arena,
             "drop" => Lang::Drop,
+            "send" => Lang::Send,
             _ => return None,
         })
     }

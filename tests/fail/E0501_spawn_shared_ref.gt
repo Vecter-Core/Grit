@@ -1,0 +1,4 @@
+// expect: fail E0501
+// note: &T chuyển sang luồng khác (Phase 1: mọi tham chiếu đều không Send; chưa có luồng có phạm vi hay 'static)
+ƒ w(r: &u32) ! ∅ { }
+ƒ main() ! ∅ { x ≔ 5u32; spawn(w, &x); }

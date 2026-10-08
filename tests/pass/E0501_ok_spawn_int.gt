@@ -1,0 +1,4 @@
+// expect: pass
+// note: số nguyên chuyển sang luồng
+ƒ work(n: u32) ! ∅ { }
+ƒ main() ! ∅ { spawn(work, 5u32); }

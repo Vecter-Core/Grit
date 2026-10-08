@@ -188,3 +188,21 @@ fn by_value_receiver_is_consumed_after_the_arguments() {
         other => panic!("{src}: {other:?}"),
     }
 }
+
+#[test]
+fn spawn_runs_the_function_with_its_argument() {
+    // công cụ test: spawn chạy tuần tự trong thông dịch (ngoài TCB). Worker abort khi n == 7 chứng tỏ nó thật sự chạy với đối số.
+    let src = "ƒ work(n: u32) ! ∅ { z ≔ 1u32 / (n - 7u32); }
+ƒ go(n: u32) → u32 ! ∅ { spawn(work, n); 1u32 }";
+    let (_t, m) = mir(src);
+    let mut it = Interp::new(&m, 10_000);
+    assert!(matches!(
+        it.call_key("main::go", vec![V::Int(9, gt_types::IntTy::U32)]),
+        Outcome::Value(V::Int(1, _))
+    ));
+    let mut it = Interp::new(&m, 10_000);
+    assert!(matches!(
+        it.call_key("main::go", vec![V::Int(7, gt_types::IntTy::U32)]),
+        Outcome::Abort(_)
+    ));
+}

@@ -444,3 +444,9 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - **Tài liệu/mẫu:** `docs/errors/E0701..E0703, E0801, E0802` (mỗi mã ≥3 fail + ≥3 pass, 30 mẫu mới), `DOC_REQUIRED` cập nhật, corpus kiểm mã M8 (`fail_cases_of_m8_give_exactly_their_code`, `every_pass_case_has_no_termination_or_effect_errors`).
 - **Hồi quy:** gt-mir, gt-types, gt-borrowck, gt-oblig (gồm oracle M7 2000 chương trình) xanh sau các thay đổi `env.rs`/`analysis.rs`. Cổng đầy đủ chưa chạy (theo lệnh: sau nửa 2).
 - **Đột biến:** xem KNOWN_LIMITATIONS "gt-oblig M8 nửa 1". Quyết định Q48–Q50 chờ duyệt (DECISIONS §6).
+
+## M8 nửa 2 — bước 1: `spawn` thuần (2026-10-08)
+- Trait `Send` tự động (`send.rs`), `spawn` trong prelude fixture, E0501 (5 fail + 4 pass, `docs/errors/E0501.md`), `⊐ Send for` bị E0313, thông dịch chạy `spawn` tuần tự (công cụ test). 8 test `gt-types/tests/spawn.rs`, 1 test `gt-mir` (worker abort chứng tỏ chạy với đối số).
+- Đột biến `send.rs`: 22, lần chạy lại còn 1 tương đương. Hồi quy gt-types, gt-mir xanh; corpus gt-borrowck, gt-oblig xanh.
+- Phát hiện: tên generic `A` trong chữ ký prelude đụng tham số `a` của chương trình (E0205) — prelude phải dùng tên generic riêng (`Arg`); chưa điều tra gốc ở resolver.
+- Chưa chạy cổng đầy đủ; chờ xong nửa 2.

@@ -1,0 +1,4 @@
+// expect: fail E0501
+// note: Arena gắn với luồng tạo ra nó
+ƒ w(a: Arena) ! ∅ { }
+ƒ run(a: Arena) ! ∅ { spawn(w, a); }

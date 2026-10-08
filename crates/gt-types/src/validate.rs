@@ -37,6 +37,17 @@ impl Env<'_> {
             );
             return;
         }
+        // Send: trait tự động (M8), suy theo cấu trúc; không cho viết impl
+        if td.lang == Some(Lang::Send) {
+            self.err(
+                "E0313",
+                node,
+                imp.span,
+                "`Send` là trait tự động suy theo cấu trúc kiểu: không được viết `⊐ Send for …`"
+                    .to_string(),
+            );
+            return;
+        }
         // Copy: không cho kiểu lang; mọi trường phải Copy
         if td.lang == Some(Lang::Copy) {
             self.validate_copy_impl(&imp, node);

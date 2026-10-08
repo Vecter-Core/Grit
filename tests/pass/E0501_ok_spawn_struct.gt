@@ -1,0 +1,5 @@
+// expect: pass
+// note: ADT chỉ gồm dữ liệu sở hữu
+▢ P { a: i32, b: (u8, bool) }
+ƒ w(p: P) ! ∅ { }
+ƒ main() ! ∅ { spawn(w, P { a: 1, b: (2, true) }); }

@@ -1,0 +1,4 @@
+// expect: pass
+// note: tham số kiểu có ràng buộc Send
+ƒ w<T>(x: T) ! ∅ { }
+ƒ run<T: Send>(x: T) ! ∅ { spawn(w, x); }

@@ -9,6 +9,7 @@ mod exhaust;
 mod infer;
 mod mono;
 mod region;
+mod send;
 mod traits;
 mod ty;
 mod validate;

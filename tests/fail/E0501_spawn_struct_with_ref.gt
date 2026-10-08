@@ -1,0 +1,5 @@
+// expect: fail E0501
+// note: tham chiếu nằm trong trường của ADT
+▢ H<'a> { r: &'a u32 }
+ƒ w(h: H) ! ∅ { }
+ƒ main() ! ∅ { x ≔ 5u32; spawn(w, H { r: &x }); }

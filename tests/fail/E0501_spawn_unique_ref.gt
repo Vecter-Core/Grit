@@ -1,0 +1,4 @@
+// expect: fail E0501
+// note: &!T chuyển sang luồng khác: đua dữ liệu khi người gọi còn dùng x
+ƒ w(r: &!u32) ! ∅ { }
+ƒ main() ! ∅ { μx ≔ 5u32; spawn(w, &!x); }

@@ -35,7 +35,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0405 | Con trỏ thoát Arena (D27) | M6 | E0405_arena_escape |
 | E0406 | Gán khi đang bị mượn | M6 | — |
 | E0407 | Move ra khỏi chỗ đi qua `*`/`[i]`/lát, hoặc move một trường ra khỏi giá trị có `⊐ Drop for`/`Arena` (ADR-023 §3, §8) | M6 | — |
-| E0501 | Chia sẻ không `Send` qua luồng | M8 | — |
+| E0501 | Chia sẻ không `Send` qua luồng | M8 | E0501_spawn_shared_ref, E0501_spawn_unique_ref, E0501_spawn_struct_with_ref |
 | E0502 | Vi phạm thứ tự khoá | M8 | — |
 | E0601 | Obligation biên chắc chắn sai (tràn hằng) | M7 | E0601_const_overflow, E0601_literal_out_of_range |
 | E0602 | Chia 0 chắc chắn | M7 | E0602_const_div_zero |

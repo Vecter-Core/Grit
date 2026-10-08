@@ -1,0 +1,6 @@
+// expect: pass
+// note: enum và mảng của dữ liệu sở hữu
+⊔ E { A(u32), B }
+ƒ w(e: E) ! ∅ { }
+ƒ wa(a: [u8; 4]) ! ∅ { }
+ƒ main() ! ∅ { spawn(w, E::A(3)); spawn(wa, [1, 2, 3, 4]); }
