@@ -611,3 +611,38 @@ Giang chỉ có bản tóm tắt ADR-025; tôi đối chiếu từng điểm v�
 **Ngưỡng độ phủ của oracle mức chương trình (đặt trong `tests/oracle.rs`, 1 500 chương trình × 24 đầu vào):** mỗi ô (loại.phép × {xoá, giữ}) ≥ 100 nghĩa vụ và ≥ 100 lần chạm, với loại.phép ∈ {overflow.Add/Sub/Mul/Div/Rem, neg_min, div_zero, rem_zero, index, cast_lossy, invariant}; `slice_range` ≥ 40; mỗi ô 'đỏ' ≥ 8 nghĩa vụ và ≥ 8 lần chạm; `pre`/`post` ≥ 100 (xoá|giữ) và ≥ 8 (đỏ); mỗi loại abort (precondition, postcondition, invariant, overflow, div_by_zero, rem_by_zero, index_out_of_bounds, cast_lossy, overflow_neg) ≥ 100; ≥ 30 000 lần so sánh. Điểm yếu đã biết: ~97% lần chạy abort sớm (độ sâu thực thi mỏng).
 
 **Quy trình đột biến (lệnh Giang 2026-10-08):** 1 worker, opt-level 0 cho `gt-oblig` khi chạy bộ test nhỏ (`GRIT_MUT_NO_OPT=1`), `GRIT_MUT_LINES` để chạy lại theo dòng, kết quả ghi nối sau từng mẫu.
+
+## ADR-026 — M8: hiệu ứng, điều kiện dừng, đa luồng (DỰ THẢO viết TRƯỚC khi code, 2026-10-08; CHỜ GIANG DUYỆT — chưa có dòng mã M8 nào)
+
+### 0. Điều kiện xuất phát (nói thẳng)
+- **M7 chỉ "đạt có điều kiện"** (69 đột biến nguy hiểm của `analysis.rs`/`driver.rs` chưa giải quyết). M8 phụ thuộc vào độ chính xác VÀ độ đúng của `analysis.rs` (kiểm giảm nghiêm ngặt dùng khoảng/zone). Rủi ro: một chứng minh "giảm" sai ⇒ E07xx bị bỏ sót ⇒ vòng lặp không dừng lọt qua. Giảm thiểu: M8 KHÔNG dùng "xoá check" mà dùng truy vấn miền chỉ-đọc, và mọi kết luận "giảm" cũng phải qua bộ giải kép (vét cạn ở độ rộng nhỏ) như nghĩa vụ M7.
+- **Món nợ của M7 với M8:** ADR-025 §7 hứa M7 công bố `DomainQuery` (khoảng/zone của một biểu thức tại một điểm MIR). **M7 CHƯA làm** (không có trong lệnh (i)–(x)). Đề xuất: bước 1 của M8 là thêm API này (đọc `states[bb]` đã có trong `analyze_body`; ~100 dòng) kèm test cho `0..n`, đếm lên/xuống.
+- **Khoá cứng (GRIT_PLAN §7 điểm 9–10):** phần `Mutex`/atomics của M8 KHÔNG bắt đầu cho tới khi bốn đột biến 238/361/591/554 của `gt-borrowck/src/regions.rs` được mở lại (giết bằng chương trình tấn công `interior_mut`, hoặc lập luận tương đương mới) VÀ vị từ trên các kiểu có mutability bên trong bị loại khỏi `pure_preds` của M7. Mọi thứ khác của M8 (hiệu ứng, dừng, `spawn` thuần) KHÔNG bị chặn.
+
+### 1. Phạm vi và thứ tự đề xuất
+(a) `DomainQuery` + test; (b) **hiệu ứng** (E0801, E0802): suy luận trên MIR theo đồ thị gọi, so với khai báo `! {…}`; SCC cho đệ quy tương hỗ; (c) **dừng** (E0701–E0703): `↓` trên kiểu well-founded (số nguyên không âm/có cận dưới), kiểm "giảm nghiêm ngặt qua mỗi vòng" bằng `DomainQuery` + dạng mẫu `i ← i ± c` hướng về cận; `div` cho phân kỳ chủ ý; đệ quy tương hỗ theo SCC (mọi cạnh trong SCC phải giảm một biến thể chung); (d) **`spawn(hàm, đối_số)`** (chưa có closure): điều kiện kiểu `Send`-like tự suy, chia sẻ chỉ qua kiểu đồng bộ — phần không cần mutability bên trong; (e) **BỊ KHOÁ:** `Mutex<T, L>` + thứ tự khoá tăng nghiêm ngặt xuyên hàm (E0502, E0501) và atomics có ordering bắt buộc.
+
+### 2. Thiết kế chính
+- **Hiệu ứng:** tập hiệu ứng của thân = hợp hiệu ứng của mọi `Call`/`Callee` (+ hiệu ứng nguyên thuỷ của capability/`div`); hàm `∅` gọi hàm có hiệu ứng ⇒ E0802; suy ra ⊄ khai báo ⇒ E0801. `Callee::Value`/`TraitMethod` dùng hiệu ứng trong KIỂU hàm/trait (đã có ở M4) — không suy ngược. Đệ quy: điểm cố định trên SCC (tập hữu hạn ⇒ dừng, tất định D9/D20).
+- **Dừng:** mỗi cạnh lùi của CFG phải mang biến thể `v` (từ `↓`) với `v` giảm nghiêm ngặt và bị chặn dưới trên MỌI đường quanh vòng: Obligation `Variant{decrease}` giải bằng bộ giải M7 (cùng `Prover`, cùng bộ vét cạn kiểm chứng). Không có `↓` ⇒ E0701; `↓` không giảm/không chặn ⇒ E0702; đệ quy thiếu `↓` ⇒ E0703. `⟳` vô hạn có `⊠` vẫn cần `↓` hoặc `div` (D12).
+- **Đa luồng (phần mở được):** `spawn` nhận hàm tự do và đối số có thể gửi; một kiểu là `Send`-like nếu mọi trường là `Send`-like và không chứa tham chiếu `&!`/con trỏ thô/`Rc`-like; chia sẻ tham chiếu `&T` sang luồng khác chỉ khi `T` đồng bộ (`Sync`-like). Vi phạm ⇒ E0501.
+- **Khoá (khi mở khoá cứng):** hạng khoá `L` (số nguyên cấp thời gian biên dịch) gắn vào `Mutex<T, L>`; hiệu ứng `lock(L)` truyền xuyên hàm; thứ tự khoá phải tăng nghiêm ngặt trên mọi đường ⇒ chặn deadlock theo thứ tự (E0502).
+
+### 3. Chiến lược test (rút kinh nghiệm M6–M7)
+1. **Corpus** (plan M8): data race / deadlock / vòng lặp không biến thể đều bị chặn đúng mã; ≥3 fail + ≥3 pass mỗi mã; chương trình đa luồng đúng chạy qua (trong phạm vi thông dịch).
+2. **Oracle động:** bộ sinh vòng lặp/đệ quy ngẫu nhiên có/không `↓` hợp lệ; thông dịch MIR với nhiên liệu — chương trình được M8 chấp nhận KHÔNG ĐƯỢC hết nhiên liệu trên đầu vào thử (âm tính giả = lọt vòng lặp vô hạn); chương trình bị bác ĐỎ không cần chạy. Hiệu ứng: oracle so tập hiệu ứng thực thi (vết lời gọi) với tập suy ra (suy ra phải ⊇ thực thi).
+3. **Luật bộ sinh (grit-contract §3.3):** mọi lỗ hổng tìm bằng cách khác ⇒ mở rộng bộ sinh + kiểm "tắt bản sửa". Bộ sinh M7 chỉ phủ ~3% lần chạy không abort — M8 phải cải thiện độ sâu thực thi.
+4. **Đột biến:** đầy đủ cho M8 (chính sách), 1 worker, lô nhỏ, quy tắc môi trường 2026-10-08; hàm quyết định "giảm nghiêm ngặt" và "suy hiệu ứng" được nhóm theo hàm, có golden riêng.
+5. **Khoá cứng test:** `interior_mut` kịch bản trong bộ sinh borrowck + M7 trước khi `Mutex`/atomics vào fixture.
+
+### 4. Rủi ro / đánh đổi
+- Độ chính xác của "giảm nghiêm ngặt" bị chặn bởi M7 (chưa tinh chỉnh `∧ ∨`, hằng khởi tạo không tạo quan hệ zone): nhiều vòng lặp hợp lệ sẽ bị E0702 nhầm — fail-closed nhưng gây khó chịu; bù bằng dạng mẫu `i ← i ± c`. Đề xuất (chờ Giang): sửa M5 hạ điều kiện `⎇ a ∧ b` thành nhánh lồng (ảnh hưởng golden M5, M6) — hỏi trước khi làm.
+- Hiệu ứng suy ngược qua `Callee::Value` quá bảo thủ ⇒ phải khai báo; chấp nhận.
+- Khoá thứ tự: toàn bộ chứng minh phụ thuộc "tóm tắt hiệu ứng `lock`" đúng ⇒ nhóm đột biến riêng, và vì bị khoá cứng nên là phần cuối.
+
+### 5. Câu hỏi cho Giang (đề xuất kèm lý do ở trên)
+- **Q43** Thêm `DomainQuery` như bước 1 của M8 (món nợ của ADR-025 §7). Đề xuất: có.
+- **Q44** Thứ tự (a)→(b)→(c)→(d), (e) chặn bởi khoá cứng. Đề xuất: có; dừng chờ duyệt sau (a)+(b), (c), (d).
+- **Q45** Biến thể `↓` bắt buộc kiểu số nguyên không âm hay cho tuple lexicographic? Đề xuất Phase 1: chỉ một số nguyên (D12), tuple để Phase 2.
+- **Q46** Hạ `⎇ a ∧ b` thành nhánh lồng ở M5 để M7/M8 chính xác hơn (đụng golden M5/M6). Đề xuất: làm như một bước riêng, có golden, TRƯỚC (c).
+- **Q47** Mã lỗi: dùng E0501 cho vi phạm `Send/Sync`-like của `spawn`, E0502 cho thứ tự khoá (đúng bảng hiện có); thêm ghi chú N08xx cho hiệu ứng suy ra rộng hơn khai báo? Đề xuất: chưa thêm.
