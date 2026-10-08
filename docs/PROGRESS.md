@@ -475,3 +475,4 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - **Cổng đầy đủ (chạy một lần sau nửa 2, `tools/gate.sh`): XANH** — fmt, clippy `-D warnings`, audit, **634 test pass / 0 lỗi** (M7-close: 576), check_expectations (757 tệp .gt, 63 mã lỗi, 184 tham chiếu test) + unittest script. Lần chạy đầu đỏ vì sổ mã `gt_diag::known_codes()` thiếu E0503; đã thêm và chạy lại.
 - Kích thước: `target/` 1,8 GB, `.git/` 2,1 MB.
 - ADR-028 (M9) viết xong, DỰ THẢO chờ duyệt (Q53–Q58).
+- **GT_FULL8=1 (vét cạn 8 bit HOÀN TOÀN, chạy một lần khi máy rảnh): XANH** — `gt-oblig/tests/exhaustive.rs` 4 test pass, 665,9 s (~11 phút).
