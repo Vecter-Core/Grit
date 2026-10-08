@@ -448,5 +448,11 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 ## M8 nửa 2 — bước 1: `spawn` thuần (2026-10-08)
 - Trait `Send` tự động (`send.rs`), `spawn` trong prelude fixture, E0501 (5 fail + 4 pass, `docs/errors/E0501.md`), `⊐ Send for` bị E0313, thông dịch chạy `spawn` tuần tự (công cụ test). 8 test `gt-types/tests/spawn.rs`, 1 test `gt-mir` (worker abort chứng tỏ chạy với đối số).
 - Đột biến `send.rs`: 22, lần chạy lại còn 1 tương đương. Hồi quy gt-types, gt-mir xanh; corpus gt-borrowck, gt-oblig xanh.
-- Phát hiện: tên generic `A` trong chữ ký prelude đụng tham số `a` của chương trình (E0205) — prelude phải dùng tên generic riêng (`Arg`); chưa điều tra gốc ở resolver.
+- Phát hiện E0205 oan khi thêm `spawn<A>(f, a: A)`: ĐÃ truy gốc và sửa ở commit `M3-fix` (xem dưới); không còn né bằng đổi tên.
 - Chưa chạy cổng đầy đủ; chờ xong nửa 2.
+
+## M3-fix: mã prelude chỉ thấy prelude (2026-10-08)
+- **Gốc (không phải chữ hoa/thường, cũng không phải generics rò):** `module_scope_site`/`module_scope_lookup` (gt-resolve/src/walk.rs) luôn tra `[module hiện tại, gốc người dùng, prelude]`, kể cả khi đang duyệt MÃ PRELUDE. Hệ quả: (1) tên tệp/module của người dùng (vd `a.gt`) bị D7 so với tham số trong chữ ký prelude → E0205 oan trên `<prelude>`; mọi tệp tên trùng tham số của lib (`x`, `n`, `p`, `a`, `f`…) đều dính; (2) tên trong prelude có thể phân giải nhầm sang item cùng tên của người dùng.
+- **Tái hiện tối thiểu:** prelude `ƒ idv(a: u32) → u32 ! ∅ { a }` + tệp `a.gt` (E0205), `b.gt`/`A.gt` sạch.
+- **Sửa:** `scope_containers()` — mã prelude chỉ thấy `[module prelude, prelude]`. Test hồi quy `gt-resolve/tests/prelude_isolation.rs` (6 ca pass: tệp/module tên `x`/`n`/`p`; 4 ca fail: D7 vẫn áp dụng cho mã người dùng) và `gt-types/tests/adt.rs` (tệp `a.gt` với prelude `spawn<A>(…, a: A)`).
+- Sai sót của tôi cùng đợt: commit `4a436e2` làm hỏng corpus gt-resolve (fixture prelude riêng chưa có `spawn`/`Send`) vì tôi không chạy gt-resolve; đã bổ sung fixture.

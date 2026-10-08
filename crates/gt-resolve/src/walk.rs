@@ -132,10 +132,21 @@ impl<'t> Walker<'t> {
 
     // ---------------- tên cấp module ----------------
 
+    /// Các bảng module để tra tên trần, theo thứ tự ưu tiên. Mã của PRELUDE chỉ thấy prelude: nếu để lọt gốc người dùng thì (1) tên tệp
+    /// của người dùng (vd `a.gt`) bị D7 so với tham số trong chữ ký prelude → E0205 oan, (2) tên trong prelude có thể phân giải nhầm sang item
+    /// cùng tên của người dùng (M3-fix).
+    fn scope_containers(&self) -> Vec<DefId> {
+        if self.file == crate::prelude::prelude_file() {
+            vec![self.module, self.t.prelude]
+        } else {
+            vec![self.module, self.t.root, self.t.prelude]
+        }
+    }
+
     /// Tên `n` thấy được ở cấp module (bảng module hiện tại → module-tệp → prelude): vị trí định nghĩa đầu tiên.
     fn module_scope_site(&self, n: &str) -> Option<(FileId, Span)> {
         let site_of = |t: &Tables, d: DefId| (t.defs[d.index()].file, t.defs[d.index()].name_span);
-        for container in [self.module, self.t.root, self.t.prelude] {
+        for container in self.scope_containers() {
             if let Some(entries) = self.t.tables[container.index()].get(n) {
                 return match entries.first()? {
                     crate::tables::Entry::Def(d) => Some(site_of(self.t, *d)),
@@ -150,7 +161,7 @@ impl<'t> Walker<'t> {
 
     /// Tra tên trần ở cấp module (không kiểm khả kiến): module hiện tại → module-tệp → prelude.
     fn module_scope_lookup(&mut self, n: &str) -> Found {
-        for container in [self.module, self.t.root, self.t.prelude] {
+        for container in self.scope_containers() {
             match self.t.lookup_in(container, n, None) {
                 Found::Missing => {}
                 other => return other,

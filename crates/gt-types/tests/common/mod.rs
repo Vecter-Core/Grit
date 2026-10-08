@@ -17,7 +17,7 @@ pub const PRELUDE_SRC: &str = "\
 ⊏ Copy { }
 #lang(send)
 ⊏ Send { }
-ƒ spawn<Arg: Send>(f: ƒ(Arg) ! ∅, arg: Arg) ! ∅ { }
+ƒ spawn<A: Send>(f: ƒ(A) ! ∅, a: A) ! ∅ { }
 #lang(drop)
 ⊏ Drop { ƒ drop(&!self) ! ∅; }
 ▢ Buf { n: i32 }

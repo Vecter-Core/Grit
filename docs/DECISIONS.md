@@ -178,6 +178,9 @@
 - **Kết quả:** `ResolveOutput { resolutions, report }`. Mỗi vị trí dùng → `Res::{Def, Local, Variant, Assoc, Err}`; DefId đặt theo đường dẫn đủ tên (không theo thứ tự khai báo). Dạng chuẩn `canonical()` (khoá = đường dẫn item bao + số thứ tự trong item) dùng để so sánh bất biến thứ tự.
 - **Tính chất bắt buộc (plan) — phạm vi chính xác:** xáo thứ tự TỆP → kết quả và danh sách lỗi (sắp D19) **giống từng byte** (vị trí trong tệp không đổi). Xáo thứ tự ITEM trong tệp → `canonical()` giống hệt và tập lỗi (mã, thông điệp, vị trí logic = đường dẫn item bao) giống hệt; **vị trí byte và do đó thứ tự D19 theo offset KHÔNG thể giống** (D19 sắp theo offset, mà offset đổi khi xáo). Đó là hệ quả của D19, không phải lỗi; ADR ghi để không hứa điều không thể.
 
+### ADR-017 phụ lục (2026-10-08, M3-fix): phạm vi tên của mã prelude
+- Mã trong prelude (chữ ký, thân, hợp đồng) chỉ thấy `[module prelude, prelude]`; KHÔNG thấy gốc người dùng. Lý do: nếu thấy thì tên tệp/module của người dùng bị luật D7 (cấm shadowing) so với tham số của hàm lib → E0205 oan, và tên trong lib có thể phân giải nhầm sang item cùng tên của người dùng. Hướng ngược lại giữ nguyên: mã người dùng thấy prelude và D7 áp dụng đầy đủ. Cài ở `gt-resolve/src/walk.rs::scope_containers`; test `gt-resolve/tests/prelude_isolation.rs`.
+
 ## ADR-018 — M4 hệ thống kiểu: đơn hình hoá, biểu diễn impl, kiểu `!` — **Giang duyệt 2026-10-06 (điểm 1, 2, 3; Q20, Q21, Q22; `#lang`)**
 Viết TRƯỚC khi có dòng code M4 nào. Mỗi điểm: bối cảnh → phương án → **đề xuất** → hệ quả (kể cả chi phí) → cái cần Giang chốt.
 

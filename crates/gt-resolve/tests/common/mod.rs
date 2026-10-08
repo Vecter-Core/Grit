@@ -8,6 +8,8 @@ pub const PRELUDE_SRC: &str = "\
 ⊔ Result<T, E> { Ok(T), Err(E) }
 ⊏ Copy { }
 ⊏ Drop { }
+⊏ Send { }
+ƒ spawn<A: Send>(f: ƒ(A) ! ∅, a: A) ! ∅ { }
 ▢ Buf { n: i32 }
 ƒ mk_buf() → Buf ! ∅ { }
 ▢ Guard { ◈ inner: Buf, ◈ n: i32 }
