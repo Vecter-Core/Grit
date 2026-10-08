@@ -129,6 +129,16 @@ impl Builder<'_> {
         let t = self.decl_temp_unregistered(ty);
         self.push(StatementKind::StorageLive(t));
         self.assign(Place::local(t), rv);
+        self.switch_local(t, targets, otherwise)
+    }
+
+    /// Rẽ nhánh theo local `t` (đã sống): `t` chết NGAY ở đầu mọi nhánh.
+    pub(crate) fn switch_local(
+        &mut self,
+        t: Local,
+        targets: Vec<(u128, BasicBlock)>,
+        otherwise: BasicBlock,
+    ) -> R<()> {
         let mut tramp = Vec::new();
         for (v, b) in &targets {
             let x = self.new_block();
@@ -168,6 +178,94 @@ impl Builder<'_> {
             span: self.at.0,
         });
         Local(u32::try_from(self.body.locals.len() - 1).unwrap_or(u32::MAX))
+    }
+
+    /// Điều kiện ghép (`∧ ∨ ⇒ ¬`) cần hạ thẳng thành nhánh.
+    pub(crate) fn is_compound_cond(e: &Expr) -> bool {
+        matches!(
+            &e.kind,
+            ExprKind::Binary {
+                op: BinaryOp::And | BinaryOp::Or | BinaryOp::Implies,
+                ..
+            } | ExprKind::Unary {
+                op: UnaryOp::Not,
+                ..
+            }
+        )
+    }
+
+    /// Hạ điều kiện bool THẲNG thành nhánh điều khiển (lệnh Giang 2026-10-08, M5-fix): đúng → `t`, sai → `f`, KHÔNG cụ thể hoá
+    /// `∧ ∨ ⇒ ¬` thành biến tạm bool rồi mới rẽ. Thứ tự đánh giá và ngắn mạch như semantics §3a: vế trái trước, vế phải chỉ khi cần.
+    /// `scoped`: đang ở khối chỉ một đường tới (vế phải, hoặc đầu mỗi vòng lặp) nên biến tạm của lá phải chết TRƯỚC khi rẽ.
+    pub(crate) fn cond_branch(
+        &mut self,
+        e: &Expr,
+        t: BasicBlock,
+        f: BasicBlock,
+        scoped: bool,
+    ) -> R<()> {
+        match &e.kind {
+            ExprKind::Lit(Lit {
+                kind: LitKind::Bool(v),
+                ..
+            }) => self.with_at(e, |b| {
+                b.terminate(TerminatorKind::Goto(if *v { t } else { f }))
+            }),
+            ExprKind::Unary {
+                op: UnaryOp::Not,
+                operand,
+            } => self.cond_branch(operand, f, t, scoped),
+            ExprKind::Binary {
+                op: BinaryOp::And,
+                lhs,
+                rhs,
+            } => {
+                let mid = self.new_block();
+                self.cond_branch(lhs, mid, f, scoped)?;
+                self.cur = mid;
+                self.cond_branch(rhs, t, f, true)
+            }
+            ExprKind::Binary {
+                op: BinaryOp::Or,
+                lhs,
+                rhs,
+            } => {
+                let mid = self.new_block();
+                self.cond_branch(lhs, t, mid, scoped)?;
+                self.cur = mid;
+                self.cond_branch(rhs, t, f, true)
+            }
+            ExprKind::Binary {
+                op: BinaryOp::Implies,
+                lhs,
+                rhs,
+            } => {
+                // a ⇒ b  ≡  ¬a ∨ b
+                let mid = self.new_block();
+                self.cond_branch(lhs, mid, t, scoped)?;
+                self.cur = mid;
+                self.cond_branch(rhs, t, f, true)
+            }
+            _ => self.with_at(e, |b| {
+                if scoped {
+                    let cv = b.decl_temp_unregistered(Ty::Bool);
+                    b.push(StatementKind::StorageLive(cv));
+                    b.in_stmt(|b| {
+                        let o = b.as_operand(e)?;
+                        b.assign(Place::local(cv), Rvalue::Use(o));
+                        Ok(())
+                    })?;
+                    b.switch_local(cv, vec![(0, f)], t)
+                } else {
+                    let c = b.as_operand(e)?;
+                    b.terminate(TerminatorKind::SwitchInt {
+                        discr: c,
+                        targets: vec![(0, f)],
+                        otherwise: t,
+                    })
+                }
+            }),
+        }
     }
 
     /// Nhảy theo bool: `false` → `f`, khác → `t`.
@@ -1128,6 +1226,13 @@ impl Builder<'_> {
                 }
             };
         }
+        if Self::is_compound_cond(cond) {
+            let then_bb = self.new_block();
+            let else_bb = self.new_block();
+            let join = self.new_block();
+            self.cond_branch(cond, then_bb, else_bb, false)?;
+            return self.if_arms(dest, then_b, els, then_bb, else_bb, join);
+        }
         let c = self.as_operand(cond)?;
         let then_bb = self.new_block();
         let else_bb = self.new_block();
@@ -1137,6 +1242,18 @@ impl Builder<'_> {
             targets: vec![(0, else_bb)],
             otherwise: then_bb,
         })?;
+        self.if_arms(dest, then_b, els, then_bb, else_bb, join)
+    }
+
+    fn if_arms(
+        &mut self,
+        dest: &Place,
+        then_b: &Block,
+        els: Option<&Expr>,
+        then_bb: BasicBlock,
+        else_bb: BasicBlock,
+        join: BasicBlock,
+    ) -> R<()> {
         self.cur = then_bb;
         self.lower_block(dest, then_b)?;
         self.terminate(TerminatorKind::Goto(join))?;
@@ -1407,13 +1524,20 @@ impl Builder<'_> {
                     }) => Some(*v),
                     _ => None,
                 };
-                let cv = self.temp(Ty::Bool);
+                let compound = Self::is_compound_cond(c);
+                let cv = if compound {
+                    None
+                } else {
+                    Some(self.temp(Ty::Bool))
+                };
                 self.goto(head)?;
                 self.invariants_at_head(&l.invariants)?;
                 match lit {
                     Some(true) => self.terminate(TerminatorKind::Goto(body_bb))?,
                     Some(false) => self.terminate(TerminatorKind::Goto(exit))?,
+                    None if compound => self.cond_branch(c, body_bb, exit, true)?,
                     None => {
+                        let cv = cv.expect("điều kiện đơn có biến tạm");
                         self.in_stmt(|b| {
                             let o = b.as_operand(c)?;
                             b.assign(Place::local(cv), Rvalue::Use(o));
