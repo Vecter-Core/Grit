@@ -648,3 +648,9 @@ Giang chỉ có bản tóm tắt ADR-025; tôi đối chiếu từng điểm v�
 - **Q45** Biến thể `↓` bắt buộc kiểu số nguyên không âm hay cho tuple lexicographic? Đề xuất Phase 1: chỉ một số nguyên (D12), tuple để Phase 2.
 - **Q46** Hạ `⎇ a ∧ b` thành nhánh lồng ở M5 để M7/M8 chính xác hơn (đụng golden M5/M6). Đề xuất: làm như một bước riêng, có golden, TRƯỚC (c).
 - **Q47** Mã lỗi: dùng E0501 cho vi phạm `Send/Sync`-like của `spawn`, E0502 cho thứ tự khoá (đúng bảng hiện có); thêm ghi chú N08xx cho hiệu ứng suy ra rộng hơn khai báo? Đề xuất: chưa thêm.
+
+### 6. Quyết định khi cài M8 nửa 1 (2026-10-08) — ĐỀ XUẤT, chờ Giang duyệt
+- **Q48 (đề xuất)** Nghĩa của E0802: bảng cũ ghi "hàm `∅` gọi hàm có hiệu ứng", nhưng mẫu đã duyệt `E0801_effect_undeclared` chính là trường hợp đó. Cài đặt: E0801 = suy ra ⊄ khai báo (kể cả hàm `∅`); E0802 = thành viên impl khai hiệu ứng ngoài tập thành viên trait cho phép. Hiệu ứng trong KIỂU hàm khớp chính xác nên đưa hàm khác hiệu ứng vào chỗ kiểu hàm đã bị M4 bác bằng E0301 (không có nhánh E0802 cho trường hợp này; đã thử bỏ mã chết không kiểm thử được).
+- **Q49 (đề xuất)** Mô-đun `gt_oblig::effects` và `gt_oblig::termination` nằm TRONG gt-oblig (không tạo crate mới): dùng chung MIR, kiểu và bộ giải M7; tránh thêm một crate chỉ để chia sẻ ba hàm. Vòng vô hạn thiếu `div` do E0701 (termination) sở hữu, effects không suy `div` từ vòng lặp để khỏi báo trùng.
+- **Q50 (đề xuất)** Vòng for-in (`a..b`, `&xs`) hữu hạn và tự giảm: `↓` ghi thêm ở đó bị BỎ QUA (không kiểm). Vòng không có cạnh lùi (thân luôn thoát) lặp tối đa một lần nên không cần biến thể và không bị kiểm. Cả hai đều chỉ nới lỏng chỗ vốn đã chắc chắn dừng.
+- Chọn cài đặt (không cần duyệt): biến của biến thể vòng được xếp TRƯỚC trong ngân sách 24 biến zone (hàm nhiều tham số không mất biến cần chứng minh; chỉ ảnh hưởng thân có vòng cần biến thể). Đệ quy qua giá trị hàm hoặc phương thức trait luôn bị E0703 dù có `↓` (không kiểm được giảm), khai `div` nếu cố ý.

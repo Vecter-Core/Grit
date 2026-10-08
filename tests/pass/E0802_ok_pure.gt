@@ -1,0 +1,5 @@
+// expect: pass
+// note: cả hai ∅
+⊏ T { ƒ m(&self) ! ∅; }
+▢ S { v: i32 }
+⊐ T for S { ƒ m(&self) ! ∅ { } }

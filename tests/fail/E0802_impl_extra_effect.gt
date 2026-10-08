@@ -1,0 +1,5 @@
+// expect: fail E0802
+// note: trait cho {io}, impl khai thêm mem
+⊏ T { ƒ m(&self) ! {io}; }
+▢ S { v: i32 }
+⊐ T for S { ƒ m(&self) ! {io, mem} { } }

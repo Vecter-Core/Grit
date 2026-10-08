@@ -1,0 +1,4 @@
+// expect: fail E0703
+// note: chỉ một hàm của chu trình có ↓; hàm còn lại vẫn thiếu
+ƒ even(n: u32) → bool ! ∅ ↓ n { odd(n) }
+ƒ odd(n: u32) → bool ! ∅ { even(n) }

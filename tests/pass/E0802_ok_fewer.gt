@@ -1,0 +1,5 @@
+// expect: pass
+// note: impl khai ít hơn trait
+⊏ T { ƒ m(&self) ! {io}; }
+▢ S { v: i32 }
+⊐ T for S { ƒ m(&self) ! ∅ { } }

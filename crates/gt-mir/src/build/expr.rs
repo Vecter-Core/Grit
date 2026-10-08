@@ -1491,7 +1491,31 @@ impl Builder<'_> {
 
     // ---------------- vòng lặp ----------------
 
+    /// Ghi nhận khối đầu vòng lặp đang hạ (M8): đích của mọi cạnh lùi.
+    fn register_head(&mut self, head: BasicBlock, shape: LoopShape) {
+        if let Some((span, node, variant, cond)) = self.pending_loop.take() {
+            self.body.loops.push(LoopInfo {
+                head,
+                shape,
+                node,
+                span,
+                variant,
+                cond,
+            });
+        }
+    }
+
     fn loop_into(&mut self, l: &Loop) -> R<()> {
+        let cond_clone = match &l.kind {
+            LoopKind::While(c) => Some((**c).clone()),
+            _ => None,
+        };
+        self.pending_loop = Some((
+            self.at.0,
+            self.at.1,
+            l.variant.as_deref().cloned(),
+            cond_clone,
+        ));
         if let Some(v) = &l.variant {
             self.body.contracts.push(v.id);
         }
@@ -1505,6 +1529,7 @@ impl Builder<'_> {
                 let head = self.new_block();
                 let exit = self.new_block();
                 self.goto(head)?;
+                self.register_head(head, LoopShape::Infinite);
                 self.invariants_at_head(&l.invariants)?;
                 self.enter_loop(exit, head);
                 self.lower_block(&scr, &l.body)?;
@@ -1531,6 +1556,7 @@ impl Builder<'_> {
                     Some(self.temp(Ty::Bool))
                 };
                 self.goto(head)?;
+                self.register_head(head, LoopShape::While);
                 self.invariants_at_head(&l.invariants)?;
                 match lit {
                     Some(true) => self.terminate(TerminatorKind::Goto(body_bb))?,
@@ -1618,6 +1644,7 @@ impl Builder<'_> {
                 let step = self.new_block();
                 let exit = self.new_block();
                 self.goto(head)?;
+                self.register_head(head, LoopShape::ForSlice);
                 self.invariants_at_head(invs)?;
                 self.branch_bool(
                     Rvalue::BinaryOp(
@@ -1705,10 +1732,12 @@ impl Builder<'_> {
                     )?;
                     self.cur = pre;
                     self.goto(head)?;
+                    self.register_head(head, LoopShape::ForRange);
                     self.invariants_at_head(invs)?;
                     self.terminate(TerminatorKind::Goto(body_bb))?;
                 } else {
                     self.goto(head)?;
+                    self.register_head(head, LoopShape::ForRange);
                     self.invariants_at_head(invs)?;
                     self.branch_bool(
                         Rvalue::BinaryOp(

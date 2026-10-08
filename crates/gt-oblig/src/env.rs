@@ -58,7 +58,7 @@ pub fn lin(t: &Term) -> Option<Lin> {
         }
     }
     merged.retain(|(s, _)| *s != 0);
-    if merged.iter().any(|(s, _)| s.abs() > 1) || merged.len() > 2 {
+    if merged.iter().any(|(s, _)| s.abs() > 1) || merged.len() > 4 {
         return None;
     }
     l.vars = merged;
@@ -81,7 +81,7 @@ pub fn lin_diff(a: &Lin, b: &Lin) -> Option<Lin> {
         }
     }
     merged.retain(|(s, _)| *s != 0);
-    if merged.iter().any(|(s, _)| s.abs() > 1) || merged.len() > 2 {
+    if merged.iter().any(|(s, _)| s.abs() > 1) || merged.len() > 4 {
         return None;
     }
     Some(Lin {
@@ -211,26 +211,95 @@ impl Env {
         }
     }
 
+    /// Khoảng của `t` giao với cận zone của chính `t` (dạng tuyến tính `c + Σ ±x`): đọc được `i − n ≤ −1` mà khoảng đơn lẻ không thấy.
+    /// Cả hai là biên ngoài ĐÚNG nên giao cũng đúng; nếu giao rỗng (chỉ khi trạng thái chết) trả khoảng thuần để không tạo khoảng sai.
+    #[must_use]
+    pub fn eval_term_zone(&self, t: &Term) -> Interval {
+        let iv = self.eval_term(t);
+        let Some(p) = lin(t) else { return iv };
+        let (up, lo) = self.zone_diff(&p);
+        let (mut l, mut h) = (iv.lo, iv.hi);
+        if let Some(u) = up
+            && B::Fin(u) < h
+        {
+            h = B::Fin(u);
+        }
+        if let Some(v) = lo
+            && B::Fin(v) > l
+        {
+            l = B::Fin(v);
+        }
+        if l > h { iv } else { Interval { lo: l, hi: h } }
+    }
+
     /// Cận trên/dưới của `P = a − b` dùng zone (hai biến ngược dấu cùng trong zone).
     fn zone_diff(&self, p: &Lin) -> (Option<I256>, Option<I256>) {
         // hai vế cùng biểu thức (các biến triệt tiêu): P = c CHÍNH XÁC (vd `x == x`, `x + 1 > x`)
         if p.vars.is_empty() {
             return (Some(p.c), Some(p.c));
         }
-        // P = c + (+x) + (−y)  ⇒  x − y ≤ m[x][y]  nên  P ≤ c + m[x][y];  y − x ≤ m[y][x] nên  P ≥ c − m[y][x]
-        if let [(s1, v1), (s2, v2)] = p.vars.as_slice()
-            && *s1 == -*s2
-        {
-            let (x, y) = if *s1 > 0 { (*v1, *v2) } else { (*v2, *v1) };
-            let up = self
-                .zone_bound(x, y)
-                .and_then(|m| p.c.checked_add(I256::from_i128(m)));
-            let lo = self
-                .zone_bound(y, x)
-                .and_then(|m| p.c.checked_sub(I256::from_i128(m)));
-            return (up, lo);
+        // P = c + Σ (x_i − y_i) (mỗi biến dương ghép một biến âm; hệ số ±1 do `lin`):
+        //   x_i − y_i ≤ m[x_i][y_i]  nên  P ≤ c + Σ m[x_i][y_i];   y_i − x_i ≤ m[y_i][x_i]  nên  P ≥ c − Σ m[y_i][x_i].
+        // Hai cận độc lập nên mỗi cận chọn phép ghép TỐT NHẤT riêng (≤ 4 cặp ⇒ ≤ 24 hoán vị); ghép nào cũng cho cận ĐÚNG.
+        let pos: Vec<VarId> = p
+            .vars
+            .iter()
+            .filter(|(s, _)| *s > 0)
+            .map(|(_, v)| *v)
+            .collect();
+        let neg: Vec<VarId> = p
+            .vars
+            .iter()
+            .filter(|(s, _)| *s < 0)
+            .map(|(_, v)| *v)
+            .collect();
+        if pos.len() != neg.len() || pos.len() > 4 || p.vars.iter().any(|(s, _)| s.abs() != 1) {
+            return (None, None);
         }
-        (None, None)
+        let n = pos.len();
+        let mut idx: Vec<usize> = (0..n).collect();
+        let (mut best_up, mut best_lo): (Option<I256>, Option<I256>) = (None, None);
+        let mut consider = |perm: &[usize]| {
+            let mut up = Some(p.c);
+            let mut lo = Some(p.c);
+            for (i, &j) in perm.iter().enumerate() {
+                up = match (up, self.zone_bound(pos[i], neg[j])) {
+                    (Some(u), Some(m)) => u.checked_add(I256::from_i128(m)),
+                    _ => None,
+                };
+                lo = match (lo, self.zone_bound(neg[j], pos[i])) {
+                    (Some(l), Some(m)) => l.checked_sub(I256::from_i128(m)),
+                    _ => None,
+                };
+            }
+            if let Some(u) = up
+                && best_up.is_none_or(|b| u < b)
+            {
+                best_up = Some(u);
+            }
+            if let Some(l) = lo
+                && best_lo.is_none_or(|b| l > b)
+            {
+                best_lo = Some(l);
+            }
+        };
+        // Heap: duyệt mọi hoán vị
+        fn heap(k: usize, a: &mut Vec<usize>, f: &mut impl FnMut(&[usize])) {
+            if k <= 1 {
+                f(a);
+                return;
+            }
+            for i in 0..k {
+                heap(k - 1, a, f);
+                if k.is_multiple_of(2) {
+                    a.swap(i, k - 1);
+                } else {
+                    a.swap(0, k - 1);
+                }
+            }
+        }
+        heap(n, &mut idx, &mut consider);
+        (best_up, best_lo)
     }
 
     fn tri_le(&self, a: &Term, b: &Term, strict: bool) -> Tri {

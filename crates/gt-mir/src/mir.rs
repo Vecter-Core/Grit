@@ -1,6 +1,6 @@
 //! Biểu diễn MIR (ADR-020 §2, §9). Chỉ mục là newtype trên `u32`; mọi bảng là `Vec` — không `HashMap` (tất định).
 //! Không có cạnh unwind, không có khối cleanup (D3, panic = abort).
-use gt_ast::NodeId;
+use gt_ast::{Expr, NodeId};
 use gt_resolve::{DefId, LocalId};
 use gt_span::Span;
 use gt_types::{FloatTy, IntTy, Ty};
@@ -77,6 +77,33 @@ pub struct Body {
     pub bad_literals: Vec<BadLiteral>,
     /// nghĩa vụ trong hợp đồng mà M5 không hạ được thành kiểm lúc chạy (vd lượng từ không biên): M7 báo E0902 (D25)
     pub uncheckable: Vec<Uncheckable>,
+    /// Mọi vòng lặp của thân (M8, ADR-026): đầu vòng (đích của cạnh lùi), hình dạng, biến thể `↓` và điều kiện (bản sao AST) để M8 kiểm dừng.
+    pub loops: Vec<LoopInfo>,
+    /// Ánh xạ định danh biến của resolver → local MIR (tham số và `≔`), để dịch biểu thức biến thể từ AST.
+    pub var_map: Vec<(LocalId, Local)>,
+}
+
+/// Hình dạng vòng lặp.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LoopShape {
+    Infinite,
+    While,
+    /// `⟳ x in a..b` (số phần tử còn lại hữu hạn, tự giảm)
+    ForRange,
+    /// `⟳ x in &xs` (hữu hạn, tự giảm)
+    ForSlice,
+}
+
+/// Một vòng lặp trong thân.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LoopInfo {
+    /// khối đầu vòng: đích của MỌI cạnh lùi (và của cạnh vào lần đầu)
+    pub head: BasicBlock,
+    pub shape: LoopShape,
+    pub node: NodeId,
+    pub span: Span,
+    pub variant: Option<Expr>,
+    pub cond: Option<Expr>,
 }
 
 /// Một thành phần hợp đồng không kiểm được lúc chạy.

@@ -1,0 +1,3 @@
+// expect: pass
+// note: biến thể đệ quy ↓ n, lời gọi n - 1 giảm và n ≥ 0 nhờ nhánh n ≠ 0
+ƒ fact(n: u32) → u64 ! ∅ ↓ n { ⎇ n == 0 { 1 } ⇝ { n as u64 *% fact(n - 1) } }

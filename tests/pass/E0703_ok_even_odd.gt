@@ -1,0 +1,4 @@
+// expect: pass
+// note: đệ quy tương hỗ, mỗi hàm có ↓ n và gọi với n - 1
+ƒ even(n: u32) → bool ! ∅ ↓ n { ⎇ n == 0 { true } ⇝ { odd(n - 1) } }
+ƒ odd(n: u32) → bool ! ∅ ↓ n { ⎇ n == 0 { false } ⇝ { even(n - 1) } }

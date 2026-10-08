@@ -435,3 +435,12 @@ Thông dịch MIR có theo dõi khoản vay/move/Arena, độc lập với mã p
 - Kiểm "tắt bản sửa" #3 sau khi đổi bộ sinh: oracle vẫn bắt ở chương trình #346 (Bug: đọc ngoài biên không có assert).
 ### 3. Điểm mù của oracle
 Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITATIONS.md` (mục "những gì oracle không quan sát được"). Lỗ hổng #4 là ví dụ: oracle không thể quan sát (chương trình bị E0902), nên chỉ `tests/decisions2.rs` giết được.
+
+## M8 nửa 1 (2026-10-08) — DomainQuery, hiệu ứng E08xx, điều kiện dừng E07xx. **Chưa commit tại thời điểm viết**
+- **DomainQuery** (`gt_oblig::analysis::DomainQuery`, ADR-025 §7): khoảng của biểu thức tại điểm MIR, kèm cận zone (`Env::eval_term_zone`). 4 test (`tests/domain_query.rs`): đếm lên (nhánh vào thân `i − n ≤ −1`, nhánh thoát `≥ 0`), đếm xuống, `0..n`, điểm không tới được.
+- **Điều kiện dừng** (`termination.rs`): biến bóng + quan hệ zone, chứng minh ở mỗi cạnh lùi `v' < v ∧ 0 ≤ v` bằng bộ giải M7; tự suy từ `∧` của điều kiện; SCC cho đệ quy; `div`. Dữ liệu vòng lặp mới ở MIR (`Body.loops`, `var_map`; `tests/loops_info.rs`). Sửa 2 chỗ khi chạy corpus: biến vòng xếp trước trong ngân sách zone (mẫu N0605 30 tham số); `↓` trên for-in bị bỏ qua, vòng không cạnh lùi không cần biến thể.
+- **Hiệu ứng** (`effects.rs`): suy từ hiệu ứng khai báo của callee (trực tiếp, qua giá trị hàm, qua phương thức trait); E0801 suy ra ⊄ khai báo, E0802 impl ⊄ trait. 7 test.
+- **Oracle** `term_oracle` (1500 chương trình, không âm tính giả; ngưỡng ≥300 chấp nhận, ≥200 bác đúng, mỗi mã ≥50 đều đạt: 318/627, E0701 608, E0702 1109, E0703 112). Chèn lỗi vào chứng minh biến thể: bắt ở #78.
+- **Tài liệu/mẫu:** `docs/errors/E0701..E0703, E0801, E0802` (mỗi mã ≥3 fail + ≥3 pass, 30 mẫu mới), `DOC_REQUIRED` cập nhật, corpus kiểm mã M8 (`fail_cases_of_m8_give_exactly_their_code`, `every_pass_case_has_no_termination_or_effect_errors`).
+- **Hồi quy:** gt-mir, gt-types, gt-borrowck, gt-oblig (gồm oracle M7 2000 chương trình) xanh sau các thay đổi `env.rs`/`analysis.rs`. Cổng đầy đủ chưa chạy (theo lệnh: sau nửa 2).
+- **Đột biến:** xem KNOWN_LIMITATIONS "gt-oblig M8 nửa 1". Quyết định Q48–Q50 chờ duyệt (DECISIONS §6).

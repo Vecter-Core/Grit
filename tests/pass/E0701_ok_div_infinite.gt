@@ -1,0 +1,3 @@
+// expect: pass
+// note: vòng vô hạn cố ý khai hiệu ứng div (D12)
+ƒ f() → () ! {div} { ⟳ { } }

@@ -1,0 +1,4 @@
+// expect: fail E0801
+// note: phương thức trait khai io
+⊏ T { ƒ m(&self) ! {io}; }
+ƒ f<X: T>(x: &X) → () ! ∅ { x.m(); }

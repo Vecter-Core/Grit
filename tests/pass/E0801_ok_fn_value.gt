@@ -1,0 +1,3 @@
+// expect: pass
+// note: gọi qua giá trị hàm, hiệu ứng được khai đủ
+ƒ f(g: ƒ() → () ! {io}) → () ! {io} { g(); }

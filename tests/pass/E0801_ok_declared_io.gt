@@ -1,0 +1,4 @@
+// expect: pass
+// note: khai báo đúng hiệu ứng suy ra
+ƒ out() → () ! {io} { }
+ƒ f() → () ! {io} { out(); }

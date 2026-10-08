@@ -66,6 +66,8 @@ fn definite_code(k: &ObKind) -> &'static str {
         ObKind::DivZero | ObKind::RemZero => "E0602",
         ObKind::Index | ObKind::SliceRange => "E0603",
         ObKind::CastLossy => "E0604",
+        ObKind::Variant => "E0702",
+        ObKind::LoopBound => "E0701",
         _ => "E0901",
     }
 }
@@ -84,6 +86,8 @@ fn definite_msg(k: &ObKind) -> &'static str {
         ObKind::Pre => "tiền điều kiện luôn sai tại điểm gọi",
         ObKind::Post => "hậu điều kiện luôn sai",
         ObKind::Invariant => "bất biến vòng lặp luôn sai khi tới đầu vòng",
+        ObKind::Variant => "biến thể `↓` luôn không giảm",
+        ObKind::LoopBound => "biến thể tự suy luôn không giảm",
     }
 }
 

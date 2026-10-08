@@ -35,6 +35,7 @@ DOC_REQUIRED = [
     "E0310", "E0311", "E0312", "E0313", "E0314", "E0315", "E0316", "E1002",
     "E0401", "E0402", "E0403", "E0404", "E0405", "E0406", "E0407",
     "E0601", "E0602", "E0603", "E0604", "E0901", "E0902",
+    "E0701", "E0702", "E0703", "E0801", "E0802",
 ]
 # Ghi chú (N) của M7: docs/errors/<mã>.md với >=3 mẫu `pass` (mỗi mẫu PHẢI phát đúng ghi chú đó: kiểm bằng gt-oblig/tests/corpus.rs).
 NOTE_DOC_REQUIRED = [

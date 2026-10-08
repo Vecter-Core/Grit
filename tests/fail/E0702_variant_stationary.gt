@@ -1,0 +1,3 @@
+// expect: fail E0702
+// note: thân không đổi biến thể n - i
+ƒ f(n: u32) → () ! ∅ { μi ≔ 0u32; ⟳ i < n ↓ n - i { } }

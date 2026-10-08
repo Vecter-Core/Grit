@@ -59,6 +59,8 @@ pub(crate) struct Builder<'t> {
     pub(crate) bad_lits: std::cell::RefCell<Vec<BadLiteral>>,
     /// đang hạ một biểu thức hợp đồng (thân `⊳`/`⊲` hay `⋈`): `∀/∃` chỉ hạ được ở đây
     pub(crate) in_contract: u32,
+    /// dữ liệu vòng lặp đang hạ (`register_head` lấy ra khi biết khối đầu vòng)
+    pub(crate) pending_loop: Option<(Span, NodeId, Option<Expr>, Option<Expr>)>,
     /// Nút AST đang hạ (cho `SourceInfo`).
     pub(crate) at: (Span, NodeId),
 }
@@ -86,6 +88,8 @@ impl<'t> Builder<'t> {
             span,
             bad_literals: Vec::new(),
             uncheckable: Vec::new(),
+            loops: Vec::new(),
+            var_map: Vec::new(),
         };
         Builder {
             t,
@@ -99,6 +103,7 @@ impl<'t> Builder<'t> {
             bounds: t.scope_of(node),
             bad_lits: std::cell::RefCell::new(Vec::new()),
             in_contract: 0,
+            pending_loop: None,
             at: (span, node),
         }
     }
@@ -370,6 +375,7 @@ impl<'t> Builder<'t> {
         bad.sort_by_key(|b| (b.span.start, b.span.end, b.node));
         bad.dedup_by_key(|b| b.node);
         self.body.bad_literals = bad;
+        self.body.var_map = self.vars.iter().map(|(k, v)| (*k, *v)).collect();
         let open: Vec<usize> = self
             .body
             .blocks
@@ -622,6 +628,15 @@ fn prune_unreachable(body: &mut Body, reach: &[bool]) {
     body.fall_off = body
         .fall_off
         .and_then(|(b, sp)| map[b.index()].map(|nb| (nb, sp)));
+    body.loops = std::mem::take(&mut body.loops)
+        .into_iter()
+        .filter_map(|mut li| {
+            map[li.head.index()].map(|h| {
+                li.head = h;
+                li
+            })
+        })
+        .collect();
     // khoản mượn: giữ những cái còn được tham chiếu, đánh số lại theo thứ tự cũ
     let mut used = vec![false; body.borrows.len()];
     for bb in &body.blocks {

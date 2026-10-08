@@ -1,0 +1,3 @@
+// expect: fail E0801
+// note: gọi qua giá trị hàm mang hiệu ứng io
+ƒ f(g: ƒ() → () ! {io}) → () ! ∅ { g(); }

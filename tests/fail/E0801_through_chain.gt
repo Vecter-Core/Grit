@@ -1,0 +1,5 @@
+// expect: fail E0801
+// note: hiệu ứng io đi qua hai tầng gọi
+ƒ out() → () ! {io} { }
+ƒ g() → () ! {io} { out(); }
+ƒ f() → () ! ∅ { g(); }

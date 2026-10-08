@@ -1,0 +1,3 @@
+// expect: pass
+// note: biến thể tự suy từ `i < n`, thân tăng i
+ƒ f(n: u32) → u32 ! ∅ { μi ≔ 0u32; ⟳ i < n { i ← i + 1; } i }

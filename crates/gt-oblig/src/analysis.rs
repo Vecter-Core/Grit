@@ -34,6 +34,10 @@ pub const CONTRACT_OPAQUE_BASE: u32 = 4 << 20;
 pub const SITE_BASE: u32 = 5 << 20;
 /// nghĩa vụ hợp đồng không biểu diễn được: một nguyên tử riêng cho mỗi (khối, chỉ số hợp đồng)
 pub const UNREP_BASE: u32 = 6 << 20;
+/// biến BÓNG (ảnh chụp giá trị lúc vào đầu vòng lặp, M8): `GHOST_BASE + id biến gốc`
+pub const GHOST_BASE: u32 = 1 << 28;
+/// số biến bóng tối đa mỗi thân (ngoài `ZONE_MAX_VARS`); vượt thì các biến thừa không có bóng ⇒ biến thể không chứng minh được (E0702/E0701)
+pub const GHOST_MAX_VARS: usize = 8;
 /// vị từ thuần một đối số trên một local (vd `is_some(&x)`): `PRED_BASE + chỉ_số_vị_từ·1024 + local`
 pub const PRED_BASE: u32 = 7 << 20;
 
@@ -65,6 +69,8 @@ pub struct Judged {
     pub status: Status,
     /// chỗ phải chèn lệnh gọi hợp đồng + `Assert` khi `status` là `Lowered` (chỉ `Pre`/`Post`)
     pub insert: Option<Insert>,
+    /// (đầu vòng, ứng viên) của nghĩa vụ biến thể; `None` cho nghĩa vụ khác
+    pub tag: Option<(u32, u32)>,
 }
 
 /// Chèn kiểm hợp đồng lúc chạy (driver áp lên MIR đã tối ưu).
@@ -102,6 +108,23 @@ pub struct ContractProp {
     pub has_loop: bool,
 }
 
+/// Một ứng viên biến thể cho một vòng lặp (M8): `term` giảm nghiêm ngặt qua mỗi cạnh lùi và `0 ≤ term` ở đầu vòng đang tiếp tục.
+#[derive(Clone, Debug)]
+pub struct LoopSpec {
+    /// khối đầu vòng (đích của cạnh lùi)
+    pub head: u32,
+    /// chỉ số ứng viên (một vòng `while` có thể có nhiều ứng viên từ các vế `∧`; chỉ cần MỘT ứng viên qua)
+    pub cand: u32,
+    /// biến thể: biểu thức tuyến tính theo `Var(local)` / `Var(LEN_BASE + local)`
+    pub term: Term,
+    /// các biến của `term` (cần biến bóng)
+    pub vars: Vec<VarId>,
+    /// `true`: do người dùng viết `↓` (hỏng ⇒ E0702); `false`: tự suy từ điều kiện (hỏng ⇒ E0701)
+    pub given: bool,
+    pub node: gt_ast::NodeId,
+    pub span: (u32, u32),
+}
+
 /// Thông tin toàn chương trình cho phân tích một thân.
 #[derive(Clone, Debug, Default)]
 pub struct ProgInfo {
@@ -117,6 +140,12 @@ pub struct ProgInfo {
     pub pure_preds: BTreeMap<gt_ast::NodeId, u32>,
     /// theo khoá thân: từng local có kiểu Copy (theo ràng buộc đa hình của hàm)
     pub local_copy: BTreeMap<String, Vec<bool>>,
+    /// theo khoá thân: ứng viên biến thể của từng vòng lặp (M8)
+    pub loops: BTreeMap<String, Vec<LoopSpec>>,
+    /// biến thể `↓` của hàm (theo NodeId hàm): biểu thức theo `Var(chỉ số tham số)` (M8, đệ quy)
+    pub fn_variant: BTreeMap<gt_ast::NodeId, Term>,
+    /// hàm → số hiệu thành phần liên thông mạnh đệ quy (chỉ hàm đệ quy)
+    pub scc: BTreeMap<gt_ast::NodeId, usize>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -255,6 +284,10 @@ struct Ctx<'a> {
     len_callee: BTreeSet<gt_ast::NodeId>,
     info: &'a ProgInfo,
     record_pc: bool,
+    /// đầu vòng → [(biến gốc, biến bóng)] (M8)
+    ghosts: BTreeMap<usize, Vec<(VarId, VarId)>>,
+    /// đầu vòng → ứng viên biến thể
+    specs: BTreeMap<usize, Vec<LoopSpec>>,
     /// số lần gán tĩnh của mỗi local (không tính ràng buộc tham số)
     assigns: Vec<u32>,
 }
@@ -364,6 +397,15 @@ impl<'a> Ctx<'a> {
             }
             let _ = l;
         }
+        // biến của biến thể vòng lặp (M8) xếp TRƯỚC trong ngân sách zone, để hàm nhiều tham số không làm mất biến cần chứng minh
+        let prio: BTreeSet<VarId> = info
+            .loops
+            .get(&body.key)
+            .into_iter()
+            .flatten()
+            .flat_map(|sp| sp.vars.iter().copied())
+            .collect();
+        cand.sort_by_key(|(v, _)| !prio.contains(v));
         let mut zvars = Vec::new();
         let mut zone_dropped = Vec::new();
         for (v, n) in cand {
@@ -371,6 +413,25 @@ impl<'a> Ctx<'a> {
                 zvars.push(v);
             } else if use_zone {
                 zone_dropped.push(n);
+            }
+        }
+        // biến bóng cho biến thể của vòng lặp (M8): thêm vào zone ngoài ZONE_MAX_VARS
+        let mut ghosts: BTreeMap<usize, Vec<(VarId, VarId)>> = BTreeMap::new();
+        let mut specs: BTreeMap<usize, Vec<LoopSpec>> = BTreeMap::new();
+        let mut ghost_count = 0usize;
+        for sp in info.loops.get(&body.key).into_iter().flatten() {
+            specs.entry(sp.head as usize).or_default().push(sp.clone());
+            let g = ghosts.entry(sp.head as usize).or_default();
+            for v in &sp.vars {
+                if !g.iter().any(|(o, _)| o == v) && ghost_count < GHOST_MAX_VARS {
+                    ghost_count += 1;
+                    let gv = GHOST_BASE + *v;
+                    g.push((*v, gv));
+                    // mỗi biến bóng chỉ MỘT lần trong zone (hai vòng có thể dùng chung biến gốc)
+                    if use_zone && !zvars.contains(&gv) {
+                        zvars.push(gv);
+                    }
+                }
             }
         }
         // ngưỡng widening: hằng xuất hiện trong thân + 0, ±1 + cận kiểu
@@ -434,6 +495,8 @@ impl<'a> Ctx<'a> {
             info,
             record_pc: false,
             assigns,
+            ghosts,
+            specs,
         }
     }
 
@@ -502,6 +565,18 @@ impl<'a> Ctx<'a> {
         }
         for a in self.slice_atom.values() {
             env.declare(*a, Ty::new(64, false));
+        }
+        for (v, g) in self.ghosts.values().flatten() {
+            let ty = if *v >= LEN_BASE {
+                Ty::new(64, false)
+            } else {
+                self.itys
+                    .get(*v as usize)
+                    .copied()
+                    .flatten()
+                    .unwrap_or(Ty::new(64, false))
+            };
+            env.declare(*g, ty);
         }
         // `⊳` được đảm bảo kiểm ở mọi lời gọi ⇒ giả thiết cho cả thân
         if self.body.kind == gt_mir::BodyKind::Fn && self.info.assume_pre.contains(&self.body.node)
@@ -1293,6 +1368,120 @@ impl<'a> Ctx<'a> {
         term: &Terminator,
         mut judge: Option<&mut Judge<'_>>,
     ) -> Vec<(BasicBlock, AState)> {
+        let out = self.edges_inner(st, bb, term, judge.as_deref_mut());
+        // cạnh lùi tới đầu vòng có biến thể: nghĩa vụ "giảm nghiêm ngặt và bị chặn dưới" (M8)
+        if let Some(j) = judge {
+            for (tgt, s) in &out {
+                let t = tgt.index();
+                if self.rpo_pos[t] <= self.rpo_pos[bb]
+                    && let Some(sps) = self.specs.get(&t)
+                {
+                    for sp in sps {
+                        self.judge_variant_edge(s, bb, sp, j);
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Nghĩa vụ của một ứng viên biến thể tại một cạnh lùi.
+    fn judge_variant_edge(&self, s: &AState, bb: usize, sp: &LoopSpec, j: &mut Judge<'_>) {
+        let map: BTreeMap<VarId, Term> = sp
+            .vars
+            .iter()
+            .map(|v| (*v, Term::Var(GHOST_BASE + *v)))
+            .collect();
+        let goal = match Self::subst_term(&sp.term, &map) {
+            Some(old) => Prop::And(vec![
+                Prop::Lt(sp.term.clone(), old.clone()),
+                Prop::Le(Term::int(0), old),
+            ]),
+            None => Prop::Atom(self.unrep_atom(bb, sp.cand as usize)),
+        };
+        j.judge_core(
+            self,
+            s,
+            bb,
+            sp.span,
+            sp.node,
+            if sp.given {
+                ObKind::Variant
+            } else {
+                ObKind::LoopBound
+            },
+            goal,
+            Checkability::NotCheckable("điều kiện dừng không kiểm được lúc chạy".to_string()),
+            None,
+            false,
+            Some((sp.head, sp.cand)),
+        );
+    }
+
+    /// Lời gọi đệ quy trong cùng SCC: biến thể của callee tại đối số phải nhỏ hơn biến thể của hàm gọi tại tham số lúc vào (M8).
+    fn judge_recursive_call(
+        &self,
+        st: &AState,
+        bb: usize,
+        term: &Terminator,
+        callee: gt_ast::NodeId,
+        args: &[Operand],
+        j: &mut Judge<'_>,
+    ) {
+        let me = self.body.node;
+        let (Some(sa), Some(sb)) = (self.info.scc.get(&me), self.info.scc.get(&callee)) else {
+            return;
+        };
+        if sa != sb {
+            return;
+        }
+        let (Some(own), Some(theirs)) = (
+            self.info.fn_variant.get(&me),
+            self.info.fn_variant.get(&callee),
+        ) else {
+            return;
+        };
+        let (ints, _props, _keys) = self.arg_maps(st, args);
+        // biến thể của hàm gọi dùng GIÁ TRỊ LÚC VÀO của tham số: chỉ hợp lệ nếu tham số không bị gán lại/mượn `&!`
+        let mut vs = Vec::new();
+        own.vars(&mut vs);
+        let own_ok = vs.iter().all(|v| {
+            let l = if *v >= LEN_BASE {
+                (*v - LEN_BASE) as usize
+            } else {
+                *v as usize
+            };
+            l < self.nl && self.assigns[l] == 0 && !self.aliased[l]
+        });
+        let goal = match (own_ok, Self::subst_term(theirs, &ints)) {
+            (true, Some(now)) => Prop::And(vec![
+                Prop::Lt(now.clone(), own.clone()),
+                Prop::Le(Term::int(0), now),
+            ]),
+            _ => Prop::Atom(self.unrep_atom(bb, 1000)),
+        };
+        j.judge_core(
+            self,
+            st,
+            bb,
+            (term.source.span.start, term.source.span.end),
+            term.source.node,
+            ObKind::Variant,
+            goal,
+            Checkability::NotCheckable("điều kiện dừng không kiểm được lúc chạy".to_string()),
+            None,
+            false,
+            None,
+        );
+    }
+
+    fn edges_inner(
+        &self,
+        st: &AState,
+        bb: usize,
+        term: &Terminator,
+        mut judge: Option<&mut Judge<'_>>,
+    ) -> Vec<(BasicBlock, AState)> {
         let mut out = Vec::new();
         if st.env.is_dead() {
             return out;
@@ -1401,6 +1590,11 @@ impl<'a> Ctx<'a> {
                 ..
             } => {
                 let mut s = st.clone();
+                if let gt_mir::Callee::Fn { node, .. } = callee
+                    && let Some(j) = judge.as_deref_mut()
+                {
+                    self.judge_recursive_call(st, bb, term, *node, args, j);
+                }
                 if let gt_mir::Callee::Fn { node, generics } = callee {
                     if let Some(j) = judge {
                         self.judge_pres(&mut s, st, bb, term, *node, generics, args, j);
@@ -1457,6 +1651,14 @@ impl<'a> Ctx<'a> {
         judge: Option<&mut Judge<'_>>,
     ) -> Vec<(BasicBlock, AState)> {
         let mut s = st.clone();
+        // đầu vòng có biến thể: chụp giá trị các biến của biến thể vào biến bóng (quan hệ zone `x = bóng` được dịch qua thân vòng)
+        if let Some(gs) = self.ghosts.get(&bb)
+            && !s.env.is_dead()
+        {
+            for (v, g) in gs {
+                s.env.assign(*g, &Term::Var(*v));
+            }
+        }
         let b = &self.body.blocks[bb];
         for (i, stmt) in b.statements.iter().enumerate() {
             self.step_stmt(&mut s, stmt, loc_id(bb, i));
@@ -1524,6 +1726,36 @@ impl Judge<'_> {
         insert: Option<Insert>,
         is_assert: bool,
     ) {
+        self.judge_core(
+            cx,
+            st,
+            bb,
+            (term.source.span.start, term.source.span.end),
+            term.source.node,
+            kind,
+            goal,
+            runtime,
+            insert,
+            is_assert,
+            None,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn judge_core(
+        &mut self,
+        cx: &Ctx<'_>,
+        st: &AState,
+        bb: usize,
+        span: (u32, u32),
+        node: gt_ast::NodeId,
+        kind: ObKind,
+        goal: Prop,
+        runtime: Checkability,
+        insert: Option<Insert>,
+        is_assert: bool,
+        tag: Option<(u32, u32)>,
+    ) {
         let (vars, atoms, hyps) = cx.hyps_for(st, &goal);
         let ob = Obligation {
             id: format!("{}#{}", self.key, self.ordinal),
@@ -1531,7 +1763,7 @@ impl Judge<'_> {
             body: self.key.clone(),
             block: bb as u32,
             stmt: cx.body.blocks[bb].statements.len() as u32,
-            span: (term.source.span.start, term.source.span.end),
+            span,
             vars,
             atoms,
             goal,
@@ -1575,10 +1807,11 @@ impl Judge<'_> {
             None
         };
         self.out.push(Judged {
-            node: term.source.node,
+            node,
             ob,
             status,
             insert,
+            tag,
         });
     }
 }
@@ -1934,4 +2167,68 @@ pub fn extract_contract(body: &Body, info: &ProgInfo, counter: &mut u32) -> Opti
     };
     let mut map = BTreeMap::new();
     canon_prop(&p, body.arg_count as u32, &mut map, counter)
+}
+
+/// Truy vấn miền (M8, ADR-025 §7): khoảng của một biểu thức tại một điểm MIR, dùng cùng điểm cố định (khoảng + zone) mà M7 dùng để xoá
+/// kiểm tra. Biến của `Term` là chỉ số local (`Var(l.index())`); hiệu hai biểu thức (`Sub(a, b)`) được đọc qua quan hệ zone nên `i - g`
+/// có cận chính xác khi zone biết. `None` ⇒ điểm không tới được hoặc phân tích không đủ tin cậy (hết ngân sách / không qua kiểm điểm cố định)
+/// — người dùng phải coi đó là "không biết" (fail-closed).
+pub struct DomainQuery<'a> {
+    cx: Ctx<'a>,
+    states: Vec<Option<AState>>,
+}
+
+impl<'a> DomainQuery<'a> {
+    #[must_use]
+    pub fn new(body: &'a Body, info: &'a ProgInfo) -> Option<DomainQuery<'a>> {
+        let cx = Ctx::new(body, info, true);
+        let mut steps = 0u64;
+        let mut states = fixpoint(&cx, &mut steps)?;
+        let pre = states.clone();
+        narrow(&cx, &mut states);
+        if check_post_fixpoint(&cx, &states).is_err() {
+            states = pre;
+        }
+        check_post_fixpoint(&cx, &states).ok()?;
+        Some(DomainQuery { cx, states })
+    }
+
+    fn state_at(&self, loc: gt_mir::Location) -> Option<AState> {
+        let bb = loc.block.index();
+        let mut s = self.states.get(bb)?.clone()?;
+        let b = &self.cx.body.blocks[bb];
+        if loc.statement > b.statements.len() {
+            return None;
+        }
+        // đầu vòng có biến bóng: chụp trước câu lệnh đầu (khớp `block_out`)
+        if let Some(gs) = self.cx.ghosts.get(&bb)
+            && !s.env.is_dead()
+        {
+            for (v, g) in gs {
+                s.env.assign(*g, &Term::Var(*v));
+            }
+        }
+        for (i, stmt) in b.statements.iter().take(loc.statement).enumerate() {
+            self.cx.step_stmt(&mut s, stmt, loc_id(bb, i));
+        }
+        if s.env.is_dead() { None } else { Some(s) }
+    }
+
+    /// Điểm có tới được (theo phân tích) không.
+    #[must_use]
+    pub fn reachable(&self, loc: gt_mir::Location) -> bool {
+        self.state_at(loc).is_some()
+    }
+
+    /// Khoảng của `t` ngay TRƯỚC câu lệnh `loc.statement` của khối `loc.block` (`== statements.len()` là trước terminator).
+    #[must_use]
+    pub fn interval_at(&self, loc: gt_mir::Location, t: &Term) -> Option<Interval> {
+        self.state_at(loc).map(|s| s.env.eval_term_zone(t))
+    }
+
+    /// Khoảng của một local nguyên tại `loc`.
+    #[must_use]
+    pub fn local_interval(&self, loc: gt_mir::Location, l: gt_mir::Local) -> Option<Interval> {
+        self.interval_at(loc, &Term::Var(l.0))
+    }
 }

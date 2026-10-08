@@ -1,0 +1,3 @@
+// expect: fail E0702
+// note: biến thể i giảm nhưng có thể âm khi điều kiện i > -100 vẫn đúng: không bị chặn dưới
+ƒ f() → () ! ∅ { μi ≔ 5i32; ⟳ i > -100 ↓ i { i ← i - 1; } }
