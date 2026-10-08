@@ -390,7 +390,7 @@ pub fn build_prog_info(t: &TypesOutput, m: &MirOutput) -> ProgInfo {
     let fn_by_key: BTreeMap<&str, gt_ast::NodeId> =
         m.keys.iter().map(|(n, k)| (k.as_str(), *n)).collect();
     // vị từ thuần một đối số trả `bool`, hiệu ứng `∅`, không nhận `&!`: mô hình hoá như nguyên tử không diễn giải
-    for (node, _) in m.keys.iter() {
+    for node in m.keys.keys() {
         if let Some(sig) = t.db.sig_by_node(*node) {
             let n_args = sig.params.len() + usize::from(sig.self_kind.is_some());
             let mut_arg = matches!(sig.self_kind, Some(gt_ast::SelfKind::RefMut))
@@ -534,7 +534,7 @@ fn apply_insert(t: &TypesOutput, ob: &mut Body, ins: &Insert, tails: &mut BTreeM
     let Some(orig) = ob.blocks[cur].terminator.take() else {
         return;
     };
-    let src = orig.source.clone();
+    let src = orig.source;
     let span = src.span;
     // bản sao các đối số (Move của kiểu Copy ⇒ Copy)
     let args: Vec<Operand> = args
@@ -556,7 +556,7 @@ fn apply_insert(t: &TypesOutput, ob: &mut Body, ins: &Insert, tails: &mut BTreeM
     let tail = BasicBlock(ob.blocks.len() as u32 + 1);
     ob.blocks[cur].statements.push(Statement {
         kind: StatementKind::StorageLive(tmp),
-        source: src.clone(),
+        source: src,
     });
     ob.blocks[cur].terminator = Some(Terminator {
         kind: TerminatorKind::Call {
@@ -569,7 +569,7 @@ fn apply_insert(t: &TypesOutput, ob: &mut Body, ins: &Insert, tails: &mut BTreeM
             dest: Place::local(tmp),
             target: Some(mid),
         },
-        source: src.clone(),
+        source: src,
     });
     ob.blocks.push(BlockData {
         statements: Vec::new(),
@@ -580,7 +580,7 @@ fn apply_insert(t: &TypesOutput, ob: &mut Body, ins: &Insert, tails: &mut BTreeM
                 kind,
                 target: tail,
             },
-            source: src.clone(),
+            source: src,
         }),
     });
     ob.blocks.push(BlockData {

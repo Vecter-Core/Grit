@@ -589,3 +589,25 @@ Giang chỉ có bản tóm tắt ADR-025; tôi đối chiếu từng điểm v�
 - **Obligation IR (§1):** thêm yêu cầu **tuần tự hoá** (JSON, khoá cố định và thứ tự xác định), `ObId` tất định, giới hạn tài nguyên theo BƯỚC (D20); báo cáo "số check còn lại" xuất JSON từ đầu (schema có version).
 - **shift/unwrap (§0.2):** theo lệnh, prelude fixture khai báo `shl`, `shr`, `unwrap` kèm `⊳` ngay ở M7 và test pass/fail dùng chúng (sửa lại phần "test bằng hàm người dùng" của ADR). `unwrap` dùng vị từ thuần `is_some` như NGUYÊN TỬ không diễn giải (giả thiết nhánh `is_some(o)` khớp mục tiêu `Pre(unwrap)` khi `o` không đổi).
 - **Câu hỏi:** Q35 (zone), Q36 (mọi hồ sơ), Q37–Q42 theo ADR đã duyệt; Q40: thêm N0605 cho cận zone.
+
+### 13. Ghi nhận triển khai M7 (2026-10-08) — số thật, độ lệch so với §0–§12, ngưỡng đã đặt
+**Trạng thái: M7 "ĐẠT CÓ ĐIỀU KIỆN"** (như M6): còn 69 đột biến theo hướng nguy hiểm chưa giải quyết (KNOWN_LIMITATIONS, mục gt-oblig), xem điều kiện cứng mới ở GRIT_PLAN §7 điểm 11.
+
+**Cái đã làm đúng như ADR:** IR nghĩa vụ tuần tự hoá JSON (schema 1, id tất định, cờ `runtime`), trait `Prover` với hai cài đặt (`ZoneProver` = khoảng + zone; `ExhaustiveProver` = vét cạn độc lập), miền tham số theo độ rộng, widening có ngưỡng + hai lượt narrowing + kiểm hậu-điểm-cố-định, `ZONE_MAX_VARS = 24` (N0605), trần bước (D20), chính sách xoá/giữ/ĐỎ/E0902, E0601 độc lập đường tới (M5 ghi `Body.bad_literals`), hợp đồng `⊳ ⊲` (thân hợp đồng MIR + trích mệnh đề), bất biến `⋈` (Assert ở đầu vòng), lượng từ có biên (vòng lặp thuần), `shl/shr/unwrap` trong prelude fixture, báo cáo JSON "check còn lại".
+
+**Độ lệch / quyết định phát sinh (để Giang biết):**
+1. **Hợp đồng ở MIR:** thêm `BodyKind::{Pre, Post}`, `AssertKind::{Precondition, Postcondition, Invariant}`, `Body.uncheckable`, `Body.bad_literals`. `⊳` chỉ là giả thiết của thân hàm khi hàm CHỈ bị gọi trực tiếp (không thoát qua `FnItem`, không thuộc `⊐ Trait for`); `⊲` được dùng làm giả thiết sau lời gọi trực tiếp; `⊲` nhắc tham số bị gán lại/mượn `&!` ⇒ E0902 (và KHÔNG được chứng minh bằng giá trị hiện tại).
+2. **Vị từ thuần** (một đối số, trả `bool`, hiệu ứng `∅`, không `&!`) được mô hình như nguyên tử không diễn giải khoá theo local (cần cho `unwrap ⊳ self.is_some()`); ràng buộc bổ sung vào điều kiện cứng mutability bên trong.
+3. **E0316 (mới, M4):** lượng từ ngoài hợp đồng là lỗi ĐỎ (lệnh Giang 2026-10-08); ICE ở M5 chỉ là chốt phòng thủ.
+4. **`E0901`** dùng cho cả `⊳`, `⊲` và `⋈` chắc chắn sai. **Mã mới trong bảng:** N0603, N0604, N0605, N0902–N0904, E0316.
+5. **Định nghĩa biến tạm (`defs`)** chỉ cho biến tạm, giá trị trả về và biến người dùng BẤT BIẾN; bị xoá ngay khi một local nó nhắc tới bị gán lại (bỏ cơ chế nhãn phiên bản — nhãn MERGED làm mất định nghĩa qua vòng lặp).
+6. **Vét cạn:** 2..7 bit đầy đủ mọi cặp hộp, 8 bit phân tầng; 8 bit đầy đủ (`GT_FULL8=1`) CHƯA chạy (chạy một lần sau cổng cuối, không chặn commit — lệnh Giang). Thực đo: cộng/trừ/nhân **493 564 176** cặp hộp, chia/dư **329 042 784** cặp hộp, mỗi cặp kiểm mọi giá trị cụ thể; ngoài ra 154 016 nghĩa vụ ngẫu nhiên so bộ chính với bộ vét cạn (0 chứng minh sai, 0 'chắc chắn sai' sai).
+7. **Điều kiện ghép `∧ ∨`** chưa tinh chỉnh khoảng (M5 hạ thành luồng điều khiển rồi hợp): câu hỏi mở, KHÔNG làm trong M7.
+
+**Lỗ hổng soundness tìm thấy khi làm M7 (cả hai đều đã sửa và có test):**
+- **#3** chuỗi bí danh của tham số lát đi qua tham số có gán ngầm lúc vào ⇒ `ys ≔ xs; xs ← zs; ⎇ i < ys.len() { xs[i] }` xoá nhầm check chỉ số. Tìm bằng `tests/decisions.rs` (KHÔNG phải bộ sinh); theo luật §3.3 bộ sinh đã được mở rộng (tham số lát `μxs, zs`, bí danh, gán lại, gọi mọi hàm phụ ở đầu `entry`) và kiểm "tắt bản sửa": oracle bắt được ở chương trình #141.
+- **#4** `⊲` nhắc tham số bị gán lại được chứng minh bằng giá trị HIỆN TẠI (sai nghĩa "giá trị lúc vào"); sửa: goal là nguyên tử không giải được ⇒ E0902. Oracle không thể quan sát (chương trình bị E0902 từ chối) nên chỉ `decisions2.rs` giết được; ghi nhận ở đây theo luật §3.3.
+
+**Ngưỡng độ phủ của oracle mức chương trình (đặt trong `tests/oracle.rs`, 1 500 chương trình × 24 đầu vào):** mỗi ô (loại.phép × {xoá, giữ}) ≥ 100 nghĩa vụ và ≥ 100 lần chạm, với loại.phép ∈ {overflow.Add/Sub/Mul/Div/Rem, neg_min, div_zero, rem_zero, index, cast_lossy, invariant}; `slice_range` ≥ 40; mỗi ô 'đỏ' ≥ 8 nghĩa vụ và ≥ 8 lần chạm; `pre`/`post` ≥ 100 (xoá|giữ) và ≥ 8 (đỏ); mỗi loại abort (precondition, postcondition, invariant, overflow, div_by_zero, rem_by_zero, index_out_of_bounds, cast_lossy, overflow_neg) ≥ 100; ≥ 30 000 lần so sánh. Điểm yếu đã biết: ~97% lần chạy abort sớm (độ sâu thực thi mỏng).
+
+**Quy trình đột biến (lệnh Giang 2026-10-08):** 1 worker, opt-level 0 cho `gt-oblig` khi chạy bộ test nhỏ (`GRIT_MUT_NO_OPT=1`), `GRIT_MUT_LINES` để chạy lại theo dòng, kết quả ghi nối sau từng mẫu.

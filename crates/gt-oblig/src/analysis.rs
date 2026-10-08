@@ -1402,7 +1402,7 @@ impl<'a> Ctx<'a> {
             } => {
                 let mut s = st.clone();
                 if let gt_mir::Callee::Fn { node, generics } = callee {
-                    if let Some(j) = judge.as_deref_mut() {
+                    if let Some(j) = judge {
                         self.judge_pres(&mut s, st, bb, term, *node, generics, args, j);
                     } else {
                         self.assume_pres(&mut s, st, bb, *node, args);

@@ -401,6 +401,8 @@ impl<'t> Builder<'t> {
 }
 
 /// Hạ một hàm (tự do hoặc thành viên impl).
+// 8 tham số: mỗi cái là một dữ kiện độc lập của thân cần dựng (hàm hay hợp đồng)
+#[allow(clippy::too_many_arguments)]
 fn start_fn<'t>(
     t: &'t TypesOutput,
     key: &str,

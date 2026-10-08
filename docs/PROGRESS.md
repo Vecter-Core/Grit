@@ -391,3 +391,17 @@ Thông dịch MIR có theo dõi khoản vay/move/Arena, độc lập với mã p
 - Mã mới trong bảng: N0603, N0604, N0605, N0902, N0903, N0904.
 - Corpus: 264 ca pass → 237 nghĩa vụ: 24 xoá, 213 giữ (N-mã), 0 lỗi E; E0601/E0602/E0603 (4 mẫu fail) ra đúng mã. `sum`: `xs[i]` và `i+1` xoá, `s + xs[i]` giữ N0601.
 - **Cổng chạy lại ngay trước commit (kết quả thật, `tools/gate.sh`, 37 phút do `CARGO_BUILD_JOBS=1`):** fmt sạch; clippy `-D warnings` exit 0; `cargo audit` exit 0; `cargo test --workspace` **495 passed, 0 failed**; check_expectations OK.
+
+## M7-close (2026-10-08) — hợp đồng, oracle, đột biến, cổng cuối. **Trạng thái: M7 ĐẠT CÓ ĐIỀU KIỆN**
+Điều kiện: 69 đột biến của `analysis.rs`/`driver.rs` theo hướng nguy hiểm (có thể xoá thêm check) chưa giải quyết; xem KNOWN_LIMITATIONS (mục gt-oblig) và GRIT_PLAN §7 điểm 11 (M9 phải có chế độ giữ mọi check).
+
+### Số liệu (kết quả thật)
+- **Corpus:** `tests/pass` 315 (+51 so với M6), `tests/fail` 355 (+27: E0601–E0604, E0901, E0902, E0316); 29 mẫu fail E06xx/E09xx ra ĐÚNG mã; 315 mẫu pass không có lỗi E; 27 mẫu ghi chú `pass/N0xxx_*` phát đúng ghi chú. Mỗi mã mới có docs + ≥3 fail + ≥3 pass (ghi chú: ≥3 pass).
+- **Vét cạn / bộ giải kép:** cộng/trừ/nhân 493 564 176 cặp hộp, chia/dư 329 042 784 cặp hộp (2..7 bit đầy đủ, 8 bit phân tầng); 154 016 nghĩa vụ ngẫu nhiên so bộ chính với bộ vét cạn: 0 chứng minh sai, 0 'chắc chắn sai' sai. **GT_FULL8=1 (8 bit đầy đủ): CHƯA chạy** (theo lệnh: chạy một lần, một worker, không chặn commit).
+- **Oracle mức chương trình:** 1 500 chương trình, 36 000 lần chạy, ~35 600 lần so sánh MIR đủ check với MIR đã tỉa: **0 bất đồng**; độ phủ đạt mọi ngưỡng ở ADR-025 §13; kiểm "tắt bản sửa" #3: oracle bắt ở chương trình #141. Điểm yếu: ~97% lần chạy abort sớm.
+- **Lỗ hổng soundness tìm được:** #3 (chuỗi bí danh qua tham số lát) và #4 (`⊲` chứng minh bằng giá trị hiện tại của tham số bị gán lại) — đã sửa, có test (`tests/decisions*.rs`).
+- **Đột biến gt-oblig:** 1 148 đột biến (7 tệp): **826 bị bắt, 232 sống sót, 90 không biên dịch**. Sống sót theo nhóm: 69 nguy hiểm chưa giải quyết (`analysis.rs` 62, `driver.rs` 7), 7 chèn kiểm, 134 tương đương/an toàn theo lập luận, 22 ở lõi (tương đương). Chi tiết theo hàm và lập luận: KNOWN_LIMITATIONS.
+- **Số check còn lại trên mẫu golden** (`tests/golden/obligations`): `sum` 3 nghĩa vụ → xoá 2, giữ 1 (N0601); `count_to_const` 3 → xoá 3; `two_indices` 9 → xoá 6, giữ 3; `division_guard` 6 → xoá 5, giữ 1; `cast_narrow` 3 → xoá 2, giữ 1; corpus pass: 294 nghĩa vụ, 54 xoá, 239 giữ. Chưa có 3 chương trình thật của M12.
+- **Dung lượng:** `target/` 1,2 GB, `.git/` 3,0 MB.
+- **Cổng chạy MỘT lần ở cuối (kết quả thật, `tools/gate.sh`, ~19 phút với `CARGO_BUILD_JOBS=2 --test-threads=2`):** fmt sạch; clippy `-D warnings` exit 0 (lần chạy đầu đỏ vì 4 lỗi clippy — đã sửa rồi chạy lại); `cargo audit` exit 0; `cargo test --workspace` **576 passed, 0 failed**; check_expectations OK; test script OK.
+- **Lịch sử trung thực:** 6 commit giữa chừng ghi "chưa chạy cổng đầy đủ"; commit này là lần đầu cổng đầy đủ chạy sau chúng.

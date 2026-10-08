@@ -460,3 +460,42 @@ fn eval_prop_is_three_valued_and_exact_on_boxes() {
     assert_eq!(e.eval_prop(&Prop::Atom(2)), Tri::No);
     assert_eq!(e.eval_prop(&Prop::Not(Box::new(Prop::Atom(2)))), Tri::Yes);
 }
+
+#[test]
+fn constants_in_linear_forms_and_offset_disequalities_are_exact() {
+    // x + 5 ≤ y + 2 ⇔ x − y ≤ −3 (hiệu hai hằng: 2 − 5)
+    let mut e = env2(true);
+    e.assume(&Prop::Le(Term::add(x(), k(5)), Term::add(y(), k(2))), true);
+    assert_eq!(e.zone_bound(1, 2), Some(-3));
+    // x − 4 ≤ y ⇔ x − y ≤ 4
+    let mut e = env2(true);
+    e.assume(&Prop::Le(Term::sub(x(), k(4)), y()), true);
+    assert_eq!(e.zone_bound(1, 2), Some(4));
+    // x + y ≤ 5 với x ≥ 2 ⇒ y ≤ 3 (nhánh đối xứng của tổng)
+    let mut e = env2(false);
+    e.assume(&Prop::Le(k(2), x()), true);
+    e.assume(&Prop::Le(Term::add(x(), y()), k(5)), true);
+    assert_eq!(e.interval(2), iv(0, 3));
+    // x + y ≥ 20 với y ≤ 7 ⇒ x ≥ 13
+    let mut e = env2(false);
+    e.assume(&Prop::Le(y(), k(7)), true);
+    e.assume(&Prop::Le(k(20), Term::add(x(), y())), true);
+    assert_eq!(e.interval(1), iv(13, 15));
+    // x + 3 ≠ 5 ⇔ x ≠ 2: cắt cận dưới khi x ∈ [2,9], KHÔNG đụng khi x ∈ [8,9]
+    let mut e = env2(false);
+    e.assume(&Prop::Le(k(2), x()), true);
+    e.assume(&Prop::Le(x(), k(9)), true);
+    e.assume(&Prop::Ne(Term::add(x(), k(3)), k(5)), true);
+    assert_eq!(e.interval(1), iv(3, 9));
+    let mut e = env2(false);
+    e.assume(&Prop::Le(k(8), x()), true);
+    e.assume(&Prop::Le(x(), k(9)), true);
+    e.assume(&Prop::Ne(Term::add(x(), k(3)), k(5)), true);
+    assert_eq!(e.interval(1), iv(8, 9));
+    // x − 3 ≠ 5 ⇔ x ≠ 8: cắt cận trên khi x ∈ [2,8]
+    let mut e = env2(false);
+    e.assume(&Prop::Le(k(2), x()), true);
+    e.assume(&Prop::Le(x(), k(8)), true);
+    e.assume(&Prop::Ne(Term::sub(x(), k(3)), k(5)), true);
+    assert_eq!(e.interval(1), iv(2, 7));
+}

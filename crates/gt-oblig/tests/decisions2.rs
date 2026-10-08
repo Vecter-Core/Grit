@@ -191,6 +191,69 @@ fn preconditions_are_hypotheses_only_for_directly_called_functions() {
 }
 
 #[test]
+fn a_checked_precondition_becomes_a_fact_after_the_call() {
+    check(&[
+        // sau lời gọi (kiểm lúc chạy đã qua) n > 0 ⇒ x - 1 không tràn
+        (
+            "ƒ pos(n: u8) → u8 ! ∅ ⊳ n > 0 { n }
+ƒ f(x: u8) → u8 ! ∅ { y ≔ pos(x); x - 1 }",
+            "pre:g,overflow:x",
+        ),
+        // không có ⊳ thì không suy ra
+        (
+            "ƒ pos(n: u8) → u8 ! ∅ { n }
+ƒ f(x: u8) → u8 ! ∅ { y ≔ pos(x); x - 1 }",
+            "overflow:g",
+        ),
+        // hai lời gọi cùng hàm khác đối số: sự thật về đối số thứ nhất không suy ra cho thứ hai
+        (
+            "ƒ pos(n: u8) → u8 ! ∅ ⊳ n > 0 { n }
+ƒ f(x: u8, z: u8) → u8 ! ∅ { y ≔ pos(x); w ≔ pos(z); x - 1 }",
+            "pre:g,pre:g,overflow:x",
+        ),
+        (
+            "ƒ pos(n: u8) → u8 ! ∅ ⊳ n > 0 { n }
+ƒ f(x: u8, z: u8) → u8 ! ∅ { y ≔ pos(x); w ≔ pos(z); z - 1 }",
+            "pre:g,pre:g,overflow:x",
+        ),
+        (
+            "ƒ pos(n: u8) → u8 ! ∅ ⊳ n > 0 { n }
+ƒ f(x: u8, z: u8) → u8 ! ∅ { y ≔ pos(x); x + z }",
+            "pre:g,overflow:g",
+        ),
+    ]);
+}
+
+#[test]
+fn wide_literals_and_wrapped_relations() {
+    check(&[
+        // hằng 128 bit: MIN - 1 chắc chắn tràn; MIN + 1 thì không
+        (
+            "ƒ f() → i128 ! ∅ { x: i128 ≔ -170141183460469231731687303715884105728; x - 1 }",
+            "overflow:d",
+        ),
+        (
+            "ƒ f() → i128 ! ∅ { x: i128 ≔ -170141183460469231731687303715884105728; x + 1 }",
+            "overflow:x",
+        ),
+        (
+            "ƒ f() → u128 ! ∅ { x: u128 ≔ 340282366920938463463374607431768211455; x + 1 }",
+            "overflow:d",
+        ),
+        // b = a +% 250 CÓ THỂ quấn (a ≥ 6) nên b < a khả thi: nhánh đó phải còn và b - a chắc chắn tràn
+        (
+            "ƒ f(a: u8) → u8 ! ∅ { ⎇ a < 10 { b ≔ a +% 250; ⎇ b < a { b - a } ⇝ { 0 } } ⇝ { 0 } }",
+            "overflow:d",
+        ),
+        // không quấn (a < 6): b = a + 250 > a ⇒ nhánh b < a bất khả thi ⇒ không có nghĩa vụ nào
+        (
+            "ƒ f(a: u8) → u8 ! ∅ { ⎇ a < 6 { b ≔ a +% 250; ⎇ b < a { b - a } ⇝ { 0 } } ⇝ { 0 } }",
+            "",
+        ),
+    ]);
+}
+
+#[test]
 fn remaining_checks_json_has_the_exact_documented_shape() {
     let (t, m) = common::mir("ƒ f(a: u8) → u8 ! ∅ { ⎇ a < 5 { a + 1 } ⇝ { a + 1 } }");
     let o = analyze_program(&t, &m, &mut ZoneProver::new(24));
