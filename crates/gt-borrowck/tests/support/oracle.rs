@@ -135,6 +135,7 @@ pub struct Stats {
     pub reborrows: usize,
     pub arena_allocs: usize,
     pub arena_resets: usize,
+    pub cell_ops: usize,
     pub moves: usize,
     pub calls: usize,
 }
@@ -751,6 +752,39 @@ impl<'a> Oracle<'a> {
             self.access(&ar.loc, AK::Write, Some(ar.loan))?;
             self.stats.arena_resets += 1;
             return Ok(V::Unit);
+        }
+        // `Cell<T>` (lang `cell`, mutability bên trong; công cụ test, NGOÀI TCB): `set` ghi qua `&self` mà KHÔNG làm vô hiệu khoản vay chung khác
+        if key.contains("Cell") && key.ends_with("::new") {
+            let v = args
+                .pop()
+                .ok_or(Flow::Bug("Cell::new thiếu đối số".into()))?;
+            return Ok(V::Adt(0, vec![v]));
+        }
+        if key.contains("Cell") && (key.ends_with("::set") || key.ends_with("::get")) {
+            let is_set = key.ends_with("::set");
+            let x = if is_set {
+                Some(
+                    args.pop()
+                        .ok_or(Flow::Bug("Cell::set thiếu đối số".into()))?,
+                )
+            } else {
+                None
+            };
+            let Some(V::Ref(cr)) = args.pop() else {
+                return bug("Cell: người nhận không phải tham chiếu");
+            };
+            self.use_loan(cr.loan)?;
+            self.access(&cr.loc, AK::Read, Some(cr.loan))?;
+            let mut loc = cr.loc.clone();
+            loc.path.push(Step::Field(0));
+            self.stats.cell_ops += 1;
+            return match x {
+                Some(x) => {
+                    self.set(&loc, x)?;
+                    Ok(V::Unit)
+                }
+                None => self.get(&loc),
+            };
         }
         bug(format!("không có thân MIR cho {key}"))
     }

@@ -54,10 +54,12 @@ pub const PRELUDE: &str = "\
 ƒ idg<T>(x: T) → T ! ∅ { x }
 ƒ takes(r: &!i32) ! ∅ { *r ← 1; }
 ƒ look(r: &i32) ! ∅ { use_i(*r); }
+▢ Cl1<'a> { c: &'a Cell<&'a i32> }
+ƒ putc<'a>(cl: Cl1<'a>, v: &'a i32) ! ∅ { cl.c.set(v); }
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
-pub const KINDS: [&str; 10] = [
+pub const KINDS: [&str; 11] = [
     "move",
     "reborrow",
     "borrow_in_loop",
@@ -68,6 +70,7 @@ pub const KINDS: [&str; 10] = [
     "nested_struct",
     "ref_flow",
     "adt_invariant",
+    "interior_mut",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -263,7 +266,8 @@ impl Gen {
             63..=73 => self.arena(),
             74..=83 => self.calls(),
             84..=87 => self.holder(),
-            88..=94 => self.slot(),
+            88..=92 => self.slot(),
+            93..=96 => self.interior_mut(),
             _ => self.flow(),
         }
     }
@@ -377,6 +381,59 @@ impl Gen {
         }
         if self.rng.chance(50) {
             out.push(raw(format!("use_i(*{p});")));
+        }
+        out
+    }
+
+    /// MUTABILITY BÊN TRONG (điều kiện cứng Giang 2026-10-07): ô `Cell<&i32>` sống lâu nhận một tham chiếu tới biến sống NGẮN (qua `&Cell` trực
+    /// tiếp, ADT giữ `&Cell`, hàm generic, tuple, `Option`, `putc`), rồi (có thể) đọc ô sau khi biến ngắn chết. Phủ quy tắc "mọi vị trí
+    /// region bên trong `Cell` bất biến kể cả qua `&`" (đột biến 238/254 của regions.rs).
+    fn interior_mut(&mut self) -> Vec<St> {
+        self.tags.insert("interior_mut");
+        let z = self.fresh("z");
+        let y = self.fresh("y");
+        let cell = self.fresh("cell");
+        let h = self.fresh("h");
+        let (kz, ky) = (self.k(), self.k());
+        let via = self.rng.below(6);
+        let mut out = vec![
+            raw(format!("μ{z} ≔ {kz};")),
+            raw(format!("{cell} ≔ Cell::new(&{z});")),
+        ];
+        let (setup, store) = match via {
+            0 => (String::new(), format!("{cell}.set(&{y});")),
+            1 => (
+                format!("{h} ≔ Cl1 {{ c: &{cell} }};"),
+                format!("{h}.c.set(&{y});"),
+            ),
+            2 => (
+                format!("{h} ≔ Cl1 {{ c: &{cell} }};"),
+                format!("putc({h}, &{y});"),
+            ),
+            3 => (format!("{h} ≔ idg(&{cell});"), format!("{h}.set(&{y});")),
+            4 => (format!("{h} ≔ (&{cell}, 0);"), format!("{h}.0.set(&{y});")),
+            _ => (
+                format!("{h} ≔ Some(&{cell});"),
+                format!("⌥ {h} {{ Some(q) ↦ {{ q.set(&{y}); }}, None ↦ {{ }} }};"),
+            ),
+        };
+        if !setup.is_empty() {
+            out.push(raw(setup));
+        }
+        let restore = if self.rng.chance(25) {
+            format!("{cell}.set(&{z});")
+        } else {
+            String::new()
+        };
+        let inner = vec![raw(format!("{y} ≔ {ky};")), raw(store), raw(restore)];
+        if self.rng.chance(65) {
+            // `y` chết ở cuối khối: đọc ô sau đó là đọc chỗ đã chết
+            out.push(St::Block(inner));
+        } else {
+            out.extend(inner);
+        }
+        if self.rng.chance(70) {
+            out.push(raw(format!("use_i(*{cell}.get());")));
         }
         out
     }

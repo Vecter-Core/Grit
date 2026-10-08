@@ -456,3 +456,9 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - **Tái hiện tối thiểu:** prelude `ƒ idv(a: u32) → u32 ! ∅ { a }` + tệp `a.gt` (E0205), `b.gt`/`A.gt` sạch.
 - **Sửa:** `scope_containers()` — mã prelude chỉ thấy `[module prelude, prelude]`. Test hồi quy `gt-resolve/tests/prelude_isolation.rs` (6 ca pass: tệp/module tên `x`/`n`/`p`; 4 ca fail: D7 vẫn áp dụng cho mã người dùng) và `gt-types/tests/adt.rs` (tệp `a.gt` với prelude `spawn<A>(…, a: A)`).
 - Sai sót của tôi cùng đợt: commit `4a436e2` làm hỏng corpus gt-resolve (fixture prelude riêng chưa có `spawn`/`Send`) vì tôi không chạy gt-resolve; đã bổ sung fixture.
+
+## M8 nửa 2 — bước 2: đóng điều kiện cứng mutability bên trong (2026-10-08)
+- Lang item `cell` (`Cell<T>`, fixture gt-types), `adt_invariant` coi nó bất biến; `gt-borrowck/tests/interior_mut.rs` (chương trình tấn công + đối chứng); kịch bản `interior_mut` (KINDS 10 → 11) + oracle động hiểu `Cell::new/set/get`. 20 000 chương trình: 0 âm tính giả; phân loại thêm 1 nguyên nhân dương tính giả đã biết.
+- Kiểm tắt bản sửa: 53 âm tính giả/3 000 chương trình. Đột biến 238 giết; 361/591/554 còn sống, có lập luận đơn điệu (ADR-027 §0), chờ Giang.
+- `pure_preds` loại kiểu có thể chứa ô (`TypeDb::may_have_interior_mut`, 3 test); sửa một hồi quy do chính tôi gây ra trong đợt này (`Option<T>::is_some` bị loại oan vì coi mọi tham số kiểu là có thể chứa ô → chỉ tham số có ràng buộc trait mới bị loại).
+- ADR-027 viết xong (lang item, Sync, `with` có phạm vi, cấp khoá `#level`, E0502/E0503, hiệu ứng đa hình `effect_poly`). Chưa cài Mutex/Atomic*.

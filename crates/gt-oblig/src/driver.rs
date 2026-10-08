@@ -402,7 +402,28 @@ pub fn build_prog_info(t: &TypesOutput, m: &MirOutput) -> ProgInfo {
                     .params
                     .iter()
                     .any(|p| matches!(p, gt_types::Ty::Ref(true, _)));
-            if n_args == 1 && sig.ret == gt_types::Ty::Bool && sig.effects.is_empty() && !mut_arg {
+            // kiểu của `self` (thành viên impl) không nằm trong `sig.params`: lấy từ impl chứa thành viên
+            let imp =
+                t.db.impls
+                    .iter()
+                    .find(|i| i.members.iter().any(|m| m.node == *node));
+            let gens: Vec<&gt_types::GParam> = sig
+                .generics
+                .iter()
+                .chain(imp.iter().flat_map(|i| i.generics.iter()))
+                .collect();
+            // điều kiện cứng mutability bên trong (Giang 2026-10-07): vị từ trên kiểu có thể chứa ô ghi được qua `&` không phải sự kiện ổn định
+            let interior = sig
+                .params
+                .iter()
+                .any(|p| t.db.may_have_interior_mut(p, &gens))
+                || imp.is_some_and(|i| t.db.may_have_interior_mut(&i.self_ty, &gens));
+            if n_args == 1
+                && sig.ret == gt_types::Ty::Bool
+                && sig.effects.is_empty()
+                && !mut_arg
+                && !interior
+            {
                 let idx = info.pure_preds.len() as u32;
                 info.pure_preds.insert(*node, idx);
             }

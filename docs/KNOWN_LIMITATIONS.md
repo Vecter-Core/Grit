@@ -190,3 +190,9 @@ Lập luận từng nhóm (KHÔNG phải chứng minh):
 - **Bảo thủ:** mọi tham chiếu, con trỏ thô và `Arena` không `Send`; worker của `spawn` phải `! ∅`; `spawn` không trả về tay cầm (không `join`). Thông dịch MIR chạy `spawn` tuần tự — KHÔNG phản ánh ngữ nghĩa luồng thật, không phải bằng chứng cho codegen (M10).
 - **Không quan sát được:** không có oracle động cho đua dữ liệu (thông dịch tuần tự không tạo ra đua); độ tin cậy của E0501 dựa vào corpus (5 fail + 4 pass), test cấu trúc (generic, đệ quy, đệ quy đa hình, ràng buộc theo tham số) và đột biến.
 - **Đột biến `send.rs` (22):** sau khi thêm test còn 1 sống sót tương đương: `depth > 64` → `>= 64` (chỉ dịch biên chốt độ sâu). Đột biến theo hướng nguy hiểm (ràng buộc của tham số khác, `seen` che trường bẩn) đều bị bắt.
+
+### Điều kiện cứng mutability bên trong: TRẠNG THÁI (2026-10-08, ADR-027 §0)
+- **Đã làm trước khi Mutex/Atomic* vào fixture/lib:** lang item `cell` bất biến trong `regions.rs`; **238 đã giết** (test tấn công `interior_mut.rs` + kịch bản `interior_mut` của bộ sinh với oracle động hiểu `Cell`; tắt bản sửa ⇒ oracle bắt 53 âm tính giả/3 000 chương trình); vị từ trên kiểu có thể chứa ô bị loại khỏi `pure_preds`.
+- **Chờ Giang chấp nhận lập luận đơn điệu** cho **361, 591, 554** (dòng 366, 596, 559 hiện tại): cả ba THÊM ràng buộc ⇒ chỉ có thể từ chối thêm, không chấp nhận thêm. Vẫn sống sau lần chạy lại với bộ test mới.
+- Đột biến `TypeDb::may_have_interior_mut` (db.rs) và điều kiện loại vị từ (driver.rs): còn 2 tương đương (`Ty::Infer` không còn sau suy kiểu; ADT thiếu trong `adts` không xảy ra với chương trình hợp lệ) và 1 có sẵn từ M7 (driver.rs `mut_arg`).
+- Sai khác bộ sinh `interior_mut`: dương tính giả "ghi đè muộn" (kiểu `Cell<&'a T>` buộc mọi tham chiếu lưu vào sống tới lần dùng cuối của ô) đã được phân loại là nguyên nhân đã biết (Rust cũng từ chối).

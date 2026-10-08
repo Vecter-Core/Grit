@@ -18,6 +18,13 @@ pub const PRELUDE_SRC: &str = "\
 #lang(send)
 ⊏ Send { }
 ƒ spawn<A: Send>(f: ƒ(A) ! ∅, a: A) ! ∅ { }
+#lang(cell)
+▢ Cell<T> { v: T }
+⊐ <T> Cell<T> {
+  ƒ new(v: T) → Cell<T> ! ∅ { }
+  ƒ set(&self, x: T) ! ∅ { }
+  ƒ get(&self) → T ! ∅ { }
+}
 #lang(drop)
 ⊏ Drop { ƒ drop(&!self) ! ∅; }
 ▢ Buf { n: i32 }

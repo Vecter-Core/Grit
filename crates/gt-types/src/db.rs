@@ -20,6 +20,57 @@ pub struct TypeDb {
 }
 
 impl TypeDb {
+    /// Kiểu có thể chứa MUTABILITY BÊN TRONG (lang `cell`, và sau này Mutex/Atomic*) không? Dùng để loại vị từ khỏi `pure_preds` của M7:
+    /// kết quả vị từ trên `&Cell` đổi được sau `cell.set(..)` nên không được coi là sự kiện ổn định. `generics` = tham số kiểu trong tầm
+    /// (của hàm và của impl). Tham số kiểu KHÔNG có ràng buộc trait không bị quan sát được nội dung (tính tham số: thân không gọi được gì
+    /// trên nó) nên không tính; tham số CÓ ràng buộc (một impl của trait có thể đọc ô) và biến suy luận tính là CÓ THỂ (fail-closed).
+    #[must_use]
+    pub fn may_have_interior_mut(&self, ty: &Ty, generics: &[&crate::collect::GParam]) -> bool {
+        self.imut(ty, Some(generics), &mut Vec::new())
+    }
+
+    /// `params`: `Some(generics)` = tra ràng buộc; `None` = đang duyệt trường của ADT (tham số của ADT đã được kiểm qua đối số).
+    fn imut(
+        &self,
+        ty: &Ty,
+        params: Option<&[&crate::collect::GParam]>,
+        seen: &mut Vec<DefId>,
+    ) -> bool {
+        match ty {
+            Ty::Infer(_) => true,
+            Ty::Param(p) => params.is_some_and(|gs| {
+                gs.iter()
+                    .find(|g| g.id == *p)
+                    .is_none_or(|g| !g.bounds.is_empty())
+            }),
+            Ty::Tuple(v) => v.iter().any(|t| self.imut(t, params, seen)),
+            Ty::Array(t, _) | Ty::Slice(t) | Ty::Ref(_, t) | Ty::RawPtr(_, t) => {
+                self.imut(t, params, seen)
+            }
+            Ty::Adt(d, args) => {
+                let Some(adt) = self.adts.get(d) else {
+                    return false;
+                };
+                if adt.lang == Some(Lang::Cell) {
+                    return true;
+                }
+                if args.iter().any(|t| self.imut(t, params, seen)) {
+                    return true;
+                }
+                if seen.contains(d) {
+                    return false;
+                }
+                seen.push(*d);
+                let fields: Vec<&Ty> = match &adt.kind {
+                    AdtKind::Struct(fs) => fs.iter().map(|f| &f.ty).collect(),
+                    AdtKind::Enum(vs) => vs.iter().flat_map(|v| v.fields.iter()).collect(),
+                };
+                fields.into_iter().any(|t| self.imut(t, None, seen))
+            }
+            _ => false,
+        }
+    }
+
     /// Tìm impl của `trait_def` cho `ty` (đã giải). Trả (chỉ số impl, tham số impl) nếu có đúng một.
     pub(crate) fn find_impl(
         &self,

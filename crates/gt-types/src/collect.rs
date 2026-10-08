@@ -25,6 +25,9 @@ pub enum Lang {
     Arena,
     /// `Send` (M8): trait TỰ ĐỘNG — kiểu có thể chuyển sang luồng khác; suy cấu trúc (send.rs), cấm viết `⊐ Send for`.
     Send,
+    /// Kiểu có MUTABILITY BÊN TRONG (`&self` ghi được): gt-borrowck coi mọi vị trí region bên trong là BẤT BIẾN, kể cả qua `&`
+    /// (điều kiện cứng Giang 2026-10-07). Nhóm lang item này (Cell-like, Mutex, Atomic*) thuộc TCB (GRIT_PLAN mục 3.3).
+    Cell,
 }
 
 impl Lang {
@@ -39,6 +42,7 @@ impl Lang {
             "arena" => Lang::Arena,
             "drop" => Lang::Drop,
             "send" => Lang::Send,
+            "cell" => Lang::Cell,
             _ => return None,
         })
     }
