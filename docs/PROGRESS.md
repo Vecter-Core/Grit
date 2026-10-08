@@ -470,3 +470,8 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - **Corpus:** E0501 mở rộng (4 fail + 4 pass mới), E0502 (4 fail + 4 pass), E0503 (4 fail + 4 pass); `docs/errors/E0502.md`, `E0503.md`; chương trình đa luồng đúng (static `Mutex`/`Atomic` + `spawn`) trong pass.
 - **Đột biến** (1 worker, lô nhỏ): send.rs 21, ordering.rs 63, effects.rs phần khoá 23 — chi tiết và phần chưa giải quyết ở KNOWN_LIMITATIONS.
 - Hồi quy: gt-resolve, gt-types, gt-mir, gt-borrowck (oracle 20 000), gt-oblig xanh. Cổng đầy đủ chưa chạy (một lần, ngay sau bước này).
+
+## M8 đóng (2026-10-08): cổng đầy đủ + ADR M9
+- **Cổng đầy đủ (chạy một lần sau nửa 2, `tools/gate.sh`): XANH** — fmt, clippy `-D warnings`, audit, **634 test pass / 0 lỗi** (M7-close: 576), check_expectations (757 tệp .gt, 63 mã lỗi, 184 tham chiếu test) + unittest script. Lần chạy đầu đỏ vì sổ mã `gt_diag::known_codes()` thiếu E0503; đã thêm và chạy lại.
+- Kích thước: `target/` 1,8 GB, `.git/` 2,1 MB.
+- ADR-028 (M9) viết xong, DỰ THẢO chờ duyệt (Q53–Q58).

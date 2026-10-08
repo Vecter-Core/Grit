@@ -700,3 +700,59 @@ Mỗi lang item có test hợp đồng riêng (corpus + thuộc tính). Thông d
 ### 5. Rủi ro / đánh đổi
 - API khoá có phạm vi (`with`) không biểu diễn được giữ-khoá-qua-nhiều-hàm bằng guard; đổi lại kiểm thứ tự đầy đủ mà không cần phân tích sống của guard (an toàn hơn). Ghi vào KNOWN_LIMITATIONS.
 - Không có oracle động cho đua dữ liệu/deadlock (thông dịch tuần tự): độ tin cậy dựa corpus + test cấu trúc + đột biến; M10 cần kiểm thử luồng thật (ThreadSanitizer/loom-like) trước khi tuyên bố đa luồng.
+
+## ADR-028 — M9: `gritc`, Cổng phán quyết, secret scanner — DỰ THẢO viết TRƯỚC khi code (2026-10-08; CHỜ GIANG DUYỆT — chưa có dòng mã M9 nào)
+
+### 0. Điều kiện xuất phát (nói thẳng)
+- M8 xong về mã (nửa 1: dừng, hiệu ứng, DomainQuery; nửa 2: `spawn`, `Send`/`Sync`, `Mutex`/`Atomic`, thứ tự khoá, ordering). Cổng đầy đủ xanh (634 test). **Chưa có codegen (M10)**: ở M9 `gritc build` KHÔNG sinh binary thật và `gritc run` KHÔNG chạy mã máy; phần "chạy" của M9 dùng thông dịch MIR tuần tự (§1). Mọi tuyên bố "ĐỎ ⇒ không chạy" ở M9 kiểm bằng thông dịch; M10 phải lặp lại kiểm bằng binary thật.
+- **Hai điều kiện cứng đang áp dụng cho M9:** (a) GRIT_PLAN §7 điểm 10: không còn đột biến "xoá thêm check" chưa giải quyết ở `gt-oblig/src/analysis.rs` (69 đột biến nguy hiểm: `analysis.rs` 62 + `driver.rs` 7, xem KNOWN_LIMITATIONS "gt-oblig") và có chế độ **giữ mọi check** làm MẶC ĐỊNH; (b) điểm 11: `gritc` không được sinh binary nếu E0601 (M7) hoặc E0307 (M5) chưa triển khai và qua test. E0601 và E0307 ĐÃ triển khai và có corpus; M9 biến chúng thành cổng chặn kiểm được ở mức CLI (§5).
+
+### 1. Lệnh `gritc` và cấu trúc crate
+- **Crate:** `gt-driver` (thư viện: chạy chuỗi pass, bộ tổng hợp phán quyết, bằng chứng/attestation, báo cáo JSON), `gt-secrets` (thư viện: S1xx/S2xx), `gritc` (binary mỏng: đọc đối số, gọi `gt-driver`, ánh xạ exit code). Toàn bộ logic kiểm tra nằm ở thư viện đã có; `gritc` KHÔNG tự suy phán quyết (một nguồn sự thật duy nhất, D17).
+- `gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven]`: chạy lexer → parser → resolve → types → MIR → borrowck → oblig (nghĩa vụ) → dừng → hiệu ứng/đa luồng → secret scanner; in chẩn đoán (người đọc được hoặc JSON schema v1 có version); KHÔNG ghi tệp nào ngoài báo cáo yêu cầu.
+- `gritc build <tệp> [-o ra] [--checks=…]` (M9): `check` + ghi **gói trung gian** `*.gtmir` (MIR đã hạ + danh sách check giữ/xoá + attestation băm). Ghi nguyên tử (tệp tạm rồi đổi tên) và CHỈ khi phán quyết ≤ VÀNG cho phép. M10 thay gói bằng binary LLVM.
+- `gritc run <tệp> [--checks=…]` (M9): `check` rồi chạy gói bằng **thông dịch MIR tuần tự** (công cụ tham chiếu, NGOÀI TCB: không phải bằng chứng cho codegen). In rõ "chạy bằng thông dịch tham chiếu". M10 chạy binary thật.
+- `gritc explain <mã>`: in `docs/errors/<mã>.md` (nhúng lúc biên dịch bằng `include_str!`; mã lạ ⇒ exit 3). `gritc fmt [--check]`: dùng `gt-fmt` (chuẩn hoá về dạng canonical; `--check` exit 1 nếu khác).
+- Không có đối số ẩn, không có cấu hình ngầm; cùng đầu vào + cùng phiên bản ⇒ cùng đầu ra (D9/D20).
+
+### 2. Chế độ giữ mọi check — MẶC ĐỊNH (trả lời điều kiện cứng điểm 10)
+- `--checks=all` (**mặc định**): mọi `Assert` do M5 sinh ra ĐƯỢC GIỮ, kể cả check đã chứng minh. Bộ giải nghĩa vụ vẫn chạy và vẫn báo ĐỎ (E0601…) và GHI CHÚ N06xx; chỉ khác là KHÔNG xoá. `--checks=proven`: xoá check đã chứng minh (đường M7 hiện có) — chỉ dùng cho đo hiệu năng và thử nghiệm, phải gõ tường minh.
+- **Điều kiện đổi mặc định sang `proven`:** (1) mọi đột biến "xoá thêm check" của `analysis.rs`/`driver.rs` đã bị giết hoặc có lập luận tương đương được Giang chấp nhận; (2) báo cáo đột biến mới trên `analysis.rs` đạt cùng ngưỡng như `regions.rs`; (3) Giang duyệt bằng văn bản. Đến lúc đó cờ mặc định là hằng số duy nhất trong `gt-driver`, có test khoá giá trị.
+- Test bắt buộc: chương trình mẫu chạy qua `gritc run` ở `all` có số `Assert` thực thi ≥ ở `proven` và KHÔNG có khác biệt quan sát được ngoài các abort thêm vào chỗ chương trình sai; mutation: đột biến cờ mặc định phải bị bắt.
+
+### 3. Từ chối chạy khi ĐỎ hoặc ICE; exit code
+- **Một cổng duy nhất:** `gt-driver::verdict(pass_results) -> Verdict { Green, Yellow, Red, Ice }`. `build` và `run` nhận ĐÚNG đối tượng `Verdict` do `check` trả về trong cùng tiến trình (không gọi lại, không tái hiện logic). Chỉ `Green`/`Yellow` (và `Yellow` khi KHÔNG `--deny-yellow`) mở cổng; `Red`/`Ice` ⇒ không ghi tệp đầu ra, không chạy.
+- **ICE:** mọi pass chạy qua `gt_stack::run_with_big_stack`; panic hay lỗi tạo luồng ⇒ `E9901` ⇒ `Ice`. Bộ tổng hợp tự phòng thủ: pass nào thiếu kết quả (chưa chạy, trả lỗi không rõ) ⇒ `Ice`, không bao giờ coi "không có chẩn đoán" là sạch nếu pass không báo đã hoàn tất (danh sách pass bắt buộc ở §5).
+- **Exit code (D17 giữ nguyên):** `0` = qua (có thể kèm VÀNG), `1` = có ĐỎ (hoặc có VÀNG khi `--deny-yellow`), `2` = ICE, **`3` = lỗi dùng/IO** (đối số sai, không đọc được tệp, mã `explain` lạ). Sau khi cổng mở, `gritc run` trả: `0` nếu chương trình kết thúc bình thường; `70` nếu chương trình **abort** (D3: tràn, chỉ số, chia 0… — mọi `Assert` thất bại). Mã thoát tuỳ ý của chương trình người dùng đi qua JSON (`run.exit_status`), KHÔNG qua exit code của `gritc`, để 1/2/3/70 không bao giờ mơ hồ. Mọi exit code ở M9 có test ở mức tiến trình.
+- Test bắt buộc ("ĐỎ ⇒ không output, không chạy"): với mẫu ĐỎ mọi lệnh `build`/`run` trả 1, KHÔNG tạo tệp `-o`, KHÔNG gọi thông dịch (đếm bằng móc đo lường test); với mẫu ICE (chèn panic bằng hook test-only) trả 2 như vậy; với mẫu VÀNG: chạy và in cảnh báo, `--deny-yellow` ⇒ 1 và không chạy.
+
+### 4. VÀNG, `#allow` có lý do, `--deny-yellow`
+- VÀNG = mã `S…` (secret scanner, S1xx/S2xx theo mục 5 của kế hoạch). `N…` là GHI CHÚ, không phải VÀNG; ĐỎ `E…` không có cách tắt.
+- `#allow(S1xx, "lý do")` đặt TRƯỚC item; phạm vi = item đó. **Lý do bắt buộc, không rỗng** (thiếu/rỗng ⇒ ĐỎ, mã mới **E1301**-họ: sẽ chọn số khi cài, đưa vào bảng mã + docs + ≥3 fail/≥3 pass); `#allow` mã ĐỎ hoặc mã không tồn tại ⇒ ĐỎ; `#allow` không dùng tới ⇒ GHI CHÚ (không im lặng nuốt). Mọi `#allow` đã áp dụng xuất hiện trong JSON `allowed:[{code, reason, span}]` làm dấu vết kiểm toán.
+- `--deny-yellow`: mọi VÀNG còn lại sau `#allow` ⇒ exit 1 và không chạy. Mặc định: VÀNG ⇒ chạy + in cảnh báo.
+
+### 5. Cổng chặn cứng E0601 và E0307 (điểm 11)
+- `gt-driver` giữ **danh sách pass bắt buộc** (`REQUIRED_PASSES`): tên các pass phải báo "đã hoàn tất" trong attestation, trong đó có `m5.return_paths` (E0307) và `m7.const_bounds` (E0601). Thiếu một pass bắt buộc (cấu hình sai/biên dịch thiếu) ⇒ `Ice`, KHÔNG sinh gói, KHÔNG chạy.
+- Test CLI: các mẫu `tests/fail/E0601_*` và `E0307_*` qua `gritc build`/`run` PHẢI ra exit 1 và không có tệp đầu ra (chạy mọi mẫu của hai mã). Test "gỡ pass": dựng `gt-driver` với danh sách pass thiếu `m7.const_bounds` ⇒ `gritc build` exit 2.
+- Attestation (gói `*.gtmir`): băm nguồn + phiên bản gritc + danh sách pass đã chạy + kết quả + chế độ `--checks`; M10 IR Guard đối chiếu.
+
+### 6. Báo cáo JSON "check còn lại" (remaining checks)
+- Thêm vào JSON `gritc check --json` (schema v1, **chỉ thêm trường** theo quy tắc tương thích; tăng `schema_version` chỉ khi đổi/xoá): `checks: { mode: "all"|"proven", kept: [...], deleted: [...], would_delete: [...] }`. Mỗi phần tử: `{ id, fn, kind (overflow.Add, index, div_zero…), span, status: "kept_not_proven" | "kept_mode_all" | "deleted_proven" , solver: "interval+zone"|"exhaustive"|null }`.
+- Ở `--checks=all`: `deleted` rỗng; `would_delete` liệt kê những check mà `proven` sẽ xoá — đây là nguồn dữ liệu để người/AI đánh giá độ tin cậy trước khi bật `proven`. `kept` gồm cả check giữ vì chưa chứng minh được (`kept_not_proven`) và vì chế độ (`kept_mode_all`).
+- Thứ tự xác định (theo hàm, vị trí). Test golden trên vài chương trình mẫu; kiểm: tổng `kept + deleted` = số `Assert` của MIR.
+
+### 7. Secret scanner (S1xx/S2xx)
+- Theo mục 5 của kế hoạch: mẫu khoá API/token/khoá riêng/URL kèm thông tin xác thực trong literal chuỗi và comment; mỗi mẫu một mã `S…`, mức VÀNG, có test pass/fail (≥3 mỗi loại) và tài liệu giới hạn (không phải bộ quét đầy đủ; có dương tính giả/âm tính giả). Chạy trên nguồn đã qua lexer (biết chuỗi/comment), không trên MIR.
+
+### 8. Rủi ro / đánh đổi
+- Thông dịch MIR là "bộ chạy tham chiếu" mang đi trong sản phẩm: sai ngữ nghĩa của nó KHÔNG phá bảo đảm an toàn của binary M10 nhưng có thể gây hiểu nhầm; nhãn rõ trong đầu ra và tài liệu, không dùng làm bằng chứng codegen.
+- `--checks=all` mặc định làm chương trình chậm hơn; chấp nhận cho tới khi điều kiện §2 đạt.
+- Phạm vi M9 không gồm: codegen, LSP, `rig`, `prove`/`recheck`.
+
+### 9. Câu hỏi cho Giang
+- **Q53** Duyệt chia crate `gt-driver`/`gt-secrets`/`gritc` và việc `build` ở M9 sinh gói `*.gtmir` (chưa phải binary)?
+- **Q54** Duyệt mặc định `--checks=all` và ba điều kiện đổi mặc định ở §2?
+- **Q55** Duyệt exit code thêm `3` (lỗi dùng/IO) và `70` (chương trình abort) cho `run`, mã thoát tuỳ ý của chương trình qua JSON?
+- **Q56** Duyệt `#allow` bắt buộc lý do không rỗng, lỗi thiếu lý do là ĐỎ (mã mới họ E13xx), và `#allow` không dùng tới là GHI CHÚ?
+- **Q57** Duyệt `REQUIRED_PASSES` làm cổng chặn cứng E0601/E0307 ở mức CLI (§5)?
+- **Q58** Duyệt trường JSON `checks.{kept,deleted,would_delete}` (§6) là thêm trường vào schema v1?
