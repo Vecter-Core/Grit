@@ -1,0 +1,3 @@
+// expect: fail E0503
+// note: memory ordering phải viết thẳng, không truyền qua tham số (không đoán)
+ƒ f(a: &Atomic<u32>, o: Ordering) → u32 ! ∅ { a.load(o) }

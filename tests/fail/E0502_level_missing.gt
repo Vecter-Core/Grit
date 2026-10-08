@@ -1,0 +1,6 @@
+// expect: fail E0502
+// note: kiểu cấp khoá không có #level thì không so được thứ tự (fail-closed)
+▢ NoLevel { }
+■ M: Mutex<u32, NoLevel> ≔ Mutex::new(0u32);
+ƒ leaf(v: &!u32, n: u32) → u32 ! ∅ { *v }
+ƒ go() → u32 ! {lock(NoLevel)} { M.with(leaf, 0u32) }

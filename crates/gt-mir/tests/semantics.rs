@@ -206,3 +206,27 @@ fn spawn_runs_the_function_with_its_argument() {
         Outcome::Abort(_)
     ));
 }
+
+#[test]
+fn mutex_atomic_and_cell_intrinsics_run_sequentially() {
+    // công cụ test (ngoài TCB): ngữ nghĩa tuần tự, không phải bằng chứng cho codegen
+    let src = "#level(\"1\")\n▢ Lo { }\n\
+        ƒ addn(v: &!u32, n: u32) → u32 ! ∅ { *v ← *v +% n; *v }\n\
+        ƒ go(n: u32) → u32 ! {lock(Lo)} {\n\
+          m: Mutex<u32, Lo> ≔ Mutex::new(10u32);\n\
+          a ≔ Atomic::new(5u32);\n\
+          c ≔ Cell::new(7u32);\n\
+          r1 ≔ m.with(addn, n);\n\
+          r2 ≔ m.with(addn, n);\n\
+          a.fetch_add(n, Ordering::SeqCst);\n\
+          c.set(c.get() +% 1u32);\n\
+          r2 +% a.load(Ordering::SeqCst) +% c.get() +% r1\n\
+        }";
+    let (_t, m) = mir(src);
+    let mut it = Interp::new(&m, 100_000);
+    // n = 3: r1 = 13, r2 = 16, a = 8, c = 8 ⇒ 16 + 8 + 8 + 13 = 45
+    assert!(matches!(
+        it.call_key("main::go", vec![V::Int(3, gt_types::IntTy::U32)]),
+        Outcome::Value(V::Int(45, _))
+    ));
+}

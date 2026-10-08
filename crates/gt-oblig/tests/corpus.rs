@@ -193,7 +193,9 @@ fn ok_samples_do_not_emit_their_own_code() {
 
 // ---- M8: điều kiện dừng và hiệu ứng ----
 
-const OWNED_M8: &[&str] = &["E0701", "E0702", "E0703", "E0801", "E0802"];
+const OWNED_M8: &[&str] = &[
+    "E0701", "E0702", "E0703", "E0801", "E0802", "E0502", "E0503",
+];
 
 /// `None` nếu không qua M4/M5. Mã lỗi M8 (điều kiện dừng + hiệu ứng) của một mẫu.
 fn m8_codes(p: &Path) -> Option<Vec<String>> {

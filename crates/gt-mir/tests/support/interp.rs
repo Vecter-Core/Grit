@@ -249,6 +249,22 @@ impl<'a> Interp<'a> {
                                 None => return Flow::Bug("len trả về `!`".to_string()),
                             }
                         }
+                        match self.lang_ops(&k, &vals) {
+                            Ok(Some(v)) => {
+                                if let Err(e) = self.write(dest, v) {
+                                    return e;
+                                }
+                                match target {
+                                    Some(x) => {
+                                        cur = *x;
+                                        continue;
+                                    }
+                                    None => return Flow::Bug("intrinsic trả về `!`".to_string()),
+                                }
+                            }
+                            Ok(None) => {}
+                            Err(e) => return e,
+                        }
                         if k == "$prelude::spawn"
                             && let [V::Fn(fnode), arg] = vals.as_slice()
                         {
@@ -387,6 +403,11 @@ impl<'a> Interp<'a> {
 
     fn write(&mut self, p: &Place, val: V) -> Result<(), Flow> {
         let (fr, local, path) = self.resolve(p)?;
+        self.set_at(fr, local, &path, val)
+    }
+
+    /// Ghi `val` vào (khung, local, đường đi).
+    fn set_at(&mut self, fr: usize, local: usize, path: &[Step], val: V) -> Result<(), Flow> {
         // Downcast + Field trên enum: ghi vào trường của biến thể; ghi cả biến thể khi không có đường
         fn set(slot: &mut V, path: &[Step], val: V) -> Result<(), String> {
             match path.split_first() {
@@ -405,7 +426,94 @@ impl<'a> Interp<'a> {
                 Some((Step::Sub(..), _)) => Err("ghi vào lát".to_string()),
             }
         }
-        set(&mut self.frames[fr].locals[local], &path, val).map_err(Flow::Bug)
+        set(&mut self.frames[fr].locals[local], path, val).map_err(Flow::Bug)
+    }
+
+    /// Lang item đồng thời/mutability bên trong (`Cell`, `Mutex`, `Atomic`): CÔNG CỤ TEST, NGOÀI TCB, thực thi TUẦN TỰ. Ngữ nghĩa này KHÔNG
+    /// phải bằng chứng cho ngữ nghĩa codegen (M10 phải dùng atomics/khoá LLVM thật; ADR-027 §1). `Ok(None)`: không phải intrinsic loại này.
+    fn lang_ops(&mut self, key: &str, vals: &[V]) -> Result<Option<V>, Flow> {
+        let is = |name: &str| key.contains(name);
+        let m = key.rsplit("::").next().unwrap_or("");
+        if !(is("Cell") || is("Mutex") || is("Atomic")) {
+            return Ok(None);
+        }
+        if m == "new" {
+            return match vals {
+                [v] => Ok(Some(V::Adt(0, vec![v.clone()]))),
+                _ => Err(Flow::Bug("new: sai số đối số".to_string())),
+            };
+        }
+        let Some(V::Ref(fr, l, path)) = vals.first() else {
+            return Err(Flow::Bug(format!(
+                "{key}: người nhận không phải tham chiếu"
+            )));
+        };
+        let mut field = path.clone();
+        field.push(Step::Field(0));
+        let cur = self.get(*fr, *l, &field)?;
+        let int_op = |old: &V, d: &V, sub: bool| -> Result<V, Flow> {
+            match (old, d) {
+                (V::Int(a, t), V::Int(b, _)) => {
+                    Ok(V::Int(wrap(if sub { a - b } else { a + b }, *t), *t))
+                }
+                _ => Err(Flow::Bug(
+                    "fetch_add/sub trên giá trị không nguyên".to_string(),
+                )),
+            }
+        };
+        match m {
+            "get" | "load" => Ok(Some(cur)),
+            "set" | "store" => {
+                let v = vals
+                    .get(1)
+                    .cloned()
+                    .ok_or(Flow::Bug("thiếu giá trị".to_string()))?;
+                self.set_at(*fr, *l, &field, v)?;
+                Ok(Some(V::Unit))
+            }
+            "swap" => {
+                let v = vals
+                    .get(1)
+                    .cloned()
+                    .ok_or(Flow::Bug("thiếu giá trị".to_string()))?;
+                self.set_at(*fr, *l, &field, v)?;
+                Ok(Some(cur))
+            }
+            "fetch_add" | "fetch_sub" => {
+                let d = vals.get(1).ok_or(Flow::Bug("thiếu giá trị".to_string()))?;
+                let nv = int_op(&cur, d, m == "fetch_sub")?;
+                self.set_at(*fr, *l, &field, nv)?;
+                Ok(Some(cur))
+            }
+            "compare_exchange" => {
+                let (Some(want), Some(newv)) = (vals.get(1), vals.get(2)) else {
+                    return Err(Flow::Bug("compare_exchange thiếu đối số".to_string()));
+                };
+                if &cur == want {
+                    self.set_at(*fr, *l, &field, newv.clone())?;
+                    Ok(Some(V::Adt(0, vec![cur])))
+                } else {
+                    Ok(Some(V::Adt(1, vec![cur])))
+                }
+            }
+            "with" => {
+                // `Mutex::with(&self, f, a)`: chạy `f(&!inner, a)` tại chỗ (khoá giữ trong lời gọi)
+                let (Some(V::Fn(fnode)), Some(arg)) = (vals.get(1), vals.get(2)) else {
+                    return Err(Flow::Bug("with: thiếu hàm hoặc đối số".to_string()));
+                };
+                let Some(wb) = self.mir.bodies.iter().find(|x| x.node == *fnode) else {
+                    return Err(Flow::Bug("with: không có thân MIR của hàm".to_string()));
+                };
+                let inner = V::Ref(*fr, *l, field);
+                match self.run(wb, vec![inner, arg.clone()]) {
+                    Outcome::Value(v) => Ok(Some(v)),
+                    Outcome::Abort(k) => Err(Flow::Abort(k)),
+                    Outcome::Bug(b) => Err(Flow::Bug(b)),
+                    Outcome::OutOfFuel => Err(Flow::Fuel),
+                }
+            }
+            _ => Ok(None),
+        }
     }
 
     fn operand(&self, o: &Operand) -> Result<V, Flow> {

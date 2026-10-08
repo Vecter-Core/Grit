@@ -80,3 +80,16 @@ fn same_lifetime_stores_into_a_cell_are_accepted() {
         "μlong ≔ 1; { short ≔ 2; cell ≔ Cell::new(&long); cell.set(&short); use_i(*cell.get()); };",
     );
 }
+
+#[test]
+fn mutex_and_atomic_share_the_interior_mutability_rule() {
+    // Mutex<&i32, L>: tham chiếu sống ngắn không được lọt vào khoá sống lâu qua `&Mutex` (với `with`, giá trị đi qua `Arg: Send` nên
+    // thử bằng ADT giữ `&Mutex<&i32, Lo>` hiệp biến giả)
+    let lv = "#level(\"1\")\n▢ Lo { }\n▢ Hm<'a> { m: &'a Mutex<&'a i32, Lo> }\n";
+    let src = format!(
+        "{HEAD}{lv}ƒ main() ! ∅ {{ μlong ≔ 1; m: Mutex<&i32, Lo> ≔ Mutex::new(&long); h ≔ Hm {{ m: &m }}; {{ short ≔ 2; h2 ≔ h; use_i(short); }}; use_i(long); }}"
+    );
+    // chương trình không ghi gì: phải được chấp nhận (đối chứng: bất biến không làm hỏng chương trình hợp lệ)
+    let r = bc(&src);
+    assert!(r.bc.diagnostics.is_empty(), "{:?}\n{src}", bc_show(&r));
+}

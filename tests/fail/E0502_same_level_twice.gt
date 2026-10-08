@@ -1,0 +1,8 @@
+// expect: fail E0502
+// note: khoá lại cùng cấp khi đang giữ nó (tự deadlock)
+#level("10")
+▢ Lo { }
+■ LO: Mutex<u32, Lo> ≔ Mutex::new(0u32);
+ƒ leaf(v: &!u32, n: u32) → u32 ! ∅ { *v }
+ƒ inner(v: &!u32, n: u32) → u32 ! {lock(Lo)} { LO.with(leaf, 0u32) }
+ƒ go() → u32 ! {lock(Lo)} { LO.with(inner, 0u32) }

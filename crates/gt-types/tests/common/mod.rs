@@ -17,7 +17,36 @@ pub const PRELUDE_SRC: &str = "\
 ⊏ Copy { }
 #lang(send)
 ⊏ Send { }
-ƒ spawn<A: Send>(f: ƒ(A) ! ∅, a: A) ! ∅ { }
+ƒ spawn<A: Send>(f: ƒ(A) ! {detach}, a: A) ! {detach} { }
+#lang(sync)
+⊏ Sync { }
+#lang(ordering)
+⊔ Ordering { Relaxed, Acquire, Release, AcqRel, SeqCst }
+#lang(atomic_int)
+⊏ AtomicInt { }
+⊐ AtomicInt for bool { }
+⊐ AtomicInt for i32 { }
+⊐ AtomicInt for u32 { }
+⊐ AtomicInt for i64 { }
+⊐ AtomicInt for u64 { }
+⊐ AtomicInt for usize { }
+#lang(atomic)
+▢ Atomic<T: AtomicInt> { v: T }
+⊐ <T: AtomicInt> Atomic<T> {
+  ƒ new(v: T) → Atomic<T> ! ∅ { }
+  ƒ load(&self, o: Ordering) → T ! ∅ { }
+  ƒ store(&self, v: T, o: Ordering) ! ∅ { }
+  ƒ swap(&self, v: T, o: Ordering) → T ! ∅ { }
+  ƒ fetch_add(&self, v: T, o: Ordering) → T ! ∅ { }
+  ƒ fetch_sub(&self, v: T, o: Ordering) → T ! ∅ { }
+  ƒ compare_exchange(&self, cur: T, new: T, s: Ordering, f: Ordering) → Result<T, T> ! ∅ { }
+}
+#lang(mutex)
+▢ Mutex<T, L> { v: T }
+⊐ <T, L> Mutex<T, L> {
+  ƒ new(v: T) → Mutex<T, L> ! ∅ { }
+  ƒ with<R: Send, Arg: Send>(&self, f: ƒ(&!T, Arg) → R ! {poly}, a: Arg) → R ! {poly, lock(L)} { }
+}
 #lang(cell)
 ▢ Cell<T> { v: T }
 ⊐ <T> Cell<T> {

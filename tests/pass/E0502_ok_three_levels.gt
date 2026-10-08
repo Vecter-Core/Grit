@@ -1,0 +1,15 @@
+// expect: pass
+// note: ba tầng khoá lồng nhau tăng dần
+#level("10")
+▢ A { }
+#level("20")
+▢ B { }
+#level("30")
+▢ C { }
+■ MA: Mutex<u32, A> ≔ Mutex::new(0u32);
+■ MB: Mutex<u32, B> ≔ Mutex::new(0u32);
+■ MC: Mutex<u32, C> ≔ Mutex::new(0u32);
+ƒ leaf(v: &!u32, n: u32) → u32 ! ∅ { *v }
+ƒ t2(v: &!u32, n: u32) → u32 ! {lock(C)} { MC.with(leaf, 0u32) }
+ƒ t1(v: &!u32, n: u32) → u32 ! {lock(B), lock(C)} { MB.with(t2, 0u32) }
+ƒ go() → u32 ! {lock(A), lock(B), lock(C)} { MA.with(t1, 0u32) }

@@ -38,12 +38,12 @@ impl Env<'_> {
             return;
         }
         // Send: trait tự động (M8), suy theo cấu trúc; không cho viết impl
-        if td.lang == Some(Lang::Send) {
+        if td.lang == Some(Lang::Send) || td.lang == Some(Lang::Sync) {
             self.err(
                 "E0313",
                 node,
                 imp.span,
-                "`Send` là trait tự động suy theo cấu trúc kiểu: không được viết `⊐ Send for …`"
+                "`Send`/`Sync` là trait tự động suy theo cấu trúc kiểu: không được viết `⊐ Send for …`/`⊐ Sync for …`"
                     .to_string(),
             );
             return;

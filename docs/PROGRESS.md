@@ -462,3 +462,11 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - Kiểm tắt bản sửa: 53 âm tính giả/3 000 chương trình. Đột biến 238 giết; 361/591/554 còn sống, có lập luận đơn điệu (ADR-027 §0), chờ Giang.
 - `pure_preds` loại kiểu có thể chứa ô (`TypeDb::may_have_interior_mut`, 3 test); sửa một hồi quy do chính tôi gây ra trong đợt này (`Option<T>::is_some` bị loại oan vì coi mọi tham số kiểu là có thể chứa ô → chỉ tham số có ràng buộc trait mới bị loại).
 - ADR-027 viết xong (lang item, Sync, `with` có phạm vi, cấp khoá `#level`, E0502/E0503, hiệu ứng đa hình `effect_poly`). Chưa cài Mutex/Atomic*.
+
+## M8 nửa 2 — bước 3: Mutex, Atomic, Sync, thứ tự khoá (2026-10-08, ADR-027)
+- **Lang item mới** (prelude fixture, hợp đồng ở ADR-027 §1): `send`/`sync` (tự động), `cell`, `mutex`, `atomic`, `atomic_int`, `ordering`; marker hiệu ứng `poly`/`detach` (chỉ lib/core, E1002 nếu ở nơi khác); `#level("n")`. `Mutex::with` có phạm vi; `spawn` dùng `detach`.
+- **Kiểm:** `Sync`/`Send` tự động (send.rs, E0501; `■` static phải `Sync`); `lock(L)` suy từ `Mutex::with` + lan truyền xuyên hàm; **E0502** thứ tự khoá tăng nghiêm ngặt tại mỗi `with` (đầy đủ nhờ phạm vi); **E0503** memory ordering viết thẳng và tổ hợp hợp lệ (mức MIR); borrowck/M7 coi Mutex/Atomic cùng nhóm với Cell (bất biến, loại khỏi `pure_preds`).
+- **Thông dịch MIR** (tuần tự, công cụ test, ngoài TCB) cài `Cell`/`Mutex::with`/`Atomic`/`spawn`; 1 test ngữ nghĩa (kết quả 45 tính tay).
+- **Corpus:** E0501 mở rộng (4 fail + 4 pass mới), E0502 (4 fail + 4 pass), E0503 (4 fail + 4 pass); `docs/errors/E0502.md`, `E0503.md`; chương trình đa luồng đúng (static `Mutex`/`Atomic` + `spawn`) trong pass.
+- **Đột biến** (1 worker, lô nhỏ): send.rs 21, ordering.rs 63, effects.rs phần khoá 23 — chi tiết và phần chưa giải quyết ở KNOWN_LIMITATIONS.
+- Hồi quy: gt-resolve, gt-types, gt-mir, gt-borrowck (oracle 20 000), gt-oblig xanh. Cổng đầy đủ chưa chạy (một lần, ngay sau bước này).

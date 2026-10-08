@@ -333,6 +333,19 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
         let ty = env.db.consts.get(&d).cloned().unwrap_or(Ty::Err);
         let key = env.defs()[d.index()].path.clone();
         check::Checker::check_const(&mut env, key, module, n, ty, value);
+        // `■` static chia sẻ giữa mọi luồng: kiểu phải Sync (ADR-027 §2, D11)
+        if matches!(env.items[&n].item.kind, ItemKind::Static(_))
+            && !env.is_prelude(n.file())
+            && let Err(why) = env.sync_like(&env.db.consts.get(&d).cloned().unwrap_or(Ty::Err), &[])
+        {
+            let sp = env.items[&n].item.span;
+            env.err(
+                "E0501",
+                n,
+                sp,
+                format!("`■` static phải có kiểu `Sync` (chia sẻ giữa các luồng): {why}"),
+            );
+        }
     }
     let instances = env.collect_instances(&bodies);
     let fn_keys: BTreeMap<NodeId, String> = bodies

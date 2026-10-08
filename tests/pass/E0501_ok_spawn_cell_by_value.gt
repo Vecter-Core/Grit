@@ -1,0 +1,4 @@
+// expect: pass
+// note: Cell có thể CHUYỂN (Send) sang luồng khác theo giá trị; chỉ chia sẻ là cấm
+ƒ w(c: Cell<u32>) ! ∅ { c.set(2u32); }
+ƒ main() ! ∅ { spawn(w, Cell::new(1u32)); }

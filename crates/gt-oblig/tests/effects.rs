@@ -136,3 +136,226 @@ fn messages_name_declared_and_inferred_effects() {
         "{msgs:?}"
     );
 }
+
+// ---------------------------------------------------------------- khoá (ADR-027 §3)
+
+const LV: &str = "#level(\"10\")\n▢ Lo { }\n#level(\"20\")\n▢ Hi { }\n#level(\"30\")\n▢ Top { }\n";
+
+#[test]
+fn lock_effects_are_inferred_and_must_be_declared() {
+    // khai đúng lock(Lo)
+    ok(&format!(
+        "{LV}ƒ bump(v: &!u32, n: u32) → u32 ! ∅ {{ *v ← *v +% n; *v }}\nƒ go(m: &Mutex<u32, Lo>) → u32 ! {{lock(Lo)}} {{ m.with(bump, 1u32) }}"
+    ));
+    // thiếu khai báo lock(Lo)
+    only(
+        &format!(
+            "{LV}ƒ bump(v: &!u32, n: u32) → u32 ! ∅ {{ *v }}\nƒ go(m: &Mutex<u32, Lo>) → u32 ! ∅ {{ m.with(bump, 1u32) }}"
+        ),
+        "E0801",
+    );
+    // khai nhầm cấp khác
+    only(
+        &format!(
+            "{LV}ƒ bump(v: &!u32, n: u32) → u32 ! ∅ {{ *v }}\nƒ go(m: &Mutex<u32, Lo>) → u32 ! {{lock(Hi)}} {{ m.with(bump, 1u32) }}"
+        ),
+        "E0801",
+    );
+}
+
+const STATICS: &str = "■ LO: Mutex<u32, Lo> ≔ Mutex::new(0u32);
+■ HI: Mutex<u32, Hi> ≔ Mutex::new(0u32);
+■ TOP: Mutex<u32, Top> ≔ Mutex::new(0u32);
+ƒ leaf(v: &!u32, n: u32) → u32 ! ∅ { *v }
+";
+
+#[test]
+fn nested_locks_must_have_strictly_increasing_levels() {
+    // trong khoá Lo lấy khoá Hi (cấp cao hơn): hợp lệ
+    ok(&format!(
+        "{LV}{STATICS}ƒ inner(v: &!u32, n: u32) → u32 ! {{lock(Hi)}} {{ HI.with(leaf, 0u32) }}
+ƒ go() → u32 ! {{lock(Hi), lock(Lo)}} {{ LO.with(inner, 0u32) }}"
+    ));
+    // ba tầng tăng dần
+    ok(&format!(
+        "{LV}{STATICS}ƒ t2(v: &!u32, n: u32) → u32 ! {{lock(Top)}} {{ TOP.with(leaf, 0u32) }}
+ƒ t1(v: &!u32, n: u32) → u32 ! {{lock(Hi), lock(Top)}} {{ HI.with(t2, 0u32) }}
+ƒ go() → u32 ! {{lock(Hi), lock(Lo), lock(Top)}} {{ LO.with(t1, 0u32) }}"
+    ));
+    // đảo ngược thứ tự: trong Hi lấy Lo
+    only(
+        &format!(
+            "{LV}{STATICS}ƒ inner(v: &!u32, n: u32) → u32 ! {{lock(Lo)}} {{ LO.with(leaf, 0u32) }}
+ƒ go() → u32 ! {{lock(Hi), lock(Lo)}} {{ HI.with(inner, 0u32) }}"
+        ),
+        "E0502",
+    );
+    // khoá lại cùng cấp (tự deadlock)
+    only(
+        &format!(
+            "{LV}{STATICS}ƒ inner(v: &!u32, n: u32) → u32 ! {{lock(Lo)}} {{ LO.with(leaf, 0u32) }}
+ƒ go() → u32 ! {{lock(Lo)}} {{ LO.with(inner, 0u32) }}"
+        ),
+        "E0502",
+    );
+    // đảo ngược qua nhiều tầng hàm
+    only(
+        &format!(
+            "{LV}{STATICS}ƒ deep(v: &!u32, n: u32) → u32 ! {{lock(Lo)}} {{ LO.with(leaf, 0u32) }}
+ƒ mid(v: &!u32, n: u32) → u32 ! {{lock(Lo)}} {{ deep(v, n) }}
+ƒ go() → u32 ! {{lock(Hi), lock(Lo)}} {{ HI.with(mid, 0u32) }}"
+        ),
+        "E0502",
+    );
+}
+
+#[test]
+fn locks_sequentially_in_any_order_are_fine_and_spawn_does_not_nest() {
+    // lần lượt (không lồng) theo thứ tự bất kỳ
+    ok(&format!(
+        "{LV}{STATICS}ƒ go() ! {{lock(Hi), lock(Lo)}} {{ HI.with(leaf, 0u32); LO.with(leaf, 0u32); }}"
+    ));
+    // worker của spawn lấy khoá thấp trong khi người gọi giữ khoá cao: không lồng, không phải E0502
+    ok(&format!(
+        "{LV}{STATICS}ƒ w(n: u32) ! {{lock(Lo)}} {{ LO.with(leaf, n); }}
+ƒ go() ! {{lock(Hi)}} {{ HI.with(spawner, 0u32); }}
+ƒ spawner(v: &!u32, n: u32) → u32 ! ∅ {{ spawn(w, 1u32); 0u32 }}"
+    ));
+}
+
+// ---------------------------------------------------------------- memory ordering (E0503)
+
+#[test]
+fn atomic_orderings_must_be_literal_and_valid() {
+    // hợp lệ
+    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(Ordering::Acquire) }");
+    ok("ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, Ordering::Release); }");
+    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.fetch_add(1u32, Ordering::AcqRel) }");
+    ok(
+        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, Ordering::AcqRel, Ordering::Acquire) }",
+    );
+    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { o ≔ Ordering::SeqCst; a.load(o) }");
+    // load với Release/AcqRel
+    only(
+        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(Ordering::Release) }",
+        "E0503",
+    );
+    only(
+        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(Ordering::AcqRel) }",
+        "E0503",
+    );
+    // store với Acquire/AcqRel
+    only(
+        "ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, Ordering::Acquire); }",
+        "E0503",
+    );
+    only(
+        "ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, Ordering::AcqRel); }",
+        "E0503",
+    );
+    // compare_exchange: thất bại Release/AcqRel, SeqCst khi thành công yếu hơn, Acquire khi thành công Relaxed/Release
+    only(
+        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, Ordering::SeqCst, Ordering::Release) }",
+        "E0503",
+    );
+    only(
+        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, Ordering::AcqRel, Ordering::SeqCst) }",
+        "E0503",
+    );
+    only(
+        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, Ordering::Relaxed, Ordering::Acquire) }",
+        "E0503",
+    );
+    // ordering không viết thẳng (tính toán / tham số) ⇒ không đoán
+    only(
+        "ƒ f(a: &Atomic<u32>, o: Ordering) → u32 ! ∅ { a.load(o) }",
+        "E0503",
+    );
+    only(
+        "ƒ pick(c: bool) → Ordering ! ∅ { ⎇ c { Ordering::Acquire } ⇝ { Ordering::SeqCst } }\nƒ f(a: &Atomic<u32>, c: bool) → u32 ! ∅ { a.load(pick(c)) }",
+        "E0503",
+    );
+    // cú pháp kết hợp cũng đi qua cùng kiểm tra
+    only(
+        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { Atomic::load(a, Ordering::Release) }",
+        "E0503",
+    );
+}
+
+#[test]
+fn ordering_tracing_is_exact_and_scans_every_call() {
+    // biến gán hai lần: không truy được một biến thể duy nhất ⇒ E0503 (dù giá trị cuối hợp lệ)
+    only(
+        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { μo ≔ Ordering::Release; o ← Ordering::Acquire; a.load(o) }",
+        "E0503",
+    );
+    // chuỗi sao chép vẫn truy được
+    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { o ≔ Ordering::Acquire; p ≔ o; q ≔ p; a.load(q) }");
+    // lời gọi hỏng nằm SAU các khối/lời gọi khác (không dừng quét sớm)
+    only(
+        "ƒ g() ! ∅ { }\nƒ f(a: &Atomic<u32>, c: bool) → u32 ! ∅ { g(); ⎇ c { g(); } g(); a.load(Ordering::Release) }",
+        "E0503",
+    );
+    // impl khác (của người dùng) đứng cạnh: vẫn tìm đúng impl của Atomic
+    only(
+        "▢ S { v: u32 }\n⊐ S { ƒ m(&self) ! ∅ { } ƒ n(&self) ! ∅ { } }\nƒ f(a: &Atomic<u32>, s: &S) ! ∅ { s.m(); a.store(1u32, Ordering::Acquire); }",
+        "E0503",
+    );
+    // hàm của người dùng nhận Ordering KHÔNG phải atomic: không bị kiểm
+    ok(
+        "▢ S { v: u32 }\n⊐ S { ƒ m(&self, o: Ordering) ! ∅ { } }\nƒ f(s: &S, o: Ordering) ! ∅ { s.m(o); }",
+    );
+    // đúng MỘT chẩn đoán cho mỗi lời gọi sai
+    assert_eq!(
+        codes("ƒ f(a: &Atomic<u32>, o: Ordering) → u32 ! ∅ { a.load(o) }"),
+        vec!["E0503"]
+    );
+    assert_eq!(
+        codes("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(Ordering::Release) }"),
+        vec!["E0503"]
+    );
+}
+
+#[test]
+fn polymorphic_argument_effects_reach_the_caller() {
+    // spawn: hiệu ứng io/mem của worker phải được người gọi khai báo
+    only(
+        "ƒ w(n: u32) ! {io} { }\nƒ go() ! ∅ { spawn(w, 1u32); }",
+        "E0801",
+    );
+    ok("ƒ w(n: u32) ! {io} { }\nƒ go() ! {io} { spawn(w, 1u32); }");
+    // worker có cả lock lẫn mem: lock bị bỏ (không lồng), mem vẫn truyền — kể cả khi lock đứng trước trong thứ tự
+    let src = format!(
+        "{LV}{STATICS}ƒ w(n: u32) ! {{lock(Lo), mem}} {{ LO.with(leaf, n); }}\nƒ go() ! {{{{}}}} {{ spawn(w, 1u32); }}"
+    )
+    .replace("{{}}", "∅");
+    only(&src, "E0801");
+    ok(&format!(
+        "{LV}{STATICS}ƒ w(n: u32) ! {{lock(Lo), mem}} {{ LO.with(leaf, n); }}\nƒ go() ! {{mem}} {{ spawn(w, 1u32); }}"
+    ));
+    // Mutex::with: hiệu ứng của hàm bên trong (ngoài lock) truyền vào người gọi
+    only(
+        &format!(
+            "{LV}{STATICS}ƒ f(v: &!u32, n: u32) → u32 ! {{io}} {{ *v }}\nƒ go() → u32 ! {{lock(Lo)}} {{ LO.with(f, 0u32) }}"
+        ),
+        "E0801",
+    );
+    ok(&format!(
+        "{LV}{STATICS}ƒ f(v: &!u32, n: u32) → u32 ! {{io}} {{ *v }}\nƒ go() → u32 ! {{io, lock(Lo)}} {{ LO.with(f, 0u32) }}"
+    ));
+}
+
+#[test]
+fn calling_a_function_that_declares_lock_directly_is_fine() {
+    ok(&format!(
+        "{LV}{STATICS}ƒ a() ! {{lock(Lo)}} {{ LO.with(leaf, 0u32); }}\nƒ b() ! {{lock(Lo)}} {{ a(); }}"
+    ));
+}
+
+#[test]
+fn two_level_types_with_the_same_short_name_are_ambiguous() {
+    only(
+        "▦ m1 { #level(\"1\") ◈ ▢ X { } }\n▦ m2 { #level(\"2\") ◈ ▢ X { } }",
+        "E0502",
+    );
+}

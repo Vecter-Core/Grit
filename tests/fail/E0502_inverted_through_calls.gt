@@ -1,0 +1,12 @@
+// expect: fail E0502
+// note: đảo thứ tự qua nhiều tầng hàm (tóm tắt hiệu ứng lock xuyên hàm)
+#level("10")
+▢ Lo { }
+#level("20")
+▢ Hi { }
+■ LO: Mutex<u32, Lo> ≔ Mutex::new(0u32);
+■ HI: Mutex<u32, Hi> ≔ Mutex::new(0u32);
+ƒ leaf(v: &!u32, n: u32) → u32 ! ∅ { *v }
+ƒ deep(v: &!u32, n: u32) → u32 ! {lock(Lo)} { LO.with(leaf, 0u32) }
+ƒ mid(v: &!u32, n: u32) → u32 ! {lock(Lo)} { deep(v, n) }
+ƒ go() → u32 ! {lock(Hi), lock(Lo)} { HI.with(mid, 0u32) }

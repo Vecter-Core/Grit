@@ -238,7 +238,13 @@ impl<'a> Gen<'a> {
             return *v;
         }
         // mutability bên trong: ghi được qua `&` nên MỌI vị trí region bên trong bất biến, kể cả khi chỉ có `&` tới nó (điều kiện cứng Giang 2026-10-07)
-        if self.db.adts.get(&d).and_then(|a| a.lang) == Some(gt_types::Lang::Cell) {
+        if self
+            .db
+            .adts
+            .get(&d)
+            .and_then(|a| a.lang)
+            .is_some_and(gt_types::Lang::interior_mutable)
+        {
             self.adt_inv.insert(d, true);
             return true;
         }

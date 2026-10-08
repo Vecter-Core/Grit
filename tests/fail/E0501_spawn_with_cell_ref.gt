@@ -1,0 +1,4 @@
+// expect: fail E0501
+// note: đua dữ liệu kinh điển: chuyển &Cell sang luồng khác
+ƒ w(c: &Cell<u32>) ! ∅ { c.set(2u32); }
+ƒ main() ! ∅ { c ≔ Cell::new(1u32); spawn(w, &c); }

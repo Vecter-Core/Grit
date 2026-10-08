@@ -51,7 +51,7 @@ impl TypeDb {
                 let Some(adt) = self.adts.get(d) else {
                     return false;
                 };
-                if adt.lang == Some(Lang::Cell) {
+                if adt.lang.is_some_and(Lang::interior_mutable) {
                     return true;
                 }
                 if args.iter().any(|t| self.imut(t, params, seen)) {

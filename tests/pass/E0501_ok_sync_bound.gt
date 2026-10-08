@@ -1,0 +1,4 @@
+// expect: pass
+// note: ràng buộc T: Sync thoả với kiểu số nguyên và Atomic
+ƒ share<T: Sync>(x: &T) ! ∅ { }
+ƒ main() ! ∅ { n ≔ 1u32; a ≔ Atomic::new(0u32); share(&n); share(&a); }

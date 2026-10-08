@@ -1,0 +1,5 @@
+// expect: fail E0501
+// note: Mutex<&u32, L> không Send nên không Sync; static phải Sync
+#level("1")
+▢ Lo { }
+■ M: Mutex<&u32, Lo> ≔ Mutex::new(&5u32);

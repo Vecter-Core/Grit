@@ -4,6 +4,39 @@ use crate::collect::AdtKind;
 use crate::traits::{Pick, bounds_of, fresh_args, subst_with};
 
 impl<'e, 'a> Checker<'e, 'a> {
+    /// Hiệu ứng của một đối số hàm không có tác dụng phụ khi dò: `Path` tới hàm tự do hoặc biến cục bộ kiểu hàm.
+    fn fn_arg_effects(&mut self, a: &Expr) -> Option<Vec<String>> {
+        let ExprKind::Path(p) = &a.kind else {
+            return None;
+        };
+        match self.env.res.uses.get(&p.id)?.clone() {
+            Res::Def(d) if self.env.defs()[d.index()].kind == DefKind::Fn => {
+                self.env.db.fns.get(&d).map(|(s, _)| s.effects.clone())
+            }
+            Res::Local(l) => {
+                let t = self.locals.get(&l)?.ty.clone();
+                match self.infer.shallow(&t) {
+                    Ty::Fn(_, _, e) => Some(e),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Tham số kiểu hàm có hiệu ứng đa hình (`poly`/`detach`, chỉ ở prelude): lấy hiệu ứng của đối số thay cho marker (ADR-027 §3).
+    fn poly_param(&mut self, a: &Expr, p: &Ty) -> Ty {
+        let ps = self.infer.shallow(p);
+        if let Ty::Fn(params, ret, eff) = &ps
+            && eff.len() == 1
+            && (eff[0] == "poly" || eff[0] == "detach")
+            && let Some(e) = self.fn_arg_effects(a)
+        {
+            return Ty::Fn(params.clone(), ret.clone(), e);
+        }
+        ps
+    }
+
     pub(crate) fn push_oblig(&mut self, ty: Ty, trait_def: DefId, node: NodeId, span: Span) {
         self.oblig.push(Oblig {
             ty,
@@ -381,7 +414,8 @@ impl<'e, 'a> Checker<'e, 'a> {
                     }
                 }
                 for (a, p) in args.iter().zip(&params) {
-                    self.expr_expect(a, p);
+                    let p = self.poly_param(a, p);
+                    self.expr_expect(a, &p);
                 }
                 *ret
             }
@@ -476,7 +510,8 @@ impl<'e, 'a> Checker<'e, 'a> {
             return pick.ret;
         }
         for (a, p) in args.iter().zip(&pick.params) {
-            self.expr_expect(a, p);
+            let p = self.poly_param(a, p);
+            self.expr_expect(a, &p);
         }
         pick.ret
     }

@@ -1,0 +1,8 @@
+// expect: pass
+// note: chia sẻ qua ■ static kiểu Sync (Mutex<u32, L>) bằng tên, không truyền tham chiếu
+#level("1")
+▢ Lo { }
+■ M: Mutex<u32, Lo> ≔ Mutex::new(0u32);
+ƒ add(v: &!u32, n: u32) → u32 ! ∅ { *v ← *v +% n; *v }
+ƒ worker(n: u32) ! {lock(Lo)} { M.with(add, n); }
+ƒ main() ! {lock(Lo)} { spawn(worker, 1u32); spawn(worker, 2u32); }

@@ -1,0 +1,4 @@
+// expect: fail E0501
+// note: ràng buộc T: Sync không thoả với Cell<u32>
+ƒ share<T: Sync>(x: &T) ! ∅ { }
+ƒ main() ! ∅ { c ≔ Cell::new(1u32); share(&c); }

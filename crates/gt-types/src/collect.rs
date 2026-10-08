@@ -28,9 +28,25 @@ pub enum Lang {
     /// Kiểu có MUTABILITY BÊN TRONG (`&self` ghi được): gt-borrowck coi mọi vị trí region bên trong là BẤT BIẾN, kể cả qua `&`
     /// (điều kiện cứng Giang 2026-10-07). Nhóm lang item này (Cell-like, Mutex, Atomic*) thuộc TCB (GRIT_PLAN mục 3.3).
     Cell,
+    /// `Mutex<T, L>`: khoá tương hỗ có cấp `L` (kiểu đánh dấu mang `#level`); chỉ truy cập qua `with` (ADR-027).
+    Mutex,
+    /// `Atomic<T>`: thao tác nguyên tử, mọi thao tác nhận `Ordering` tường minh (ADR-027).
+    Atomic,
+    /// trait đánh dấu kiểu được phép đặt trong `Atomic<T>` (prelude impl cho bool và số nguyên).
+    AtomicInt,
+    /// `enum Ordering { Relaxed, Acquire, Release, AcqRel, SeqCst }`.
+    Ordering,
+    /// `Sync` (M8): trait TỰ ĐỘNG, suy theo cấu trúc (send.rs), cấm viết `⊐ Sync for`.
+    Sync,
 }
 
 impl Lang {
+    /// Nhóm lang item có MUTABILITY BÊN TRONG (ghi được qua `&`): Cell, Mutex, Atomic (ADR-027 §0).
+    #[must_use]
+    pub fn interior_mutable(self) -> bool {
+        matches!(self, Lang::Cell | Lang::Mutex | Lang::Atomic)
+    }
+
     fn from_name(s: &str) -> Option<Lang> {
         Some(match s {
             "option" => Lang::Option,
@@ -43,6 +59,11 @@ impl Lang {
             "drop" => Lang::Drop,
             "send" => Lang::Send,
             "cell" => Lang::Cell,
+            "mutex" => Lang::Mutex,
+            "atomic" => Lang::Atomic,
+            "atomic_int" => Lang::AtomicInt,
+            "ordering" => Lang::Ordering,
+            "sync" => Lang::Sync,
             _ => return None,
         })
     }
@@ -88,6 +109,8 @@ pub struct AdtDef {
     pub kind: AdtKind,
     pub lang: Option<Lang>,
     pub module: DefId,
+    /// cấp khoá từ thuộc tính `#level("n")` (kiểu đánh dấu cho `Mutex<T, L>`; ADR-027 §3)
+    pub level: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
@@ -270,6 +293,19 @@ impl<'a> Env<'a> {
         }
     }
 
+    /// Cấp khoá từ `#level("n")` (n: số nguyên không âm viết trong chuỗi).
+    fn level_of(item: &Item) -> Option<u64> {
+        item.attrs.iter().find_map(|a| {
+            if a.name.name != "level" {
+                return None;
+            }
+            match a.args.first().map(|x| &x.kind) {
+                Some(AttrArgKind::Str(t)) => t.trim().parse().ok(),
+                _ => None,
+            }
+        })
+    }
+
     fn lang_of(&mut self, item: &Item) -> Option<Lang> {
         for a in &item.attrs {
             if a.name.name != "lang" {
@@ -333,6 +369,21 @@ impl<'a> Env<'a> {
 
     // ---------------- hạ kiểu ----------------
 
+    /// Marker hiệu ứng đa hình `poly`/`detach` (ADR-027 §3) chỉ dùng trong lib/core: người dùng không được tự nhận "hiệu ứng tuỳ đối số hàm".
+    fn check_marker_effects(&mut self, e: &Effects, node: NodeId, span: Span) {
+        if self.is_prelude(node.file()) {
+            return;
+        }
+        if effect_names(e).iter().any(|n| n == "poly" || n == "detach") {
+            self.err(
+                "E1002",
+                node,
+                span,
+                "hiệu ứng `poly`/`detach` chỉ dùng được trong `lib/core` hoặc prelude".to_string(),
+            );
+        }
+    }
+
     pub fn lower_ty(&mut self, t: &Type, cx: &LowerCx) -> Ty {
         match &t.kind {
             TypeKind::Prim(p) => Ty::from_prim(*p),
@@ -387,6 +438,7 @@ impl<'a> Env<'a> {
                     .map(|x| self.elem_ty(x, cx, "tham số của kiểu hàm"))
                     .collect();
                 let r = ret.as_ref().map_or_else(Ty::unit, |x| self.lower_ty(x, cx));
+                self.check_marker_effects(effects, t.id, t.span);
                 Ty::Fn(p, Box::new(r), effect_names(effects))
             }
         }
@@ -727,6 +779,7 @@ impl<'a> Env<'a> {
                                 kind: AdtKind::Struct(Vec::new()),
                                 lang,
                                 module,
+                                level: Self::level_of(item),
                             },
                         );
                         if let Some(l) = lang {
@@ -747,6 +800,7 @@ impl<'a> Env<'a> {
                                 kind: AdtKind::Enum(Vec::new()),
                                 lang,
                                 module,
+                                level: Self::level_of(item),
                             },
                         );
                         if let Some(l) = lang {
@@ -999,6 +1053,7 @@ impl<'a> Env<'a> {
         let Some(&d) = self.def_by_node.get(&item.id) else {
             return;
         };
+        self.check_marker_effects(&f.sig.effects, item.id, item.span);
         let info = self.sig_info(&f.sig, item.id, &LowerCx::default());
         let lts = self.region_sigs[&item.id].declared.clone();
         self.db.fns.insert(d, (info.clone(), module));

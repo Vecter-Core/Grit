@@ -1,0 +1,3 @@
+// expect: pass
+// note: store Release hợp lệ
+ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, Ordering::Release); }

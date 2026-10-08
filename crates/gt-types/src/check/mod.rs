@@ -539,17 +539,25 @@ impl<'e, 'a> Checker<'e, 'a> {
                 continue;
             }
             let scope = self.scope.clone();
-            if self.env.db.lang.get(&crate::collect::Lang::Send) == Some(&o.trait_def) {
-                if let Err(why) = self.env.send_like(&ty, &scope) {
+            let auto = if self.env.db.lang.get(&crate::collect::Lang::Send) == Some(&o.trait_def) {
+                Some(crate::send::Auto::Send)
+            } else if self.env.db.lang.get(&crate::collect::Lang::Sync) == Some(&o.trait_def) {
+                Some(crate::send::Auto::Sync)
+            } else {
+                None
+            };
+            if let Some(which) = auto {
+                if let Err(why) = self.env.auto_like(&ty, &scope, which) {
                     let s = self.show(&ty);
-                    self.err(
-                        "E0501",
-                        o.node,
-                        o.span,
-                        format!(
+                    let msg = match which {
+                        crate::send::Auto::Send => format!(
                             "kiểu `{s}` không `Send` nên không chuyển được sang luồng khác: {why}"
                         ),
-                    );
+                        crate::send::Auto::Sync => format!(
+                            "kiểu `{s}` không `Sync` nên không chia sẻ được giữa các luồng: {why}"
+                        ),
+                    };
+                    self.err("E0501", o.node, o.span, msg);
                 }
                 continue;
             }

@@ -12,6 +12,7 @@ pub mod driver;
 pub mod effects;
 pub mod env;
 pub mod ir;
+pub mod ordering;
 pub mod prover;
 pub mod termination;
 pub mod zone;
