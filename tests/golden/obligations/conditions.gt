@@ -1,0 +1,8 @@
+ƒ and_if(a: i32, b: i32) → i32 ! ∅ { ⎇ a < b ∧ b < 10 { 1 } ⇝ { 2 } }
+ƒ or_if(a: i32, b: i32) → i32 ! ∅ { ⎇ a < b ∨ b < 10 { 1 } ⇝ { 2 } }
+ƒ not_and(a: i32, b: i32) → i32 ! ∅ { ⎇ ¬(a < b ∧ b < 10) { 1 } ⇝ { 2 } }
+ƒ nested(a: i32, b: i32, c: i32) → i32 ! ∅ { ⎇ (a < b ∧ b < c) ∨ c == 0 { 1 } ⇝ { 2 } }
+ƒ implies_if(a: bool, b: bool) → i32 ! ∅ { ⎇ a ⇒ b { 1 } ⇝ { 2 } }
+ƒ while_and(n: i32) → i32 ! ∅ { μi ≔ 0; ⟳ i < n ∧ i < 100 ↓ n - i { i ← i + 1; } i }
+ƒ as_value(a: i32, b: i32) → bool ! ∅ { c ≔ a < b ∧ b < 10; c }
+ƒ with_effects(a: i32) → i32 ! ∅ { ⎇ a / 2 > 1 ∧ a % 3 == 0 { 1 } ⇝ { 2 } }

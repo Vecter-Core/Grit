@@ -16,7 +16,7 @@ use gt_oblig::driver::{OblOutput, analyze_program};
 use gt_oblig::ir::{Budget, ObKind, Obligation, Prover, Verdict};
 use gt_oblig::prover::ZoneProver;
 use interp::{Interp, Outcome, V};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 struct ZeroProver;
 impl Prover for ZeroProver {
@@ -64,6 +64,12 @@ struct Cov {
     skipped: u64,
     aborts: u64,
     abort_kinds: BTreeMap<String, u64>,
+    /// loại → các check BỊ XOÁ (chương trình, thân, khối) mà ít nhất một lần chạy kết thúc BÌNH THƯỜNG sau khi chạy qua nó
+    /// (đoạn code sau check chạy tới cuối hàm — lệnh Giang 2026-10-08, mục 2)
+    end_checks: BTreeMap<String, BTreeSet<(u64, String, u32)>>,
+    /// loại → (số lần check được thực thi trong lần chạy kết thúc bình thường, … trong lần chạy abort)
+    reach: BTreeMap<String, (u64, u64)>,
+    normal_runs: u64,
 }
 
 fn status_name(s: &Status) -> &'static str {
@@ -75,19 +81,22 @@ fn status_name(s: &Status) -> &'static str {
     }
 }
 
-fn inputs(rng: &mut progen::Rng, ty: obgen::Ity, n: usize, count: usize) -> Vec<Vec<i128>> {
-    let b = ty.boundary();
+/// Đầu vào của `entry` THOẢ tiền điều kiện `⊳` (không ai kiểm `⊳` của `entry` nên bộ chạy phải tôn trọng nó), thiên về biên của khoảng.
+fn inputs(rng: &mut progen::Rng, ranges: &[(i128, i128)], count: usize) -> Vec<Vec<i128>> {
     (0..count)
         .map(|_| {
-            (0..n)
-                .map(|_| {
-                    if rng.chance(75) {
-                        b[rng.below(b.len() as u64) as usize]
-                    } else {
-                        let span = ((ty.max() - ty.min()).min(1 << 30)) as u64;
-                        (ty.min().max(-(1 << 29)) + rng.below(span + 1) as i128)
-                            .clamp(ty.min(), ty.max())
+            ranges
+                .iter()
+                .map(|&(lo, hi)| {
+                    let edges = [lo, lo + 1, hi - 1, hi, (lo + hi) / 2, 0, 1, -1];
+                    if rng.chance(70) {
+                        let e = edges[rng.below(edges.len() as u64) as usize];
+                        if e >= lo && e <= hi {
+                            return e;
+                        }
                     }
+                    let span = ((hi - lo).min(1 << 30)) as u64;
+                    lo + rng.below(span + 1) as i128
                 })
                 .collect()
         })
@@ -122,6 +131,7 @@ fn one_program(seed: u64, cov: &mut Cov, stats: &mut obgen::GenStats) {
     stats.casts += s.casts;
     stats.divs += s.divs;
     stats.negs += s.negs;
+    stats.compound_loops += s.compound_loops;
     let t = common::run(&[("main.gt", p.src.as_str())]);
     assert!(
         t.report.diagnostics.is_empty(),
@@ -167,16 +177,34 @@ fn one_program(seed: u64, cov: &mut Cov, stats: &mut obgen::GenStats) {
     }
     let ty = ity_of(p.ty.name);
     let mut rng = progen::Rng(seed ^ 0xABCD_EF01_2345_6789 | 1);
-    let ins = inputs(&mut rng, p.ty, p.entry_params, 24);
+    let ins = inputs(&mut rng, &p.entry_ranges, 24);
+    let mut normal_in_prog = false;
     for input in ins {
         cov.runs += 1;
         let args: Vec<V> = input.iter().map(|v| V::Int(*v, ty)).collect();
         let mut ir = Interp::new(&m_ref, 200_000);
         let out_r = ir.call_key("main::entry", args.clone());
         // vết của tham chiếu: nghĩa vụ chạm tới
+        let ended = matches!(out_r, Outcome::Value(_));
+        if ended {
+            cov.normal_runs += 1;
+            normal_in_prog = true;
+        }
         for (k, b, ok) in &ir.asserts {
             if let Some((kind, st)) = table.get(&(k.clone(), *b)) {
                 cov.cells.entry((kind.clone(), st)).or_default().1 += 1;
+                let r = cov.reach.entry(kind.clone()).or_default();
+                if ended {
+                    r.0 += 1;
+                } else {
+                    r.1 += 1;
+                }
+                if ended && *st == "xoa" {
+                    cov.end_checks
+                        .entry(kind.clone())
+                        .or_default()
+                        .insert((seed, k.clone(), *b));
+                }
                 if *st == "do" {
                     assert!(
                         !*ok,
@@ -213,9 +241,23 @@ fn one_program(seed: u64, cov: &mut Cov, stats: &mut obgen::GenStats) {
             }
         }
     }
+    // hợp đồng không có vết `Assert`: tính theo chương trình có >= 1 lần chạy kết thúc bình thường
+    if normal_in_prog {
+        for ((key, blk), (kind, st)) in &table {
+            if *st == "xoa" && (kind == "pre" || kind == "post") {
+                cov.end_checks
+                    .entry(kind.clone())
+                    .or_default()
+                    .insert((seed, key.clone(), *blk));
+            }
+        }
+    }
 }
 
-const FULL_PROGRAMS: u64 = 1500;
+const FULL_PROGRAMS: u64 = 2000;
+
+/// ngưỡng "đã kiểm": số check BỊ XOÁ mà đoạn sau nó chạy tới cuối hàm, mỗi loại (ADR-025 §13)
+const END_THRESHOLD: usize = 100;
 
 fn programs() -> u64 {
     std::env::var("GT_OBLIG_PROGRAMS")
@@ -241,6 +283,16 @@ fn pruned_programs_behave_exactly_like_fully_checked_ones() {
         eprintln!("  {k:<22} {st:<6} nghĩa vụ {n:>5}  chạm {hit:>6}");
     }
     eprintln!("  loại abort (tham chiếu): {:?}", cov.abort_kinds);
+    eprintln!(
+        "  lần chạy kết thúc bình thường: {}/{}",
+        cov.normal_runs, cov.runs
+    );
+    for (k, (ok, ab)) in &cov.reach {
+        eprintln!(
+            "  {k:<22} thực thi trong lần chạy bình thường {ok:>8}, trong lần chạy abort {ab:>8}; check XOÁ chạy tới cuối hàm: {}",
+            cov.end_checks.get(k).map_or(0, BTreeSet::len)
+        );
+    }
     if n < FULL_PROGRAMS {
         return; // bản nhanh (đột biến giai đoạn 1): chỉ kiểm tính đúng, không kiểm ngưỡng độ phủ
     }
@@ -308,6 +360,27 @@ fn pruned_programs_behave_exactly_like_fully_checked_ones() {
     ] {
         let n = cov.abort_kinds.get(k).copied().unwrap_or(0);
         assert!(n >= 100, "abort '{k}' chỉ {n} < 100");
+    }
+    for k in [
+        "overflow.Add",
+        "overflow.Sub",
+        "overflow.Mul",
+        "overflow.Div",
+        "overflow.Rem",
+        "neg_min",
+        "div_zero",
+        "rem_zero",
+        "index",
+        "cast_lossy",
+        "invariant",
+        "pre",
+        "post",
+    ] {
+        let n = cov.end_checks.get(k).map_or(0, BTreeSet::len);
+        assert!(
+            n >= END_THRESHOLD,
+            "loại '{k}': chỉ {n} check bị xoá mà đoạn sau chạy tới cuối hàm (< {END_THRESHOLD}) — chưa được tính là đã kiểm"
+        );
     }
     assert!(
         cov.compared >= 30_000,

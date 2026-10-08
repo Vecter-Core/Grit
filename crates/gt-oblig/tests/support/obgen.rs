@@ -106,6 +106,7 @@ pub struct GenStats {
     pub casts: usize,
     pub divs: usize,
     pub negs: usize,
+    pub compound_loops: usize,
 }
 
 pub struct Prog {
@@ -113,12 +114,16 @@ pub struct Prog {
     pub ty: Ity,
     /// số tham số của `main::entry`
     pub entry_params: usize,
+    /// khoảng [lo, hi] mà tiền điều kiện `⊳` của `entry` cho phép cho từng tham số (không có `⊳` ⇒ cả kiểu)
+    pub entry_ranges: Vec<(i128, i128)>,
 }
 
 struct Fx {
     name: String,
     params: usize,
     has_slice: bool,
+    /// tham số (chỉ số) và khoảng [lo, hi] mà `⊳` cho phép: lời gọi thường truyền đối số trong khoảng đó
+    pre_range: Option<(usize, i128, i128)>,
 }
 
 pub struct OGen {
@@ -126,6 +131,8 @@ pub struct OGen {
     ty: Ity,
     /// chế độ "an toàn": phần lớn phép toán dùng `+% -% *%` / có bảo vệ, để chương trình chạy sâu hơn
     safe: bool,
+    /// chế độ "nghiêm": mọi phép có nghĩa vụ đều bọc trong bảo vệ chứng minh được VÀ thật sự đúng lúc chạy, để chạy tới cuối hàm
+    strict: bool,
     pub stats: GenStats,
     counter: usize,
     helpers: Vec<Fx>,
@@ -146,11 +153,13 @@ impl OGen {
     pub fn new(seed: u64) -> OGen {
         let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
         let ty = TYPES[rng.below(TYPES.len() as u64) as usize];
-        let safe = rng.chance(55);
+        let safe = rng.chance(75);
+        let strict = safe && rng.chance(50);
         OGen {
             rng,
             ty,
             safe,
+            strict,
             stats: GenStats::default(),
             counter: 0,
             helpers: Vec::new(),
@@ -202,6 +211,56 @@ impl OGen {
         }
     }
 
+    /// phép `+ - *` kiểm tra bọc trong bảo vệ vừa chứng minh được vừa đúng lúc chạy (không tràn)
+    fn guarded_arith(&mut self, sc: &Scope) -> String {
+        let (a, b) = (self.atom(sc), self.atom(sc));
+        let ty = self.ty;
+        let half = |lo: i128, hi: i128| (lo / 2, hi / 2);
+        let (op, guard) = match self.rng.below(3) {
+            0 => {
+                let (lo, hi) = half(ty.min(), ty.max());
+                (
+                    "+",
+                    format!(
+                        "{a} >= {l} ∧ {a} <= {h} ∧ {b} >= {l} ∧ {b} <= {h}",
+                        l = ty.lit(lo),
+                        h = ty.lit(hi)
+                    ),
+                )
+            }
+            1 if ty.signed => {
+                let (lo, hi) = half(ty.min(), ty.max());
+                (
+                    "-",
+                    format!(
+                        "{a} >= {l} ∧ {a} <= {h} ∧ {b} >= {l} ∧ {b} <= {h}",
+                        l = ty.lit(lo),
+                        h = ty.lit(hi)
+                    ),
+                )
+            }
+            1 => ("-", format!("{a} >= {b}")),
+            _ => {
+                let k = if ty.signed {
+                    (ty.bits - 1) / 2
+                } else {
+                    ty.bits / 2
+                };
+                let lim = (1i128 << k) - 1;
+                let lo = if ty.signed { -lim } else { 0 };
+                (
+                    "*",
+                    format!(
+                        "{a} >= {l} ∧ {a} <= {h} ∧ {b} >= {l} ∧ {b} <= {h}",
+                        l = ty.lit(lo),
+                        h = ty.lit(lim)
+                    ),
+                )
+            }
+        };
+        format!("(⎇ {guard} {{ ({a} {op} {b}) }} ⇝ {{ {a} }})")
+    }
+
     fn expr(&mut self, sc: &Scope, depth: u32) -> String {
         if depth == 0 {
             return self.atom(sc);
@@ -209,7 +268,10 @@ impl OGen {
         match self.rng.below(100) {
             0..=24 => self.atom(sc),
             25..=49 => {
-                let wrap = self.safe && self.rng.chance(65);
+                if self.strict && self.rng.chance(60) {
+                    return self.guarded_arith(sc);
+                }
+                let wrap = self.strict || (self.safe && self.rng.chance(65));
                 let op = if wrap {
                     ["+%", "-%", "*%"][self.rng.below(3) as usize]
                 } else {
@@ -235,12 +297,17 @@ impl OGen {
                     };
                     return format!("({l} {op} {mo})");
                 }
-                if self.safe && self.rng.chance(70) {
-                    // mẫu số có bảo vệ: chứng minh được ≠ 0 (số có dấu vẫn còn MIN / -1)
+                if self.strict || (self.safe && self.rng.chance(70)) {
+                    // mẫu số có bảo vệ: chứng minh được ≠ 0 (nghiêm: cả ≠ -1 cho số có dấu)
                     let d = self.atom(sc);
                     let z = self.ty.lit(0);
+                    let extra = if self.strict && self.ty.signed {
+                        format!(" ∧ {d} != {}", self.ty.lit(-1))
+                    } else {
+                        String::new()
+                    };
                     format!(
-                        "(⎇ {d} != {z} {{ {} {op} {d} }} ⇝ {{ {} }})",
+                        "(⎇ {d} != {z}{extra} {{ {} {op} {d} }} ⇝ {{ {} }})",
                         self.expr(sc, depth - 1),
                         self.atom(sc)
                     )
@@ -254,17 +321,48 @@ impl OGen {
             }
             56..=60 if self.ty.signed => {
                 self.stats.negs += 1;
+                if self.strict {
+                    let a = self.atom(sc);
+                    return format!(
+                        "(⎇ {a} > {} {{ (-{a}) }} ⇝ {{ {a} }})",
+                        self.ty.lit(self.ty.min())
+                    );
+                }
                 format!("(-{})", self.expr(sc, depth - 1))
             }
             61..=68 => {
                 // chuyển đổi qua kiểu hẹp/khác dấu rồi về `T`
                 self.stats.casts += 1;
-                let via = ["u8", "i8", "u16", "i16", "u32", "i32"][self.rng.below(6) as usize];
-                format!(
-                    "(({} as {via}) as {})",
-                    self.expr(sc, depth - 1),
-                    self.ty.name
-                )
+                let vi = self.rng.below(6) as usize;
+                let via = ["u8", "i8", "u16", "i16", "u32", "i32"][vi];
+                let e = self.expr(sc, depth - 1);
+                if self.strict || (self.safe && self.rng.chance(75)) {
+                    // chế độ an toàn: chỉ ép khi giá trị nằm trong khoảng của kiểu trung gian (kiểu chứng minh được)
+                    let (vb, vs) = [
+                        (8u32, false),
+                        (8, true),
+                        (16, false),
+                        (16, true),
+                        (32, false),
+                        (32, true),
+                    ][vi];
+                    let via_t = Ity {
+                        name: via,
+                        bits: vb,
+                        signed: vs,
+                    };
+                    let (lo, hi) = (
+                        via_t.min().max(self.ty.min()),
+                        via_t.max().min(self.ty.max()),
+                    );
+                    return format!(
+                        "(⎇ {e} >= {} ∧ {e} <= {} {{ (({e} as {via}) as {}) }} ⇝ {{ {e} }})",
+                        self.ty.lit(lo),
+                        self.ty.lit(hi),
+                        self.ty.name
+                    );
+                }
+                format!("(({e} as {via}) as {})", self.ty.name)
             }
             69..=80 => {
                 let c = self.cond(sc, depth - 1);
@@ -277,7 +375,7 @@ impl OGen {
             81..=88 if !sc.arrays.is_empty() || !sc.slices.is_empty() => {
                 let i = self.expr(sc, depth - 1);
                 let ix = self.index(sc, &i);
-                if self.rng.chance(45) {
+                if self.strict || self.rng.chance(if self.safe { 85 } else { 45 }) {
                     // chỉ số có bảo vệ bằng độ dài (chứng minh được)
                     let fb = self.atom(sc);
                     if !sc.slices.is_empty() && (sc.arrays.is_empty() || self.rng.chance(50)) {
@@ -318,7 +416,18 @@ impl OGen {
             (h.name.clone(), h.params, h.has_slice)
         };
         let mut args: Vec<String> = Vec::new();
-        for _ in 0..params {
+        let pre_range = self.helpers[k].pre_range;
+        for j in 0..params {
+            if let Some((pi, lo, hi)) = pre_range
+                && pi == j
+                && self.rng.chance(75)
+            {
+                // đối số thoả ⊳ của hàm gọi (kể cả các biên của nó): lời gọi chạy tới cuối thay vì abort ngay
+                let edges = [lo, lo + 1, hi - 1, hi, lo + (hi - lo) / 2];
+                let e = edges[self.rng.below(edges.len() as u64) as usize];
+                args.push(self.ty.lit(e.clamp(lo, hi)));
+                continue;
+            }
             args.push(self.expr(sc, depth.saturating_sub(1)));
         }
         if has_slice {
@@ -340,7 +449,7 @@ impl OGen {
             && (sc.slices.is_empty() || self.rng.chance(70))
         {
             // cắt lát [0..k] với k có thể vượt độ dài (nghĩa vụ SliceRange)
-            let k = if valid || self.rng.chance(60) {
+            let k = if valid || self.strict || self.rng.chance(60) {
                 // lát hợp lệ, độ dài tuỳ ý trong [1, n] để hai lát có thể KHÁC độ dài
                 (1 + self.rng.below(n as u64)).to_string()
             } else if self.rng.chance(50) {
@@ -408,7 +517,11 @@ impl OGen {
                 60..=74 if depth > 0 && !sc.muts.is_empty() => {
                     self.stats.loops += 1;
                     let i = self.fresh("i");
-                    let lim = if self.rng.chance(50) {
+                    let lim = if self.strict {
+                        // vòng ngắn: chạy tới cuối thay vì cạn nhiên liệu
+                        let hi = (self.ty.max()).min(12);
+                        self.ty.lit(1 + self.rng.below(hi as u64) as i128)
+                    } else if self.rng.chance(50) {
                         self.lit()
                     } else {
                         self.var(sc)
@@ -417,9 +530,14 @@ impl OGen {
                     let zero = self.ty.lit(0);
                     let one = self.ty.lit(1);
                     let acc = sc.muts[self.rng.below(sc.muts.len() as u64) as usize].clone();
-                    let inv = if self.rng.chance(40) {
+                    let inv = if self.rng.chance(70) {
                         self.stats.invariants += 1;
-                        let k = self.lit();
+                        // một nửa bất biến là `i <= lim` (chứng minh được và đúng lúc chạy), nửa kia hằng ngẫu nhiên
+                        let k = if self.rng.chance(50) {
+                            lim.clone()
+                        } else {
+                            self.lit()
+                        };
                         format!(" ⋈ {i} <= {k}")
                     } else {
                         String::new()
@@ -432,9 +550,22 @@ impl OGen {
                     };
                     s1.vars.push(i.clone());
                     let body = self.expr(&s1, 2);
-                    let wrap = if self.rng.chance(50) { "+" } else { "+%" };
+                    let wrap = if self.rng.chance(if self.safe { 10 } else { 50 }) {
+                        "+"
+                    } else {
+                        "+%"
+                    };
+                    // điều kiện ghép của vòng lặp (hạ thẳng thành nhánh, M5-fix 2026-10-08): `∧`/`∨` với một so sánh bất kỳ
+                    let guard = if self.rng.chance(35) {
+                        self.stats.compound_loops += 1;
+                        let c2 = self.cond(&s1, 1);
+                        let op = "∧"; // `∨` có thể lặp vô hạn (nhiên liệu cạn ⇒ ca bị bỏ)
+                        format!("{i} < {lim} {op} {c2}")
+                    } else {
+                        format!("{i} < {lim}")
+                    };
                     out.push_str(&format!(
-                        "μ{i} ≔ {zero}; ⟳ {i} < {lim} ↓ {lim} - {i}{inv} {{ {acc} ← {acc} {wrap} {body}; {i} ← {i} + {one}; }} "
+                        "μ{i} ≔ {zero}; ⟳ {guard} ↓ {lim} - {i}{inv} {{ {acc} ← {acc} {wrap} {body}; {i} ← {i} + {one}; }} "
                     ));
                 }
                 75..=84 if sc.arrays.len() < 2 && self.ty.bits >= 8 => {
@@ -474,24 +605,65 @@ impl OGen {
         out
     }
 
-    fn contracts(&mut self, params: &[String], has_ret_post: bool) -> String {
+    fn contracts(
+        &mut self,
+        params: &[String],
+        has_ret_post: bool,
+    ) -> (String, Option<(usize, i128, i128)>) {
         let mut out = String::new();
+        let mut range = None;
         if params.is_empty() {
-            return out;
+            return (out, range);
         }
-        if self.rng.chance(30) {
+        if self.rng.chance(if self.strict {
+            4
+        } else if self.safe {
+            12
+        } else {
+            30
+        }) {
             self.stats.pre += 1;
-            let p = &params[self.rng.below(params.len() as u64) as usize];
-            let k = self.lit();
+            let pi = self.rng.below(params.len() as u64) as usize;
+            let p = &params[pi];
+            let (tmin, tmax) = (self.ty.min(), self.ty.max());
+            let b = self.ty.boundary();
+            let k = b[self.rng.below(b.len() as u64) as usize];
             let form = match self.rng.below(4) {
-                0 => format!("{p} > {k}"),
-                1 => format!("{p} <= {k}"),
-                2 => format!("{p} >= {} ∧ {p} <= {}", self.lit(), self.lit()),
-                _ => format!("{p} != {k}"),
+                0 => {
+                    if k < tmax {
+                        range = Some((pi, k + 1, tmax));
+                    }
+                    format!("{p} > {}", self.ty.lit(k))
+                }
+                1 => {
+                    range = Some((pi, tmin, k));
+                    format!("{p} <= {}", self.ty.lit(k))
+                }
+                2 => {
+                    let hi = (k + 1 + self.rng.below(30) as i128).min(tmax);
+                    range = Some((pi, k, hi));
+                    format!("{p} >= {} ∧ {p} <= {}", self.ty.lit(k), self.ty.lit(hi))
+                }
+                _ => {
+                    range = Some((
+                        pi,
+                        if k < tmax { k + 1 } else { k - 1 },
+                        if k < tmax { k + 1 } else { k - 1 },
+                    ));
+                    format!("{p} != {}", self.ty.lit(k))
+                }
             };
             out.push_str(&format!(" ⊳ {form}"));
         }
-        if has_ret_post && self.rng.chance(40) {
+        if has_ret_post
+            && self.rng.chance(if self.strict {
+                4
+            } else if self.safe {
+                15
+            } else {
+                40
+            })
+        {
             self.stats.post += 1;
             let k = self.lit();
             let p = &params[self.rng.below(params.len() as u64) as usize];
@@ -502,7 +674,7 @@ impl OGen {
             };
             out.push_str(&format!(" ⊲ {form}"));
         }
-        out
+        (out, range)
     }
 
     pub fn program(&mut self) -> Prog {
@@ -529,8 +701,15 @@ impl OGen {
                 sc.slices.push("xs".into());
                 sc.slices.push("zs".into());
             }
-            let ctr = self.contracts(&pnames, true);
+            let (mut ctr, pre_range) = self.contracts(&pnames, true);
             let n = 2 + self.rng.below(3) as usize;
+            // mẫu "trả nguyên tham số": thân không có `⏎` sớm, đuôi `p0`, hậu điều kiện về `p0` (chứng minh được và đúng lúc chạy)
+            let id_tail = self.rng.chance(25);
+            if id_tail {
+                self.stats.post += 1;
+                let rel = ["==", ">=", "<="][self.rng.below(3) as usize];
+                ctr.push_str(&format!(" ⊲ result {rel} p0"));
+            }
             // kịch bản "bí danh rồi gán lại tham số lát" (luật bộ sinh grit-contract §3.3, lỗ hổng #3 của M7)
             let mut pre = String::new();
             if has_slice && self.rng.chance(40) {
@@ -545,8 +724,12 @@ impl OGen {
                     "{w} ≔ ⎇ {ix} < al0.len() {{ xs[{ix}] }} ⇝ {{ {fb} }}; "
                 ));
             }
-            let body = format!("{pre}{}", self.stmts(&mut sc, 2, n, true));
-            let tail = self.expr(&sc, 2);
+            let body = format!("{pre}{}", self.stmts(&mut sc, 2, n, !id_tail));
+            let tail = if id_tail {
+                "p0".to_string()
+            } else {
+                self.expr(&sc, 2)
+            };
             src.push_str(&format!(
                 "ƒ {name}({}) → {t} ! ∅{ctr} {{ {body}{tail} }}\n",
                 params.join(", ")
@@ -555,6 +738,7 @@ impl OGen {
                 name,
                 params: np,
                 has_slice,
+                pre_range,
             });
         }
         let entry_params = 3;
@@ -566,6 +750,30 @@ impl OGen {
             slices: Vec::new(),
         };
         let params: Vec<String> = pn.iter().map(|p| format!("{p}: {t}")).collect();
+        // tiền điều kiện của `entry`: bộ chạy CHỈ cấp đầu vào thoả nó (không ai kiểm `⊳` của `entry`), kể cả các biên của nó
+        let mut ranges = vec![(self.ty.min(), self.ty.max()); entry_params];
+        let mut entry_pre = String::new();
+        if self.rng.chance(65) {
+            let b = self.ty.boundary();
+            let mut conj: Vec<String> = Vec::new();
+            for (k, r) in ranges.iter_mut().enumerate() {
+                if self.rng.chance(80) {
+                    let lo = b[self.rng.below(b.len() as u64) as usize];
+                    let span = 1 + self.rng.below(40) as i128;
+                    let hi = (lo + span).min(self.ty.max());
+                    *r = (lo, hi);
+                    conj.push(format!(
+                        "a{k} >= {} ∧ a{k} <= {}",
+                        self.ty.lit(lo),
+                        self.ty.lit(hi)
+                    ));
+                }
+            }
+            if !conj.is_empty() {
+                self.stats.pre += 1;
+                entry_pre = format!(" ⊳ {}", conj.join(" ∧ "));
+            }
+        }
         let n = 3 + self.rng.below(4) as usize;
         // gọi MỌI hàm phụ ngay đầu (trước các phép có thể abort), trên mảng `ar0` của đầu vào: để mọi hàm đều được chạy
         let mut calls = format!("ar0 ≔ [{}]; ", pn.join(", "));
@@ -579,13 +787,14 @@ impl OGen {
         let body = format!("{calls}{}", self.stmts(&mut sc, 3, n, true));
         let tail = self.expr(&sc, 3);
         src.push_str(&format!(
-            "ƒ entry({}) → {t} ! ∅ {{ {body}{tail} }}\n",
+            "ƒ entry({}) → {t} ! ∅{entry_pre} {{ {body}{tail} }}\n",
             params.join(", ")
         ));
         Prog {
             src,
             ty: self.ty,
             entry_params,
+            entry_ranges: ranges,
         }
     }
 }

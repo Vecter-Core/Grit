@@ -195,17 +195,88 @@ fn negation_casts_and_comparisons_feed_later_obligations() {
             "overflow:d",
         ),
         // ∧ / ∨
-        // `∧`/`∨` được hạ thành luồng điều khiển rồi hợp lại: quan hệ của cả điều kiện ghép chưa được dùng (sound, chưa đầy đủ)
+        // điều kiện ghép được hạ THẲNG thành nhánh (M5-fix 2026-10-08): nhánh "đúng" của `∧` biết cả hai vế
         (
             "ƒ f(x: u8) → u8 ! ∅ { ⎇ x >= 10 ∧ x < 20 { x - 10 } ⇝ { 0 } }",
+            "overflow:x",
+        ),
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ x >= 10 ∧ x < 20 { x + 235 } ⇝ { 0 } }",
+            "overflow:x",
+        ),
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ x >= 10 ∧ x < 20 { x + 237 } ⇝ { 0 } }",
+            "overflow:g",
+        ),
+        // nhánh "sai" của `∧` chỉ biết ¬a ∨ ¬b (không suy ra gì chắc chắn)
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ x >= 10 ∧ x < 20 { 0 } ⇝ { x - 10 } }",
             "overflow:g",
         ),
         (
             "ƒ f(x: u8) → u8 ! ∅ { ⎇ x >= 10 ∨ x < 20 { x - 10 } ⇝ { 0 } }",
             "overflow:g",
         ),
+        // nhánh "sai" của `∨` biết ¬a ∧ ¬b
         (
             "ƒ f(x: u8) → u8 ! ∅ { ⎇ x < 10 ∨ x >= 20 { 0 } ⇝ { x - 10 } }",
+            "overflow:x",
+        ),
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ x < 10 ∨ x >= 20 { 0 } ⇝ { x + 235 } }",
+            "overflow:x",
+        ),
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ x < 10 ∨ x >= 20 { 0 } ⇝ { x + 237 } }",
+            "overflow:g",
+        ),
+        // ¬(a ∧ b) ≡ ¬a ∨ ¬b: nhánh sai biết a ∧ b
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ ¬(x >= 10 ∧ x < 20) { 0 } ⇝ { x - 10 } }",
+            "overflow:x",
+        ),
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ ¬(x >= 10 ∧ x < 20) { x - 10 } ⇝ { 0 } }",
+            "overflow:g",
+        ),
+        // lồng nhau
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ (x >= 10 ∧ x < 20) ∧ x != 15 { x - 10 } ⇝ { 0 } }",
+            "overflow:x",
+        ),
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ x < 5 ∨ (x >= 10 ∧ x < 20) { 0 } ⇝ { x - 5 } }",
+            "overflow:x",
+        ),
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { ⎇ (x < 5 ∨ x >= 20) ∨ x == 7 { 0 } ⇝ { x - 5 } }",
+            "overflow:x",
+        ),
+        // vế phải chỉ được đánh giá khi vế trái đúng/sai (ngắn mạch): nghĩa vụ ở vế phải dùng kết quả vế trái
+        (
+            "ƒ f(xs: &[u8], i: usize) → u8 ! ∅ { ⎇ i < xs.len() ∧ xs[i] > 3 { 1 } ⇝ { 0 } }",
+            "index:x",
+        ),
+        (
+            "ƒ f(xs: &[u8], i: usize) → u8 ! ∅ { ⎇ i >= xs.len() ∨ xs[i] > 3 { 1 } ⇝ { 0 } }",
+            "index:x",
+        ),
+        (
+            "ƒ f(xs: &[u8], i: usize) → u8 ! ∅ { ⎇ i < xs.len() ∨ xs[i] > 3 { 1 } ⇝ { 0 } }",
+            "index:d",
+        ),
+        (
+            "ƒ f(xs: &[u8], i: usize) → u8 ! ∅ { ⎇ i >= xs.len() ∧ xs[i] > 3 { 1 } ⇝ { 0 } }",
+            "index:d",
+        ),
+        // vòng lặp có điều kiện ghép
+        (
+            "ƒ f(xs: &[u8]) → usize ! ∅ { μi ≔ 0; ⟳ i < xs.len() ∧ xs[i] > 0 ↓ xs.len() - i { i ← i + 1; } i }",
+            "index:x,overflow:x",
+        ),
+        // dùng điều kiện như GIÁ TRỊ vẫn hạ như cũ (không refine)
+        (
+            "ƒ f(x: u8) → u8 ! ∅ { c ≔ x >= 10 ∧ x < 20; ⎇ c { x - 10 } ⇝ { 0 } }",
             "overflow:g",
         ),
     ]);

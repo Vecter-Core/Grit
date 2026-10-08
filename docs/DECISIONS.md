@@ -612,6 +612,8 @@ Giang chỉ có bản tóm tắt ADR-025; tôi đối chiếu từng điểm v�
 
 **Quy trình đột biến (lệnh Giang 2026-10-08):** 1 worker, opt-level 0 cho `gt-oblig` khi chạy bộ test nhỏ (`GRIT_MUT_NO_OPT=1`), `GRIT_MUT_LINES` để chạy lại theo dòng, kết quả ghi nối sau từng mẫu.
 
+**Bổ sung §13 (2026-10-08) — ngưỡng "chạy tới cuối hàm":** oracle đo thêm, theo từng loại nghĩa vụ, SỐ CHECK BỊ XOÁ mà ít nhất một lần chạy kết thúc bình thường sau khi chạy qua nó (đoạn code sau check đã chạy tới cuối hàm). **Ngưỡng ≥ 100 mỗi loại**; lý do: một check bị xoá nhầm chỉ lộ ra khi đoạn code sau nó chạy (nếu lần chạy abort sớm ở chỗ khác thì xoá nhầm không quan sát được) và 100 là cỡ đủ để loại bỏ trường hợp một-hai chương trình may mắn, vẫn đạt được với bộ sinh hiện có. Loại nào dưới ngưỡng thì CHƯA được tính là đã kiểm (test đỏ). `FULL_PROGRAMS` nâng 1 500 → 2 000. Tỉ lệ lần chạy kết thúc bình thường: 8,4% → 29,9% sau khi thêm chế độ "nghiêm" của bộ sinh (số liệu PROGRESS).
+
 ## ADR-026 — M8: hiệu ứng, điều kiện dừng, đa luồng (DỰ THẢO viết TRƯỚC khi code, 2026-10-08; CHỜ GIANG DUYỆT — chưa có dòng mã M8 nào)
 
 ### 0. Điều kiện xuất phát (nói thẳng)

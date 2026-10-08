@@ -1,0 +1,10 @@
+fn main::both: nghĩa vụ 1 | xoá 1 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 1 → 0
+  main::both#0 overflow       bb1   xoá (interval+zone)
+fn main::either: nghĩa vụ 1 | xoá 1 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 1 → 0
+  main::either#0 overflow       bb2   xoá (interval+zone)
+fn main::guard_then_index: nghĩa vụ 1 | xoá 1 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 1 → 0
+  main::guard_then_index#0 index          bb4   xoá (interval+zone)
+fn main::scan: nghĩa vụ 2 | xoá 2 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 2 → 0
+  main::scan#0 index          bb4   xoá (interval+zone)
+  main::scan#1 overflow       bb2   xoá (interval+zone)
+-- tổng: nghĩa vụ 5 | xoá 5 | giữ 0 | ĐỎ 0 | e0902 0 | Assert 5 → 0

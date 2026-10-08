@@ -1,0 +1,14 @@
+fn main::and_if: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::or_if: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::not_and: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::nested: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::implies_if: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::while_and: nghĩa vụ 1 | xoá 1 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 1 → 0
+  main::while_and#0 overflow       bb2   xoá (interval+zone)
+fn main::as_value: nghĩa vụ 0 | xoá 0 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 0 → 0
+fn main::with_effects: nghĩa vụ 4 | xoá 4 | giữ lúc chạy 0 | ĐỎ 0 | e0902 0 | Assert 4 → 0
+  main::with_effects#0 div_zero       bb0   xoá (interval+zone)
+  main::with_effects#1 div_overflow   bb5   xoá (interval+zone)
+  main::with_effects#2 rem_zero       bb4   xoá (interval+zone)
+  main::with_effects#3 div_overflow   bb7   xoá (interval+zone)
+-- tổng: nghĩa vụ 5 | xoá 5 | giữ 0 | ĐỎ 0 | e0902 0 | Assert 5 → 0

@@ -405,3 +405,33 @@ Thông dịch MIR có theo dõi khoản vay/move/Arena, độc lập với mã p
 - **Dung lượng:** `target/` 1,2 GB, `.git/` 3,0 MB.
 - **Cổng chạy MỘT lần ở cuối (kết quả thật, `tools/gate.sh`, ~19 phút với `CARGO_BUILD_JOBS=2 --test-threads=2`):** fmt sạch; clippy `-D warnings` exit 0 (lần chạy đầu đỏ vì 4 lỗi clippy — đã sửa rồi chạy lại); `cargo audit` exit 0; `cargo test --workspace` **576 passed, 0 failed**; check_expectations OK; test script OK.
 - **Lịch sử trung thực:** 6 commit giữa chừng ghi "chưa chạy cổng đầy đủ"; commit này là lần đầu cổng đầy đủ chạy sau chúng.
+
+## M7-sau-duyệt (2026-10-08) — M5-fix điều kiện ghép, đo tỉ lệ chạy tới cuối hàm của oracle, điểm mù của oracle
+### 1. M5-fix: lower boolean conditions directly to branches (commit riêng `8b2d020`)
+- Điều kiện của `⎇` và `⟳` có `∧ ∨ ⇒ ¬` (lồng nhau) hạ THẲNG thành nhánh; điều kiện đơn và điều kiện dùng làm giá trị hạ như cũ. Thứ tự đánh giá/ngắn mạch giữ nguyên (semantics §3a): vế trái đầy đủ trước, vế phải chỉ khi cần.
+- **Golden cũ KHÔNG đổi** (không golden nào có điều kiện ghép trong `⎇`/`⟳`); golden mới: `tests/golden/mir/conditions` (and/or/not-and/lồng/`⇒`/`⟳ ∧`/dùng làm giá trị/có tác dụng phụ ở vế trái), đọc tay từng nhánh. Golden obligations mới: `compound_conditions`, `conditions`.
+- Kiểm (chỉ các test đó, không cổng đầy đủ, không đột biến): `gt-mir` (corpus, golden, semantics — thông dịch MIR vs bộ đánh giá AST độc lập trên 400 chương trình ngẫu nhiên CÓ điều kiện ghép), `gt-borrowck` (corpus, soundness, diag_snapshot, oracle động M6), `gt-dataflow`: 79 passed. Bơm lỗi (đảo nhánh "đúng" của `∨`) thì `semantics.rs` tự bắt. Bộ sinh M7 (`obgen`) nay sinh cả `⟳ i < lim ∧ <cond>` (555/2000 chương trình có vòng điều kiện ghép).
+- Kết quả cho bộ giải (`tests/decisions.rs`): sau `⎇ x >= 10 ∧ x < 20` biết cả hai vế; nhánh sai của `∨` biết `¬a ∧ ¬b`; `⎇ i < xs.len() ∧ xs[i] > 3` xoá check chỉ số ở vế phải; `⟳ i < xs.len() ∧ xs[i] > 0` xoá cả chỉ số và `i + 1`. Điều kiện dùng làm GIÁ TRỊ vẫn chưa refine (đã ghi KNOWN_LIMITATIONS).
+### 2. Oracle mức chương trình: tỉ lệ chạy tới cuối hàm (2 000 chương trình × 24 đầu vào = 48 000 lần chạy)
+- **Trước khi chỉnh bộ sinh:** 3 034/36 000 = **8,4%** lần chạy kết thúc bình thường (91,6% abort sớm; ví dụ trước đó 12 114/14 217 ở bản đầu). Lý do: ép kiểu hẹp, phép số học, chỉ số, tiền điều kiện của hàm phụ gần như luôn abort sớm.
+- **Sau khi chỉnh bộ sinh** (chế độ "nghiêm" 37% chương trình: mọi phép có nghĩa vụ được bọc trong bảo vệ vừa chứng minh được vừa ĐÚNG lúc chạy; vòng ngắn; `entry` có `⊳` với đầu vào luôn thoả nó kể cả các biên; đối số hàm phụ thoả `⊳` của nó 75%; mẫu "trả nguyên tham số" với `⊲ result ⋈ p0`): **14 367/48 000 = 29,9%** kết thúc bình thường; so sánh 47 539 lần, 0 bất đồng; bỏ 461 (hết nhiên liệu).
+- **Theo từng loại nghĩa vụ** (lần thực thi trong lần chạy bình thường : trong lần chạy abort; số check BỊ XOÁ mà đoạn sau chạy tới cuối hàm):
+| loại | bình thường | abort | check xoá chạy tới cuối hàm |
+|---|---|---|---|
+| overflow.Add | 959 134 | 19 705 016 | 1 005 |
+| overflow.Sub | 456 120 | 1 733 440 | 703 |
+| overflow.Mul | 22 097 | 1 357 052 | 583 |
+| overflow.Div | 6 045 | 10 210 | 147 |
+| overflow.Rem | 6 285 | 466 843 | 163 |
+| neg_min | 9 107 | 10 987 | 238 |
+| div_zero | 28 670 | 413 023 | 580 |
+| rem_zero | 22 521 | 1 006 977 | 580 |
+| index | 13 767 | 65 048 | 401 |
+| cast_lossy | 67 757 | 3 428 200 | 2 016 |
+| slice_range | 30 582 | 43 074 | 1 495 |
+| invariant | 468 764 | 11 133 123 | 203 |
+| pre, post | (không có vết Assert) | | ≥ 100 (đếm theo chương trình có ≥ 1 lần chạy bình thường) |
+- **Ngưỡng:** mỗi loại ≥ 100 check bị xoá mà đoạn sau chạy tới cuối hàm (hằng `END_THRESHOLD` trong `oracle.rs`); dưới ngưỡng thì test ĐỎ ("chưa được tính là đã kiểm"). Lúc đầu 7/13 loại dưới ngưỡng (invariant 17, neg_min 46, Add 87, Div 41, pre 65, post 33…) — là lý do phải chỉnh bộ sinh.
+- Kiểm "tắt bản sửa" #3 sau khi đổi bộ sinh: oracle vẫn bắt ở chương trình #346 (Bug: đọc ngoài biên không có assert).
+### 3. Điểm mù của oracle
+Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITATIONS.md` (mục "những gì oracle không quan sát được"). Lỗ hổng #4 là ví dụ: oracle không thể quan sát (chương trình bị E0902), nên chỉ `tests/decisions2.rs` giết được.

@@ -1,0 +1,4 @@
+ƒ both(x: u8) → u8 ! ∅ { ⎇ x >= 10 ∧ x < 20 { x - 10 } ⇝ { 0 } }
+ƒ either(x: u8) → u8 ! ∅ { ⎇ x < 10 ∨ x >= 20 { 0 } ⇝ { x - 10 } }
+ƒ guard_then_index(xs: &[u8], i: usize) → u8 ! ∅ { ⎇ i < xs.len() ∧ xs[i] > 3 { 1 } ⇝ { 0 } }
+ƒ scan(xs: &[u8]) → usize ! ∅ { μi ≔ 0; ⟳ i < xs.len() ∧ xs[i] > 0 ↓ xs.len() - i { i ← i + 1; } i }
