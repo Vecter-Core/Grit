@@ -56,10 +56,13 @@ pub const PRELUDE: &str = "\
 ƒ look(r: &i32) ! ∅ { use_i(*r); }
 ▢ Cl1<'a> { c: &'a Cell<&'a i32> }
 ƒ putc<'a>(cl: Cl1<'a>, v: &'a i32) ! ∅ { cl.c.set(v); }
+#level(\"1\")
+▢ Lk { }
+ƒ rd(v: &!&i32, n: u32) → i32 ! ∅ { **v }
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
-pub const KINDS: [&str; 11] = [
+pub const KINDS: [&str; 13] = [
     "move",
     "reborrow",
     "borrow_in_loop",
@@ -71,6 +74,8 @@ pub const KINDS: [&str; 11] = [
     "ref_flow",
     "adt_invariant",
     "interior_mut",
+    "interior_mut_mutex",
+    "interior_mut_atomic",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -260,14 +265,14 @@ impl Gen {
         match self.rng.below(100) {
             0..=16 => self.int_borrow(),
             17..=28 => self.reborrow(),
-            29..=44 => self.moves(),
-            45..=52 => self.partial_move_nested(),
-            53..=62 => self.match_scenario(),
-            63..=73 => self.arena(),
-            74..=83 => self.calls(),
-            84..=87 => self.holder(),
-            88..=92 => self.slot(),
-            93..=96 => self.interior_mut(),
+            29..=36 => self.moves(),
+            37..=44 => self.partial_move_nested(),
+            45..=54 => self.match_scenario(),
+            55..=65 => self.arena(),
+            66..=75 => self.calls(),
+            76..=79 => self.holder(),
+            80..=85 => self.slot(),
+            86..=94 => self.interior_mut(),
             _ => self.flow(),
         }
     }
@@ -395,7 +400,11 @@ impl Gen {
         let cell = self.fresh("cell");
         let h = self.fresh("h");
         let (kz, ky) = (self.k(), self.k());
-        let via = self.rng.below(6);
+        // 20% Cell, 40% Mutex thật, 40% Atomic thật (đủ để mỗi loại vượt ngưỡng độ phủ)
+        let via = self.rng.below(20);
+        if via >= 4 {
+            return self.interior_mut_sync(via >= 12);
+        }
         let mut out = vec![
             raw(format!("μ{z} ≔ {kz};")),
             raw(format!("{cell} ≔ Cell::new(&{z});")),
@@ -434,6 +443,53 @@ impl Gen {
         }
         if self.rng.chance(70) {
             out.push(raw(format!("use_i(*{cell}.get());")));
+        }
+        out
+    }
+
+    /// Biến thể `Mutex`/`Atomic` THẬT của kịch bản `interior_mut`: một ổ/khoá/nguyên tử bên ngoài rồi (có thể) gán/mượn thứ chết ngắn hơn vào nó
+    /// trong khối, sau đó đọc qua `with`/`load` sau khi khối kết thúc. Tham chiếu không thể lọt vào `Mutex` qua `with` (đối số phải `Send`) nên
+    /// nguy cơ ở đây là gán cả khoá/mượn `&Atomic` tới thứ chết.
+    fn interior_mut_sync(&mut self, atomic: bool) -> Vec<St> {
+        let z = self.fresh("z");
+        let y = self.fresh("y");
+        let m = self.fresh("m");
+        self.tags.insert("interior_mut");
+        self.tags.insert(if atomic {
+            "interior_mut_atomic"
+        } else {
+            "interior_mut_mutex"
+        });
+        let (kz, ky) = (self.k(), self.k());
+        let mut out = Vec::new();
+        let (inner, user) = if atomic {
+            out.push(raw(format!("{z} ≔ Atomic::new({kz}u32);")));
+            out.push(raw(format!("μ{m} ≔ &{z};")));
+            (
+                vec![
+                    raw(format!("{y} ≔ Atomic::new({ky}u32);")),
+                    raw(format!("{m} ← &{y};")),
+                ],
+                format!("{m}.fetch_add(1u32, Ordering::SeqCst);"),
+            )
+        } else {
+            out.push(raw(format!("μ{z} ≔ {kz};")));
+            out.push(raw(format!("μ{m}: Mutex<&i32, Lk> ≔ Mutex::new(&{z});")));
+            (
+                vec![
+                    raw(format!("{y} ≔ {ky};")),
+                    raw(format!("{m} ← Mutex::new(&{y});")),
+                ],
+                format!("use_i({m}.with(rd, 0u32));"),
+            )
+        };
+        if self.rng.chance(65) {
+            out.push(St::Block(inner));
+        } else {
+            out.extend(inner);
+        }
+        if self.rng.chance(70) {
+            out.push(raw(user));
         }
         out
     }

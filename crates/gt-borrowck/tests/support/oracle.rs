@@ -753,37 +753,66 @@ impl<'a> Oracle<'a> {
             self.stats.arena_resets += 1;
             return Ok(V::Unit);
         }
-        // `Cell<T>` (lang `cell`, mutability bên trong; công cụ test, NGOÀI TCB): `set` ghi qua `&self` mà KHÔNG làm vô hiệu khoản vay chung khác
-        if key.contains("Cell") && key.ends_with("::new") {
-            let v = args
-                .pop()
-                .ok_or(Flow::Bug("Cell::new thiếu đối số".into()))?;
+        // Lang item MUTABILITY BÊN TRONG (`Cell`, `Mutex`, `Atomic`; công cụ test, NGOÀI TCB, tuần tự): ghi qua `&self` mà KHÔNG làm vô hiệu
+        // khoản vay chung khác. Ngữ nghĩa này không phải bằng chứng cho codegen (ADR-027 §1).
+        let cell_like = key.contains("Cell") || key.contains("Mutex") || key.contains("Atomic");
+        if cell_like && key.ends_with("::new") {
+            let v = args.pop().ok_or(Flow::Bug("new thiếu đối số".into()))?;
             return Ok(V::Adt(0, vec![v]));
         }
-        if key.contains("Cell") && (key.ends_with("::set") || key.ends_with("::get")) {
-            let is_set = key.ends_with("::set");
-            let x = if is_set {
-                Some(
-                    args.pop()
-                        .ok_or(Flow::Bug("Cell::set thiếu đối số".into()))?,
-                )
-            } else {
-                None
-            };
+        let m = key.rsplit("::").next().unwrap_or("");
+        if cell_like
+            && matches!(
+                m,
+                "set" | "get" | "load" | "store" | "swap" | "fetch_add" | "fetch_sub" | "with"
+            )
+        {
+            // args = [người nhận, các đối số…]
+            let rest: Vec<V> = args.split_off(1);
             let Some(V::Ref(cr)) = args.pop() else {
-                return bug("Cell: người nhận không phải tham chiếu");
+                return bug("lang item: người nhận không phải tham chiếu");
             };
             self.use_loan(cr.loan)?;
             self.access(&cr.loc, AK::Read, Some(cr.loan))?;
             let mut loc = cr.loc.clone();
             loc.path.push(Step::Field(0));
             self.stats.cell_ops += 1;
-            return match x {
-                Some(x) => {
-                    self.set(&loc, x)?;
-                    Ok(V::Unit)
+            let cur = self.get(&loc)?;
+            return match m {
+                "get" | "load" => Ok(cur),
+                "set" | "store" | "swap" => {
+                    let v = rest
+                        .first()
+                        .cloned()
+                        .ok_or(Flow::Bug("thiếu giá trị".into()))?;
+                    self.set(&loc, v)?;
+                    Ok(if m == "swap" { cur } else { V::Unit })
                 }
-                None => self.get(&loc),
+                "fetch_add" | "fetch_sub" => {
+                    let (V::Int(a, t), Some(V::Int(b, _))) = (&cur, rest.first()) else {
+                        return bug("fetch_add/sub trên giá trị không nguyên");
+                    };
+                    let nv = wrap(if m == "fetch_sub" { a - b } else { a + b }, *t);
+                    self.set(&loc, V::Int(nv, *t))?;
+                    Ok(cur)
+                }
+                _ => {
+                    // `Mutex::with(&self, f, a)`: chạy `f(&!inner, a)` tại chỗ; `&!` mới là CON của khoản vay trên ổ
+                    let (Some(V::Fn(fnode)), Some(arg)) = (rest.first(), rest.get(1)) else {
+                        return bug("with: thiếu hàm hoặc đối số");
+                    };
+                    let Some(cb) = self.mir.bodies.iter().find(|x| x.node == *fnode) else {
+                        return bug("with: không có thân MIR của hàm");
+                    };
+                    let loan = self.new_loan(true, loc.clone(), Some(cr.loan), false);
+                    match self.run(cb, vec![V::Ref(RefV { loc, loan }), arg.clone()]) {
+                        Outcome::Value(v) => Ok(v),
+                        Outcome::Abort(k) => Err(Flow::Abort(k)),
+                        Outcome::Violation(v) => Err(Flow::Viol(v)),
+                        Outcome::Bug(b) => Err(Flow::Bug(b)),
+                        Outcome::OutOfFuel => Err(Flow::Fuel),
+                    }
+                }
             };
         }
         bug(format!("không có thân MIR cho {key}"))

@@ -476,3 +476,8 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - Kích thước: `target/` 1,8 GB, `.git/` 2,1 MB.
 - ADR-028 (M9) viết xong, DỰ THẢO chờ duyệt (Q53–Q58).
 - **GT_FULL8=1 (vét cạn 8 bit HOÀN TOÀN, chạy một lần khi máy rảnh): XANH** — `gt-oblig/tests/exhaustive.rs` 4 test pass, 665,9 s (~11 phút).
+
+## M8 bổ sung (2026-10-09): kịch bản interior_mut với Mutex/Atomic thật
+- Oracle động của borrowck hiểu `Mutex::new/with` và `Atomic::*`; bộ sinh thêm `interior_mut_mutex` (40%) và `interior_mut_atomic` (40%) trong kịch bản; KINDS 11 → 13; tỉ trọng kịch bản cân lại (`moves` 16% → 8%, `interior_mut` 4% → 9%, `slot` 5% → 6%) để mọi loại vượt ngưỡng 300.
+- Độ phủ 20 000 chương trình: interior_mut 3 700/1 194/2 415; mutex 1 561/510/1 033; atomic 1 523/474/1 031 (tổng/chấp nhận+sạch/vi phạm); 0 âm tính giả; dương tính giả 4,41%.
+- Tắt bản sửa: cả nhóm ⇒ 24 âm tính giả (bắt được); chỉ Mutex/Atomic ⇒ 0 (nói thẳng ở ADR-027 §0). Đo hướng 361/591/554: giống hệt bản gốc (0 / 127); đều CHẶT hơn theo mã.
