@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Memory ordering của atomics (M8 nửa 2, ADR-027 §4): E0503.
 //!
 //! Mọi thao tác của `Atomic<T>` nhận `Ordering` TƯỜNG MINH (không tham số mặc định ⇒ thiếu là lỗi arity thường). Ở đây kiểm:

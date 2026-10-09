@@ -3,7 +3,7 @@
 mod common;
 use gt_oblig::driver::build_prog_info;
 use gt_oblig::prover::ZoneProver;
-use gt_oblig::termination::check_termination;
+use gt_term::check_termination;
 
 fn codes(src: &str) -> Vec<String> {
     let (t, m) = common::mir(src);

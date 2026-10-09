@@ -25,6 +25,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "gt-conc"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-mir",
+ "gt-parser",
+ "gt-resolve",
+ "gt-span",
+ "gt-types",
+]
+
+[[package]]
 name = "gt-dataflow"
 version = "0.1.0"
 dependencies = [
@@ -43,6 +56,19 @@ version = "0.1.0"
 dependencies = [
  "gt-span",
  "serde_json",
+]
+
+[[package]]
+name = "gt-effects"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-mir",
+ "gt-parser",
+ "gt-resolve",
+ "gt-span",
+ "gt-types",
 ]
 
 [[package]]
@@ -124,6 +150,22 @@ version = "0.1.0"
 [[package]]
 name = "gt-stack"
 version = "0.1.0"
+
+[[package]]
+name = "gt-term"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-conc",
+ "gt-diag",
+ "gt-effects",
+ "gt-mir",
+ "gt-oblig",
+ "gt-parser",
+ "gt-resolve",
+ "gt-span",
+ "gt-types",
+]
 
 [[package]]
 name = "gt-types"

@@ -1,0 +1,25 @@
+[package]
+name = "gt-term"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Grit: điều kiện dừng (M8, ADR-026) — biến thể vòng lặp/đệ quy, E0701/E0702/E0703; dùng bộ giải của gt-oblig"
+
+[dependencies]
+gt-span = { path = "../gt-span" }
+gt-ast = { path = "../gt-ast" }
+gt-diag = { path = "../gt-diag" }
+gt-resolve = { path = "../gt-resolve" }
+gt-types = { path = "../gt-types" }
+gt-mir = { path = "../gt-mir" }
+gt-oblig = { path = "../gt-oblig" }
+
+[dev-dependencies]
+gt-parser = { path = "../gt-parser" }
+gt-diag = { path = "../gt-diag" }
+gt-effects = { path = "../gt-effects" }
+gt-conc = { path = "../gt-conc" }
+
+[lints]
+workspace = true

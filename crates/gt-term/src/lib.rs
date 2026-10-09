@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Điều kiện dừng (M8 nửa 1, ADR-026 §2; semantics §21): E0701 (vòng lặp thiếu/không suy ra được biến thể, vòng vô hạn thiếu `div`),
 //! E0702 (`↓` không giảm nghiêm ngặt hoặc không bị chặn dưới), E0703 (đệ quy thiếu `↓`/`div`). KHÔNG có đường hạ runtime (D25):
 //! không chứng minh được thì ĐỎ.
@@ -7,14 +8,14 @@
 //! tại MỖI cạnh lùi phải chứng minh `v(x) < v(g)` và `0 ≤ v(g)` bằng chính bộ giải của M7 (`Prover`, cùng bộ vét cạn kiểm chứng).
 //! `⟳ x in a..b` / `⟳ x in &xs` hữu hạn và tự giảm nên không cần biến thể. Đệ quy: SCC của đồ thị gọi; mỗi hàm trong SCC đệ quy cần
 //! `↓` (hoặc `div`) và mỗi lời gọi trong SCC phải thoả `v_callee(đối số) < v_caller(tham số)` và `0 ≤ v_callee(đối số)`.
-use crate::analysis::{BodyReport, LEN_BASE, LoopSpec, ProgInfo, Status, analyze_body};
-use crate::ir::{ObKind, Prover, Term, VarId};
 use gt_ast::{
     BinaryOp, ContractKind, Expr, ExprKind, FieldName, FnItem, Item, ItemKind, LitKind, NodeId,
     UnaryOp,
 };
 use gt_diag::{Code, Diagnostic, Diagnostics, Report};
 use gt_mir::{Body, BodyKind, Callee, Local, LocalKind, LoopShape, MirOutput, TerminatorKind};
+use gt_oblig::analysis::{BodyReport, LEN_BASE, LoopSpec, ProgInfo, Status, analyze_body};
+use gt_oblig::ir::{ObKind, Prover, Term, VarId};
 use gt_resolve::Res;
 use gt_span::Span;
 use gt_types::TypesOutput;

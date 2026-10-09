@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Hiệu ứng (M8 nửa 1, ADR-026 §1; semantics §4): "khai báo ⊇ suy ra".
 //!
 //! Suy ra cho mỗi thân hàm = hợp của (a) hiệu ứng KHAI BÁO của mọi hàm được gọi — gọi trực tiếp (`Callee::Fn`), qua giá trị hàm
@@ -173,8 +174,6 @@ pub fn check_effects(t: &TypesOutput, m: &MirOutput) -> EffectsOutput {
             }
         }
     }
-
-    crate::ordering::check_orderings(t, m, &mut bag);
 
     EffectsOutput {
         report: bag.finish(),
