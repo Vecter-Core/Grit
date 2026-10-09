@@ -1,0 +1,3 @@
+// expect: fail E1001
+// note: kiểu trả về con trỏ thô nằm ngoài ⚠ (Q13)
+ƒ f(p: usize) → *μ i32 ! ∅ { ⚠ { raw_read(p); }; f(p) }

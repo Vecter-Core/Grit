@@ -1,9 +1,8 @@
-//! Thông dịch MIR cỡ nhỏ — CÔNG CỤ TEST, không thuộc TCB (ADR-020 §9a). Phạm vi (§9c): số nguyên, bool, rẽ nhánh, vòng lặp,
+//! Thông dịch MIR cỡ nhỏ — BỘ CHẠY THAM CHIẾU, không thuộc TCB (ADR-020 §9a; ADR-028: backend `interpreter` của `gritc run` ở M9, M10 thay bằng binary LLVM). Phạm vi (§9c): số nguyên, bool, rẽ nhánh, vòng lặp,
 //! gọi hàm, struct/tuple/enum, tham chiếu tới chỗ. `Assert` sai ⇒ abort với loại nghĩa vụ (§9d). Đọc chỗ đã `StorageDead`
 //! hoặc chưa gán ⇒ lỗi của MIR (`Bug`), tới `Unreachable` ⇒ `Bug`.
-#![allow(dead_code)]
+use crate::*;
 use gt_ast::NodeId;
-use gt_mir::*;
 use gt_types::{IntTy, Ty};
 
 #[derive(Clone, Debug, PartialEq)]

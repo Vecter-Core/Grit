@@ -1,0 +1,4 @@
+// expect: pass
+// note: dữ liệu thường tới hàm io không bị cảnh báo
+ƒ log(x: u32) ! {io} { }
+ƒ f(n: u32) ! {io} { log(n); }

@@ -4,7 +4,7 @@
 mod common;
 mod support;
 use common::*;
-use support::interp::{Interp, Outcome, V};
+use gt_mir::interp::{Interp, Outcome, V};
 use support::progen::{Gen, Res, call, print};
 
 const PROGRAMS: u64 = 400;

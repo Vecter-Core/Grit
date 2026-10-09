@@ -1,0 +1,4 @@
+// expect: warn S202
+// note: giá trị sau declassify chảy tới hàm log io (kèm S201)
+ƒ log(x: u32) ! {io} { }
+ƒ f(s: Secret<u32>) ! {io} { log(s.declassify()); }

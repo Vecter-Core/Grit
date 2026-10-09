@@ -1,0 +1,4 @@
+// expect: fail E1401
+// note: ĐỎ không có cách tắt: #allow mã E… là lỗi
+#allow(E0601, "cố tắt lỗi đỏ")
+ƒ f() → u32 ! ∅ { 1u32 }

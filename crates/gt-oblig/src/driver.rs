@@ -29,6 +29,17 @@ pub struct Stats {
     pub asserts_before: usize,
     pub asserts_after: usize,
     pub literal_errors: usize,
+    /// số E1001 (`⚠` thiếu bằng chứng, con trỏ thô ngoài `⚠`)
+    pub unsafe_errors: usize,
+}
+
+/// Chế độ xử lý check (ADR-028 §2): `All` GIỮ mọi check (không xoá check nào, kể cả đã chứng minh; chèn cả kiểm hợp đồng đã chứng minh mà
+/// kiểm được lúc chạy) — MẶC ĐỊNH của `gritc` cho tới khi điều kiện đột biến "xoá thêm check" giải quyết; `Proven` xoá check đã chứng minh.
+/// Nghĩa vụ không chứng minh được và không kiểm được lúc chạy vẫn ĐỎ ở MỌI chế độ (D25).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Checks {
+    All,
+    Proven,
 }
 
 #[derive(Debug)]
@@ -113,6 +124,17 @@ pub fn analyze_program(
     m: &MirOutput,
     prover: &mut (dyn Prover + Send),
 ) -> OblOutput {
+    analyze_program_with(t, m, prover, Checks::Proven)
+}
+
+/// Như `analyze_program` nhưng chọn chế độ check (`Checks::All` giữ mọi check).
+#[must_use]
+pub fn analyze_program_with(
+    t: &TypesOutput,
+    m: &MirOutput,
+    prover: &mut (dyn Prover + Send),
+    mode: Checks,
+) -> OblOutput {
     let mut bag = Diagnostics::new(LIMIT);
     let mut stats = Stats::default();
     if !m.report.diagnostics.is_empty() {
@@ -122,6 +144,11 @@ pub fn analyze_program(
             per_body: Vec::new(),
             stats,
         };
+    }
+    // E1001: `⚠` thiếu bằng chứng và con trỏ thô ngoài `⚠` (D21, Q13) — độc lập với phân tích số
+    for d in crate::unsafe_check::check_unsafe(t, m) {
+        stats.unsafe_errors += 1;
+        bag.push(d);
     }
     let info = build_prog_info(t, m);
     let mut bodies = Vec::with_capacity(m.bodies.len());
@@ -252,11 +279,20 @@ pub fn analyze_program(
                 apply_insert(t, &mut ob, ins, &mut tails);
             }
         }
-        for blk in &rep.discharged_blocks {
-            if let Some(term) = ob.blocks[*blk as usize].terminator.as_mut()
-                && let TerminatorKind::Assert { target, .. } = &term.kind
-            {
-                term.kind = TerminatorKind::Goto(*target);
+        if mode == Checks::All {
+            // giữ mọi check: chèn thêm kiểm hợp đồng đã chứng minh mà kiểm được lúc chạy, KHÔNG xoá `Assert` nào
+            for j in &rep.judged {
+                if let Some(ins) = &j.proven_insert {
+                    apply_insert(t, &mut ob, ins, &mut tails);
+                }
+            }
+        } else {
+            for blk in &rep.discharged_blocks {
+                if let Some(term) = ob.blocks[*blk as usize].terminator.as_mut()
+                    && let TerminatorKind::Assert { target, .. } = &term.kind
+                {
+                    term.kind = TerminatorKind::Goto(*target);
+                }
             }
         }
         if let Err(errs) = gt_mir::validate::validate(&ob, &t.db) {

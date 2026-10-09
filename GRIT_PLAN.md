@@ -212,7 +212,7 @@ Số học: mặc định **kiểm tràn**. Toán tử tường minh: `+%` (qu�
 
 - **D16** Hệ thống mã: `E` + 4 số (ĐỎ), `S` + 3 số (VÀNG, bảo mật), `N` + 4 số (GHI CHÚ).
   - E01xx cú pháp · E02xx tên/module · E03xx kiểu · E04xx sở hữu/mượn · E05xx đa luồng · E06xx biên/trường hợp biên · E07xx điều kiện dừng · E08xx hiệu ứng/trạng thái · E09xx logic/Obligation · E10xx unsafe/bằng chứng · E11xx IR Guard · E12xx unicode/nguồn · E13xx định dạng (gt-fmt) · E99xx ICE.
-- **D17** Exit code: `0` = qua (có thể kèm VÀNG), `1` = có ĐỎ, `2` = ICE. **Cả 1 và 2 đều không sinh binary và không chạy.**
+- **D17** Exit code: `0` = qua (có thể kèm VÀNG), `1` = có ĐỎ, `2` = ICE. **Cả 1 và 2 đều không sinh binary và không chạy.** **Phân vùng mã thoát (Giang duyệt 2026-10-09, ADR-028 §3):** giai đoạn `check`/`build`/lỗi dùng: `0` qua, `1` ĐỎ (hoặc VÀNG khi `--deny-yellow`), `2` ICE (kể cả thiếu pass bắt buộc, pass panic), `3` lỗi dùng/I/O. Giai đoạn `run` (chương trình ĐÃ chạy): `0` chạy xong bình thường, `70` chương trình abort (D3), `71` bộ chạy tham chiếu hết giới hạn, `100+s` (s = 1..=100) trạng thái thoát do chính chương trình báo (dành riêng). Hai vùng KHÔNG chồng nhau nên "chương trình trả 1" không bao giờ lẫn với "gritc báo ĐỎ" (mã 1 chỉ do gritc ở giai đoạn check); mã thoát tuỳ ý của chương trình còn đi qua JSON (`phase`, `run.exit_status`). Mọi đầu ra ghi `backend` (M9: `"interpreter"`).
 - **D18** Lệnh gritc: `check`, `build`, `run`, `explain <mã>`, `fmt`, `--json` (schema có version, ổn định). Phase 2 thêm: `prove`, `recheck`, `serve`.
 - **D19** Báo **tất cả** lỗi (có giới hạn số lượng), thứ tự xác định.
 - **D20** Giới hạn solver theo **tài nguyên** (số bước/bộ nhớ), không theo giây.

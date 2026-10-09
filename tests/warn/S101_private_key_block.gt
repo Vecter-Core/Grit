@@ -1,0 +1,3 @@
+// expect: warn S101
+// note: khối khoá riêng PEM (GIẢ) trong literal chuỗi
+ƒ pem() → &str ! ∅ { k ≔ "-----BEGIN RSA PRIVATE KEY----- MIIEFAKE -----END RSA PRIVATE KEY-----"; k }

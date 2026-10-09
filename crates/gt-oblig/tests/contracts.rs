@@ -4,9 +4,9 @@ mod common;
 #[path = "../../gt-mir/tests/support/mod.rs"]
 mod support;
 use gt_mir::MirOutput;
+use gt_mir::interp::{Interp, Outcome, V};
 use gt_oblig::driver::{OblOutput, analyze_program};
 use gt_oblig::prover::ZoneProver;
-use support::interp::{Interp, Outcome, V};
 
 fn pipeline(src: &str) -> (gt_types::TypesOutput, MirOutput, OblOutput) {
     let (t, m) = common::mir(src);

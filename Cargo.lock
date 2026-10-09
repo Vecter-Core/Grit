@@ -59,6 +59,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "gt-driver"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-borrowck",
+ "gt-conc",
+ "gt-diag",
+ "gt-effects",
+ "gt-fmt",
+ "gt-mir",
+ "gt-oblig",
+ "gt-parser",
+ "gt-resolve",
+ "gt-secrets",
+ "gt-span",
+ "gt-stack",
+ "gt-term",
+ "gt-types",
+ "serde_json",
+]
+
+[[package]]
 name = "gt-effects"
 version = "0.1.0"
 dependencies = [
@@ -141,6 +163,20 @@ dependencies = [
  "gt-parser",
  "gt-span",
  "gt-stack",
+]
+
+[[package]]
+name = "gt-secrets"
+version = "0.1.0"
+dependencies = [
+ "gt-ast",
+ "gt-diag",
+ "gt-lexer",
+ "gt-mir",
+ "gt-parser",
+ "gt-resolve",
+ "gt-span",
+ "gt-types",
 ]
 
 [[package]]

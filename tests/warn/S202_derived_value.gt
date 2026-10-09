@@ -1,0 +1,4 @@
+// expect: warn S202
+// note: taint lan qua phép tính rồi tới io
+ƒ log(x: u32) ! {io} { }
+ƒ f(s: Secret<u32>) ! {io} { a ≔ s.declassify(); b ≔ a + 1; log(b); }

@@ -97,7 +97,9 @@ fn every_pass_case_has_no_obligation_errors() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
-const OWNED: &[&str] = &["E0601", "E0602", "E0603", "E0604", "E0901", "E0902"];
+const OWNED: &[&str] = &[
+    "E0601", "E0602", "E0603", "E0604", "E0901", "E0902", "E1001",
+];
 
 #[test]
 fn fail_cases_of_m7_give_exactly_their_code() {

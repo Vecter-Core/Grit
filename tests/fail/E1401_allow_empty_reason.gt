@@ -1,0 +1,4 @@
+// expect: fail E1401
+// note: lý do rỗng (chỉ khoảng trắng) không được
+#allow(S101, "  ")
+ƒ f() → u32 ! ∅ { 1u32 }

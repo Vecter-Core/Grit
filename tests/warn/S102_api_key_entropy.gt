@@ -1,0 +1,3 @@
+// expect: warn S102
+// note: literal entropy cao gán cho tên gợi ý secret (api_key)
+ƒ f() → &str ! ∅ { api_key ≔ "x8F3kQ9zLp2Vw7Rm"; api_key }

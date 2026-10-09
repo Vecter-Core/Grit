@@ -58,6 +58,7 @@ pub const PRELUDE_SRC: &str = "\
 ƒ shl(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
 ƒ shr(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
 ▢ Secret<T> { v: T }
+⊐ <T> Secret<T> { ƒ declassify(self) → T ! ∅ { } }
 ▢ Cap<T> { v: T }
 ▢ Fs { x: i32 }
 ▢ Net { x: i32 }

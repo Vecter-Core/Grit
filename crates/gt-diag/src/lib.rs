@@ -11,6 +11,6 @@ mod report;
 pub use code::{Code, CodeError, Level, known_codes};
 pub use diag::{Applicability, Diagnostic, Edit, Label, Suggestion};
 pub use edit::{EditError, apply_edits};
-pub use json::{SCHEMA_VERSION, diagnostic_to_json};
+pub use json::{SCHEMA_VERSION, diagnostic_to_json, json_string};
 pub use render::{RenderOptions, render_human, render_human_files};
 pub use report::{Diagnostics, Report};

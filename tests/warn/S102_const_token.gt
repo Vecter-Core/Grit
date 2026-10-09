@@ -1,0 +1,4 @@
+// expect: warn S102
+// note: hằng cấp module tên gợi ý secret
+□ API_TOKEN: &str ≔ "x8F3kQ9zLp2Vw7RmZ";
+ƒ f() → u32 ! ∅ { 1u32 }

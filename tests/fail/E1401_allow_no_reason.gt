@@ -1,0 +1,4 @@
+// expect: fail E1401
+// note: #allow bắt buộc có lý do không rỗng
+#allow(S101)
+ƒ f() → &str ! ∅ { k ≔ "AKIAIOSFODNN7EXAMPLE"; k }

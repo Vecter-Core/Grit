@@ -132,10 +132,25 @@ fn write_diagnostic(d: &Diagnostic, files: &[&SourceFile], out: &mut String) {
     out.push('}');
 }
 
+/// Chuỗi JSON (có dấu nháy, đã thoát) — cho bên dựng thêm trường mở rộng ở `Report::to_json_with`.
+#[must_use]
+pub fn json_string(s: &str) -> String {
+    let mut out = String::new();
+    esc(s, &mut out);
+    out
+}
+
 impl Report {
     /// JSON đầy đủ (`schema_version` 1). `files`: các tệp nguồn để quy offset ra dòng/cột.
     #[must_use]
     pub fn to_json(&self, files: &[&SourceFile], deny_yellow: bool) -> String {
+        self.to_json_with(files, deny_yellow, "")
+    }
+
+    /// Như `to_json` nhưng thêm các thành viên cấp cao `extra` (đoạn JSON dạng `"khoá":giá_trị,…`, không dấu `{}`/dấu phẩy thừa) vào cuối
+    /// đối tượng. Quy tắc tương thích schema: chỉ THÊM trường (bộ tiêu thụ phải bỏ qua trường lạ).
+    #[must_use]
+    pub fn to_json_with(&self, files: &[&SourceFile], deny_yellow: bool, extra: &str) -> String {
         let mut out = String::new();
         let _ = write!(
             out,
@@ -153,6 +168,12 @@ impl Report {
             self.truncated,
             self.exit_code(deny_yellow)
         );
+        if !extra.is_empty() {
+            out.pop();
+            out.push(',');
+            out.push_str(extra);
+            out.push('}');
+        }
         out
     }
 }

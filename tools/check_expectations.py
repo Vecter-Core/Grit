@@ -34,14 +34,16 @@ DOC_REQUIRED = [
     "E0301", "E0302", "E0303", "E0304", "E0305", "E0307", "E0308", "E0309",
     "E0310", "E0311", "E0312", "E0313", "E0314", "E0315", "E0316", "E1002",
     "E0401", "E0402", "E0403", "E0404", "E0405", "E0406", "E0407", "E0501", "E0502", "E0503",
-    "E0601", "E0602", "E0603", "E0604", "E0901", "E0902",
+    "E0601", "E0602", "E0603", "E0604", "E0901", "E0902", "E1001", "E1401",
     "E0701", "E0702", "E0703", "E0801", "E0802",
 ]
 # Ghi chú (N) của M7: docs/errors/<mã>.md với >=3 mẫu `pass` (mỗi mẫu PHẢI phát đúng ghi chú đó: kiểm bằng gt-oblig/tests/corpus.rs).
 NOTE_DOC_REQUIRED = [
-    "N0601", "N0602", "N0603", "N0604", "N0605", "N0901", "N0902", "N0903", "N0904",
+    "N0601", "N0602", "N0603", "N0604", "N0605", "N0901", "N0902", "N0903", "N0904", "N1401",
 ]
-DOC_LINE_RE = re.compile(r"^- (fail|pass): (\S+)\s*$")
+# Cảnh báo VÀNG (S) của M9: docs/errors/<mã>.md với >=3 mẫu `warn` (đúng "warn <mã>") và >=3 mẫu `pass`.
+S_DOC_REQUIRED = ["S101", "S102", "S201", "S202"]
+DOC_LINE_RE = re.compile(r"^- (fail|warn|pass): (\S+)\s*$")
 
 errors = []
 
@@ -163,7 +165,7 @@ def read_expect_of(ref):
 
 def check_error_docs():
     """docs/errors/<mã>.md cho các mã đã triển khai: có tệp, >=3 `- fail:` và >=3 `- pass:`, mọi tham chiếu tồn tại và đúng kỳ vọng."""
-    for code in DOC_REQUIRED:
+    for code in DOC_REQUIRED + S_DOC_REQUIRED:
         path = os.path.join(ROOT, "docs", "errors", code + ".md")
         rel = f"docs/errors/{code}.md"
         if not os.path.isfile(path):
@@ -171,17 +173,18 @@ def check_error_docs():
             continue
         with open(path, encoding="utf-8") as f:
             lines = f.read().split("\n")
-        found = {"fail": [], "pass": []}
+        found = {"fail": [], "warn": [], "pass": []}
         for ln in lines:
             m = DOC_LINE_RE.match(ln)
             if m:
                 found[m.group(1)].append(m.group(2))
-        for kind in ("fail", "pass"):
+        kinds = ("warn", "pass") if code.startswith("S") else ("fail", "pass")
+        for kind in kinds:
             if len(found[kind]) < 3:
                 err(f"{rel}: cần >=3 dòng '- {kind}: <tham chiếu>' (plan §0.5), có {len(found[kind])}")
             for ref in found[kind]:
                 exp = read_expect_of(ref)
-                want = f"fail {code}" if kind == "fail" else "pass"
+                want = f"{kind} {code}" if kind in ("fail", "warn") else "pass"
                 if exp is None:
                     err(f"{rel}: tham chiếu '{ref}' không tồn tại hoặc thiếu dòng expect")
                 elif exp != want:

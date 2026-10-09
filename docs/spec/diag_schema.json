@@ -19,7 +19,24 @@
         "truncated": { "type": "integer", "minimum": 0, "description": "Số diagnostics bị cắt do giới hạn số lượng (D19). ICE không bao giờ bị cắt." },
         "exit_code": { "enum": [0, 1, 2], "description": "D17: 0 = qua (có thể kèm VÀNG), 1 = có ĐỎ, 2 = ICE. Tính theo cờ deny-yellow của lần chạy." }
       }
-    }
+    },
+    "backend": { "type": "string", "description": "Thêm ở M9 (Giang duyệt 2026-10-09). Backend thực thi của lần chạy: \"interpreter\" (thông dịch MIR tuần tự, KHÔNG phải bằng chứng cho codegen; M10 thêm \"llvm\"). Có mặt ở mọi đầu ra của gritc." },
+    "phase": { "enum": ["check", "run"], "description": "Giai đoạn cho exit code: \"check\" = mã thoát là phán quyết (0/1/2/3); \"run\" = chương trình ĐÃ chạy (mã thoát: 0 bình thường, 70 abort, 100+s trạng thái chương trình)." },
+    "verdict": { "enum": ["green", "yellow", "red", "ice"] },
+    "passes": { "type": "array", "items": { "type": "object", "required": ["name", "status"], "properties": { "name": { "type": "string" }, "status": { "enum": ["done", "skipped", "failed"] } } }, "description": "Các pass đã chạy; thiếu pass bắt buộc ⇒ verdict ice." },
+    "checks": {
+      "type": "object",
+      "description": "Báo cáo check còn lại (ADR-028 §6). mode all = giữ mọi check (mặc định); proven = xoá check đã chứng minh.",
+      "properties": {
+        "mode": { "enum": ["all", "proven"] },
+        "kept": { "type": "array" },
+        "deleted": { "type": "array" },
+        "would_delete": { "type": "array", "description": "Ở mode all: những check mà mode proven sẽ xoá." }
+      }
+    },
+    "allowed": { "type": "array", "description": "Các #allow đã áp dụng (dấu vết kiểm toán): {code, reason, file, span}." },
+    "attestation": { "type": "string", "description": "SHA-256 (hex) của bản ghi attestation (nguồn, phiên bản, chế độ, pass, MIR)." },
+    "run": { "type": "object", "description": "Chỉ khi phase = run: {exit_status, aborted, abort_kind}." }
   },
   "$defs": {
     "position": {

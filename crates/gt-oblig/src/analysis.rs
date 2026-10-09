@@ -69,6 +69,8 @@ pub struct Judged {
     pub status: Status,
     /// chỗ phải chèn lệnh gọi hợp đồng + `Assert` khi `status` là `Lowered` (chỉ `Pre`/`Post`)
     pub insert: Option<Insert>,
+    /// kiểm hợp đồng lúc chạy sẽ chèn nếu nghĩa vụ ĐÃ chứng minh nhưng vẫn kiểm được lúc chạy: chỉ chế độ `--checks=all` dùng (giữ mọi check)
+    pub proven_insert: Option<Insert>,
     /// (đầu vòng, ứng viên) của nghĩa vụ biến thể; `None` cho nghĩa vụ khác
     pub tag: Option<(u32, u32)>,
 }
@@ -1800,6 +1802,13 @@ impl Judge<'_> {
                 Checkability::NotCheckable(w) => Status::Rejected { why: w.clone() },
             },
         };
+        let proven_insert = if matches!(status, Status::Discharged { .. })
+            && matches!(ob.runtime, Checkability::Runtime(_))
+        {
+            insert.clone()
+        } else {
+            None
+        };
         // chương trình có lỗi ĐỎ không được chạy, nhưng MIR vẫn giữ nghĩa abort (oracle so sánh được)
         let insert = if matches!(status, Status::Lowered { .. } | Status::DefinitelyFalse) {
             insert
@@ -1811,6 +1820,7 @@ impl Judge<'_> {
             ob,
             status,
             insert,
+            proven_insert,
             tag,
         });
     }

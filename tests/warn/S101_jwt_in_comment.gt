@@ -1,0 +1,4 @@
+// expect: warn S101
+// note: JWT (GIẢ) nằm trong comment cũng bị cảnh báo
+// token cũ: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnop
+ƒ f() → u32 ! ∅ { 1u32 }

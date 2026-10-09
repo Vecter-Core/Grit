@@ -64,6 +64,7 @@ pub const PRELUDE_SRC: &str = "\
 ƒ mk_guard() → Guard ! ∅ { }
 #lang(secret)
 ▢ Secret<T> { v: T }
+⊐ <T> Secret<T> { ƒ declassify(self) → T ! ∅ { } }
 #lang(cap)
 ▢ Cap<T> { v: T }
 ▢ Fs { x: i32 }

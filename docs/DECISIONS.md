@@ -766,3 +766,92 @@ Mỗi lang item có test hợp đồng riêng (corpus + thuộc tính). Thông d
 - **Q56** Duyệt `#allow` bắt buộc lý do không rỗng, lỗi thiếu lý do là ĐỎ (mã mới họ E13xx), và `#allow` không dùng tới là GHI CHÚ?
 - **Q57** Duyệt `REQUIRED_PASSES` làm cổng chặn cứng E0601/E0307 ở mức CLI (§5)?
 - **Q58** Duyệt trường JSON `checks.{kept,deleted,would_delete}` (§6) là thêm trường vào schema v1?
+
+### 10. Phụ lục — duyệt và sửa của Giang (2026-10-09), cài đặt thực tế
+- **Q53–Q58 duyệt**, kèm: (a) `--checks=all` mặc định cho tới khi điều kiện đột biến "xoá thêm check" giải quyết; nghĩa vụ không chứng minh được và không kiểm được lúc chạy vẫn ĐỎ ở mọi chế độ (D25) — test `keep_all.rs`: mọi mẫu ĐỎ M7 giữ nguyên mã ở cả hai chế độ. (b) Mã thoát phân vùng, ghi vào D17 (GRIT_PLAN) và `gt-driver/src/verdict.rs`; test cả hai phía. (c) Backend `interpreter` ghi ở MỌI đầu ra (JSON `backend`, dòng tóm tắt, tiêu đề gói). (d) Bộ quét secret đủ S1xx (literal/entropy) và S2xx (luồng `Secret<T>`), `#allow` có lý do, `--deny-yellow`, ICE bắt panic thành mã riêng và không bao giờ chạy. (e) E0601/E0307 qua driver thật. (f) JSON "check còn lại", `gritc fmt` nối `gt-fmt`, `gritc explain` đọc `docs/errors/`.
+- **Lệch đã sửa theo GRIT_PLAN §6.1:** `gt-driver` là crate có CẢ thư viện lẫn binary `gritc` (kế hoạch ghi `gt-driver/` = binary `gritc`; bản ADR đầu tách "gritc" riêng — bỏ). Thêm `gt-secrets`. Thông dịch MIR chuyển từ công cụ test thành `gt_mir::interp` (bộ chạy tham chiếu, NGOÀI TCB) để `run` và test dùng chung một nguồn.
+- **Mã mới:** `S102` (entropy), `S202` (Secret → sink io), `E1401` (`#allow` sai), `N1401` (`#allow` thừa). `#allow` chỉ nhận mã VÀNG đã biết {S101, S102, S201, S202}; lý do không rỗng.
+- **Sơ hở M7 phát hiện khi chạy corpus qua driver thật:** mã `E1001` (`⚠` thiếu bằng chứng; con trỏ thô ngoài `⚠`) có trong bảng mã lỗi và có mẫu `fail` nhưng CHƯA được cài ở bất kỳ pass nào — gritc đã chấp nhận các mẫu đó (XANH). Đã cài `gt-oblig/src/unsafe_check.rs` (D21: Phase 1 chưa giải được nghĩa vụ `⊢` nào ⇒ mọi `⚠` ở mã người dùng là ĐỎ; kiểu con trỏ thô ngoài `⚠` là ĐỎ; lib/core miễn theo D22).
+- **Canary (`selftest`)**: trước mỗi phán quyết XANH/VÀNG, gritc kiểm lại bằng hai chương trình mẫu rằng E0601 và E0307 VẪN bị bắt (kết quả nhớ trong tiến trình); hỏng ⇒ ICE. Đây là lớp phòng thủ thứ hai cho điều kiện cứng điểm 11 ngoài danh sách pass bắt buộc.
+- **Chèn lỗi để kiểm cổng:** biến môi trường `GRITC_FAULT=panic:<pass>|skip:<pass>` (chỉ làm gritc TỪ CHỐI thêm: panic ⇒ ICE, bỏ pass ⇒ thiếu pass bắt buộc ⇒ ICE; không có chiều ngược). Ghi rõ vì nó nằm trong binary phát hành.
+
+## ADR-029 — M10: codegen LLVM, IR Guard, gt-rt — DỰ THẢO viết TRƯỚC khi code (2026-10-09; CHỜ GIANG DUYỆT — chưa có dòng mã M10 nào)
+
+### 0. Điều kiện xuất phát (nói thẳng)
+- M9 xong về mã (gritc check/build/run/explain/fmt, cổng phán quyết, bộ quét secret). **M8 và M9 chỉ "đạt có điều kiện"**: ADR-027 §0 (quy tắc bất biến cho Mutex/Atomic chưa chứng minh được là cần bằng oracle) và 69 đột biến "xoá thêm check" của `gt-oblig` (KNOWN_LIMITATIONS). Hệ quả cho M10: **mặc định `--checks=all` giữ nguyên** — codegen mặc định sinh MỌI `Assert` của MIR; chỉ `--checks=proven` mới bỏ check đã chứng minh, và phải gõ tường minh.
+- Hai điều kiện cứng còn áp dụng: GRIT_PLAN §7 điểm 10 (mặc định giữ mọi check) và 11 (E0601/E0307 qua driver thật — đã có test qua `gritc`). Ghi nhớ: khi có binary thật, "ĐỎ/ICE ⇒ không có tệp đầu ra" phải được kiểm lại bằng test mức tiến trình cho `gritc build -o prog.exe` (hiện chỉ kiểm cho gói `.gtmir`).
+
+### 1. Môi trường thật (đo ngày 2026-10-09 — KHÔNG giả định)
+| Hạng mục | Kết quả đo |
+|---|---|
+| Ổ C: | 275,6 GB tổng, **10,1 GB trống** (lệnh nói "vừa thêm 15 GB" nhưng số đo KHÔNG thấy: trống vẫn ~10–11 GB) |
+| Ổ D: | 200,4 GB tổng, **151 GB trống** (repo, `target/`, công cụ ở đây) |
+| RAM | **15,6 GB vật lý** (lúc đo trống 3,4 GB); bộ nhớ ảo (commit limit) tổng 36,1 GB, trống 8,3 GB |
+| Paging file | `C:\pagefile.sys` do hệ thống tự quản lý, cấp 20,9 GB, đỉnh dùng 7,6 GB. **Paging file nằm trên C:** (chỉ còn 10 GB trống: nếu C: đầy thì paging file không giãn được ⇒ WinError 1455 dù RAM còn) |
+| CPU | i5-12450H, 12 luồng logic |
+
+- **WinError 1455 là thiếu bộ nhớ ảo (commit limit = RAM + paging file), không phải thiếu ổ đĩa** (ghi nhận theo Giang). Tệp hướng dẫn môi trường (`docs/ENVIRONMENT.md`, §7) phải ghi: kiểm "Advanced system settings → Performance → Virtual memory", giữ paging file ≥ 24 GB (hoặc tự quản lý + giữ C: ≥ 15 GB trống), đóng chương trình nặng khi liên kết, và `CARGO_BUILD_JOBS` thấp (≤ 2) khi biên dịch/liên kết LLVM.
+- **Khuyến nghị:** chuyển paging file sang D: (151 GB trống) hoặc giải phóng C:. Đây là việc của người dùng (cài đặt hệ thống); tôi không tự đổi.
+
+### 2. LLVM: bản dựng sẵn, phiên bản, binding, cách ghim
+- **Chọn LLVM 20.1.8** (bản chính thức `clang+llvm-20.1.8-x86_64-pc-windows-msvc.tar.xz`, 940 MB tải về). Lý do: (a) `llvm-sys 201.1.0` ↔ LLVM 20.1; `inkwell 0.10.0` (2026-08-06) hỗ trợ tính năng `llvm20-1`; (b) có bản chính thức Windows MSVC khớp toolchain `x86_64-pc-windows-msvc` đang dùng; (c) 21/22 mới hơn nhưng ít bằng chứng dùng; 18/19 cũ hơn mà không có lợi. KHÔNG build LLVM từ nguồn (10–20 GB+, quá nặng cho máy này).
+- **Kiểm THẬT bản dựng sẵn** (đã làm, không giả định):
+  1. Liệt kê nội dung bản 20.1.8 (truyền luồng, 5 010 mục): có `bin/llvm-config.exe`, **137 `LLVM*.lib`** (static, 0,27 GB), `lib/LLVM-C.lib` + `bin/LLVM-C.dll` (70 MB); tổng giải nén **4,19 GB** nhưng 3,09 GB là ~123 công cụ `.exe` không cần. Chỉ trích `llvm-config.exe`, `LLVM-C.dll`, `lib/*.lib`, `include/llvm*` ⇒ **662 MB** trên D: (đã trích tại `D:\Tools\llvm-20.1.8`).
+  2. `llvm-config.exe --version` ⇒ `20.1.8`; `--host-target` ⇒ `x86_64-pc-windows-msvc`; `--link-static --libs` liệt kê đúng thư viện.
+  3. **Hai đường mặc định của `llvm-sys` GÃY với bản này:** (i) liên kết TĨNH: `llvm-config --system-libs` đòi `libxml2s.lib`, bản chính thức **KHÔNG kèm** (không có libxml2/zstd/zlib trong `lib/`) ⇒ lỗi liên kết; (ii) liên kết ĐỘNG qua `llvm-config --link-shared`: báo `LLVM-20.dll is missing` (bản chính thức chỉ có `LLVM-C.dll`, không có `LLVM-20.dll`).
+  4. **Đường dùng được (đã chạy thật):** liên kết thẳng `LLVM-C.lib` ↔ `LLVM-C.dll` (C API). Chương trình thử (ngoài repo, `rustc` trực tiếp): tải DLL 20.1.8, tạo module + hàm, `LLVMVerifyModule` ok, in IR, khởi tạo target X86, `LLVMGetTargetFromTriple` ok, `LLVMCreateTargetMachine`, **xuất được file object COFF** — toàn bộ đường codegen cần cho M10.
+- **Phương án dự phòng đã xét** (nếu `no-llvm-linking` có vấn đề khi cắm vào `inkwell`/`llvm-sys`): (A) tĩnh + tạo `libxml2s.lib` rỗng bằng `lib.exe` (≈ 0 MB, độ phức tạp thấp; mã LLVM dùng libxml2 chỉ cho trộn manifest Windows, ta không dùng) — nhưng liên kết tĩnh toàn bộ LLVM ngốn RAM/commit (rủi ro 1455) và tạo `gritc.exe` lớn; (B) tải bản của cộng đồng có đủ `libxml2s.lib`/`LLVM-20.dll` (~1–2 GB, phụ thuộc bên thứ ba ⇒ phải ghim băm); (C) `llvm-sys` với `LLVM_SYS_201_PREFIX` + bản tự dựng tối thiểu (X86 + core) từ nguồn (≈ 8–12 GB đĩa, nhiều giờ, nặng RAM) — loại. **Đề xuất: phương án chính (liên kết động `LLVM-C`), dự phòng A.**
+- **Binding:** `inkwell 0.10.0` với `features = ["llvm20-1-no-llvm-linking"]` (an toàn hơn gọi `llvm-sys` thô: kiểu có vòng đời), cộng `build.rs` của `gt-codegen-llvm` phát `cargo:rustc-link-search=native=$GRIT_LLVM_DIR/lib` và `cargo:rustc-link-lib=dylib=LLVM-C`. **Bước 0 của M10 là một spike** (≤ 1 giờ): chương trình `inkwell` tối thiểu in IR và xuất object; nếu `llvm-sys` với `no-llvm-linking` vẫn đòi `llvm-config`/biến môi trường thì chuyển sang dự phòng A hoặc `llvm-sys` thô — kết quả ghi vào ADR trước khi viết mã codegen. Cần ADR phụ thuộc ngoài (kế hoạch: "ADR nếu có phụ thuộc ngoài"): `inkwell`, `llvm-sys` (và chuỗi phụ thuộc bắc cầu của chúng) ghim phiên bản chính xác trong `Cargo.lock` + kiểm `cargo audit`; `gt-codegen-llvm` là crate DUY NHẤT dùng `unsafe`/FFI (các crate khác giữ `#![forbid(unsafe_code)]`; ngoại lệ có khai báo trong `Cargo.toml` của riêng nó).
+- **Ghim & vị trí:** thư mục cố định **`D:\Tools\llvm-20.1.8`**; biến môi trường `GRIT_LLVM_DIR=D:\Tools\llvm-20.1.8` (build script đọc; thiếu ⇒ lỗi rõ, không đoán) và `PATH` chứa `%GRIT_LLVM_DIR%\bin` lúc chạy (cần `LLVM-C.dll`). Băm SHA-256 của tệp tải về (`clang+llvm-20.1.8-…tar.xz`) và của `LLVM-C.dll` ghi vào `docs/ENVIRONMENT.md`; script `tools/setup_llvm.ps1` tải, kiểm băm, trích đúng tập tệp cần và chạy `llvm-config --version` — CHƯA viết (chờ duyệt).
+
+### 3. Hạ MIR → LLVM IR
+- **Mỗi `Assert` ⇒ kiểm lúc chạy rồi abort (D3):** `br i1 cond, label %ok, label %fail`; `%fail`: `call void @gritrt_abort(i32 <loại>)` (`noreturn`) rồi `unreachable` (CHỖ DUY NHẤT hợp lệ). Mặc định `--checks=all` ⇒ sinh đủ mọi `Assert` của MIR sau M7 chế độ `all`.
+- **`Unreachable` của MIR ⇒ abort**, KHÔNG BAO GIỜ thành `unreachable` của LLVM làm điều kiện tối ưu (chứng minh của compiler sai ⇒ chương trình dừng, không chạy tiếp vào hành vi không xác định). **IR Guard từ chối IR chứa `unreachable` không do codegen cố ý sinh có chủ đích**: chỉ chấp nhận đúng mẫu "ngay sau `call @gritrt_abort` đã được đánh dấu `noreturn`" (tên khối `%trap.*`), mọi `unreachable` khác ⇒ E1101.
+- Số học: tràn đã có `Assert` riêng ở MIR ⇒ phép toán LLVM dùng wrap (`add`/`sub`/`mul` không `nsw`/`nuw`) để tránh poison làm hỏng ngữ nghĩa D3; chia/`%` đã có `Assert` mẫu số ≠ 0 và `MIN / -1`; truy cập chỉ số đã có `Assert` biên ⇒ `getelementptr` không `inbounds` cho tới khi chứng minh được (an toàn trước, tối ưu sau).
+- Tham chiếu ⇒ con trỏ; `noalias`/`readonly` chỉ gắn khi borrowck đã chứng minh (hạ dần, mỗi thuộc tính có Obligation-ID); Phase đầu KHÔNG gắn `noalias` (giảm rủi ro UB do lỗi borrowck), gắn sau khi có test đối chiếu `-O0` ≡ `-O2`.
+- Quy ước ABI nội bộ: hàm Grit ⇒ hàm LLVM với `fastcc`/mặc định; `main` ⇒ `@gritrt_start` gọi `main` của người dùng; mã thoát xem §5.
+
+### 4. Đa luồng, Mutex, Atomic (khớp ADR-027)
+- **`Atomic<T>`** ⇒ `atomicrmw`/`load atomic`/`store atomic`/`cmpxchg` LLVM thật với ordering lấy từ đối số E0503 đã kiểm (`Relaxed`↦`monotonic`, `Acquire`↦`acquire`, `Release`↦`release`, `AcqRel`↦`acq_rel`, `SeqCst`↦`seq_cst`). Thông dịch tuần tự của M9 KHÔNG phải bằng chứng cho ngữ nghĩa này.
+- **`Mutex::with(&self, f, a)`** ⇒ gọi `@gritrt_mutex_lock(ptr)` (SRWLOCK/`pthread_mutex_t` thật qua gt-rt), gọi `f`, rồi `@gritrt_mutex_unlock(ptr)`; abort giữa chừng không cần mở khoá (chương trình chết).
+- **`spawn(f, a)`** ⇒ tạo luồng hệ điều hành thật qua gt-rt (`CreateThread`/`pthread_create`), truyền `a` bằng hộp sở hữu (đối số `Send`, E0501); luồng chạy `f(a)`; Phase đầu KHÔNG có `join` (đúng ngữ nghĩa M8); chương trình kết thúc khi `main` trả về (luồng còn lại bị dừng bởi runtime — ghi rõ trong tài liệu).
+- Hiệu ứng `lock(L)` và thứ tự khoá là kiểm tĩnh ở M8; codegen không thêm kiểm động thứ tự khoá ở Phase 1.
+- **Kiểm thử luồng thật là điều kiện của M10** (thông dịch không tạo ra đua dữ liệu): chạy các chương trình mẫu đa luồng (bộ đếm `Atomic`, `Mutex` tĩnh, nhiều worker) nhiều lần, có chế độ TSan khi toolchain hỗ trợ (hồ sơ `dev`), và mục KNOWN_LIMITATIONS riêng nếu TSan không dùng được trên Windows MSVC.
+
+### 5. gt-rt tối thiểu và mã thoát khi abort
+- `runtime/gt-rt` (staticlib Rust, `panic = abort`, `#![no_std]` nếu khả thi, nếu không `std` tối thiểu): `gritrt_start`, `gritrt_abort(kind)`, mutex, tạo luồng, ghi `stderr` một dòng "abort: <loại>" rồi dừng tiến trình NGAY (không unwinding, không cleanup, D3).
+- **Mã thoát của CHƯƠNG TRÌNH khi abort = 70** (cùng bảng phân vùng D17 đã duyệt ở M9: vùng chương trình tách khỏi 0–3 của gritc); kèm loại abort trên stderr. Chương trình thoát bình thường ⇒ 0. Test: chương trình tràn số ⇒ 70, KHÁC mã 1 của `gritc` ĐỎ; test cả hai phía như M9.
+- `gritc run` M10: biên dịch ra thư mục tạm, liên kết, CHẠY binary, chuyển mã thoát (0/70/…) theo bảng M9; `"backend":"llvm"` trong JSON; `backend:"interpreter"` vẫn dùng được bằng `--backend=interpreter` (đối chứng).
+
+### 6. IR Guard tối thiểu (`gt-guard`)
+Chạy SAU codegen, TRƯỚC khi ghi/chạy binary; mọi thất bại ⇒ E1101 (ĐỎ), không sinh output, không chạy:
+1. **LLVM verifier** (`LLVMVerifyModule`) phải sạch.
+2. **Đối chiếu attestation**: băm MIR sau M7 + chế độ `--checks` + danh sách pass trong IR metadata (`!gt.attest`) phải khớp bản ghi của lần `check` vừa rồi (cùng giá trị attestation M9).
+3. **Thao tác nhạy cảm có Obligation-ID đã giải**: mọi `atomicrmw`/`cmpxchg`/atomic `load`/`store`, mọi `call @gritrt_spawn`/mutex, mọi truy cập qua con trỏ thô (không có ở mã người dùng vì E1001) phải mang metadata `!gt.obl` trỏ tới nghĩa vụ đã giải (E0503 cho ordering, E0501 cho spawn, E0502 cho khoá).
+4. **`unreachable` chỉ đúng mẫu abort** (§3).
+5. Quét metadata đa luồng/ordering nhất quán (ordering trong IR = ordering E0503 đã kiểm).
+Mutation riêng cho `gt-guard` (hàm quyết định chấp nhận/từ chối), lô nhỏ, 1 worker.
+
+### 7. Hồ sơ, mục tiêu, benchmark, quy trình thử
+- **Hồ sơ `dev` trước** (`-O0`, mọi `Assert` giữ, ASan/UBSan nếu có; TSan nếu có); **`release` sau** (`-O2`) chỉ khi `dev` ≡ `release` trên bộ chương trình đối chiếu. `release` vẫn mặc định `--checks=all`.
+- **Hoàn thành M10 khi (đề xuất):** (a) 3 chương trình mẫu THẬT chạy được từ nguồn Grit tới binary và cho kết quả đúng: tính toán số (vòng lặp + đệ quy có `↓`), xử lý mảng/lát có biên được kiểm, đa luồng (`Atomic` + `Mutex` tĩnh + `spawn`); (b) mọi abort dừng NGAY với mã 70 và loại abort; (c) golden test trên LLVM IR của vài chương trình nhỏ; (d) IR Guard có test "IR bị sửa tay bị từ chối"; (e) đối chiếu hành vi `interpreter` ≡ `llvm` trên corpus pass có `main` (trừ phần đa luồng); (f) benchmark nền (GRIT_PLAN 8.G) đo thời gian biên dịch/chạy mỗi mẫu ở `--checks=all` và `--checks=proven`.
+- **Môi trường chạy:** một lệnh cargo tại một thời điểm, `CARGO_BUILD_JOBS=2`, `--test-threads=2`; đột biến 1 worker lô nhỏ; không chạy hai bản dựng LLVM đồng thời (RAM).
+
+### 8. Kế hoạch dùng thử thật (sau M10, M11 bắt đầu viết tool nhỏ bằng Grit)
+- Sau M10 và khi M11 (Rig v0) bắt đầu, viết công cụ nhỏ THẬT bằng Grit (đề xuất: bộ đếm từ/dòng, trình định dạng bảng, kiểm tra tổng SHA của tệp — mỗi cái < 300 dòng) và dùng `gritc` hàng ngày.
+- **Ghi nhận bug phát hiện khi dùng thật:** mỗi phát hiện là MỘT mục trong `docs/FIELD_BUGS.md` (id tăng dần): chương trình tối giản tái hiện + lệnh + kết quả thật + kết quả kỳ vọng + **phân loại theo định nghĩa bug nghiêm trọng của kế hoạch** (1 = false negative của kiểm tra an toàn — mức cao nhất; 2 = ICE/crash; 3 = output không tái lập; 4 = false positive). Quy tắc: (a) bug loại 1 ⇒ DỪNG mọi việc khác, viết test tái hiện (đỏ) TRƯỚC khi sửa, rồi mở rộng bộ sinh/oracle theo grit-contract §3.3 và kiểm "tắt bản sửa"; (b) loại 2–3 ⇒ test hồi quy bắt buộc; (c) loại 4 ⇒ ghi vào KNOWN_LIMITATIONS nếu không sửa; (d) mỗi bug sửa xong thêm mẫu vào `tests/{fail,pass}` có `expect`. Tuần/đợt dùng thử báo số liệu: số bug theo loại, thời gian sửa, bug lặp lại.
+
+### 9. Rủi ro / đánh đổi
+- Bản LLVM dựng sẵn thiếu thư viện hệ thống ⇒ dùng đường `LLVM-C.dll` (đã kiểm), phụ thuộc DLL 70 MB ở runtime của `gritc`; phải kèm trong gói phân phối và ghi băm.
+- `gt-codegen-llvm` đưa `unsafe`/FFI vào cơ sở tin cậy (TCB 3.3: LLVM + binding); giảm thiểu bằng IR Guard + test đối chiếu `interpreter ≡ llvm`.
+- C: chật (10 GB, chứa paging file) là rủi ro vận hành lớn nhất cho việc liên kết nặng; xem §1.
+- Thời gian biên dịch `inkwell`/`llvm-sys` lần đầu và RAM khi liên kết: giữ `CARGO_BUILD_JOBS` thấp; spike §2 đo thực tế.
+
+### 10. Câu hỏi cho Giang
+- **Q59** Duyệt LLVM 20.1.8 bản dựng sẵn, đặt ở `D:\Tools\llvm-20.1.8`, liên kết động `LLVM-C` (đường duy nhất đã chạy thật), dự phòng A (`libxml2s.lib` rỗng)?
+- **Q60** Duyệt `inkwell 0.10.0` (feature `llvm20-1-no-llvm-linking`) + spike bước 0, và việc `gt-codegen-llvm` là crate duy nhất có `unsafe`?
+- **Q61** Duyệt hạ `Assert` ⇒ abort với `unreachable` chỉ sau `call @gritrt_abort noreturn`, IR Guard từ chối mọi `unreachable` khác (E1101)?
+- **Q62** Duyệt `spawn` ⇒ luồng hệ điều hành thật không `join`, `Mutex::with` ⇒ SRWLOCK/pthread qua gt-rt, `Atomic` ⇒ atomics LLVM với ordering E0503?
+- **Q63** Duyệt mã thoát abort của chương trình = 70 (đã có ở D17 M9) và `--backend=interpreter|llvm`?
+- **Q64** Chuyển paging file sang D: hoặc giải phóng C: (việc của anh): có thực hiện trước khi bắt đầu M10 không?
+- **Q65** Duyệt quy trình `docs/FIELD_BUGS.md` và nguyên tắc "bug loại 1 ⇒ dừng mọi việc"?

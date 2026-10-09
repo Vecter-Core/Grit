@@ -1,0 +1,4 @@
+// expect: pass
+// note: #allow đúng mã nhưng sai item: không tắt gì ⇒ N1401
+#allow(S102, "không có literal nào ở đây")
+ƒ f() → u32 ! ∅ { 2u32 }

@@ -1,0 +1,3 @@
+// expect: warn S101
+// note: token GitHub (GIẢ, đúng định dạng) nằm trong nguồn
+ƒ tok() → &str ! ∅ { t ≔ "ghp_abcdefghijklmnopqrstuvwxyz0123456789"; t }

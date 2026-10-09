@@ -12,4 +12,5 @@ pub mod driver;
 pub mod env;
 pub mod ir;
 pub mod prover;
+pub mod unsafe_check;
 pub mod zone;

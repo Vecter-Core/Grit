@@ -1,0 +1,4 @@
+// expect: warn S201
+// note: declassify trong phương thức của kiểu người dùng
+▢ Vault { s: Secret<u32> }
+⊐ Vault { ƒ open(self) → u32 ! ∅ { self.s.declassify() } }

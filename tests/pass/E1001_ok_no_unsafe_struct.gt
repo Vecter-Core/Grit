@@ -1,0 +1,4 @@
+// expect: pass
+// note: struct thường không chứa con trỏ thô
+▢ H { n: i32, s: usize }
+ƒ f(h: &H) → i32 ! ∅ { h.n }

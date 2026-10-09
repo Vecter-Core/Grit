@@ -1,0 +1,38 @@
+[package]
+name = "gt-driver"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Grit: gritc (M9, ADR-028) — chuỗi pass, CỔNG PHÁN QUYẾT (ĐỎ/ICE ⇒ không output, không chạy), báo cáo JSON, build/run/check/explain/fmt"
+
+[lib]
+name = "gt_driver"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gritc"
+path = "src/main.rs"
+
+[dependencies]
+gt-span = { path = "../gt-span" }
+gt-ast = { path = "../gt-ast" }
+gt-diag = { path = "../gt-diag" }
+gt-fmt = { path = "../gt-fmt" }
+gt-resolve = { path = "../gt-resolve" }
+gt-types = { path = "../gt-types" }
+gt-mir = { path = "../gt-mir" }
+gt-borrowck = { path = "../gt-borrowck" }
+gt-oblig = { path = "../gt-oblig" }
+gt-term = { path = "../gt-term" }
+gt-effects = { path = "../gt-effects" }
+gt-conc = { path = "../gt-conc" }
+gt-secrets = { path = "../gt-secrets" }
+gt-stack = { path = "../gt-stack" }
+
+[dev-dependencies]
+gt-parser = { path = "../gt-parser" }
+serde_json = "1"
+
+[lints]
+workspace = true

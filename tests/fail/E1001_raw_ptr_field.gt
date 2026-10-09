@@ -1,0 +1,4 @@
+// expect: fail E1001
+// note: trường kiểu con trỏ thô chỉ hợp lệ trong ⚠ (Q13)
+▢ H { p: *□ i32 }
+ƒ f() → i32 ! ∅ { 0 }

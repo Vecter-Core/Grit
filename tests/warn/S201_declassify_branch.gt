@@ -1,0 +1,3 @@
+// expect: warn S201
+// note: declassify trong nhánh điều kiện vẫn bị báo
+ƒ f(s: Secret<u32>, c: bool) → u32 ! ∅ { ⎇ c { s.declassify() } ⇝ { 0 } }

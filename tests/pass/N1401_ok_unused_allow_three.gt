@@ -1,0 +1,5 @@
+// expect: pass
+// note: nhiều #allow thừa
+#allow(S201, "a")
+#allow(S202, "b")
+ƒ f() → u32 ! ∅ { 3u32 }

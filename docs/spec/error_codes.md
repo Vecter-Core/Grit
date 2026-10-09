@@ -49,7 +49,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0802 | Thành viên impl khai hiệu ứng ngoài tập mà thành viên trait cho phép | M8 | E0802_impl_more_effects |
 | E0901 | Hợp đồng chắc chắn sai: `⊳` tại lời gọi, `⊲` ở điểm thoát, `⋈` ở đầu vòng lặp (ADR-025 §6) | M7 | E0901_precondition_false, E0901_shift_too_far, E0901_postcondition_false, E0901_invariant_false |
 | E0902 | Obligation không kiểm lúc chạy được mà chưa giải (D25): lượng từ không có biên `a..b`; `⊳` cần gọi lúc chạy mà đối số không `Copy`; `⊲` nhắc tham số bị gán lại | M7 | E0902_quantifier_over_range_value, E0902_noncopy_argument_unproven_pre, E0902_post_names_reassigned_param |
-| E1001 | Nghĩa vụ `⚠` chưa giải (D21); con trỏ thô `*□ T`/`*μ T` hoặc `#noreturn` dùng ngoài phạm vi cho phép (Q12, Q13) | M7 | E1001_unsafe_unproven, E1001_raw_ptr_outside_unsafe |
+| E1001 | `⚠` thiếu bằng chứng (D21: Phase 1 chưa giải được nghĩa vụ `⊢` nào ⇒ mọi `⚠` ở mã người dùng); con trỏ thô `*□ T`/`*μ T` ngoài `⚠` (Q12, Q13) | M7 (cài ở M9) | E1001_unsafe_unproven, E1001_raw_ptr_outside_unsafe, E1001_unsafe_empty_block |
 | E1002 | Thuộc tính `#lang` dùng ngoài `lib/core`/prelude (ADR-018 §5, Q21) | M4 | E1002_lang_on_fn, E1002_lang_on_struct, E1002_lang_on_trait |
 | E1101 | IR Guard: attestation lệch | M10 | — |
 | E1201 | Ký tự bidi (D15) | M1 | E1201_bidi |
@@ -57,9 +57,12 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E1203 | Định danh trộn bảng chữ/homoglyph | M1 | E1203_homoglyph |
 | E1204 | Nguồn không phải NFC | M1 | E1204_not_nfc |
 | E1301 | gt-fmt: không đặt được comment (bước xác minh sau khi chèn comment theo token thất bại: token hoặc dãy comment đổi). PHƯƠNG ÁN CUỐI — theo Q16b mọi vị trí comment thông thường đều được đặt; gặp mã này là lỗi của gt-fmt cần báo cáo. ĐỎ — duyệt Giang 2026-10-06 (nhóm E13xx: định dạng) Không có mẫu `.gt` (không đầu vào hợp lệ nào kích hoạt); kiểm bằng unit test `verify_rejects_changed_tokens_or_changed_comment_sequence` trong gt-fmt. | M2 (gt-fmt) | — |
+| E1401 | `#allow` không hợp lệ: thiếu lý do / lý do rỗng / mã ĐỎ / mã không tồn tại / thừa tham số (ADR-028 §4) | M9 | E1401_allow_no_reason, E1401_allow_empty_reason, E1401_allow_red_code |
 | E9901 | ICE (lỗi nội bộ compiler; gồm panic trong parser bị bắt, hết bộ nhớ khi tạo luồng parser) — exit 2, không bao giờ chạy | M2 (parser) / M9 (cổng phán quyết) | — |
-| S101 | Secret nằm trong nguồn | M9 | S101_key_in_source |
-| S201 | `declassify` / Secret chảy ra sink | M9 | — |
+| S101 | Secret nằm trong nguồn (mẫu nhận dạng: khoá cloud, token VCS, PEM, JWT…) | M9 | S101_key_in_source, S101_github_token, S101_private_key_block, S101_jwt_in_comment |
+| S102 | Literal chuỗi entropy cao gán cho tên gợi ý secret | M9 | S102_api_key_entropy, S102_password_with_digit, S102_const_token |
+| S201 | `declassify` trên `Secret<T>` | M9 | S201_declassify, S201_declassify_branch, S201_declassify_in_method |
+| S202 | Giá trị nhạy cảm chảy tới sink `io` | M9 | S202_secret_to_io, S202_declassified_to_log, S202_derived_value |
 | N0601 | Check tràn hạ thành runtime | M7 | pass/02_sum_loop |
 | N0602 | Check biên mảng hạ thành runtime | M7 | — |
 | N0603 | Check chia/% (mẫu số ≠ 0, `MIN / -1`) hạ thành runtime | M7 | — |
@@ -69,6 +72,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | N0902 | Hậu điều kiện `⊲` hạ thành runtime ở mọi điểm thoát | M7 | — |
 | N0903 | Lượng từ có biên hạ thành vòng lặp lúc chạy | M7 | — |
 | N0904 | Bất biến `⋈` hạ thành runtime | M7 | — |
+| N1401 | `#allow` không tắt cảnh báo nào | M9 | pass/N1401_ok_unused_allow_one |
 
 Ghi chú: plan ghi match-đầy-đủ và capability thuộc "E01xx/E03xx/E06xx" / "E03xx/E08xx" mơ hồ → đề xuất
 E0305/E0310 (xem OPEN_QUESTIONS Q4). Các test `—` do milestone sở hữu viết (cần đa file/pass chưa có).

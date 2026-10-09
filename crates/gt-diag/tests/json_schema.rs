@@ -326,7 +326,23 @@ fn emitted_keys_equal_schema_properties() {
         k
     };
     let prop_keys = |def: &Value| keys(&def["properties"]);
-    assert_eq!(keys(&v), prop_keys(&s));
+    // `gt-diag` phát khóa LÕI; các khóa mở rộng do gritc thêm (M9: backend, phase, verdict, passes, checks, allowed, attestation, run)
+    // nằm trong schema làm thuộc tính TUỲ CHỌN — gt-driver có test riêng bảo đảm JSON đầy đủ của gritc khớp schema.
+    const EXTENSIONS: [&str; 8] = [
+        "allowed",
+        "attestation",
+        "backend",
+        "checks",
+        "passes",
+        "phase",
+        "run",
+        "verdict",
+    ];
+    let core: Vec<String> = prop_keys(&s)
+        .into_iter()
+        .filter(|k| !EXTENSIONS.contains(&k.as_str()))
+        .collect();
+    assert_eq!(keys(&v), core);
     assert_eq!(keys(&v["summary"]), prop_keys(&s["properties"]["summary"]));
     let dd = &v["diagnostics"][0];
     assert_eq!(keys(dd), prop_keys(&s["$defs"]["diagnostic"]));

@@ -1,0 +1,4 @@
+// expect: pass
+// note: #allow thừa (không có cảnh báo để tắt) ⇒ GHI CHÚ N1401, vẫn qua
+#allow(S101, "dự phòng")
+ƒ f() → u32 ! ∅ { 1u32 }

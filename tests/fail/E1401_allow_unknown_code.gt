@@ -1,0 +1,4 @@
+// expect: fail E1401
+// note: mã không tồn tại
+#allow(S999, "không có mã này")
+ƒ f() → u32 ! ∅ { 1u32 }

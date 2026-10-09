@@ -145,7 +145,7 @@ class Worker:
         os.makedirs(self.dir, exist_ok=True)
         for item in ("Cargo.toml", "Cargo.lock"):
             shutil.copy(os.path.join(ROOT, item), self.dir)
-        for d in ("crates", "tests", "lib"):
+        for d in ("crates", "tests", "lib", "docs"):
             src, dst = os.path.join(ROOT, d), os.path.join(self.dir, d)
             if os.path.isdir(src):
                 shutil.rmtree(dst, ignore_errors=True)

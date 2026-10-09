@@ -10,6 +10,7 @@ pub mod types;
 pub mod validate;
 
 pub use mir::*;
+pub mod interp;
 
 use gt_ast::{Item, ItemKind, NodeId};
 use gt_diag::{Code, Diagnostic, Diagnostics, Report};

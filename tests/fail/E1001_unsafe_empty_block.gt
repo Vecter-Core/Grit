@@ -1,0 +1,3 @@
+// expect: fail E1001
+// note: mọi ⚠ trong mã người dùng đều là nghĩa vụ chưa giải ở Phase 1, kể cả khối rỗng (D21)
+ƒ f() → i32 ! ∅ { ⚠ { }; 0 }

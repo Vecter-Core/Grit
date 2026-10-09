@@ -4,18 +4,16 @@
 //! ứng viên không (âm tính giả). Ngược lại, mọi nghĩa vụ "chắc chắn sai" mà tham chiếu CHẠM TỚI phải THẤT BẠI ở đó.
 #[path = "../../gt-mir/tests/common/mod.rs"]
 mod common;
-#[path = "../../gt-mir/tests/support/interp.rs"]
-mod interp;
 #[path = "support/obgen.rs"]
 mod obgen;
 #[path = "../../gt-mir/tests/support/progen.rs"]
 mod progen;
+use gt_mir::interp::{Interp, Outcome, V};
 use gt_mir::{AssertKind, MirOutput, TerminatorKind};
 use gt_oblig::analysis::Status;
 use gt_oblig::driver::{OblOutput, analyze_program};
 use gt_oblig::ir::{Budget, ObKind, Obligation, Prover, Verdict};
 use gt_oblig::prover::ZoneProver;
-use interp::{Interp, Outcome, V};
 use std::collections::{BTreeMap, BTreeSet};
 
 struct ZeroProver;

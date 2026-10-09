@@ -3,16 +3,14 @@
 //! (âm tính giả — lọt vòng lặp vô hạn). Chương trình bị bác mà thật sự phân kỳ là bác ĐÚNG; bị bác mà dừng là mất chính xác (chấp nhận).
 #[path = "../../gt-mir/tests/common/mod.rs"]
 mod common;
-#[path = "../../gt-mir/tests/support/interp.rs"]
-mod interp;
 #[path = "support/loopgen.rs"]
 mod loopgen;
 #[path = "../../gt-mir/tests/support/progen.rs"]
 mod progen;
+use gt_mir::interp::{Interp, Outcome, V};
 use gt_oblig::driver::build_prog_info;
 use gt_oblig::prover::ZoneProver;
 use gt_term::check_termination;
-use interp::{Interp, Outcome, V};
 use std::collections::BTreeMap;
 
 fn ity_of(name: &str) -> gt_types::IntTy {

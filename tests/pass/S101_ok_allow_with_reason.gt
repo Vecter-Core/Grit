@@ -1,0 +1,4 @@
+// expect: pass
+// note: #allow có lý do tắt cảnh báo trong phạm vi item (khoá mẫu trong tài liệu)
+#allow(S101, "khoá mẫu của tài liệu AWS, không phải khoá thật")
+ƒ f() → &str ! ∅ { k ≔ "AKIAIOSFODNN7EXAMPLE"; k }

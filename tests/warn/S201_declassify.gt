@@ -1,0 +1,3 @@
+// expect: warn S201
+// note: declassify trên Secret<T> (D13: ghi nhận và báo VÀNG)
+ƒ f(s: Secret<u32>) → u32 ! ∅ { s.declassify() }

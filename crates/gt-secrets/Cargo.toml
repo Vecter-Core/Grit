@@ -1,0 +1,22 @@
+[package]
+name = "gt-secrets"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Grit: bộ quét secret (M9, ADR-028 §7) — S101 mẫu, S102 entropy, S201 declassify, S202 Secret chảy ra sink io; #allow có lý do"
+
+[dependencies]
+gt-span = { path = "../gt-span" }
+gt-ast = { path = "../gt-ast" }
+gt-diag = { path = "../gt-diag" }
+gt-lexer = { path = "../gt-lexer" }
+gt-resolve = { path = "../gt-resolve" }
+gt-types = { path = "../gt-types" }
+gt-mir = { path = "../gt-mir" }
+
+[dev-dependencies]
+gt-parser = { path = "../gt-parser" }
+
+[lints]
+workspace = true
