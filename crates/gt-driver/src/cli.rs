@@ -156,6 +156,24 @@ fn cmd_check(cli: &Cli) -> i32 {
     check_exit_code(res.verdict)
 }
 
+/// Lỗi backend llvm ⇒ thông báo + mã thoát. IR Guard từ chối ⇒ ĐỎ (E1101, mã 1) in như mọi chẩn đoán; còn lại ⇒ thông báo môi trường/nội bộ.
+#[cfg(feature = "llvm")]
+fn native_failure(res: &mut CheckResult, cli: &Cli, e: &crate::native::NativeError) -> i32 {
+    if let crate::native::NativeError::Guard(v) = e {
+        res.reject_ir(v);
+        res.backend = "llvm";
+        let phase = if cli.cmd == "run" {
+            Phase::Run
+        } else {
+            Phase::Check
+        };
+        emit(res, cli, phase, None, None);
+        return check_exit_code(res.verdict);
+    }
+    eprintln!("gritc: backend llvm: {e}");
+    e.exit_code()
+}
+
 #[cfg(feature = "llvm")]
 fn build_llvm(cli: &Cli, mut res: CheckResult, path: &str) -> i32 {
     let code = check_exit_code(res.verdict);
@@ -168,12 +186,12 @@ fn build_llvm(cli: &Cli, mut res: CheckResult, path: &str) -> i32 {
             .map_or_else(|| "out".to_string(), |s| s.to_string_lossy().into_owned());
         format!("{stem}.exe")
     });
-    if let Err(e) = crate::native::build_exe(art, Path::new(&out), false) {
-        eprintln!("gritc: backend llvm: {e}");
-        return e.exit_code();
+    let att = crate::pipeline::attestation(&res, &format!("{:#?}", art.obl.bodies));
+    if let Err(e) = crate::native::build_exe(art, Path::new(&out), false, &att) {
+        return native_failure(&mut res, cli, &e);
     }
     res.backend = "llvm";
-    emit(&res, cli, Phase::Check, None, None);
+    emit(&res, cli, Phase::Check, None, Some(&att));
     if !cli.json {
         eprintln!("gritc: đã ghi {out} (backend: llvm)");
     }
@@ -187,25 +205,31 @@ fn build_llvm(_cli: &Cli, _res: CheckResult, _path: &str) -> i32 {
 
 /// Dựng exe vào thư mục tạm, chạy, dọn. `Err(mã)`: lỗi môi trường/codegen đã in thông báo.
 #[cfg(feature = "llvm")]
-fn run_llvm(art: &crate::pipeline::Artifacts) -> Result<RunReport, i32> {
+fn run_llvm(
+    art: &crate::pipeline::Artifacts,
+    res: &mut CheckResult,
+    cli: &Cli,
+) -> Result<RunReport, i32> {
     let dir = std::env::temp_dir().join(format!("gritc-{}", std::process::id()));
     if let Err(e) = std::fs::create_dir_all(&dir) {
         return Err(usage_err(&format!("không tạo được {}: {e}", dir.display())));
     }
     let exe = dir.join("prog.exe");
-    let r = match crate::native::build_exe(art, &exe, true) {
+    let att = crate::pipeline::attestation(res, &format!("{:#?}", art.obl.bodies));
+    let r = match crate::native::build_exe(art, &exe, true, &att) {
         Ok(()) => Ok(crate::native::run_exe(&exe)),
-        Err(e) => {
-            eprintln!("gritc: backend llvm: {e}");
-            Err(e.exit_code())
-        }
+        Err(e) => Err(native_failure(res, cli, &e)),
     };
     let _ = std::fs::remove_dir_all(&dir);
     r
 }
 
 #[cfg(not(feature = "llvm"))]
-fn run_llvm(_art: &crate::pipeline::Artifacts) -> Result<RunReport, i32> {
+fn run_llvm(
+    _art: &crate::pipeline::Artifacts,
+    _res: &mut CheckResult,
+    _cli: &Cli,
+) -> Result<RunReport, i32> {
     Err(usage_err(
         "bản gritc này dựng không có backend llvm (--no-default-features)",
     ))
@@ -281,7 +305,7 @@ fn cmd_run(cli: &Cli) -> i32 {
         return 2;
     };
     let rr = if cli.backend == Backend::Llvm {
-        match run_llvm(&art) {
+        match run_llvm(&art, &mut res, cli) {
             Ok(r) => {
                 res.backend = "llvm";
                 r

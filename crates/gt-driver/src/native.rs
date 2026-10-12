@@ -3,7 +3,7 @@
 use crate::pipeline::Artifacts;
 use crate::runner::RunReport;
 use crate::verdict::RunEnd;
-use gt_codegen_llvm::{CodegenError, Options};
+use gt_codegen_llvm::{CodegenError, Inject, Options};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -13,6 +13,8 @@ pub enum NativeError {
     Env(String),
     Codegen(CodegenError),
     Link(String),
+    /// IR Guard từ chối (E1101, ĐỎ ⇒ mã thoát 1; KHÔNG có object/exe)
+    Guard(Vec<String>),
 }
 
 impl NativeError {
@@ -20,6 +22,7 @@ impl NativeError {
     pub fn exit_code(&self) -> i32 {
         match self {
             NativeError::Env(_) => 3,
+            NativeError::Guard(_) | NativeError::Codegen(CodegenError::Guard(_)) => 1,
             NativeError::Codegen(CodegenError::Unsupported(_)) => 3,
             NativeError::Codegen(CodegenError::Internal(_)) | NativeError::Link(_) => 2,
         }
@@ -31,6 +34,7 @@ impl std::fmt::Display for NativeError {
         match self {
             NativeError::Env(m) | NativeError::Link(m) => write!(f, "{m}"),
             NativeError::Codegen(e) => write!(f, "{e}"),
+            NativeError::Guard(v) => write!(f, "IR Guard từ chối: {}", v.join("; ")),
         }
     }
 }
@@ -82,17 +86,41 @@ fn linker() -> Result<Command, NativeError> {
     Ok(tool.to_command())
 }
 
+/// `GRITC_FAULT=ir:unreachable|ir:strip-obl|ir:attest`: chèn lỗi vào IR để KIỂM IR Guard (chỉ làm gritc từ chối thêm).
+fn inject_from_env() -> Option<Inject> {
+    match std::env::var("GRITC_FAULT").ok()?.strip_prefix("ir:")? {
+        "unreachable" => Some(Inject::StrayUnreachable),
+        "strip-obl" => Some(Inject::StripObligation),
+        "attest" => Some(Inject::BadAttestation),
+        _ => None,
+    }
+}
+
 /// Biên dịch + liên kết ra `out` (.exe). `report_result`: exe báo kết quả `main` qua `GRITRT_RESULT_FILE` (dùng cho `run`).
-pub fn build_exe(art: &Artifacts, out: &Path, report_result: bool) -> Result<(), NativeError> {
+/// `attestation`: giá trị của lần `check` (xem `pipeline::attestation`); IR Guard đối chiếu nó với metadata trong IR.
+pub fn build_exe(
+    art: &Artifacts,
+    out: &Path,
+    report_result: bool,
+    attestation: &str,
+) -> Result<(), NativeError> {
     check_llvm_dll()?;
     let rt = rt_lib()?;
     let compiled = gt_codegen_llvm::compile(
         &art.types,
         &art.obl.bodies,
         &art.mir.keys,
-        &Options { report_result },
+        &Options {
+            report_result,
+            attestation: attestation.to_string(),
+            inject: inject_from_env(),
+        },
+        &|m| gt_guard::check_module(m, &gt_guard::GuardInput { attestation }),
     )
-    .map_err(NativeError::Codegen)?;
+    .map_err(|e| match e {
+        CodegenError::Guard(v) => NativeError::Guard(v),
+        other => NativeError::Codegen(other),
+    })?;
     // chẩn đoán: GRITC_DUMP_IR=<tệp> ghi IR LLVM ra tệp (không ảnh hưởng kết quả)
     if let Some(p) = std::env::var_os("GRITC_DUMP_IR") {
         let _ = std::fs::write(p, &compiled.ir);

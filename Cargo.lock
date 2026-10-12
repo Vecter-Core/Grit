@@ -57,10 +57,10 @@ name = "gt-codegen-llvm"
 version = "0.1.0"
 dependencies = [
  "gt-ast",
+ "gt-llvm",
  "gt-mir",
  "gt-resolve",
  "gt-types",
- "inkwell",
 ]
 
 [[package]]
@@ -109,6 +109,7 @@ dependencies = [
  "gt-diag",
  "gt-effects",
  "gt-fmt",
+ "gt-guard",
  "gt-mir",
  "gt-oblig",
  "gt-parser",
@@ -147,6 +148,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gt-guard"
+version = "0.1.0"
+dependencies = [
+ "gt-llvm",
+]
+
+[[package]]
 name = "gt-lexer"
 version = "0.1.0"
 dependencies = [
@@ -154,6 +162,13 @@ dependencies = [
  "unicode-ident",
  "unicode-normalization",
  "unicode-script",
+]
+
+[[package]]
+name = "gt-llvm"
+version = "0.1.0"
+dependencies = [
+ "inkwell",
 ]
 
 [[package]]

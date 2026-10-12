@@ -6,9 +6,8 @@
 //! * Thứ gì chưa hạ được ⇒ `CodegenError::Unsupported` (fail-closed: KHÔNG sinh nhị phân sai, KHÔNG đoán).
 //! * Thông dịch MIR KHÔNG phải bằng chứng cho codegen; codegen có test riêng chạy nhị phân thật.
 mod lower;
-mod shim;
 
-pub use lower::{Compiled, Options, compile};
+pub use lower::{Compiled, Inject, Options, compile};
 
 use std::fmt;
 
@@ -19,6 +18,8 @@ pub enum CodegenError {
     Unsupported(String),
     /// Lỗi nội bộ (LLVM verifier từ chối IR, thiếu thân MIR...): ICE.
     Internal(String),
+    /// IR Guard từ chối (E1101, ĐỎ): danh sách vi phạm; KHÔNG có object.
+    Guard(Vec<String>),
 }
 
 impl fmt::Display for CodegenError {
@@ -26,6 +27,7 @@ impl fmt::Display for CodegenError {
         match self {
             CodegenError::Unsupported(m) => write!(f, "backend llvm chưa hỗ trợ: {m}"),
             CodegenError::Internal(m) => write!(f, "lỗi nội bộ codegen: {m}"),
+            CodegenError::Guard(v) => write!(f, "IR Guard từ chối: {}", v.join("; ")),
         }
     }
 }

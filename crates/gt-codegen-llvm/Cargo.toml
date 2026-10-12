@@ -4,16 +4,16 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "Grit M10 (ADR-029): hạ MIR sau M7 thành LLVM IR (inkwell/LLVM-C 20.1.8 liên kết động, nạp trễ). Crate DUY NHẤT có unsafe/FFI."
+description = "Grit M10 (ADR-029): hạ MIR sau M7 thành LLVM IR (inkwell/LLVM-C 20.1.8 liên kết động, nạp trễ). FFI thô nằm ở gt-llvm; ở đây chỉ còn một `unsafe` có chú thích (GEP có chỉ số đã kiểm)."
 
 [dependencies]
 gt-ast = { path = "../gt-ast" }
 gt-resolve = { path = "../gt-resolve" }
 gt-types = { path = "../gt-types" }
 gt-mir = { path = "../gt-mir" }
-inkwell = { version = "=0.10.0", default-features = false, features = ["llvm20-1-no-llvm-linking", "target-x86"] }
+gt-llvm = { path = "../gt-llvm" }
 
-# unsafe CHỈ được phép ở đây (ADR-029 §3): `deny` rồi `#[allow]` có chủ đích ở shim.rs; phần còn lại của crate không dùng unsafe.
+# `deny` + `#[allow]` có chú thích SAFETY duy nhất ở `gep` (lower.rs).
 [lints.rust]
 unsafe_code = "deny"
 

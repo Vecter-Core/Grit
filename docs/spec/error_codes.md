@@ -51,7 +51,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0902 | Obligation không kiểm lúc chạy được mà chưa giải (D25): lượng từ không có biên `a..b`; `⊳` cần gọi lúc chạy mà đối số không `Copy`; `⊲` nhắc tham số bị gán lại | M7 | E0902_quantifier_over_range_value, E0902_noncopy_argument_unproven_pre, E0902_post_names_reassigned_param |
 | E1001 | `⚠` thiếu bằng chứng (D21: Phase 1 chưa giải được nghĩa vụ `⊢` nào ⇒ mọi `⚠` ở mã người dùng); con trỏ thô `*□ T`/`*μ T` ngoài `⚠` (Q12, Q13) | M7 (cài ở M9) | E1001_unsafe_unproven, E1001_raw_ptr_outside_unsafe, E1001_unsafe_empty_block |
 | E1002 | Thuộc tính `#lang` dùng ngoài `lib/core`/prelude (ADR-018 §5, Q21) | M4 | E1002_lang_on_fn, E1002_lang_on_struct, E1002_lang_on_trait |
-| E1101 | IR Guard: attestation lệch | M10 | — |
+| E1101 | IR Guard từ chối IR của backend llvm: verifier, attestation lệch, thao tác nhạy cảm thiếu `!gt.obl`, `unreachable` sai mẫu, cờ UB (ADR-029 §6). Không có mẫu `.gt` (không đầu vào hợp lệ nào kích hoạt); kiểm bằng gt-guard/tests/guard.rs và gt-driver/tests/llvm.rs | M10 | — |
 | E1201 | Ký tự bidi (D15) | M1 | E1201_bidi |
 | E1202 | Ký tự zero-width/vô hình | M1 | E1202_zero_width |
 | E1203 | Định danh trộn bảng chữ/homoglyph | M1 | E1203_homoglyph |

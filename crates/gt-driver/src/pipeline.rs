@@ -125,6 +125,18 @@ pub struct CheckResult {
 }
 
 impl CheckResult {
+    /// IR Guard từ chối IR đã sinh (E1101): ghi chẩn đoán ĐỎ và đóng cổng (không còn sản phẩm nào lấy được).
+    pub fn reject_ir(&mut self, violations: &[String]) {
+        for v in violations {
+            self.report.diagnostics.push(gritc_diag(
+                "E1101",
+                format!("IR Guard từ chối IR do backend sinh: {v}"),
+            ));
+        }
+        self.verdict = Verdict::Red;
+        self.artifacts = None;
+    }
+
     /// CỔNG: chỉ trả sản phẩm khi phán quyết cho phép (XANH/VÀNG). ĐỎ/ICE ⇒ `None`: không có gì để ghi hay chạy.
     #[must_use]
     pub fn open_gate(&self) -> Option<&Artifacts> {

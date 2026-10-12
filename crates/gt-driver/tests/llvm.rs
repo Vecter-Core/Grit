@@ -472,3 +472,86 @@ fn unsupported_construct_is_refused_without_exe() {
     assert!(!exe.exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// IR Guard (E1101) ở mức tiến trình: IR bị làm hỏng có chủ đích ⇒ gritc ĐỎ (mã 1), KHÔNG exe, KHÔNG chạy.
+#[test]
+fn ir_guard_rejects_tampered_ir_at_process_level() {
+    for (fault, needle) in [
+        ("ir:unreachable", "không đúng mẫu abort"),
+        ("ir:strip-obl", "thiếu metadata !gt.obl"),
+        ("ir:attest", "attestation lệch"),
+    ] {
+        let dir = scratch("guard");
+        let f = dir.join("prog.gt");
+        std::fs::write(&f, THREADS).expect("ghi");
+        let exe = dir.join("g.exe");
+        let o = gritc()
+            .env("GRITC_FAULT", fault)
+            .args(["build", "--backend=llvm", "-o"])
+            .arg(&exe)
+            .arg(&f)
+            .output()
+            .expect("chạy");
+        let err = String::from_utf8_lossy(&o.stderr).into_owned();
+        assert_eq!(o.status.code(), Some(1), "{fault}: {err}");
+        assert!(
+            err.contains("E1101") && err.contains(needle),
+            "{fault}: {err}"
+        );
+        assert!(!exe.exists(), "{fault}: ĐỎ ⇒ KHÔNG được có exe");
+        assert!(
+            !dir.join("g.exe.obj").exists(),
+            "{fault}: không để lại object"
+        );
+        // run: cũng mã 1 và không chạy chương trình (đa luồng sẽ in kết quả nếu chạy)
+        let o = gritc()
+            .env("GRITC_FAULT", fault)
+            .args(["run", "--json", "--backend=llvm"])
+            .arg(&f)
+            .output()
+            .expect("chạy");
+        assert_eq!(o.status.code(), Some(1), "{fault}");
+        let text = String::from_utf8_lossy(&o.stdout).into_owned();
+        let v: serde_json::Value = serde_json::from_str(text.lines().last().unwrap_or(""))
+            .unwrap_or_else(|e| panic!("JSON ({e}): {text}"));
+        assert_eq!(v["verdict"], "red", "{fault}");
+        assert!(
+            v["run"].is_null() || v.get("run").is_none(),
+            "{fault}: không được có kết quả chạy"
+        );
+        assert!(text.contains("E1101"), "{fault}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+/// exe mang attestation của lần check (chứng cứ truy vết): chuỗi có trong nhị phân và khớp JSON của `build`.
+#[test]
+fn exe_carries_the_attestation_of_the_check() {
+    let dir = scratch("att");
+    let f = dir.join("prog.gt");
+    std::fs::write(&f, "ƒ main() → u32 ! ∅ { 7 }\n").expect("ghi");
+    let exe = dir.join("a.exe");
+    let o = gritc()
+        .args(["build", "--json", "--backend=llvm", "-o"])
+        .arg(&exe)
+        .arg(&f)
+        .output()
+        .expect("chạy");
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let text = String::from_utf8_lossy(&o.stdout).into_owned();
+    let v: serde_json::Value =
+        serde_json::from_str(text.lines().last().unwrap_or("")).expect("JSON");
+    let att = v["attestation"].as_str().expect("attestation").to_string();
+    assert_eq!(att.len(), 64, "{att}");
+    let bytes = std::fs::read(&exe).expect("đọc exe");
+    assert!(
+        bytes.windows(att.len()).any(|w| w == att.as_bytes()),
+        "exe không mang attestation {att}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
