@@ -1,28 +1,36 @@
 //! Hạ MIR → LLVM IR. Mọi local là một `alloca` (dev profile, không tối ưu): đơn giản, đúng, dễ đối chiếu với thông dịch.
+//!
+//! Đơn hình hoá: mỗi (hàm, đối số kiểu cụ thể) là một hàm LLVM; mọi kiểu trong thân được thế tham số trước khi hạ.
+//! Con trỏ béo (`&[T]`, `&str`) = `{ ptr, i64 }`. Enum = `{ i64 tag, [k x i64] payload }`. `Mutex<T,L>` = `{ T, i64 khoá }`.
 use crate::{CodegenError, abort_kind};
 use gt_ast::NodeId;
 use gt_mir::{
-    AggregateKind, AssertKind, BinOp, Body, BodyKind, Callee, Const, Operand, Place, PlaceElem,
-    Rvalue, StatementKind, TerminatorKind, UnOp,
+    AggregateKind, AssertKind, BinOp, Body, BodyKind, Callee, Const, Local, Operand, Place,
+    PlaceElem, Rvalue, StatementKind, TerminatorKind, UnOp,
 };
-use gt_types::{AdtKind, IntTy, Ty, TypesOutput};
+use gt_types::{AdtDef, AdtKind, IntTy, Lang, ParamId, Ty, TypesOutput};
 use inkwell::AddressSpace;
+use inkwell::AtomicOrdering;
+use inkwell::AtomicRMWBinOp;
 use inkwell::IntPredicate;
 use inkwell::OptimizationLevel;
-use inkwell::attributes::AttributeLoc;
+use inkwell::attributes::{Attribute, AttributeLoc};
 use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::intrinsics::Intrinsic;
 use inkwell::module::Module;
 use inkwell::targets::{
-    CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
+    CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetData, TargetMachine,
 };
-use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, IntType};
+use inkwell::types::{
+    BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, IntType, StructType,
+};
 use inkwell::values::{
-    BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, IntValue, PointerValue,
+    BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, GlobalValue, IntValue,
+    PointerValue,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 type R<T> = Result<T, CodegenError>;
 
@@ -41,7 +49,7 @@ fn llvm<T, E: std::fmt::Display>(r: Result<T, E>) -> R<T> {
 /// Tuỳ chọn biên dịch.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Options {
-    /// Gọi `gritrt_report_int` với kết quả `main` (số nguyên/bool) — chỉ để đối chứng với thông dịch.
+    /// Gọi `gritrt_report_int` với kết quả `main` (số nguyên/bool) — chỉ để đối chiếu với thông dịch.
     pub report_result: bool,
 }
 
@@ -70,16 +78,51 @@ fn find_main(bodies: &[Body]) -> R<&Body> {
     }
 }
 
+/// Một instance đơn hình hoá.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Inst {
+    node: NodeId,
+    args: Vec<Ty>,
+}
+
+/// Hàm không có thân MIR mà backend tự hạ (lang item / runtime).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Intr {
+    Abort,
+    SliceLen,
+    Spawn,
+    AtomicNew,
+    AtomicLoad,
+    AtomicStore,
+    AtomicSwap,
+    AtomicFetchAdd,
+    AtomicFetchSub,
+    AtomicCas,
+    MutexNew,
+    MutexWith,
+    CellNew,
+    CellGet,
+    CellSet,
+}
+
 struct Cg<'ctx, 'a> {
     ctx: &'ctx Context,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
+    td: TargetData,
     t: &'a TypesOutput,
     bodies: &'a [Body],
     keys: &'a BTreeMap<NodeId, String>,
-    funcs: BTreeMap<NodeId, FunctionValue<'ctx>>,
-    pending: Vec<NodeId>,
+    funcs: BTreeMap<Inst, FunctionValue<'ctx>>,
+    pending: Vec<Inst>,
     abort_fn: FunctionValue<'ctx>,
+    nfuncs: usize,
+    /// static: node → (global, kiểu)
+    statics: BTreeMap<NodeId, (GlobalValue<'ctx>, Ty)>,
+    static_order: Vec<NodeId>,
+    static_refs: BTreeMap<NodeId, BTreeSet<NodeId>>,
+    strings: BTreeMap<String, GlobalValue<'ctx>>,
+    tramps: BTreeMap<Ty, FunctionValue<'ctx>>,
 }
 
 /// Biên dịch cả chương trình. Gọi SAU khi cổng phán quyết cho phép (xanh/vàng) — chính hàm này không kiểm lại M4–M9.
@@ -90,41 +133,6 @@ pub fn compile(
     keys: &BTreeMap<NodeId, String>,
     opts: &Options,
 ) -> R<Compiled> {
-    let ctx = Context::create();
-    let module = ctx.create_module("grit");
-    let builder = ctx.create_builder();
-    let abort_ty = ctx.void_type().fn_type(&[ctx.i32_type().into()], false);
-    let abort_fn = module.add_function("gritrt_abort", abort_ty, None);
-    let noret = ctx.create_enum_attribute(
-        inkwell::attributes::Attribute::get_named_enum_kind_id("noreturn"),
-        0,
-    );
-    abort_fn.add_attribute(AttributeLoc::Function, noret);
-    let mut cg = Cg {
-        ctx: &ctx,
-        module,
-        builder,
-        t,
-        bodies,
-        keys,
-        funcs: BTreeMap::new(),
-        pending: Vec::new(),
-        abort_fn,
-    };
-
-    let main = find_main(bodies)?;
-    let main_fn = cg.get_fn(main.node)?;
-    while let Some(node) = cg.pending.pop() {
-        let body = cg.body_of(node)?;
-        cg.define_body(body)?;
-    }
-    cg.emit_entry(main, main_fn, opts)?;
-
-    if let Err(e) = cg.module.verify() {
-        return internal(format!("LLVM verifier từ chối IR: {}", e.to_string()));
-    }
-    let ir = cg.module.print_to_string().to_string();
-
     Target::initialize_x86(&InitializationConfig::default());
     let triple = TargetMachine::get_default_triple();
     let target = llvm(Target::from_triple(&triple))?;
@@ -138,14 +146,109 @@ pub fn compile(
     ) else {
         return internal("không tạo được TargetMachine");
     };
-    cg.module.set_triple(&triple);
-    cg.module
-        .set_data_layout(&tm.get_target_data().get_data_layout());
+    let ctx = Context::create();
+    let module = ctx.create_module("grit");
+    module.set_triple(&triple);
+    let td = tm.get_target_data();
+    module.set_data_layout(&td.get_data_layout());
+    let builder = ctx.create_builder();
+    let abort_ty = ctx.void_type().fn_type(&[ctx.i32_type().into()], false);
+    let abort_fn = module.add_function("gritrt_abort", abort_ty, None);
+    abort_fn.add_attribute(AttributeLoc::Function, noreturn(&ctx));
+    let mut cg = Cg {
+        ctx: &ctx,
+        module,
+        builder,
+        td,
+        t,
+        bodies,
+        keys,
+        funcs: BTreeMap::new(),
+        pending: Vec::new(),
+        abort_fn,
+        nfuncs: 0,
+        statics: BTreeMap::new(),
+        static_order: Vec::new(),
+        static_refs: BTreeMap::new(),
+        strings: BTreeMap::new(),
+        tramps: BTreeMap::new(),
+    };
+
+    let main = find_main(bodies)?;
+    let main_inst = Inst {
+        node: main.node,
+        args: Vec::new(),
+    };
+    let main_fn = cg.get_fn(&main_inst)?;
+    // lặp tới khi hết hàng đợi VÀ mọi static đã có hàm khởi tạo
+    let mut done_statics = 0;
+    loop {
+        while let Some(inst) = cg.pending.pop() {
+            let body = cg.body_of(inst.node)?;
+            cg.define_body(&inst, body)?;
+        }
+        if done_statics == cg.static_order.len() {
+            break;
+        }
+        for i in done_statics..cg.static_order.len() {
+            let node = cg.static_order[i];
+            cg.get_fn(&Inst {
+                node,
+                args: Vec::new(),
+            })?;
+        }
+        done_statics = cg.static_order.len();
+    }
+    cg.emit_entry(main, main_fn, opts)?;
+
+    if let Err(e) = cg.module.verify() {
+        return internal(format!("LLVM verifier từ chối IR: {}", e.to_string()));
+    }
+    let ir = cg.module.print_to_string().to_string();
     let buf = llvm(tm.write_to_memory_buffer(&cg.module, FileType::Object))?;
     Ok(Compiled {
         ir,
         object: buf.as_slice().to_vec(),
     })
+}
+
+fn noreturn(ctx: &Context) -> Attribute {
+    ctx.create_enum_attribute(Attribute::get_named_enum_kind_id("noreturn"), 0)
+}
+
+fn subst_inst(ty: &Ty, params: &[ParamId], args: &[Ty]) -> Ty {
+    ty.subst(&|p| {
+        params
+            .iter()
+            .position(|q| *q == p)
+            .and_then(|i| args.get(i).cloned())
+    })
+}
+
+/// Trạng thái riêng của một hàm đang hạ.
+struct Fx<'ctx, 'b> {
+    f: FunctionValue<'ctx>,
+    body: &'b Body,
+    params: Vec<ParamId>,
+    args: Vec<Ty>,
+    /// kiểu đã thế của mọi local
+    local_tys: Vec<Ty>,
+    locals: Vec<PointerValue<'ctx>>,
+    blocks: Vec<BasicBlock<'ctx>>,
+    traps: usize,
+    /// local gán đúng một lần bằng aggregate không trường của `Ordering` ⇒ chỉ số biến thể (hằng lúc biên dịch)
+    ord_consts: BTreeMap<usize, u32>,
+    /// local tạm gán MỘT lần từ `Const::Item(static)` ⇒ là BÍ DANH của static (KHÔNG sao chép)
+    static_alias: BTreeMap<usize, NodeId>,
+    owner_static: Option<NodeId>,
+}
+
+/// Một chỗ đã tính: con trỏ tới ô nhớ + kiểu + (chỉ khi không kích thước) độ dài + biến thể đang xem.
+struct PlaceVal<'ctx> {
+    ptr: PointerValue<'ctx>,
+    ty: Ty,
+    meta: Option<IntValue<'ctx>>,
+    variant: Option<u32>,
 }
 
 impl<'ctx, 'a> Cg<'ctx, 'a> {
@@ -155,6 +258,10 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             Some(b) => Ok(b),
             None => internal(format!("thiếu thân MIR cho node {node:?}")),
         }
+    }
+
+    fn has_body(&self, node: NodeId) -> bool {
+        self.bodies.iter().any(|b| b.node == node)
     }
 
     fn int_type(&self, it: IntTy) -> IntType<'ctx> {
@@ -169,6 +276,10 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             .expect("độ rộng số nguyên hợp lệ")
     }
 
+    fn i64t(&self) -> IntType<'ctx> {
+        self.ctx.i64_type()
+    }
+
     fn unit_type(&self) -> BasicTypeEnum<'ctx> {
         self.ctx.struct_type(&[], false).into()
     }
@@ -177,11 +288,52 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         self.ctx.ptr_type(AddressSpace::default())
     }
 
-    fn is_sized(ty: &Ty) -> bool {
-        !matches!(ty, Ty::Str | Ty::Slice(_))
+    fn fat_type(&self) -> StructType<'ctx> {
+        self.ctx
+            .struct_type(&[self.ptr_type().into(), self.i64t().into()], false)
     }
 
-    /// Kiểu LLVM của một kiểu Grit (không đa hình). Gặp thứ chưa hỗ trợ ⇒ `Unsupported`.
+    fn is_unsized(ty: &Ty) -> bool {
+        matches!(ty, Ty::Str | Ty::Slice(_))
+    }
+
+    fn adt_subst(adt: &AdtDef, args: &[Ty], ty: &Ty) -> Ty {
+        ty.subst(&|p| {
+            adt.generics
+                .iter()
+                .position(|g| g.id == p)
+                .and_then(|i| args.get(i).cloned())
+        })
+    }
+
+    /// Kiểu của các trường của một biến thể (struct: biến thể 0) sau khi thế đối số.
+    fn variant_fields(&self, def: gt_resolve::DefId, args: &[Ty], v: u32) -> R<Vec<Ty>> {
+        let Some(adt) = self.t.db.adts.get(&def) else {
+            return internal("ADT không có trong db");
+        };
+        if adt.generics.len() != args.len() {
+            return internal("số đối số kiểu của ADT không khớp");
+        }
+        let raw: Vec<&Ty> = match &adt.kind {
+            AdtKind::Struct(fs) => fs.iter().map(|f| &f.ty).collect(),
+            AdtKind::Enum(vs) => match vs.get(v as usize) {
+                Some(var) => var.fields.iter().collect(),
+                None => return internal("biến thể không tồn tại"),
+            },
+        };
+        Ok(raw.iter().map(|t| Self::adt_subst(adt, args, t)).collect())
+    }
+
+    fn variant_struct(&self, def: gt_resolve::DefId, args: &[Ty], v: u32) -> R<StructType<'ctx>> {
+        let fs = self
+            .variant_fields(def, args, v)?
+            .iter()
+            .map(|t| self.lower_ty(t))
+            .collect::<R<Vec<_>>>()?;
+        Ok(self.ctx.struct_type(&fs, false))
+    }
+
+    /// Kiểu LLVM của một kiểu Grit ĐÃ CỤ THỂ. Gặp thứ chưa hỗ trợ ⇒ `Unsupported`.
     fn lower_ty(&self, ty: &Ty) -> R<BasicTypeEnum<'ctx>> {
         Ok(match ty {
             Ty::Int(it) => self.int_type(*it).into(),
@@ -197,36 +349,52 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 self.lower_ty(e)?.array_type(n).into()
             }
             Ty::Ref(_, inner) | Ty::RawPtr(_, inner) => {
-                if !Self::is_sized(inner) {
-                    return unsupported("tham chiếu tới slice/str (con trỏ béo)");
+                if Self::is_unsized(inner) {
+                    self.fat_type().into()
+                } else {
+                    self.ptr_type().into()
                 }
-                self.ptr_type().into()
             }
             Ty::Fn(..) => self.ptr_type().into(),
             Ty::Adt(def, args) => {
                 let Some(adt) = self.t.db.adts.get(def) else {
                     return internal("ADT không có trong db");
                 };
-                if !args.is_empty() || !adt.generics.is_empty() {
-                    return unsupported("ADT đa hình (cần đơn hình hoá)");
-                }
-                if adt.lang.is_some() {
-                    return unsupported(format!("kiểu lang item {:?}", adt.lang));
-                }
-                match &adt.kind {
-                    AdtKind::Struct(fs) => {
-                        let ts = fs
-                            .iter()
-                            .map(|f| self.lower_ty(&f.ty))
-                            .collect::<R<Vec<_>>>()?;
-                        self.ctx.struct_type(&ts, false).into()
+                match (&adt.kind, adt.lang) {
+                    (AdtKind::Struct(_), Some(Lang::Mutex)) => {
+                        let fs = self.variant_fields(*def, args, 0)?;
+                        let [t0] = fs.as_slice() else {
+                            return internal("Mutex phải có đúng một trường");
+                        };
+                        // { T, khoá 8 byte } — trường `v` giữ chỉ số 0
+                        self.ctx
+                            .struct_type(&[self.lower_ty(t0)?, self.i64t().into()], false)
+                            .into()
                     }
-                    AdtKind::Enum(_) => return unsupported("enum"),
+                    (AdtKind::Struct(_), _) => self.variant_struct(*def, args, 0)?.into(),
+                    (AdtKind::Enum(vs), _) => {
+                        let mut max = 0u64;
+                        for v in 0..vs.len() {
+                            let st = self.variant_struct(*def, args, v as u32)?;
+                            if self.td.get_abi_alignment(&st) > 8 {
+                                return unsupported("biến thể enum cần căn lề > 8");
+                            }
+                            max = max.max(self.td.get_abi_size(&st));
+                        }
+                        let k = u32::try_from(max.div_ceil(8))
+                            .or_else(|_| unsupported("enum quá lớn"))?;
+                        self.ctx
+                            .struct_type(
+                                &[self.i64t().into(), self.i64t().array_type(k).into()],
+                                false,
+                            )
+                            .into()
+                    }
                 }
             }
             Ty::Float(_) => return unsupported("số thực"),
             Ty::Str | Ty::Slice(_) => return unsupported("kiểu không kích thước đứng riêng"),
-            Ty::Param(_) | Ty::Infer(_) => return unsupported("tham số kiểu (cần đơn hình hoá)"),
+            Ty::Param(_) | Ty::Infer(_) => return unsupported("tham số kiểu chưa được thế"),
             Ty::Err => return internal("Ty::Err sau cổng"),
         })
     }
@@ -239,23 +407,59 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         Ok(self.lower_ty(ret)?.fn_type(&ps, false))
     }
 
-    /// Khai báo (lần đầu) một hàm có thân MIR và xếp hàng để định nghĩa.
-    fn get_fn(&mut self, node: NodeId) -> R<FunctionValue<'ctx>> {
-        if let Some(f) = self.funcs.get(&node) {
+    /// Thứ tự tham số kiểu của một thân: generics của impl (nếu thành viên) rồi của hàm.
+    fn params_of(&self, node: NodeId) -> Vec<ParamId> {
+        for imp in &self.t.db.impls {
+            for m in &imp.members {
+                if m.node == node {
+                    return imp
+                        .generics
+                        .iter()
+                        .chain(m.generics.iter())
+                        .map(|g| g.id)
+                        .collect();
+                }
+            }
+        }
+        for (sig, _) in self.t.db.fns.values() {
+            if sig.node == node {
+                return sig.generics.iter().map(|g| g.id).collect();
+            }
+        }
+        Vec::new()
+    }
+
+    /// Khai báo (lần đầu) một instance có thân MIR và xếp hàng để định nghĩa.
+    fn get_fn(&mut self, inst: &Inst) -> R<FunctionValue<'ctx>> {
+        if let Some(f) = self.funcs.get(inst) {
             return Ok(*f);
         }
-        let body = self.body_of(node)?;
-        if body.kind != BodyKind::Fn {
-            return unsupported("gọi thân không phải hàm");
+        let body = self.body_of(inst.node)?;
+        let params = self.params_of(inst.node);
+        if params.len() != inst.args.len() {
+            return unsupported(format!(
+                "`{}`: số đối số kiểu ({}) không khớp số tham số ({}) — có thể là thành viên trait/mặc định",
+                body.key,
+                inst.args.len(),
+                params.len()
+            ));
         }
-        let params: Vec<Ty> = (1..=body.arg_count)
-            .map(|i| body.locals[i].ty.clone())
-            .collect();
-        let ft = self.fn_type(&params, body.return_ty())?;
-        let name = format!("{}#{}.{}", body.key, node.file().raw(), node.raw());
+        let sub = |ty: &Ty| subst_inst(ty, &params, &inst.args);
+        let ft = match body.kind {
+            BodyKind::Fn => {
+                let ps: Vec<Ty> = (1..=body.arg_count)
+                    .map(|i| sub(&body.locals[i].ty))
+                    .collect();
+                self.fn_type(&ps, &sub(body.return_ty()))?
+            }
+            BodyKind::Const | BodyKind::Static => self.fn_type(&[], &sub(body.return_ty()))?,
+            BodyKind::Pre | BodyKind::Post => return unsupported("thân hợp đồng"),
+        };
+        let name = format!("{}#{}", body.key, self.nfuncs);
+        self.nfuncs += 1;
         let f = self.module.add_function(&name, ft, None);
-        self.funcs.insert(node, f);
-        self.pending.push(node);
+        self.funcs.insert(inst.clone(), f);
+        self.pending.push(inst.clone());
         Ok(f)
     }
 
@@ -264,14 +468,26 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         let entry = self.module.add_function("gt_entry", entry_ty, None);
         let bb = self.ctx.append_basic_block(entry, "entry");
         self.builder.position_at_end(bb);
+        // khởi tạo static (theo thứ tự phụ thuộc) TRƯỚC main
+        for node in self.static_init_order() {
+            let g = self.statics[&node].0;
+            let f = self.funcs[&Inst {
+                node,
+                args: Vec::new(),
+            }];
+            let call = llvm(self.builder.build_call(f, &[], "sinit"))?;
+            let Some(v) = call.try_as_basic_value().basic() else {
+                return internal("hàm khởi tạo static không trả giá trị");
+            };
+            llvm(self.builder.build_store(g.as_pointer_value(), v))?;
+        }
         let r = llvm(self.builder.build_call(main_fn, &[], "main"))?;
         if opts.report_result {
-            let v = r.try_as_basic_value();
-            let value = v.basic();
-            let rep_ty = self.ctx.void_type().fn_type(
-                &[self.ctx.i64_type().into(), self.ctx.i32_type().into()],
-                false,
-            );
+            let value = r.try_as_basic_value().basic();
+            let rep_ty = self
+                .ctx
+                .void_type()
+                .fn_type(&[self.i64t().into(), self.ctx.i32_type().into()], false);
             let rep = self.module.add_function("gritrt_report_int", rep_ty, None);
             match main.return_ty() {
                 Ty::Int(it) => {
@@ -281,11 +497,16 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     if it.bits() > 64 {
                         return unsupported("báo kết quả main rộng hơn 64 bit");
                     }
-                    let i64t = self.ctx.i64_type();
                     let w = if it.signed() {
-                        llvm(self.builder.build_int_s_extend_or_bit_cast(iv, i64t, "w"))?
+                        llvm(
+                            self.builder
+                                .build_int_s_extend_or_bit_cast(iv, self.i64t(), "w"),
+                        )?
                     } else {
-                        llvm(self.builder.build_int_z_extend_or_bit_cast(iv, i64t, "w"))?
+                        llvm(
+                            self.builder
+                                .build_int_z_extend_or_bit_cast(iv, self.i64t(), "w"),
+                        )?
                     };
                     let s = self.ctx.i32_type().const_int(u64::from(it.signed()), false);
                     llvm(self.builder.build_call(rep, &[w.into(), s.into()], ""))?;
@@ -294,10 +515,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     let Some(BasicValueEnum::IntValue(iv)) = value else {
                         return internal("main không trả bool");
                     };
-                    let w = llvm(
-                        self.builder
-                            .build_int_z_extend(iv, self.ctx.i64_type(), "w"),
-                    )?;
+                    let w = llvm(self.builder.build_int_z_extend(iv, self.i64t(), "w"))?;
                     let s = self.ctx.i32_type().const_zero();
                     llvm(self.builder.build_call(rep, &[w.into(), s.into()], ""))?;
                 }
@@ -327,27 +545,73 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         Ok(())
     }
 
-    fn define_body(&mut self, body: &Body) -> R<()> {
-        let f = self.funcs[&body.node];
+    /// Thứ tự khởi tạo static: phụ thuộc TRỰC TIẾP trước (DFS hậu thứ tự, ổn định theo thứ tự phát hiện).
+    fn static_init_order(&self) -> Vec<NodeId> {
+        fn visit(
+            n: NodeId,
+            refs: &BTreeMap<NodeId, BTreeSet<NodeId>>,
+            seen: &mut BTreeSet<NodeId>,
+            out: &mut Vec<NodeId>,
+        ) {
+            if !seen.insert(n) {
+                return;
+            }
+            if let Some(ds) = refs.get(&n) {
+                for d in ds {
+                    visit(*d, refs, seen, out);
+                }
+            }
+            out.push(n);
+        }
+        let mut seen = BTreeSet::new();
+        let mut out = Vec::new();
+        for n in &self.static_order {
+            visit(*n, &self.static_refs, &mut seen, &mut out);
+        }
+        out
+    }
+
+    fn define_body(&mut self, inst: &Inst, body: &'a Body) -> R<()> {
+        let f = self.funcs[inst];
+        let params = self.params_of(inst.node);
+        let local_tys: Vec<Ty> = body
+            .locals
+            .iter()
+            .map(|l| subst_inst(&l.ty, &params, &inst.args))
+            .collect();
         let mut fx = Fx {
             f,
             body,
+            params,
+            args: inst.args.clone(),
+            local_tys,
             locals: Vec::new(),
             blocks: Vec::new(),
             traps: 0,
+            ord_consts: BTreeMap::new(),
+            static_alias: BTreeMap::new(),
+            owner_static: (body.kind == BodyKind::Static).then_some(body.node),
         };
+        self.prescan(&mut fx)?;
         let entry = self.ctx.append_basic_block(f, "alloca");
         self.builder.position_at_end(entry);
-        for (i, l) in body.locals.iter().enumerate() {
-            let ty = self.lower_ty(&l.ty)?;
+        for i in 0..body.locals.len() {
+            if fx.static_alias.contains_key(&i) {
+                // bí danh: không cần ô nhớ riêng (chỗ thật là global của static)
+                fx.locals.push(self.ptr_type().const_null());
+                continue;
+            }
+            let ty = self.lower_ty(&fx.local_tys[i])?;
             let p = llvm(self.builder.build_alloca(ty, &format!("l{i}")))?;
             fx.locals.push(p);
         }
-        for i in 0..body.arg_count {
-            let Some(arg) = f.get_nth_param(u32::try_from(i).unwrap_or(u32::MAX)) else {
-                return internal("thiếu tham số hàm");
-            };
-            llvm(self.builder.build_store(fx.locals[i + 1], arg))?;
+        if body.kind == BodyKind::Fn {
+            for i in 0..body.arg_count {
+                let Some(arg) = f.get_nth_param(u32::try_from(i).unwrap_or(u32::MAX)) else {
+                    return internal("thiếu tham số hàm");
+                };
+                llvm(self.builder.build_store(fx.locals[i + 1], arg))?;
+            }
         }
         for i in 0..body.blocks.len() {
             fx.blocks
@@ -373,6 +637,81 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         Ok(())
     }
 
+    /// Quét thân: (a) local gán một lần bằng `Ordering::X` ⇒ hằng; (b) local TẠM gán một lần từ `Const::Item(static)` ⇒ bí danh.
+    fn prescan(&mut self, fx: &mut Fx<'ctx, 'a>) -> R<()> {
+        let body = fx.body;
+        let mut assigns: BTreeMap<usize, usize> = BTreeMap::new();
+        let ord_def = self.t.db.lang.get(&Lang::Ordering).copied();
+        let mut ord: BTreeMap<usize, u32> = BTreeMap::new();
+        let mut stat: BTreeMap<usize, NodeId> = BTreeMap::new();
+        for bd in &body.blocks {
+            for s in &bd.statements {
+                let StatementKind::Assign(p, rv) = &s.kind else {
+                    continue;
+                };
+                if p.projection.is_empty() {
+                    *assigns.entry(p.local.index()).or_insert(0) += 1;
+                    match rv {
+                        Rvalue::Aggregate(AggregateKind::Adt(d, v, _), ops)
+                            if ops.is_empty() && Some(*d) == ord_def =>
+                        {
+                            ord.insert(p.local.index(), *v);
+                        }
+                        Rvalue::Use(Operand::Const(Const::Item { node, .. }))
+                            if self
+                                .bodies
+                                .iter()
+                                .any(|b| b.node == *node && b.kind == BodyKind::Static) =>
+                        {
+                            stat.insert(p.local.index(), *node);
+                        }
+                        _ => {}
+                    }
+                } else {
+                    // ghi vào một thành phần: không còn là "gán đúng một lần"
+                    *assigns.entry(p.local.index()).or_insert(0) += 2;
+                }
+            }
+            if let Some(t) = &bd.terminator
+                && let TerminatorKind::Call { dest, .. } = &t.kind
+            {
+                *assigns.entry(dest.local.index()).or_insert(0) += 2;
+            }
+        }
+        for (l, v) in ord {
+            if assigns.get(&l) == Some(&1) {
+                fx.ord_consts.insert(l, v);
+            }
+        }
+        for (l, node) in stat {
+            let is_temp = matches!(body.locals[l].kind, gt_mir::LocalKind::Temp);
+            if assigns.get(&l) == Some(&1) && is_temp {
+                fx.static_alias.insert(l, node);
+                self.static_global(node)?;
+                if let Some(owner) = fx.owner_static {
+                    self.static_refs.entry(owner).or_default().insert(node);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Global của một static (tạo lần đầu, xếp hàng hàm khởi tạo).
+    fn static_global(&mut self, node: NodeId) -> R<GlobalValue<'ctx>> {
+        if let Some((g, _)) = self.statics.get(&node) {
+            return Ok(*g);
+        }
+        let body = self.body_of(node)?;
+        let ty = body.return_ty().clone();
+        let lt = self.lower_ty(&ty)?;
+        let name = format!("static.{}", body.key);
+        let g = self.module.add_global(lt, None, &name);
+        g.set_initializer(&lt.const_zero());
+        self.statics.insert(node, (g, ty));
+        self.static_order.push(node);
+        Ok(g)
+    }
+
     /// Khối `trap.N`: `call @gritrt_abort(kind)` rồi `unreachable` — chỗ DUY NHẤT sinh `unreachable` (ADR-029 §3).
     fn trap_block(&mut self, fx: &mut Fx<'ctx, '_>, kind: u64) -> R<BasicBlock<'ctx>> {
         let here = self.builder.get_insert_block();
@@ -383,11 +722,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         self.builder.position_at_end(bb);
         let k = self.ctx.i32_type().const_int(kind, false);
         let call = llvm(self.builder.build_call(self.abort_fn, &[k.into()], ""))?;
-        let noret = self.ctx.create_enum_attribute(
-            inkwell::attributes::Attribute::get_named_enum_kind_id("noreturn"),
-            0,
-        );
-        call.add_attribute(AttributeLoc::Function, noret);
+        call.add_attribute(AttributeLoc::Function, noreturn(self.ctx));
         llvm(self.builder.build_unreachable())?;
         if let Some(h) = here {
             self.builder.position_at_end(h);
@@ -406,72 +741,151 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
 
     // ---------------------------------------------------------------- chỗ (place) và toán hạng
 
-    fn place(&mut self, fx: &Fx<'ctx, '_>, p: &Place) -> R<(PointerValue<'ctx>, Ty)> {
-        let mut ptr = fx.locals[p.local.index()];
-        let mut ty = fx.body.locals[p.local.index()].ty.clone();
+    #[allow(unsafe_code)]
+    fn gep(
+        &self,
+        elem: BasicTypeEnum<'ctx>,
+        ptr: PointerValue<'ctx>,
+        idx: &[IntValue<'ctx>],
+    ) -> R<PointerValue<'ctx>> {
+        // SAFETY: mọi chỉ số đi vào đây đã được MIR kiểm bằng `Assert` ngay trước (`Index`/`Subslice`), hoặc là hằng của bố cục;
+        // IR Guard (bước 7) kiểm các `Assert` biên còn nguyên.
+        llvm(unsafe { self.builder.build_in_bounds_gep(elem, ptr, idx, "gep") })
+    }
+
+    fn sub(fx: &Fx<'ctx, '_>, ty: &Ty) -> Ty {
+        subst_inst(ty, &fx.params, &fx.args)
+    }
+
+    fn place(&mut self, fx: &Fx<'ctx, '_>, p: &Place) -> R<PlaceVal<'ctx>> {
+        let mut pv = PlaceVal {
+            ptr: fx.locals[p.local.index()],
+            ty: fx.local_tys[p.local.index()].clone(),
+            meta: None,
+            variant: None,
+        };
+        if let Some(node) = fx.static_alias.get(&p.local.index()) {
+            // bí danh: chỗ thật là global của static
+            pv.ptr = self.static_global(*node)?.as_pointer_value();
+            pv.ty = self.body_of(*node)?.return_ty().clone();
+        }
         for e in &p.projection {
             match e {
                 PlaceElem::Deref => {
-                    let inner = match &ty {
-                        Ty::Ref(_, i) | Ty::RawPtr(_, i) if Self::is_sized(i) => (**i).clone(),
-                        _ => return unsupported("Deref qua con trỏ béo hoặc kiểu lạ"),
+                    let (inner, unsized_) = match &pv.ty {
+                        Ty::Ref(_, i) | Ty::RawPtr(_, i) => ((**i).clone(), Self::is_unsized(i)),
+                        other => return internal(format!("Deref trên {other:?}")),
                     };
-                    let pt = self.ptr_type();
-                    let v = llvm(self.builder.build_load(pt, ptr, "deref"))?;
-                    ptr = v.into_pointer_value();
-                    ty = inner;
+                    if unsized_ {
+                        let fat = llvm(self.builder.build_load(self.fat_type(), pv.ptr, "fat"))?;
+                        let fv = fat.into_struct_value();
+                        let ptr = llvm(self.builder.build_extract_value(fv, 0, "p"))?;
+                        let len = llvm(self.builder.build_extract_value(fv, 1, "n"))?;
+                        pv.ptr = ptr.into_pointer_value();
+                        pv.meta = Some(len.into_int_value());
+                    } else {
+                        let v = llvm(self.builder.build_load(self.ptr_type(), pv.ptr, "deref"))?;
+                        pv.ptr = v.into_pointer_value();
+                        pv.meta = None;
+                    }
+                    pv.ty = inner;
+                    pv.variant = None;
                 }
                 PlaceElem::Field(i, fty) => {
-                    let ct = self.lower_ty(&ty)?;
-                    let BasicTypeEnum::StructType(st) = ct else {
-                        return internal("Field trên kiểu không phải struct");
-                    };
-                    ptr = llvm(self.builder.build_struct_gep(st, ptr, *i, "fld"))?;
-                    ty = fty.clone();
+                    let fty = Self::sub(fx, fty);
+                    match (&pv.ty, pv.variant) {
+                        (Ty::Adt(def, args), Some(v)) => {
+                            let (def, args) = (*def, args.clone());
+                            let et = self.lower_ty(&pv.ty)?.into_struct_type();
+                            let payload =
+                                llvm(self.builder.build_struct_gep(et, pv.ptr, 1, "pay"))?;
+                            let vs = self.variant_struct(def, &args, v)?;
+                            pv.ptr = llvm(self.builder.build_struct_gep(vs, payload, *i, "vf"))?;
+                        }
+                        _ => {
+                            let BasicTypeEnum::StructType(st) = self.lower_ty(&pv.ty)? else {
+                                return internal("Field trên kiểu không phải struct");
+                            };
+                            pv.ptr = llvm(self.builder.build_struct_gep(st, pv.ptr, *i, "fld"))?;
+                        }
+                    }
+                    pv.ty = fty;
+                    pv.variant = None;
+                    pv.meta = None;
                 }
                 PlaceElem::Index(l) => {
-                    let Ty::Array(elem, _) = &ty else {
-                        return unsupported("chỉ số trên slice");
-                    };
-                    let at = self.lower_ty(&ty)?;
-                    let i64t = self.ctx.i64_type();
-                    let idx = llvm(self.builder.build_load(i64t, fx.locals[l.index()], "idx"))?
-                        .into_int_value();
-                    // SAFETY-không-cần-unsafe: `build_in_bounds_gep` của inkwell là `unsafe fn`; chỉ số đã được `Assert` chặn trước đó.
-                    ptr = self.gep_array(at, ptr, idx)?;
-                    ty = (**elem).clone();
+                    let idx = llvm(self.builder.build_load(
+                        self.i64t(),
+                        fx.locals[l.index()],
+                        "idx",
+                    ))?
+                    .into_int_value();
+                    match pv.ty.clone() {
+                        Ty::Array(elem, _) => {
+                            let at = self.lower_ty(&pv.ty)?;
+                            pv.ptr = self.gep(at, pv.ptr, &[self.i64t().const_zero(), idx])?;
+                            pv.ty = *elem;
+                        }
+                        Ty::Slice(elem) => {
+                            let et = self.lower_ty(&elem)?;
+                            pv.ptr = self.gep(et, pv.ptr, &[idx])?;
+                            pv.ty = *elem;
+                            pv.meta = None;
+                        }
+                        other => return unsupported(format!("chỉ số trên {other:?}")),
+                    }
                 }
-                PlaceElem::Downcast(_) => return unsupported("Downcast (enum)"),
-                PlaceElem::Subslice { .. } => return unsupported("Subslice"),
+                PlaceElem::Downcast(v) => pv.variant = Some(*v),
+                PlaceElem::Subslice { from, to } => {
+                    let (elem, len) = match pv.ty.clone() {
+                        Ty::Array(e, n) => (*e, self.i64t().const_int(n, false)),
+                        Ty::Slice(e) => match pv.meta {
+                            Some(m) => (*e, m),
+                            None => return internal("slice không có độ dài"),
+                        },
+                        other => return unsupported(format!("Subslice trên {other:?}")),
+                    };
+                    let f = llvm(self.builder.build_load(
+                        self.i64t(),
+                        fx.locals[from.index()],
+                        "from",
+                    ))?
+                    .into_int_value();
+                    let t = match to {
+                        Some(l) => llvm(self.builder.build_load(
+                            self.i64t(),
+                            fx.locals[l.index()],
+                            "to",
+                        ))?
+                        .into_int_value(),
+                        None => len,
+                    };
+                    let et = self.lower_ty(&elem)?;
+                    pv.ptr = self.gep(et, pv.ptr, &[f])?;
+                    pv.meta = Some(llvm(self.builder.build_int_sub(t, f, "sublen"))?);
+                    pv.ty = Ty::Slice(Box::new(elem));
+                }
             }
         }
-        Ok((ptr, ty))
+        Ok(pv)
     }
 
-    #[allow(unsafe_code)]
-    fn gep_array(
-        &self,
-        at: BasicTypeEnum<'ctx>,
-        ptr: PointerValue<'ctx>,
-        idx: IntValue<'ctx>,
-    ) -> R<PointerValue<'ctx>> {
-        let zero = self.ctx.i64_type().const_zero();
-        // SAFETY: chỉ số được MIR kiểm `Assert(idx < len)` ngay trước mọi `Index`; IR Guard (bước 7) kiểm điều này.
-        llvm(unsafe {
-            self.builder
-                .build_in_bounds_gep(at, ptr, &[zero, idx], "elem")
-        })
+    fn load_place(&mut self, pv: &PlaceVal<'ctx>) -> R<BasicValueEnum<'ctx>> {
+        if Self::is_unsized(&pv.ty) {
+            return unsupported("đọc giá trị không kích thước");
+        }
+        let lt = self.lower_ty(&pv.ty)?;
+        llvm(self.builder.build_load(lt, pv.ptr, "ld"))
     }
 
-    fn operand(&mut self, fx: &Fx<'ctx, '_>, o: &Operand) -> R<(BasicValueEnum<'ctx>, Ty)> {
+    fn operand(&mut self, fx: &mut Fx<'ctx, '_>, o: &Operand) -> R<(BasicValueEnum<'ctx>, Ty)> {
         match o {
             Operand::Copy(p) | Operand::Move(p) => {
-                let (ptr, ty) = self.place(fx, p)?;
-                let lt = self.lower_ty(&ty)?;
-                let v = llvm(self.builder.build_load(lt, ptr, "ld"))?;
-                Ok((v, ty))
+                let pv = self.place(fx, p)?;
+                let v = self.load_place(&pv)?;
+                Ok((v, pv.ty))
             }
-            Operand::Const(c) => self.constant(c),
+            Operand::Const(c) => self.constant(fx, c),
         }
     }
 
@@ -485,7 +899,24 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         }
     }
 
-    fn constant(&mut self, c: &Const) -> R<(BasicValueEnum<'ctx>, Ty)> {
+    fn string_global(&mut self, s: &str) -> GlobalValue<'ctx> {
+        if let Some(g) = self.strings.get(s) {
+            return *g;
+        }
+        let init = self.ctx.const_string(s.as_bytes(), false);
+        let g = self.module.add_global(
+            init.get_type(),
+            None,
+            &format!("str.{}", self.strings.len()),
+        );
+        g.set_initializer(&init);
+        g.set_constant(true);
+        g.set_unnamed_addr(true);
+        self.strings.insert(s.to_string(), g);
+        g
+    }
+
+    fn constant(&mut self, fx: &mut Fx<'ctx, '_>, c: &Const) -> R<(BasicValueEnum<'ctx>, Ty)> {
         Ok(match c {
             Const::Int { bits, ty } => (
                 self.const_int(self.int_type(*ty), *bits).into(),
@@ -500,36 +931,112 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 Ty::Char,
             ),
             Const::Unit => (self.unit_type().const_zero(), Ty::unit()),
+            Const::Str(s) => {
+                let g = self.string_global(s);
+                let fat = self.fat_type().get_undef();
+                let fat =
+                    llvm(
+                        self.builder
+                            .build_insert_value(fat, g.as_pointer_value(), 0, "s0"),
+                    )?;
+                let len = self.i64t().const_int(s.len() as u64, false);
+                let fat = llvm(self.builder.build_insert_value(fat, len, 1, "s1"))?;
+                (fat.as_basic_value_enum(), Ty::Ref(false, Box::new(Ty::Str)))
+            }
             Const::FnItem { node, generics, ty } => {
-                if !generics.is_empty() {
-                    return unsupported("giá trị hàm đa hình");
+                let args: Vec<Ty> = generics.iter().map(|g| Self::sub(fx, g)).collect();
+                if !self.has_body(*node) {
+                    return unsupported("giá trị hàm không có thân MIR (hàm của lang/runtime)");
                 }
-                let f = self.get_fn(*node)?;
-                (f.as_global_value().as_pointer_value().into(), ty.clone())
+                let f = self.get_fn(&Inst { node: *node, args })?;
+                (
+                    f.as_global_value().as_pointer_value().into(),
+                    Self::sub(fx, ty),
+                )
+            }
+            Const::Item { node, ty } => {
+                let ty = Self::sub(fx, ty);
+                let body = self.body_of(*node)?;
+                match body.kind {
+                    BodyKind::Const => {
+                        let f = self.get_fn(&Inst {
+                            node: *node,
+                            args: Vec::new(),
+                        })?;
+                        let c = llvm(self.builder.build_call(f, &[], "const"))?;
+                        let Some(v) = c.try_as_basic_value().basic() else {
+                            return internal("const không trả giá trị");
+                        };
+                        (v, ty)
+                    }
+                    BodyKind::Static => {
+                        // dùng giá trị của static không qua bí danh: CHỈ cho kiểu không có mutability bên trong (đọc một bản sao)
+                        if self.has_interior_mut(&ty) {
+                            return unsupported(
+                                "sao chép giá trị của static có mutability bên trong (Atomic/Mutex/Cell)",
+                            );
+                        }
+                        let g = self.static_global(*node)?;
+                        if let Some(owner) = fx.owner_static {
+                            self.static_refs.entry(owner).or_default().insert(*node);
+                        }
+                        let lt = self.lower_ty(&ty)?;
+                        let v = llvm(self.builder.build_load(lt, g.as_pointer_value(), "sld"))?;
+                        (v, ty)
+                    }
+                    _ => return internal("Const::Item không phải const/static"),
+                }
             }
             Const::Float { .. } => return unsupported("literal số thực"),
-            Const::Str(_) => return unsupported("literal chuỗi"),
-            Const::Item { .. } => return unsupported("giá trị const/static"),
         })
+    }
+
+    fn has_interior_mut(&self, ty: &Ty) -> bool {
+        match ty {
+            Ty::Adt(d, args) => {
+                let Some(adt) = self.t.db.adts.get(d) else {
+                    return true;
+                };
+                if adt.lang.is_some_and(Lang::interior_mutable) {
+                    return true;
+                }
+                let nvars = match &adt.kind {
+                    AdtKind::Struct(_) => 1,
+                    AdtKind::Enum(vs) => vs.len(),
+                };
+                (0..nvars).any(|v| {
+                    self.variant_fields(*d, args, v as u32)
+                        .is_ok_and(|fs| fs.iter().any(|t| self.has_interior_mut(t)))
+                })
+            }
+            Ty::Tuple(v) => v.iter().any(|t| self.has_interior_mut(t)),
+            Ty::Array(t, _) | Ty::Slice(t) => self.has_interior_mut(t),
+            Ty::Param(_) | Ty::Infer(_) | Ty::Err => true,
+            _ => false,
+        }
     }
 
     // ---------------------------------------------------------------- câu lệnh
 
     fn assign(&mut self, fx: &mut Fx<'ctx, '_>, dest: &Place, rv: &Rvalue) -> R<()> {
+        if dest.projection.is_empty() && fx.static_alias.contains_key(&dest.local.index()) {
+            // bí danh: KHÔNG sao chép static
+            return Ok(());
+        }
         match rv {
             Rvalue::Aggregate(kind, ops) => {
-                let (dp, dty) = self.place(fx, dest)?;
-                return self.aggregate(fx, dp, &dty, kind, ops);
+                let dp = self.place(fx, dest)?;
+                return self.aggregate(fx, dp.ptr, &dp.ty, kind, ops);
             }
             Rvalue::Repeat(op, n) => {
-                let (dp, dty) = self.place(fx, dest)?;
-                return self.repeat(fx, dp, &dty, op, *n);
+                let dp = self.place(fx, dest)?;
+                return self.repeat(fx, dp.ptr, &dp.ty, op, *n);
             }
             _ => {}
         }
         let v = self.rvalue(fx, rv)?;
-        let (dp, _) = self.place(fx, dest)?;
-        llvm(self.builder.build_store(dp, v))?;
+        let dp = self.place(fx, dest)?;
+        llvm(self.builder.build_store(dp.ptr, v))?;
         Ok(())
     }
 
@@ -542,29 +1049,43 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         ops: &[Operand],
     ) -> R<()> {
         let ct = self.lower_ty(dty)?;
-        match kind {
-            AggregateKind::Tuple => {}
-            AggregateKind::Array(_) => {}
+        // (con trỏ gốc của các trường, kiểu struct chứa chúng)
+        let (base, st): (PointerValue<'ctx>, Option<StructType<'ctx>>) = match kind {
+            AggregateKind::Tuple => (dp, Some(ct.into_struct_type())),
+            AggregateKind::Array(_) => (dp, None),
             AggregateKind::Adt(def, var, args) => {
+                let args: Vec<Ty> = args.iter().map(|a| Self::sub(fx, a)).collect();
                 let Some(adt) = self.t.db.adts.get(def) else {
                     return internal("ADT không có trong db");
                 };
-                if *var != 0 || !matches!(adt.kind, AdtKind::Struct(_)) || !args.is_empty() {
-                    return unsupported("khởi tạo enum / ADT đa hình");
+                match &adt.kind {
+                    AdtKind::Struct(_) => (dp, Some(ct.into_struct_type())),
+                    AdtKind::Enum(_) => {
+                        let et = ct.into_struct_type();
+                        let tag = llvm(self.builder.build_struct_gep(et, dp, 0, "tag"))?;
+                        llvm(
+                            self.builder
+                                .build_store(tag, self.i64t().const_int(u64::from(*var), false)),
+                        )?;
+                        let pay = llvm(self.builder.build_struct_gep(et, dp, 1, "pay"))?;
+                        (pay, Some(self.variant_struct(*def, &args, *var)?))
+                    }
                 }
             }
-        }
+        };
         for (i, op) in ops.iter().enumerate() {
             let (v, _) = self.operand(fx, op)?;
-            let idx = u32::try_from(i).unwrap_or(u32::MAX);
-            let slot = match (kind, ct) {
-                (AggregateKind::Array(_), BasicTypeEnum::ArrayType(_)) => {
-                    let ix = self.ctx.i64_type().const_int(i as u64, false);
-                    self.gep_array(ct, dp, ix)?
+            let slot = match (kind, st) {
+                (AggregateKind::Array(_), _) => {
+                    let ix = self.i64t().const_int(i as u64, false);
+                    self.gep(ct, base, &[self.i64t().const_zero(), ix])?
                 }
-                (_, BasicTypeEnum::StructType(st)) => {
-                    llvm(self.builder.build_struct_gep(st, dp, idx, "agg"))?
-                }
+                (_, Some(st)) => llvm(self.builder.build_struct_gep(
+                    st,
+                    base,
+                    u32::try_from(i).unwrap_or(u32::MAX),
+                    "agg",
+                ))?,
                 _ => return internal("Aggregate trên kiểu không khớp"),
             };
             llvm(self.builder.build_store(slot, v))?;
@@ -582,7 +1103,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
     ) -> R<()> {
         let at = self.lower_ty(dty)?;
         let (v, _) = self.operand(fx, op)?;
-        let i64t = self.ctx.i64_type();
+        let i64t = self.i64t();
         let counter = llvm(self.builder.build_alloca(i64t, "rep.i"))?;
         llvm(self.builder.build_store(counter, i64t.const_zero()))?;
         let cond = self.ctx.append_basic_block(fx.f, "rep.cond");
@@ -599,7 +1120,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         ))?;
         llvm(self.builder.build_conditional_branch(lt, body, end))?;
         self.builder.position_at_end(body);
-        let slot = self.gep_array(at, dp, i)?;
+        let slot = self.gep(at, dp, &[i64t.const_zero(), i])?;
         llvm(self.builder.build_store(slot, v))?;
         let next = llvm(
             self.builder
@@ -615,26 +1136,39 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         match rv {
             Rvalue::Use(o) => Ok(self.operand(fx, o)?.0),
             Rvalue::Ref(_, _, p) => {
-                let (ptr, ty) = self.place(fx, p)?;
-                if !Self::is_sized(&ty) {
-                    return unsupported("mượn chỗ không kích thước");
+                let pv = self.place(fx, p)?;
+                if Self::is_unsized(&pv.ty) {
+                    let Some(len) = pv.meta else {
+                        return internal("mượn chỗ không kích thước mà không có độ dài");
+                    };
+                    let fat = self.fat_type().get_undef();
+                    let fat = llvm(self.builder.build_insert_value(fat, pv.ptr, 0, "f0"))?;
+                    let fat = llvm(self.builder.build_insert_value(fat, len, 1, "f1"))?;
+                    Ok(fat.as_basic_value_enum())
+                } else {
+                    Ok(pv.ptr.into())
                 }
-                Ok(ptr.into())
             }
             Rvalue::Len(p) => {
-                let (_, ty) = self.place(fx, p)?;
-                match ty {
-                    Ty::Array(_, n) => Ok(self.ctx.i64_type().const_int(n, false).into()),
-                    _ => unsupported("Len của slice"),
+                let pv = self.place(fx, p)?;
+                match pv.ty {
+                    Ty::Array(_, n) => Ok(self.i64t().const_int(n, false).into()),
+                    Ty::Slice(_) | Ty::Str => match pv.meta {
+                        Some(m) => Ok(m.into()),
+                        None => internal("slice không có độ dài"),
+                    },
+                    other => unsupported(format!("Len của {other:?}")),
                 }
             }
             Rvalue::Cast(o, to) => {
                 let (v, from) = self.operand(fx, o)?;
-                self.cast(v, &from, to)
+                let to = Self::sub(fx, to);
+                self.cast(v, &from, &to)
             }
             Rvalue::CastFits(o, to) => {
                 let (v, from) = self.operand(fx, o)?;
-                self.cast_fits(v, &from, to)
+                let to = Self::sub(fx, to);
+                self.cast_fits(v, &from, &to)
             }
             Rvalue::UnaryOp(op, o) => {
                 let (v, ty) = self.operand(fx, o)?;
@@ -657,7 +1191,12 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 let (y, _) = self.operand(fx, b)?;
                 self.checked(*op, x, y, &ty)
             }
-            Rvalue::Discriminant(_) => unsupported("Discriminant (enum)"),
+            Rvalue::Discriminant(p) => {
+                let pv = self.place(fx, p)?;
+                let et = self.lower_ty(&pv.ty)?.into_struct_type();
+                let tag = llvm(self.builder.build_struct_gep(et, pv.ptr, 0, "tag"))?;
+                llvm(self.builder.build_load(self.i64t(), tag, "disc"))
+            }
             Rvalue::Aggregate(..) | Rvalue::Repeat(..) => {
                 internal("Aggregate/Repeat đi đường riêng")
             }
@@ -684,15 +1223,14 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             return unsupported(format!("phép hai ngôi {op:?} trên {ty:?}"));
         };
         let signed = Self::signed_of(ty)?;
-        let bld = &self.builder;
         let v: IntValue<'ctx> = match op {
-            BinOp::Add | BinOp::AddWrap => llvm(bld.build_int_add(a, b, "add"))?,
-            BinOp::Sub | BinOp::SubWrap => llvm(bld.build_int_sub(a, b, "sub"))?,
+            BinOp::Add | BinOp::AddWrap => llvm(self.builder.build_int_add(a, b, "add"))?,
+            BinOp::Sub | BinOp::SubWrap => llvm(self.builder.build_int_sub(a, b, "sub"))?,
             BinOp::Mul | BinOp::MulWrap => {
                 if a.get_type().get_bit_width() > 64 {
                     return unsupported("nhân 128 bit (cần __multi3)");
                 }
-                llvm(bld.build_int_mul(a, b, "mul"))?
+                llvm(self.builder.build_int_mul(a, b, "mul"))?
             }
             BinOp::Div | BinOp::Rem => {
                 let bits = a.get_type().get_bit_width();
@@ -701,7 +1239,10 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 }
                 // LLVM: chia 0 và MIN / -1 là UB ⇒ chặn tại chỗ như MỘT LỚP PHÒNG THỦ, dù MIR đã có Assert (D3).
                 let zero = a.get_type().const_zero();
-                let nz = llvm(bld.build_int_compare(IntPredicate::NE, b, zero, "nz"))?;
+                let nz = llvm(
+                    self.builder
+                        .build_int_compare(IntPredicate::NE, b, zero, "nz"),
+                )?;
                 self.guard(
                     fx,
                     nz,
@@ -757,9 +1298,9 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     (_, true) => IntPredicate::SGE,
                     (_, false) => IntPredicate::UGE,
                 };
-                llvm(bld.build_int_compare(pred, a, b, "cmp"))?
+                llvm(self.builder.build_int_compare(pred, a, b, "cmp"))?
             }
-            BinOp::BitAnd => llvm(bld.build_and(a, b, "and"))?,
+            BinOp::BitAnd => llvm(self.builder.build_and(a, b, "and"))?,
         };
         Ok(v.into())
     }
@@ -822,6 +1363,20 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
     }
 
     fn cast(&mut self, v: BasicValueEnum<'ctx>, from: &Ty, to: &Ty) -> R<BasicValueEnum<'ctx>> {
+        // ép `&[T; N]` → `&[T]` (unsize): con trỏ béo { ptr, N }
+        if let (Ty::Ref(_, a), Ty::Ref(_, b)) = (from, to)
+            && let (Ty::Array(ea, n), Ty::Slice(eb)) = (&**a, &**b)
+            && ea == eb
+        {
+            let fat = self.fat_type().get_undef();
+            let fat = llvm(
+                self.builder
+                    .build_insert_value(fat, v.into_pointer_value(), 0, "u0"),
+            )?;
+            let len = self.i64t().const_int(*n, false);
+            let fat = llvm(self.builder.build_insert_value(fat, len, 1, "u1"))?;
+            return Ok(fat.as_basic_value_enum());
+        }
         let (Some((fb, fs)), Ty::Int(ti)) = (Self::int_bits_signed(from), to) else {
             return unsupported(format!("ép kiểu {from:?} → {to:?}"));
         };
@@ -885,14 +1440,14 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 )?;
             }
             TerminatorKind::Drop { target, .. } => {
-                // Phase 1: không có destructor người dùng (cùng ngữ nghĩa thông dịch)
+                // Phase 1: không có destructor người dùng (cùng ngữ nghĩa thông dịch; KNOWN_LIMITATIONS)
                 llvm(
                     self.builder
                         .build_unconditional_branch(fx.blocks[target.index()]),
                 )?;
             }
             TerminatorKind::Return => {
-                let lt = self.lower_ty(fx.body.return_ty())?;
+                let lt = self.lower_ty(&fx.local_tys[0])?;
                 let v = llvm(self.builder.build_load(lt, fx.locals[0], "ret"))?;
                 llvm(self.builder.build_return(Some(&v)))?;
             }
@@ -959,6 +1514,35 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         }
     }
 
+    fn intr_of(&self, key: &str) -> Option<Intr> {
+        let m = key.rsplit("::").next().unwrap_or("");
+        if key.ends_with("core::abort") {
+            return Some(Intr::Abort);
+        }
+        if key == "$prelude::[T0]::len" {
+            return Some(Intr::SliceLen);
+        }
+        if key == "$prelude::spawn" {
+            return Some(Intr::Spawn);
+        }
+        let is = |n: &str| key.contains(n);
+        Some(match (m, is("Atomic"), is("Mutex"), is("Cell")) {
+            ("new", true, _, _) => Intr::AtomicNew,
+            ("load", true, _, _) => Intr::AtomicLoad,
+            ("store", true, _, _) => Intr::AtomicStore,
+            ("swap", true, _, _) => Intr::AtomicSwap,
+            ("fetch_add", true, _, _) => Intr::AtomicFetchAdd,
+            ("fetch_sub", true, _, _) => Intr::AtomicFetchSub,
+            ("compare_exchange", true, _, _) => Intr::AtomicCas,
+            ("new", _, true, _) => Intr::MutexNew,
+            ("with", _, true, _) => Intr::MutexWith,
+            ("new", _, _, true) => Intr::CellNew,
+            ("get", _, _, true) => Intr::CellGet,
+            ("set", _, _, true) => Intr::CellSet,
+            _ => return None,
+        })
+    }
+
     fn call(
         &mut self,
         fx: &mut Fx<'ctx, '_>,
@@ -967,32 +1551,31 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         dest: &Place,
         target: Option<gt_mir::BasicBlock>,
     ) -> R<()> {
-        let mut vals: Vec<BasicMetadataValueEnum<'ctx>> = Vec::new();
+        let mut vals: Vec<BasicValueEnum<'ctx>> = Vec::new();
         let mut tys: Vec<Ty> = Vec::new();
         for a in args {
             let (v, t) = self.operand(fx, a)?;
-            vals.push(v.into());
+            vals.push(v);
             tys.push(t);
         }
         let result: Option<BasicValueEnum<'ctx>> = match callee {
             Callee::Fn { node, generics } => {
-                if !generics.is_empty() {
-                    return unsupported("gọi hàm đa hình (cần đơn hình hoá)");
-                }
-                if self.bodies.iter().any(|b| b.node == *node) {
-                    let f = self.get_fn(*node)?;
-                    let c = llvm(self.builder.build_call(f, &vals, "call"))?;
+                let gargs: Vec<Ty> = generics.iter().map(|g| Self::sub(fx, g)).collect();
+                if self.has_body(*node) {
+                    let f = self.get_fn(&Inst {
+                        node: *node,
+                        args: gargs,
+                    })?;
+                    let mv: Vec<BasicMetadataValueEnum<'ctx>> =
+                        vals.iter().map(|v| (*v).into()).collect();
+                    let c = llvm(self.builder.build_call(f, &mv, "call"))?;
                     c.try_as_basic_value().basic()
                 } else {
                     let key = self.keys.get(node).cloned().unwrap_or_default();
-                    if key.ends_with("core::abort") {
-                        let k = self.ctx.i32_type().const_int(abort_kind::EXPLICIT, false);
-                        let c = llvm(self.builder.build_call(self.abort_fn, &[k.into()], ""))?;
-                        let _ = c;
-                        None
-                    } else {
+                    let Some(intr) = self.intr_of(&key) else {
                         return unsupported(format!("hàm không có thân MIR: {key}"));
-                    }
+                    };
+                    self.intrinsic(fx, intr, &key, &gargs, args, &vals, &tys)?
                 }
             }
             Callee::Value(o) => {
@@ -1001,10 +1584,12 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     return internal("gọi giá trị không phải hàm");
                 };
                 let ft = self.fn_type(ps, r)?;
+                let mv: Vec<BasicMetadataValueEnum<'ctx>> =
+                    vals.iter().map(|v| (*v).into()).collect();
                 let c = llvm(self.builder.build_indirect_call(
                     ft,
                     fv.into_pointer_value(),
-                    &vals,
+                    &mv,
                     "icall",
                 ))?;
                 c.try_as_basic_value().basic()
@@ -1014,8 +1599,8 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         match target {
             Some(t) => {
                 if let Some(v) = result {
-                    let (dp, _) = self.place(fx, dest)?;
-                    llvm(self.builder.build_store(dp, v))?;
+                    let dp = self.place(fx, dest)?;
+                    llvm(self.builder.build_store(dp.ptr, v))?;
                 }
                 llvm(
                     self.builder
@@ -1028,18 +1613,345 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 llvm(self.builder.build_unconditional_branch(trap))?;
             }
         }
-        let _ = &tys;
         Ok(())
+    }
+
+    // ---------------------------------------------------------------- lang item / runtime
+
+    /// Chỉ số biến thể hằng của đối số `Ordering` thứ `i` (phải là local gán một lần bằng `Ordering::X`).
+    fn ordering_arg(&self, fx: &Fx<'ctx, '_>, args: &[Operand], i: usize) -> R<AtomicOrdering> {
+        let v = match args.get(i) {
+            Some(Operand::Copy(p) | Operand::Move(p)) if p.projection.is_empty() => {
+                fx.ord_consts.get(&p.local.index()).copied()
+            }
+            _ => None,
+        };
+        let Some(v) = v else {
+            return unsupported(
+                "thứ tự bộ nhớ không phải hằng lúc biên dịch (E0503 đòi tường minh)",
+            );
+        };
+        Ok(match v {
+            0 => AtomicOrdering::Monotonic,
+            1 => AtomicOrdering::Acquire,
+            2 => AtomicOrdering::Release,
+            3 => AtomicOrdering::AcquireRelease,
+            4 => AtomicOrdering::SequentiallyConsistent,
+            _ => return internal("biến thể Ordering lạ"),
+        })
+    }
+
+    fn atomic_slot(&self, recv: BasicValueEnum<'ctx>, ty: &Ty) -> R<PointerValue<'ctx>> {
+        let Ty::Int(_) = ty else {
+            return unsupported(format!("Atomic<{ty:?}> (chỉ số nguyên; bool chưa hỗ trợ)"));
+        };
+        let BasicValueEnum::PointerValue(p) = recv else {
+            return internal("người nhận Atomic không phải con trỏ");
+        };
+        Ok(p) // trường `v` là trường 0 của struct {T} ⇒ cùng địa chỉ
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn intrinsic(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        intr: Intr,
+        key: &str,
+        gargs: &[Ty],
+        args: &[Operand],
+        vals: &[BasicValueEnum<'ctx>],
+        tys: &[Ty],
+    ) -> R<Option<BasicValueEnum<'ctx>>> {
+        match intr {
+            Intr::Abort => {
+                let k = self.ctx.i32_type().const_int(abort_kind::EXPLICIT, false);
+                let c = llvm(self.builder.build_call(self.abort_fn, &[k.into()], ""))?;
+                c.add_attribute(AttributeLoc::Function, noreturn(self.ctx));
+                Ok(None)
+            }
+            Intr::SliceLen => {
+                let fv = vals[0].into_struct_value();
+                Ok(Some(llvm(self.builder.build_extract_value(fv, 1, "len"))?))
+            }
+            Intr::AtomicNew | Intr::MutexNew | Intr::CellNew => {
+                let [v] = vals else {
+                    return internal(format!("{key}: sai số đối số"));
+                };
+                // kết quả: struct {v} (Mutex: {v, khoá=0})
+                let Some(def) = self.adt_of_intr(intr) else {
+                    return internal("không thấy lang item");
+                };
+                let rty = Ty::Adt(def, gargs.to_vec());
+                let ct = self.lower_ty(&rty)?.into_struct_type();
+                let s = ct.get_undef();
+                let s = llvm(self.builder.build_insert_value(s, *v, 0, "n0"))?;
+                let s = if intr == Intr::MutexNew {
+                    llvm(
+                        self.builder
+                            .build_insert_value(s, self.i64t().const_zero(), 1, "n1"),
+                    )?
+                } else {
+                    s
+                };
+                Ok(Some(s.as_basic_value_enum()))
+            }
+            Intr::AtomicLoad => {
+                let ty = gargs.first().cloned().unwrap_or_else(Ty::unit);
+                let p = self.atomic_slot(vals[0], &ty)?;
+                let ord = self.ordering_arg(fx, args, 1)?;
+                if matches!(
+                    ord,
+                    AtomicOrdering::Release | AtomicOrdering::AcquireRelease
+                ) {
+                    return unsupported("load nguyên tử với Release/AcqRel (không hợp lệ)");
+                }
+                let lt = self.lower_ty(&ty)?;
+                let v = llvm(self.builder.build_load(lt, p, "aload"))?;
+                self.mark_atomic(v.as_instruction_value(), ord, &ty)?;
+                Ok(Some(v))
+            }
+            Intr::AtomicStore => {
+                let ty = gargs.first().cloned().unwrap_or_else(Ty::unit);
+                let p = self.atomic_slot(vals[0], &ty)?;
+                let ord = self.ordering_arg(fx, args, 2)?;
+                if matches!(
+                    ord,
+                    AtomicOrdering::Acquire | AtomicOrdering::AcquireRelease
+                ) {
+                    return unsupported("store nguyên tử với Acquire/AcqRel (không hợp lệ)");
+                }
+                let st = llvm(self.builder.build_store(p, vals[1]))?;
+                self.mark_atomic(Some(st), ord, &ty)?;
+                Ok(Some(self.unit_type().const_zero()))
+            }
+            Intr::AtomicSwap | Intr::AtomicFetchAdd | Intr::AtomicFetchSub => {
+                let ty = gargs.first().cloned().unwrap_or_else(Ty::unit);
+                let p = self.atomic_slot(vals[0], &ty)?;
+                let ord = self.ordering_arg(fx, args, 2)?;
+                let op = match intr {
+                    Intr::AtomicSwap => AtomicRMWBinOp::Xchg,
+                    Intr::AtomicFetchAdd => AtomicRMWBinOp::Add,
+                    _ => AtomicRMWBinOp::Sub,
+                };
+                let old = llvm(
+                    self.builder
+                        .build_atomicrmw(op, p, vals[1].into_int_value(), ord),
+                )?;
+                Ok(Some(old.into()))
+            }
+            Intr::AtomicCas => {
+                let ty = gargs.first().cloned().unwrap_or_else(Ty::unit);
+                let p = self.atomic_slot(vals[0], &ty)?;
+                let succ = self.ordering_arg(fx, args, 3)?;
+                let fail = self.ordering_arg(fx, args, 4)?;
+                if matches!(
+                    fail,
+                    AtomicOrdering::Release | AtomicOrdering::AcquireRelease
+                ) {
+                    return unsupported(
+                        "compare_exchange: thứ tự thất bại Release/AcqRel (không hợp lệ)",
+                    );
+                }
+                let r = llvm(self.builder.build_cmpxchg(
+                    p,
+                    vals[1].into_int_value(),
+                    vals[2].into_int_value(),
+                    succ,
+                    fail,
+                ))?;
+                let old = llvm(self.builder.build_extract_value(r, 0, "old"))?;
+                let ok = llvm(self.builder.build_extract_value(r, 1, "ok"))?.into_int_value();
+                // Result<T,T>: Ok = biến thể 0, Err = biến thể 1; payload = giá trị cũ
+                let failed = llvm(self.builder.build_not(ok, "failed"))?;
+                let tag = llvm(self.builder.build_int_z_extend(failed, self.i64t(), "tag"))?;
+                let result_def = self
+                    .t
+                    .db
+                    .adts
+                    .values()
+                    .find(|a| self.is_result(a))
+                    .map(|a| a.def);
+                let Some(rd) = result_def else {
+                    return internal("không thấy enum Result của prelude");
+                };
+                let targs = vec![ty.clone(), ty.clone()];
+                let rty = Ty::Adt(rd, targs.clone());
+                let et = self.lower_ty(&rty)?.into_struct_type();
+                let tmp = llvm(self.builder.build_alloca(et, "cas.res"))?;
+                let tp = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
+                llvm(self.builder.build_store(tp, tag))?;
+                let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
+                // cả Ok(T) lẫn Err(T) đều có trường 0 = T ở cùng vị trí ⇒ dùng bố cục biến thể 0
+                let vs = self.variant_struct(rd, &targs, 0)?;
+                let f0 = llvm(self.builder.build_struct_gep(vs, pay, 0, "f0"))?;
+                llvm(self.builder.build_store(f0, old))?;
+                Ok(Some(llvm(self.builder.build_load(et, tmp, "cas.v"))?))
+            }
+            Intr::MutexWith => {
+                // with(&self, f, a): khoá thật qua gt-rt; f(&!T, Arg) → R
+                let recv = vals[0].into_pointer_value();
+                let mty = match &tys[0] {
+                    Ty::Ref(_, inner) => (**inner).clone(),
+                    other => return internal(format!("Mutex::with trên {other:?}")),
+                };
+                let mt = self.lower_ty(&mty)?.into_struct_type();
+                let lock = llvm(self.builder.build_struct_gep(mt, recv, 1, "lock"))?;
+                let val = llvm(self.builder.build_struct_gep(mt, recv, 0, "val"))?;
+                let lk_ty = self
+                    .ctx
+                    .void_type()
+                    .fn_type(&[self.ptr_type().into()], false);
+                let lockf = self.rt_fn("gritrt_mutex_lock", lk_ty);
+                let unlockf = self.rt_fn("gritrt_mutex_unlock", lk_ty);
+                llvm(self.builder.build_call(lockf, &[lock.into()], ""))?;
+                let Ty::Fn(ps, r, _) = &tys[1] else {
+                    return internal("Mutex::with: đối số f không phải hàm");
+                };
+                let ft = self.fn_type(ps, r)?;
+                let c = llvm(self.builder.build_indirect_call(
+                    ft,
+                    vals[1].into_pointer_value(),
+                    &[val.into(), vals[2].into()],
+                    "with",
+                ))?;
+                llvm(self.builder.build_call(unlockf, &[lock.into()], ""))?;
+                Ok(c.try_as_basic_value().basic())
+            }
+            Intr::CellGet => {
+                let Some(Ty::Ref(_, inner)) = tys.first() else {
+                    return internal("Cell::get: người nhận lạ");
+                };
+                let ct = self.lower_ty(inner)?.into_struct_type();
+                let Some(vt) = ct.get_field_type_at_index(0) else {
+                    return internal("Cell không có trường");
+                };
+                Ok(Some(llvm(self.builder.build_load(
+                    vt,
+                    vals[0].into_pointer_value(),
+                    "cget",
+                ))?))
+            }
+            Intr::CellSet => {
+                llvm(
+                    self.builder
+                        .build_store(vals[0].into_pointer_value(), vals[1]),
+                )?;
+                Ok(Some(self.unit_type().const_zero()))
+            }
+            Intr::Spawn => {
+                // spawn(f, a): hộp {f, a} trên heap của runtime; luồng thật chạy bước đệm gọi f(a)
+                let a_ty = tys[1].clone();
+                let tramp = self.trampoline(&a_ty, &tys[0])?;
+                let bt = self
+                    .ctx
+                    .struct_type(&[self.ptr_type().into(), self.lower_ty(&a_ty)?], false);
+                let size = self.i64t().const_int(self.td.get_abi_size(&bt), false);
+                let alloc_ty = self.ptr_type().fn_type(&[self.i64t().into()], false);
+                let alloc = self.rt_fn("gritrt_alloc", alloc_ty);
+                let blk = llvm(self.builder.build_call(alloc, &[size.into()], "blk"))?;
+                let Some(blk) = blk.try_as_basic_value().basic() else {
+                    return internal("gritrt_alloc không trả giá trị");
+                };
+                let blk = blk.into_pointer_value();
+                let fp = llvm(self.builder.build_struct_gep(bt, blk, 0, "bf"))?;
+                llvm(self.builder.build_store(fp, vals[0]))?;
+                let ap = llvm(self.builder.build_struct_gep(bt, blk, 1, "ba"))?;
+                llvm(self.builder.build_store(ap, vals[1]))?;
+                let sp_ty = self
+                    .ctx
+                    .void_type()
+                    .fn_type(&[self.ptr_type().into(), self.ptr_type().into()], false);
+                let spawn = self.rt_fn("gritrt_spawn", sp_ty);
+                llvm(self.builder.build_call(
+                    spawn,
+                    &[
+                        tramp.as_global_value().as_pointer_value().into(),
+                        blk.into(),
+                    ],
+                    "",
+                ))?;
+                Ok(Some(self.unit_type().const_zero()))
+            }
+        }
+    }
+
+    fn is_result(&self, a: &AdtDef) -> bool {
+        let name = &self.t.defs()[a.def.index()].path;
+        name.ends_with("Result") && matches!(&a.kind, AdtKind::Enum(v) if v.len() == 2)
+    }
+
+    fn adt_of_intr(&self, intr: Intr) -> Option<gt_resolve::DefId> {
+        let l = match intr {
+            Intr::AtomicNew => Lang::Atomic,
+            Intr::MutexNew => Lang::Mutex,
+            _ => Lang::Cell,
+        };
+        self.t.db.lang.get(&l).copied()
+    }
+
+    fn rt_fn(&mut self, name: &str, ty: FunctionType<'ctx>) -> FunctionValue<'ctx> {
+        match self.module.get_function(name) {
+            Some(f) => f,
+            None => self.module.add_function(name, ty, None),
+        }
+    }
+
+    fn mark_atomic(
+        &self,
+        inst: Option<inkwell::values::InstructionValue<'ctx>>,
+        ord: AtomicOrdering,
+        ty: &Ty,
+    ) -> R<()> {
+        let Some(inst) = inst else {
+            return internal("thao tác nguyên tử không phải lệnh");
+        };
+        llvm(inst.set_atomic_ordering(ord))?;
+        let sz = self.td.get_abi_size(&self.lower_ty(ty)?);
+        llvm(inst.set_alignment(u32::try_from(sz).unwrap_or(8)))?;
+        Ok(())
+    }
+
+    /// Bước đệm theo kiểu đối số: `void tramp(ptr blk)` đọc {f, a} rồi gọi `f(a)`.
+    fn trampoline(&mut self, a_ty: &Ty, f_ty: &Ty) -> R<FunctionValue<'ctx>> {
+        if let Some(t) = self.tramps.get(a_ty) {
+            return Ok(*t);
+        }
+        let Ty::Fn(ps, r, _) = f_ty else {
+            return internal("spawn: f không phải hàm");
+        };
+        let ft = self.fn_type(ps, r)?;
+        let at = self.lower_ty(a_ty)?;
+        let bt = self.ctx.struct_type(&[self.ptr_type().into(), at], false);
+        let fnty = self
+            .ctx
+            .void_type()
+            .fn_type(&[self.ptr_type().into()], false);
+        let f = self
+            .module
+            .add_function(&format!("gt.tramp.{}", self.tramps.len()), fnty, None);
+        let here = self.builder.get_insert_block();
+        let bb = self.ctx.append_basic_block(f, "entry");
+        self.builder.position_at_end(bb);
+        let Some(blk) = f.get_nth_param(0) else {
+            return internal("thiếu tham số bước đệm");
+        };
+        let blk = blk.into_pointer_value();
+        let fp = llvm(self.builder.build_struct_gep(bt, blk, 0, "bf"))?;
+        let fv = llvm(self.builder.build_load(self.ptr_type(), fp, "f"))?;
+        let ap = llvm(self.builder.build_struct_gep(bt, blk, 1, "ba"))?;
+        let av = llvm(self.builder.build_load(at, ap, "a"))?;
+        llvm(
+            self.builder
+                .build_indirect_call(ft, fv.into_pointer_value(), &[av.into()], ""),
+        )?;
+        llvm(self.builder.build_return(None))?;
+        if let Some(h) = here {
+            self.builder.position_at_end(h);
+        }
+        self.tramps.insert(a_ty.clone(), f);
+        Ok(f)
     }
 }
 
-struct Fx<'ctx, 'b> {
-    f: FunctionValue<'ctx>,
-    body: &'b Body,
-    locals: Vec<PointerValue<'ctx>>,
-    blocks: Vec<BasicBlock<'ctx>>,
-    traps: usize,
-}
-
 #[allow(dead_code)]
-fn _assert_traits(_: &dyn BasicValue<'_>) {}
+fn _assert_traits(_: &dyn BasicValue<'_>, _: Local) {}

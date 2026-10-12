@@ -97,6 +97,21 @@ pub unsafe extern "C" fn gritrt_mutex_unlock(lock: *mut u8) {
 struct Arg(*mut u8);
 unsafe impl Send for Arg {}
 
+/// Cấp `size` byte (căn lề 16, KHÔNG khởi tạo) cho hộp tham số của `spawn`; hộp thuộc về luồng mới (không giải phóng: rò rỉ có chủ đích, nhỏ).
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_alloc(size: u64) -> *mut u8 {
+    let Ok(layout) =
+        std::alloc::Layout::from_size_align(usize::try_from(size).unwrap_or(usize::MAX), 16)
+    else {
+        gritrt_abort(0)
+    };
+    let p = unsafe { std::alloc::alloc(layout) };
+    if p.is_null() {
+        gritrt_abort(0);
+    }
+    p
+}
+
 /// # Safety
 /// `f` là hàm hợp lệ nhận `arg`; `arg` sở hữu bởi luồng mới (chuyển quyền sở hữu).
 #[unsafe(no_mangle)]

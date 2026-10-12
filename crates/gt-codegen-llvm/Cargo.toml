@@ -8,6 +8,7 @@ description = "Grit M10 (ADR-029): hạ MIR sau M7 thành LLVM IR (inkwell/LLVM-
 
 [dependencies]
 gt-ast = { path = "../gt-ast" }
+gt-resolve = { path = "../gt-resolve" }
 gt-types = { path = "../gt-types" }
 gt-mir = { path = "../gt-mir" }
 inkwell = { version = "=0.10.0", default-features = false, features = ["llvm20-1-no-llvm-linking", "target-x86"] }

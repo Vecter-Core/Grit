@@ -6,6 +6,7 @@ fn main() {
     if env::var_os("CARGO_FEATURE_LLVM").is_some() {
         println!("cargo:rustc-link-arg-bins=/DELAYLOAD:LLVM-C.dll");
         println!("cargo:rustc-link-arg-tests=/DELAYLOAD:LLVM-C.dll");
+        println!("cargo:rustc-link-arg-tests=/IGNORE:4199");
     }
     let dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"))
         .join("../../docs/errors");

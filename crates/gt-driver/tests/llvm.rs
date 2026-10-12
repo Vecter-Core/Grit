@@ -353,3 +353,122 @@ fn check_runs_without_llvm_on_path() {
     assert!(!exe.exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+const SUM_SLICE: &str = "ƒ sum(xs: &[i64]) → i64 ! ∅ {
+  μs ≔ 0;
+  μi ≔ 0;
+  ⟳ i < xs.len() ↓ xs.len() - i {
+    s ← s + xs[i];
+    i ← i + 1;
+  }
+  s
+}
+";
+
+#[test]
+fn slices_subslices_and_bounds() {
+    let src = format!(
+        "{SUM_SLICE}ƒ main() → i64 ! ∅ {{ a ≔ [1i64, 2, 3, 4, 5]; sum(&a[..]) +% sum(&a[1..4]) }}\n"
+    );
+    check_value(&src, "24"); // 15 + (2+3+4)
+    // cắt ngoài biên ⇒ abort (không đọc ngoài mảng)
+    let bad = format!(
+        "{SUM_SLICE}ƒ f(n: usize) → i64 ! ∅ {{ a ≔ [1i64, 2, 3]; sum(&a[0..n]) }}\nƒ main() → i64 ! ∅ {{ f(9) }}\n"
+    );
+    let l = run(&bad, "llvm");
+    assert_eq!((l.exit, l.aborted), (70, true), "{l:?}");
+    assert_eq!(l.abort_kind, "slice_range");
+    assert_eq!(run(&bad, "interpreter"), l, "thông dịch ≠ llvm");
+}
+
+#[test]
+fn enums_generics_option_monomorphization() {
+    check_value(
+        "⊔ Shape { Circle(i32), Rect(i32, i32), Empty }\nƒ area(s: Shape) → i32 ! ∅ { ⌥ s { Circle(r) ↦ r *% r, Rect(w, h) ↦ w *% h, Empty ↦ 0 } }\nƒ pick(o: Option<i32>) → i32 ! ∅ { ⌥ o { Some(v) ↦ v, None ↦ 0 } }\nƒ id<T>(x: T) → T ! ∅ { x }\nƒ main() → i32 ! ∅ {\n  area(Shape::Circle(3)) +% area(Shape::Rect(4, 5)) +% area(Shape::Empty) +% pick(Some(7)) +% pick(None) +% id(5i32) +% (id(2u8) as i32)\n}\n",
+        "43",
+    );
+}
+
+#[test]
+fn string_literal_is_a_fat_pointer() {
+    check_value(
+        "ƒ f(s: &str) → u32 ! ∅ { 7 }\nƒ main() → u32 ! ∅ { f(\"héllo\") }\n",
+        "7",
+    );
+}
+
+const THREADS: &str = "#level(\"1\")\n▢ Lo { }\n■ COUNT: Atomic<u64> ≔ Atomic::new(0u64);\n■ SUM: Mutex<u64, Lo> ≔ Mutex::new(0u64);\nƒ add_one(v: &!u64, n: u64) → u64 ! ∅ { *v ← *v +% n; *v }\nƒ read(v: &!u64, n: u64) → u64 ! ∅ { *v }\nƒ worker(n: u32) ! {lock(Lo)} {\n  μi ≔ 0u32;\n  ⟳ i < 1000 ↓ 1000 - i {\n    SUM.with(add_one, 1u64);\n    COUNT.fetch_add(1u64, Ordering::Release);\n    i ← i + 1;\n  }\n}\nƒ main() → u64 ! {lock(Lo)} {\n  spawn(worker, 0u32);\n  spawn(worker, 1u32);\n  spawn(worker, 2u32);\n  spawn(worker, 3u32);\n  μspin ≔ 0u64;\n  ⟳ spin < 4000000000u64 ∧ COUNT.load(Ordering::Acquire) < 4000 ↓ 4000000000 - spin {\n    spin ← spin + 1;\n  }\n  COUNT.load(Ordering::SeqCst) +% SUM.with(read, 0u64)\n}\n";
+
+/// Đa luồng THẬT: 4 luồng HĐH × 1000 lần (khoá thật + atomic thật). Không có đua dữ liệu thì tổng luôn 8000; lặp nhiều lần để lộ lỗi.
+#[test]
+fn real_threads_atomic_and_static_mutex() {
+    for round in 0..8 {
+        let l = run(THREADS, "llvm");
+        assert_eq!(l.exit, 0, "vòng {round}: {l:?}");
+        assert_eq!(
+            l.value.as_deref(),
+            Some("8000"),
+            "vòng {round}: mất cập nhật ⇒ khoá/atomic sai"
+        );
+    }
+}
+
+/// IR phải dùng atomics/khoá THẬT (không phải load/store thường) với đúng thứ tự bộ nhớ đã viết trong mã nguồn.
+#[test]
+fn threads_ir_uses_real_atomics_with_requested_orderings() {
+    let dir = scratch("ir");
+    let f = dir.join("prog.gt");
+    std::fs::write(&f, THREADS).expect("ghi");
+    let ir_path = dir.join("out.ll");
+    let o = gritc()
+        .env("GRITC_DUMP_IR", &ir_path)
+        .args(["build", "--backend=llvm", "-o"])
+        .arg(dir.join("t.exe"))
+        .arg(&f)
+        .output()
+        .expect("chạy");
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let ir = std::fs::read_to_string(&ir_path).expect("IR");
+    assert!(
+        ir.contains("atomicrmw add ptr") && ir.contains(" release"),
+        "fetch_add phải là atomicrmw add release:
+{ir}"
+    );
+    assert!(
+        ir.contains("load atomic i64") && ir.contains("acquire"),
+        "load Acquire:
+{ir}"
+    );
+    assert!(ir.contains("seq_cst"), "load SeqCst");
+    assert!(
+        ir.contains("call void @gritrt_mutex_lock")
+            && ir.contains("call void @gritrt_mutex_unlock")
+    );
+    assert!(ir.contains("call void @gritrt_spawn"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Chưa hỗ trợ ⇒ gritc thoát 3 với thông báo rõ và KHÔNG sinh exe (fail-closed, không đoán).
+#[test]
+fn unsupported_construct_is_refused_without_exe() {
+    let dir = scratch("unsup");
+    let f = dir.join("prog.gt");
+    std::fs::write(&f, "ƒ main() → f64 ! ∅ { 1.5 }\n").expect("ghi");
+    let exe = dir.join("u.exe");
+    let o = gritc()
+        .args(["build", "--backend=llvm", "-o"])
+        .arg(&exe)
+        .arg(&f)
+        .output()
+        .expect("chạy");
+    let err = String::from_utf8_lossy(&o.stderr).into_owned();
+    assert_eq!(o.status.code(), Some(3), "{err}");
+    assert!(err.contains("backend llvm chưa hỗ trợ"), "{err}");
+    assert!(!exe.exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
