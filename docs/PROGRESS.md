@@ -493,3 +493,7 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - **Mutation:** xem KNOWN_LIMITATIONS "Đột biến M9" (phần quyết định: verdict 25→0 còn sống; pipeline 1 tương đương; cli 7 hiển thị; keep-all 0; unsafe_check và gt-secrets: số liệu cuối chưa đủ, nói thẳng ở đó).
 - **Cổng đầy đủ (chạy lại 3 lần vì đỏ giữa chừng: sổ mã E0503 đã sửa ở M8; test schema của gt-diag; vector SHA-256 tôi chép sai — cài đặt đúng, khớp `hashlib`): XANH — fmt, clippy `-D warnings`, audit, 687 test pass / 0 lỗi, check_expectations (788 tệp .gt, 67 mã lỗi, 201 tham chiếu test). `target/` 5,8 GB, `.git/` 3,1 MB.**
 - **ADR-029 (M10) đã viết, chưa có dòng mã M10 nào; dừng chờ duyệt.** Môi trường đo thật và LLVM 20.1.8 đã trích tại `D:\Tools\llvm-20.1.8`; xem `docs/ENVIRONMENT.md`.
+
+## Handoff (2026-10-12)
+- Viết `docs/HANDOFF.md` (dự án trong 5 dòng, tệp bắt buộc đọc, luật làm việc, trạng thái, việc tiếp theo theo thứ tự, môi trường, điều kiện cứng/đột biến chưa giải quyết, câu hỏi chờ). Từ đây mỗi bước nhỏ: commit + cập nhật mục "Trạng thái" và "Việc tiếp theo" của HANDOFF.
+- Giang duyệt ADR-029 (LLVM 20.1.8 dựng sẵn, inkwell 0.10.0, liên kết động `LLVM-C`) kèm điều kiện: ghi SHA-256 gói LLVM; gritc cần `LLVM-C.dll` trên PATH khi chạy; binary do gritc sinh KHÔNG phụ thuộc `LLVM-C.dll`; `libxml2s.lib` rỗng chỉ là workaround. Q64: Giang tự chuyển paging file sang D: và restart.
