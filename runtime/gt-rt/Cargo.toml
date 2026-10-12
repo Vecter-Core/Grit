@@ -1,0 +1,19 @@
+# Runtime tối thiểu của Grit (ADR-029 §5). KHÔNG thuộc workspace gốc: cần `panic = "abort"` và được dựng riêng thành staticlib.
+[package]
+name = "gt-rt"
+version = "0.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+
+[workspace]

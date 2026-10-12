@@ -24,7 +24,7 @@
 ## 2. Trạng thái
 - **Milestone xong về mã:** M0–M9. M6, M7, M8 chỉ **"đạt có điều kiện"** (xem mục 5). M9 (gritc, cổng phán quyết, secret) cài xong, cổng đầy đủ xanh (687 test), Giang đã duyệt hướng ADR-028.
 - **Commit cuối trước tệp này:** `76d722f` ("M9: gritc, cổng phán quyết, bộ quét secret, E1001; ADR-029 (M10) dự thảo"). Cây làm việc sạch trước khi viết HANDOFF.
-- **Đang ở:** vừa viết HANDOFF; ADR-029 (M10) đã được Giang duyệt kèm điều kiện (mục 4). Spike LLVM đã đạt (chưa có mã M10 trong repo). Bước tiếp: mục 3, bước 4 `runtime/gt-rt`.
+- **Đang ở:** vừa viết HANDOFF; ADR-029 (M10) đã được Giang duyệt kèm điều kiện (mục 4). Spike LLVM đã đạt (chưa có mã M10 trong repo). Bước tiếp: mục 3, bước 5 `gt-codegen-llvm`.
 - **Số thật gần nhất:** cổng đầy đủ `tools/gate.sh`: 687 test pass / 0 lỗi; 67 mã lỗi; 788 tệp `.gt` (391 fail, 13 warn, 358 pass). `target/` ~5,8 GB, `.git/` ~3,3 MB.
 - Crate hiện có: gt-span, gt-lexer, gt-diag, gt-ast, gt-parser, gt-stack, gt-fmt, gt-resolve, gt-types, gt-mir (kèm `interp` = bộ chạy tham chiếu), gt-dataflow, gt-borrowck, gt-oblig (kèm gt-edge gộp, `unsafe_check`), gt-effects, gt-conc, gt-term, gt-secrets, gt-driver (lib + binary `gritc`). `gt-edge` chưa tách (lệch kế hoạch, đã ghi).
 
@@ -32,7 +32,7 @@
 1. `[XONG 2026-10-12]` Ghi SHA-256 gói LLVM 20.1.8 + `LLVM-C.dll` vào ADR-029 và `docs/ENVIRONMENT.md` (băm tự tính khi tải; GitHub công bố `f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f`), ghi: gritc cần `LLVM-C.dll` trên PATH khi chạy; binary do gritc sinh KHÔNG phụ thuộc `LLVM-C.dll` (phải kiểm bằng `dumpbin /dependents`); `libxml2s.lib` rỗng chỉ là workaround dự phòng.
 2. `[XONG 2026-10-12]` ADR-029 phụ lục: Q59–Q65 quyết định cuối; vấn đề `gritc.exe` không khởi động khi thiếu `LLVM-C.dll` ⇒ cargo feature `llvm` + nạp DLL trễ.
 3. `[XONG 2026-10-12]` **Spike bước 0** (đạt; ghi ở ADR-029 "kết quả spike"; cần shim 10 hàm `LLVM_Initialize*` tự viết bằng Rust) (≤ 1 giờ, ngoài repo hoặc crate tạm): `inkwell 0.10.0` feature `llvm20-1-no-llvm-linking` + `build.rs` phát `rustc-link-search=native=$GRIT_LLVM_DIR/lib` và `rustc-link-lib=dylib=LLVM-C`; in IR + xuất object. Hỏng ⇒ dùng `llvm-sys` thô hoặc workaround `libxml2s.lib` rỗng; ghi kết quả vào ADR TRƯỚC khi viết mã codegen.
-4. `runtime/gt-rt` (staticlib, `panic = abort`): `gritrt_start`, `gritrt_abort(kind)` (mã thoát **70**), mutex, tạo luồng.
+4. `[XONG 2026-10-12]` `runtime/gt-rt` (workspace RIÊNG, dựng bằng `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml` ⇒ `runtime/gt-rt/target/release/gt_rt.lib`; 3 test đạt; ô khoá 8 byte khởi tạo 0; abort kind 0..5 = unknown/overflow/bounds/division-by-zero/assertion/unreachable) (staticlib, `panic = abort`): `gritrt_start`, `gritrt_abort(kind)` (mã thoát **70**), mutex, tạo luồng.
 5. `gt-codegen-llvm` (crate DUY NHẤT có `unsafe`/FFI): số nguyên/bool/số học (wrap), `Assert` ⇒ kiểm + `gritrt_abort`; `Unreachable` ⇒ abort, **KHÔNG BAO GIỜ** `unreachable` của LLVM (chỉ sau `call @gritrt_abort noreturn`).
 6. Luồng điều khiển, hàm, struct/enum/tuple/mảng/tham chiếu; `Atomic` ⇒ atomics LLVM thật theo ordering E0503; `Mutex::with` ⇒ khoá thật qua gt-rt; `spawn` ⇒ luồng HĐH thật.
 7. `gt-guard` (IR Guard, mã E1101): LLVM verifier, đối chiếu attestation, thao tác nhạy cảm có Obligation-ID đã giải, từ chối `unreachable` không do codegen cố ý.

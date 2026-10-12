@@ -8,3 +8,4 @@ crates/*/fuzz/logs
 mutants.out
 mutants.out.old
 __pycache__/
+runtime/gt-rt/target
