@@ -18,7 +18,9 @@ Tệp này gom MỌI thứ môi trường mà phiên sau cần biết. Chi tiế
   - `PATH` phải chứa `%GRIT_LLVM_DIR%\bin` lúc CHẠY (cần `LLVM-C.dll`).
 - **Cách liên kết (đã kiểm thật, ADR-029 §2):** liên kết ĐỘNG `LLVM-C.lib` ↔ `LLVM-C.dll`. Hai đường mặc định của `llvm-sys` GÃY với bản chính thức này: tĩnh đòi `libxml2s.lib` (không kèm), động đòi `LLVM-20.dll` (không kèm; chỉ có `LLVM-C.dll`). Vì vậy phải dùng `no-llvm-linking` + chỉ thị liên kết riêng. Dự phòng: tạo `libxml2s.lib` rỗng bằng `lib.exe` rồi liên kết tĩnh.
 - **Kiểm nhanh:** `D:\Tools\llvm-20.1.8\bin\llvm-config.exe --version` ⇒ `20.1.8`; `--host-target` ⇒ `x86_64-pc-windows-msvc`.
-- **Băm SHA-256 của tệp tải về** sẽ ghi ở đây khi có `tools/setup_llvm.ps1` (chờ duyệt ADR-029).
+- **Băm SHA-256 (đã tự tính, khớp số GitHub công bố):** gói `clang+llvm-20.1.8-x86_64-pc-windows-msvc.tar.xz` (939 541 912 byte) = `f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f`. Tệp đã trích: `bin\LLVM-C.dll` = `b84e81d2ffa8fb030b58f1d9ad75ef3ab37f63cd094993c302d9efb34242eaf1`; `bin\llvm-config.exe` = `1a3dd9f3e6769ccd5d7a27135ef85e58f0cb4be3db6765a1c6086b77fb326884`; `lib\LLVM-C.lib` = `bd7e55563f21a9d2e4c0a5cdb48354d6d99e348fd93edef72eb1a647ae311be9`. Tải: `https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/clang%2Bllvm-20.1.8-x86_64-pc-windows-msvc.tar.xz`; trích chọn lọc: `tar -xJf - --strip-components=1 --wildcards '*/bin/llvm-config.exe' '*/bin/LLVM-C.dll' '*/lib/*.lib' '*/include/llvm/*' '*/include/llvm-c/*'`.
+- **Khi chạy:** `gritc` (backend LLVM) cần `LLVM-C.dll` trên `PATH`. **Binary do `gritc` sinh cho chương trình người dùng KHÔNG phụ thuộc `LLVM-C.dll`** (LLVM chỉ sinh object; exe = object + gt-rt, kiểm bằng `dumpbin /dependents` ở test M10). Nạp DLL trễ (`/DELAYLOAD`): `gritc check/fmt/explain` chạy được dù PATH không có LLVM.
+- **`libxml2s.lib` rỗng = WORKAROUND dự phòng** (chỉ nếu liên kết tĩnh phải dùng); hiện KHÔNG dùng.
 
 ## 3. Quy tắc build/test (Giang, 2026-10-08; áp dụng MỌI lúc)
 - Không chạy hai tiến trình `cargo` cùng lúc. `CARGO_BUILD_JOBS=2`; test với `--test-threads=2` (`t.sh`, `tools/gate.sh` đã đặt sẵn).
@@ -28,7 +30,7 @@ Tệp này gom MỌI thứ môi trường mà phiên sau cần biết. Chi tiế
 
 ## 4. WinError 1455 — thiếu BỘ NHỚ ẢO, không phải thiếu ổ đĩa
 Lỗi `os error 1455` ("The paging file is too small for this operation to complete") nghĩa là **commit limit = RAM + paging file** đã cạn, KHÔNG phải ổ đĩa đầy. Gặp khi biên dịch/liên kết song song (đặc biệt LLVM, `rustc` nhiều crate cùng lúc) hoặc khi chạy nhiều việc nặng.
-- **Người dùng kiểm cài đặt paging file:** Settings → System → About → Advanced system settings → Performance → Advanced → Virtual memory. Khuyến nghị: để hệ thống tự quản lý NHƯNG giữ ổ chứa paging file còn ≥ 15 GB trống, hoặc đặt cỡ cố định ≥ 24 GB, **ưu tiên chuyển paging file sang ổ D:** (ổ C: chỉ còn ~10 GB nên paging file không giãn được). Đây là cài đặt hệ thống — công cụ tự động KHÔNG đổi.
+- **Người dùng kiểm cài đặt paging file (Giang đã báo 2026-10-12: sẽ TỰ chuyển paging file sang D: và restart):** Settings → System → About → Advanced system settings → Performance → Advanced → Virtual memory. Khuyến nghị: để hệ thống tự quản lý NHƯNG giữ ổ chứa paging file còn ≥ 15 GB trống, hoặc đặt cỡ cố định ≥ 24 GB, **ưu tiên chuyển paging file sang ổ D:** (ổ C: chỉ còn ~10 GB nên paging file không giãn được). Đây là cài đặt hệ thống — công cụ tự động KHÔNG đổi.
 - Giữ `CARGO_BUILD_JOBS` thấp (≤ 2), đóng chương trình nặng trước khi liên kết LLVM, không chạy hai bản dựng nặng cùng lúc. `t.sh` thử lại tự động khi gặp `LNK1104/LNK1108/1455`.
 
 ## 5. Ổ C: đầy
