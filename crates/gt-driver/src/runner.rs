@@ -92,7 +92,7 @@ pub fn package_text(res: &CheckResult, art: &Artifacts) -> (String, String) {
     s.push_str("GTMIR1\n");
     s.push_str(&format!("attestation: {att}\n"));
     s.push_str(&format!("gritc: {}\n", env!("CARGO_PKG_VERSION")));
-    s.push_str(&format!("backend: {}\n", crate::render::BACKEND));
+    s.push_str(&format!("backend: {}\n", res.backend));
     s.push_str(&format!(
         "checks: {}\n",
         if res.checks == gt_oblig::driver::Checks::All {

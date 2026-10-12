@@ -17,14 +17,22 @@ use std::io::Write;
 /// Mã thoát của chương trình khi abort (bảng phân vùng D17: tách khỏi mã 0–3 của `gritc`).
 pub const ABORT_EXIT_CODE: i32 = 70;
 
-/// Loại abort; số thứ tự là hợp đồng với codegen.
-pub const ABORT_KINDS: [&str; 6] = [
+/// Loại abort; số thứ tự là hợp đồng với codegen; TÊN trùng `AssertKind::name` của MIR (đối chiếu với thông dịch).
+pub const ABORT_KINDS: [&str; 14] = [
     "unknown",
     "overflow",
-    "bounds",
-    "division-by-zero",
+    "index_out_of_bounds",
+    "div_by_zero",
     "assertion",
     "unreachable",
+    "cast_lossy",
+    "precondition",
+    "postcondition",
+    "invariant",
+    "abort",
+    "overflow_neg",
+    "rem_by_zero",
+    "slice_range",
 ];
 
 #[unsafe(no_mangle)]
@@ -43,6 +51,23 @@ pub extern "C" fn gritrt_abort(kind: i32) -> ! {
 pub extern "C" fn gritrt_start(main: extern "C" fn()) -> i32 {
     main();
     0
+}
+
+/// Báo kết quả của `main` (số nguyên/bool) cho `gritc run`: ghi `<giá trị>` vào tệp có đường dẫn trong biến môi trường
+/// `GRITRT_RESULT_FILE`; KHÔNG đặt biến ⇒ không làm gì (chương trình chạy độc lập không in gì thêm). Chỉ để đối chứng với thông dịch.
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_report_int(value: i64, signed: i32) {
+    let Some(path) = std::env::var_os("GRITRT_RESULT_FILE") else {
+        return;
+    };
+    let text = if signed != 0 {
+        value.to_string()
+    } else {
+        (value as u64).to_string()
+    };
+    if std::fs::write(path, text).is_err() {
+        gritrt_abort(0);
+    }
 }
 
 #[repr(C)]

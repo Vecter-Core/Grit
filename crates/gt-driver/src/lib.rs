@@ -2,6 +2,8 @@
 //! gt-driver (M9, ADR-028): `gritc`. Chuỗi pass, CỔNG PHÁN QUYẾT (ĐỎ/ICE ⇒ không output, không chạy), báo cáo JSON có version,
 //! `check`/`build`/`run`/`explain`/`fmt`. Backend M9 = thông dịch MIR tuần tự (`"backend":"interpreter"`); M10 thêm LLVM.
 pub mod cli;
+#[cfg(feature = "llvm")]
+pub mod native;
 pub mod pipeline;
 pub mod render;
 pub mod runner;

@@ -2,6 +2,11 @@
 use std::{env, fs, path::PathBuf};
 
 fn main() {
+    // Nạp LLVM-C.dll TRỄ (ADR-029): `rustc-link-arg` của crate thư viện KHÔNG lan sang crate dùng nó, nên phát ở đây cho bin và test.
+    if env::var_os("CARGO_FEATURE_LLVM").is_some() {
+        println!("cargo:rustc-link-arg-bins=/DELAYLOAD:LLVM-C.dll");
+        println!("cargo:rustc-link-arg-tests=/DELAYLOAD:LLVM-C.dll");
+    }
     let dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"))
         .join("../../docs/errors");
     println!("cargo:rerun-if-changed=../../docs/errors");

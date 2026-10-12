@@ -133,7 +133,7 @@ pub fn json_report(
     let _ = write!(
         extra,
         "\"backend\":{},\"phase\":{},\"verdict\":{},\"passes\":[",
-        json_string(BACKEND),
+        json_string(res.backend),
         json_string(phase.name()),
         json_string(res.verdict.name())
     );
@@ -225,11 +225,12 @@ pub fn human_report(res: &CheckResult, color: bool) -> String {
         .collect();
     let _ = write!(
         out,
-        "gritc: phán quyết {}; {} lỗi, {} cảnh báo, {} ghi chú; backend: {BACKEND}",
+        "gritc: phán quyết {}; {} lỗi, {} cảnh báo, {} ghi chú; backend: {}",
         res.verdict.name(),
         res.report.errors(),
         res.report.warnings(),
-        res.report.notes()
+        res.report.notes(),
+        res.backend
     );
     if !failed.is_empty() {
         let _ = write!(out, "; pass hỏng: {}", failed.join(", "));

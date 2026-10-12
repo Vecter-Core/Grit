@@ -2,6 +2,7 @@
 # Cổng đầy đủ: fmt, clippy -D warnings, audit, test --workspace, check_expectations (+ unittest của script)
 cd "$1" || exit 1
 export TEMP='D:\Grit\target\tmp' TMP='D:\Grit\target\tmp' TMPDIR=/d/Grit/target/tmp
+export GRIT_LLVM_DIR="${GRIT_LLVM_DIR:-D:/Tools/llvm-20.1.8}"; export PATH="$(cygpath -u "$GRIT_LLVM_DIR")/bin:$PATH"
 export CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=2
 [ -n "$2" ] && export CARGO_TARGET_DIR="$2"
 echo "== fmt"; cargo fmt --all --check && echo FMT_OK

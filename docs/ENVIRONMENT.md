@@ -35,3 +35,9 @@ Lỗi `os error 1455` ("The paging file is too small for this operation to compl
 
 ## 5. Ổ C: đầy
 Triệu chứng: `No space left on device`, `LNK1104`/`LNK1108`. Cách làm đã chốt: `TEMP`/`TMP`/`TMPDIR` trỏ về `D:\Grit\target\tmp` (xem `tools/gate.sh`, `t.sh`). Giải phóng chỗ khi cần: thư mục cài đặt .NET/VS cũ trong `%TEMP%`.
+
+## 6. Dựng backend LLVM và chạy test (M10)
+- `.cargo/config.toml` đặt `GRIT_LLVM_DIR` mặc định (`D:/Tools/llvm-20.1.8`, `force=false`); build script của `gt-codegen-llvm` đọc nó.
+- **Phải dựng runtime trước:** `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml` ⇒ `runtime/gt-rt/target/release/gt_rt.lib` (hoặc đặt `GRIT_RT_LIB`). `gritc` liên kết exe bằng `link.exe` tìm qua `find-msvc-tools` (cần VS Build Tools).
+- `PATH` lúc CHẠY test/gritc (backend llvm) phải có `%GRIT_LLVM_DIR%in`; `t.sh` và `tools/gate.sh` tự đặt. Chẩn đoán: `GRITC_DUMP_IR=<tệp>` ghi IR LLVM.
+- Hai cổng cần nhớ: mã thoát 3 khi thiếu `LLVM-C.dll`/`gt_rt.lib`/`link.exe` hoặc codegen chưa hỗ trợ; 2 khi lỗi nội bộ (verifier LLVM, liên kết).

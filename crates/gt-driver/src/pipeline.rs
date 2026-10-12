@@ -120,6 +120,8 @@ pub struct CheckResult {
     /// các `#allow` đã áp dụng (dấu vết kiểm toán)
     pub allowed: Vec<Allowed>,
     artifacts: Option<Artifacts>,
+    /// backend dùng cho đầu ra này (`interpreter` | `llvm`); cli đặt trước khi in
+    pub backend: &'static str,
 }
 
 impl CheckResult {
@@ -393,6 +395,7 @@ fn finish(
         checks_report: None,
         allowed: Vec::new(),
         artifacts,
+        backend: crate::render::BACKEND,
     }
 }
 

@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 include!(concat!(env!("OUT_DIR"), "/explain_table.rs"));
 
-const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven]\n  gritc build <tệp|thư mục> [-o ra.gtmir] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc run   <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
+const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
 
 #[derive(Debug)]
 struct Cli {
@@ -21,6 +21,13 @@ struct Cli {
     checks: Checks,
     out: Option<String>,
     fmt_check: bool,
+    backend: Backend,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Backend {
+    Interpreter,
+    Llvm,
 }
 
 fn usage_err(msg: &str) -> i32 {
@@ -39,6 +46,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
         checks: crate::pipeline::DEFAULT_CHECKS,
         out: None,
         fmt_check: false,
+        backend: Backend::Interpreter,
     };
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -47,12 +55,19 @@ fn parse(args: &[String]) -> Result<Cli, String> {
             "--check" => cli.fmt_check = true,
             "--checks=all" => cli.checks = Checks::All,
             "--checks=proven" => cli.checks = Checks::Proven,
+            "--backend=interpreter" => cli.backend = Backend::Interpreter,
+            "--backend=llvm" => cli.backend = Backend::Llvm,
             "-o" => {
                 cli.out = Some(
                     it.next()
                         .ok_or_else(|| "`-o` cần đường dẫn".to_string())?
                         .clone(),
                 );
+            }
+            s if s.starts_with("--backend=") => {
+                return Err(format!(
+                    "`{s}`: chỉ nhận --backend=llvm hoặc --backend=interpreter"
+                ));
             }
             s if s.starts_with("--checks=") => {
                 return Err(format!("`{s}`: chỉ nhận --checks=all hoặc --checks=proven"));
@@ -141,6 +156,61 @@ fn cmd_check(cli: &Cli) -> i32 {
     check_exit_code(res.verdict)
 }
 
+#[cfg(feature = "llvm")]
+fn build_llvm(cli: &Cli, mut res: CheckResult, path: &str) -> i32 {
+    let code = check_exit_code(res.verdict);
+    let Some(art) = res.open_gate() else {
+        return 2;
+    };
+    let out = cli.out.clone().unwrap_or_else(|| {
+        let stem = Path::new(path)
+            .file_stem()
+            .map_or_else(|| "out".to_string(), |s| s.to_string_lossy().into_owned());
+        format!("{stem}.exe")
+    });
+    if let Err(e) = crate::native::build_exe(art, Path::new(&out), false) {
+        eprintln!("gritc: backend llvm: {e}");
+        return e.exit_code();
+    }
+    res.backend = "llvm";
+    emit(&res, cli, Phase::Check, None, None);
+    if !cli.json {
+        eprintln!("gritc: đã ghi {out} (backend: llvm)");
+    }
+    code
+}
+
+#[cfg(not(feature = "llvm"))]
+fn build_llvm(_cli: &Cli, _res: CheckResult, _path: &str) -> i32 {
+    usage_err("bản gritc này dựng không có backend llvm (--no-default-features)")
+}
+
+/// Dựng exe vào thư mục tạm, chạy, dọn. `Err(mã)`: lỗi môi trường/codegen đã in thông báo.
+#[cfg(feature = "llvm")]
+fn run_llvm(art: &crate::pipeline::Artifacts) -> Result<RunReport, i32> {
+    let dir = std::env::temp_dir().join(format!("gritc-{}", std::process::id()));
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return Err(usage_err(&format!("không tạo được {}: {e}", dir.display())));
+    }
+    let exe = dir.join("prog.exe");
+    let r = match crate::native::build_exe(art, &exe, true) {
+        Ok(()) => Ok(crate::native::run_exe(&exe)),
+        Err(e) => {
+            eprintln!("gritc: backend llvm: {e}");
+            Err(e.exit_code())
+        }
+    };
+    let _ = std::fs::remove_dir_all(&dir);
+    r
+}
+
+#[cfg(not(feature = "llvm"))]
+fn run_llvm(_art: &crate::pipeline::Artifacts) -> Result<RunReport, i32> {
+    Err(usage_err(
+        "bản gritc này dựng không có backend llvm (--no-default-features)",
+    ))
+}
+
 fn cmd_build(cli: &Cli) -> i32 {
     let Some(path) = &cli.path else {
         return usage_err("thiếu đường dẫn");
@@ -159,6 +229,9 @@ fn cmd_build(cli: &Cli) -> i32 {
         emit(&res, cli, Phase::Check, None, None);
         return code;
     };
+    if cli.backend == Backend::Llvm {
+        return build_llvm(cli, res, path);
+    }
     let out = cli.out.clone().unwrap_or_else(|| {
         let stem = Path::new(path)
             .file_stem()
@@ -169,10 +242,7 @@ fn cmd_build(cli: &Cli) -> i32 {
         Ok(att) => {
             emit(&res, cli, Phase::Check, None, Some(&att));
             if !cli.json {
-                eprintln!(
-                    "gritc: đã ghi gói {out} (backend: {})",
-                    crate::render::BACKEND
-                );
+                eprintln!("gritc: đã ghi gói {out} (backend: {})", res.backend);
             }
             code
         }
@@ -193,6 +263,9 @@ fn cmd_run(cli: &Cli) -> i32 {
         Err(e) => return usage_err(&e),
     };
     let mut res = res;
+    if cli.backend == Backend::Llvm {
+        res.backend = "llvm";
+    }
     let code = check_exit_code(res.verdict);
     if !res.verdict.allows_output() {
         emit(&res, cli, Phase::Check, None, None);
@@ -207,7 +280,17 @@ fn cmd_run(cli: &Cli) -> i32 {
         eprintln!("gritc: lỗi nội bộ: cổng mở nhưng không có sản phẩm để chạy");
         return 2;
     };
-    let rr = run_main(art);
+    let rr = if cli.backend == Backend::Llvm {
+        match run_llvm(&art) {
+            Ok(r) => {
+                res.backend = "llvm";
+                r
+            }
+            Err(code) => return code,
+        }
+    } else {
+        run_main(art)
+    };
     let exit = run_exit_code(&rr.end);
     if cli.json {
         println!(
@@ -218,12 +301,12 @@ fn cmd_run(cli: &Cli) -> i32 {
         match &rr.end {
             RunEnd::Normal | RunEnd::ProgramExit(0) => println!(
                 "chạy xong (backend: {}); main trả về {}",
-                crate::render::BACKEND,
+                res.backend,
                 rr.value.as_deref().unwrap_or("()")
             ),
             RunEnd::Aborted(k) => eprintln!(
                 "chương trình abort: {k} (mã thoát {exit}, backend: {})",
-                crate::render::BACKEND
+                res.backend
             ),
             RunEnd::Limit => eprintln!(
                 "bộ chạy tham chiếu hết giới hạn (nhiên liệu/độ sâu); chương trình chưa kết thúc (mã thoát {exit})"
