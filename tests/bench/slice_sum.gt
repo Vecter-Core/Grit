@@ -1,0 +1,20 @@
+// bench: lát có kiểm biên: tổng 1000 phần tử, lặp 200 000 lần (200 triệu lần truy cập xs[i] có Assert biên).
+ƒ sum(xs: &[i64]) → i64 ! ∅ {
+  μs ≔ 0;
+  μi ≔ 0;
+  ⟳ i < xs.len() ↓ xs.len() - i {
+    s ← s +% xs[i];
+    i ← i + 1;
+  }
+  s
+}
+ƒ main() → i64 ! ∅ {
+  a ≔ [1i64; 1000];
+  μt ≔ 0i64;
+  μk ≔ 0u32;
+  ⟳ k < 200000 ↓ 200000 - k {
+    t ← t +% sum(&a[..]);
+    k ← k + 1;
+  }
+  t
+}

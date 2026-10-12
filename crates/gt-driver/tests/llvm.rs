@@ -555,3 +555,137 @@ fn exe_carries_the_attestation_of_the_check() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+fn sample(name: &str) -> (String, String) {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/samples")
+        .join(format!("{name}.gt"));
+    let src = std::fs::read_to_string(&p)
+        .unwrap_or_else(|e| panic!("không đọc được {}: {e}", p.display()))
+        .replace("\r\n", "\n");
+    let expect = src
+        .lines()
+        .find_map(|l| l.strip_prefix("// expect-result:"))
+        .unwrap_or_else(|| panic!("{name}: thiếu `// expect-result:`"))
+        .trim()
+        .to_string();
+    (src, expect)
+}
+
+/// 3 chương trình mẫu THẬT (ADR-029 §7 (a)): từ nguồn Grit tới nhị phân, kết quả đúng với số tính tay trong tệp.
+#[test]
+fn sample_numeric_loop_and_recursion() {
+    let (src, expect) = sample("numeric");
+    check_value(&src, &expect);
+}
+
+#[test]
+fn sample_arrays_and_slices_with_checked_bounds() {
+    let (src, expect) = sample("arrays_slices");
+    check_value(&src, &expect);
+}
+
+#[test]
+fn sample_real_threads_atomic_static_mutex_spawn() {
+    let (src, expect) = sample("threads");
+    // thông dịch tham chiếu không hỗ trợ static/spawn: KHÔNG có đối chiếu; chỉ giá trị cố định, lặp để lộ đua dữ liệu
+    for round in 0..5 {
+        let l = run(&src, "llvm");
+        assert_eq!(l.exit, 0, "vòng {round}: {l:?}");
+        assert_eq!(l.value.as_deref(), Some(expect.as_str()), "vòng {round}");
+    }
+}
+
+/// Mặc định (không `--backend`) là llvm khi bản dựng có feature `llvm` (ADR-029 Q63) và đầu ra nêu rõ backend.
+#[test]
+fn default_backend_is_llvm_and_is_stated() {
+    let dir = scratch("default");
+    let f = dir.join("prog.gt");
+    std::fs::write(&f, "ƒ main() → u32 ! ∅ { 7 }\n").expect("ghi");
+    let o = gritc()
+        .args(["run", "--json"])
+        .arg(&f)
+        .output()
+        .expect("chạy");
+    let text = String::from_utf8_lossy(&o.stdout).into_owned();
+    let v: serde_json::Value =
+        serde_json::from_str(text.lines().last().unwrap_or("")).expect("JSON");
+    assert_eq!(v["backend"], "llvm", "{text}");
+    assert_eq!(v["run"]["value"], "7");
+    let o = gritc().arg(&f).arg("run").output().expect("chạy");
+    assert_ne!(o.status.code(), Some(0)); // lệnh phải đứng trước
+    let o = gritc().arg("--version").output().expect("chạy");
+    assert!(String::from_utf8_lossy(&o.stdout).contains("backend mặc định: llvm"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Golden test trên LLVM IR (ADR-029 §7 (c)): IR của vài chương trình nhỏ phải KHÔNG đổi ngoài ý muốn. Cập nhật có chủ đích:
+/// `GT_UPDATE_GOLDEN=1` rồi xem `git diff tests/golden_ll`. IR phụ thuộc đúng LLVM 20.1.8 (docs/ENVIRONMENT.md).
+fn golden(name: &str, src: &str) {
+    let dir = scratch(name);
+    let f = dir.join("prog.gt");
+    std::fs::write(&f, src).expect("ghi");
+    let ir_path = dir.join("out.ll");
+    let o = gritc()
+        .env("GRITC_DUMP_IR", &ir_path)
+        .args(["build", "--backend=llvm", "-o"])
+        .arg(dir.join("g.exe"))
+        .arg(&f)
+        .output()
+        .expect("chạy");
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let ir = std::fs::read_to_string(&ir_path)
+        .expect("IR")
+        .replace("\r\n", "\n");
+    let gold = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/golden_ll")
+        .join(format!("{name}.ll"));
+    if std::env::var_os("GT_UPDATE_GOLDEN").is_some() {
+        std::fs::write(&gold, &ir).expect("ghi golden");
+    } else {
+        let want = std::fs::read_to_string(&gold)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "thiếu {}: {e} (chạy với GT_UPDATE_GOLDEN=1)",
+                    gold.display()
+                )
+            })
+            .replace("\r\n", "\n");
+        assert_eq!(
+            ir,
+            want,
+            "IR của `{name}` đổi so với golden {}",
+            gold.display()
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn golden_ir_checked_add_and_abort_blocks() {
+    golden(
+        "checked_add",
+        "ƒ add(a: u8, b: u8) → u8 ! ∅ { a + b }\nƒ main() → u8 ! ∅ { add(200, 100) }\n",
+    );
+}
+
+#[test]
+fn golden_ir_slice_bounds() {
+    golden(
+        "slice_sum",
+        &format!("{SUM_SLICE}ƒ main() → i64 ! ∅ {{ a ≔ [1i64, 2, 3]; sum(&a[..]) }}\n"),
+    );
+}
+
+#[test]
+fn golden_ir_static_atomic_and_mutex() {
+    golden(
+        "static_atomic",
+        "■ COUNT: Atomic<u32> ≔ Atomic::new(0u32);\nƒ worker(n: u32) ! ∅ { COUNT.fetch_add(n, Ordering::Relaxed); }\nƒ main() → u32 ! ∅ { worker(1u32); COUNT.load(Ordering::SeqCst) }\n",
+    );
+}

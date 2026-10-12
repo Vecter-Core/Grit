@@ -1,0 +1,21 @@
+// sample: số học + vòng lặp + đệ quy có `↓` (M10, tiêu chí (a)). Kết quả mong đợi: xem `// expect-result`.
+// expect-result: 11630
+ƒ sum_to(n: u32) → u64 ! ∅ {
+  μs ≔ 0u64;
+  μi ≔ 0u32;
+  ⟳ i < n ↓ n - i {
+    s ← s +% (i as u64);
+    i ← i + 1;
+  }
+  s
+}
+ƒ fib(n: u32) → u64 ! ∅ ↓ n {
+  ⎇ n < 2 { n as u64 } ⇝ { fib(n - 1) +% fib(n - 2) }
+}
+ƒ fact(n: u32) → u64 ! ∅ ↓ n {
+  ⎇ n == 0 { 1 } ⇝ { n as u64 *% fact(n - 1) }
+}
+ƒ main() → u64 ! ∅ {
+  // 4950 + 6765 (fib 20) + 120 (5!) − 205 (hiệu chỉnh) = 11630
+  sum_to(100) +% fib(20) +% fact(5) -% 205
+}

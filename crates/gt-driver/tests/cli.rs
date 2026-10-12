@@ -74,6 +74,7 @@ fn red_run_and_build_produce_no_output_and_never_execute() {
     let outp = d.join("red.gtmir");
     let o = gritc()
         .arg("build")
+        .arg("--backend=interpreter")
         .arg(&red)
         .arg("-o")
         .arg(&outp)
@@ -85,7 +86,12 @@ fn red_run_and_build_produce_no_output_and_never_execute() {
         !Path::new(&format!("{}.tmp", outp.display())).exists(),
         "để lại tệp tạm"
     );
-    let o = gritc().arg("run").arg(&red).output().expect("chạy");
+    let o = gritc()
+        .arg("run")
+        .arg("--backend=interpreter")
+        .arg(&red)
+        .output()
+        .expect("chạy");
     assert_eq!(code(&o), 1);
     assert!(!out(&o).contains("chạy xong"), "ĐỎ mà vẫn chạy");
     // không tệp nào khác sinh ra
@@ -118,6 +124,7 @@ fn ice_run_and_build_produce_no_output_and_never_execute() {
         let o = gritc()
             .env("GRITC_FAULT", fault)
             .arg("run")
+            .arg("--backend=interpreter")
             .arg(&good)
             .output()
             .expect("chạy");
@@ -126,6 +133,7 @@ fn ice_run_and_build_produce_no_output_and_never_execute() {
         let o = gritc()
             .env("GRITC_FAULT", fault)
             .arg("build")
+            .arg("--backend=interpreter")
             .arg(&good)
             .arg("-o")
             .arg(&outp)
@@ -141,7 +149,12 @@ fn ice_run_and_build_produce_no_output_and_never_execute() {
 fn yellow_runs_and_warns_and_deny_yellow_blocks() {
     let d = scratch("yellow");
     let y = write(&d, "y.gt", YELLOW);
-    let o = gritc().arg("run").arg(&y).output().expect("chạy");
+    let o = gritc()
+        .arg("run")
+        .arg("--backend=interpreter")
+        .arg(&y)
+        .output()
+        .expect("chạy");
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(err(&o).contains("S101"), "phải in cảnh báo: {}", err(&o));
     assert!(
@@ -152,6 +165,7 @@ fn yellow_runs_and_warns_and_deny_yellow_blocks() {
     // --deny-yellow ⇒ ĐỎ: không chạy, không ghi gói
     let o = gritc()
         .arg("run")
+        .arg("--backend=interpreter")
         .arg("--deny-yellow")
         .arg(&y)
         .output()
@@ -160,7 +174,7 @@ fn yellow_runs_and_warns_and_deny_yellow_blocks() {
     assert!(!out(&o).contains("chạy xong"));
     let outp = d.join("y.gtmir");
     let o = gritc()
-        .args(["build", "--deny-yellow"])
+        .args(["build", "--deny-yellow", "--backend=interpreter"])
         .arg(&y)
         .arg("-o")
         .arg(&outp)
@@ -171,6 +185,7 @@ fn yellow_runs_and_warns_and_deny_yellow_blocks() {
     // build VÀNG bình thường: ghi gói, mã 0
     let o = gritc()
         .arg("build")
+        .arg("--backend=interpreter")
         .arg(&y)
         .arg("-o")
         .arg(&outp)
@@ -187,21 +202,40 @@ fn run_exit_codes_are_partitioned_from_check_codes_both_sides() {
     let ab = write(&d, "ab.gt", ABORTS);
     let red = write(&d, "red.gt", RED);
     // phía gritc (giai đoạn check): ĐỎ ⇒ 1
-    let c_red = code(&gritc().arg("run").arg(&red).output().expect("chạy"));
+    let c_red = code(
+        &gritc()
+            .arg("run")
+            .arg("--backend=interpreter")
+            .arg(&red)
+            .output()
+            .expect("chạy"),
+    );
     assert_eq!(c_red, 1);
     // phía chương trình (giai đoạn run): bình thường ⇒ 0, abort ⇒ 70
     assert_eq!(
-        code(&gritc().arg("run").arg(&good).output().expect("chạy")),
+        code(
+            &gritc()
+                .arg("run")
+                .arg("--backend=interpreter")
+                .arg(&good)
+                .output()
+                .expect("chạy")
+        ),
         0
     );
-    let o = gritc().arg("run").arg(&ab).output().expect("chạy");
+    let o = gritc()
+        .arg("run")
+        .arg("--backend=interpreter")
+        .arg(&ab)
+        .output()
+        .expect("chạy");
     assert_eq!(code(&o), 70, "{}{}", out(&o), err(&o));
     assert!(err(&o).contains("abort"));
     // 70 không bao giờ là mã của gritc ở giai đoạn check
     assert!(![0, 1, 2, 3].contains(&70));
     // JSON nói rõ giai đoạn và khớp mã thoát
     let o = gritc()
-        .args(["run", "--json"])
+        .args(["run", "--json", "--backend=interpreter"])
         .arg(&ab)
         .output()
         .expect("chạy");
@@ -214,7 +248,7 @@ fn run_exit_codes_are_partitioned_from_check_codes_both_sides() {
     );
     assert!(j.contains("\"backend\":\"interpreter\""));
     let o = gritc()
-        .args(["run", "--json"])
+        .args(["run", "--json", "--backend=interpreter"])
         .arg(&red)
         .output()
         .expect("chạy");
@@ -274,6 +308,7 @@ fn build_package_is_deterministic_and_attested() {
         code(
             &gritc()
                 .arg("build")
+                .arg("--backend=interpreter")
                 .arg(&g)
                 .arg("-o")
                 .arg(&p1)
@@ -286,6 +321,7 @@ fn build_package_is_deterministic_and_attested() {
         code(
             &gritc()
                 .arg("build")
+                .arg("--backend=interpreter")
                 .arg(&g)
                 .arg("-o")
                 .arg(&p2)
@@ -314,6 +350,7 @@ fn build_package_is_deterministic_and_attested() {
         code(
             &gritc()
                 .arg("build")
+                .arg("--backend=interpreter")
                 .arg(&g2)
                 .arg("-o")
                 .arg(&p3)
@@ -402,10 +439,15 @@ fn directory_input_and_version() {
     let d = scratch("dir");
     write(&d, "a.gt", "▢ P { x: i32 }\n");
     write(&d, "main.gt", "ƒ main() → u32 ! ∅ { 7u32 }\n");
-    let o = gritc().arg("run").arg(&d).output().expect("chạy");
+    let o = gritc()
+        .arg("run")
+        .arg("--backend=interpreter")
+        .arg(&d)
+        .output()
+        .expect("chạy");
     assert_eq!(code(&o), 0, "{}{}", out(&o), err(&o));
     assert!(out(&o).contains("Int(7"));
     let o = gritc().arg("--version").output().expect("chạy");
     assert_eq!(code(&o), 0);
-    assert!(out(&o).contains("backend: interpreter"));
+    assert!(out(&o).contains("backend mặc định: llvm"), "{}", out(&o));
 }

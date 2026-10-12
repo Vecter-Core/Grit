@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 include!(concat!(env!("OUT_DIR"), "/explain_table.rs"));
 
-const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
+const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
 
 #[derive(Debug)]
 struct Cli {
@@ -30,6 +30,15 @@ enum Backend {
     Llvm,
 }
 
+/// Backend mặc định (ADR-029 Q63): `llvm` khi bản dựng có feature `llvm`, ngược lại `interpreter`. Luôn được ghi rõ trong đầu ra.
+const fn default_backend() -> Backend {
+    if cfg!(feature = "llvm") {
+        Backend::Llvm
+    } else {
+        Backend::Interpreter
+    }
+}
+
 fn usage_err(msg: &str) -> i32 {
     eprintln!("gritc: {msg}\n{USAGE}");
     3
@@ -46,7 +55,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
         checks: crate::pipeline::DEFAULT_CHECKS,
         out: None,
         fmt_check: false,
-        backend: Backend::Interpreter,
+        backend: default_backend(),
     };
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -421,9 +430,13 @@ fn cmd_fmt(cli: &Cli) -> i32 {
 pub fn main(args: Vec<String>) -> i32 {
     if args.first().map(String::as_str) == Some("--version") {
         println!(
-            "gritc {} (backend: {})",
+            "gritc {} (backend mặc định: {})",
             env!("CARGO_PKG_VERSION"),
-            crate::render::BACKEND
+            if default_backend() == Backend::Llvm {
+                "llvm"
+            } else {
+                "interpreter"
+            }
         );
         return 0;
     }

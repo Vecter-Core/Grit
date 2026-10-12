@@ -1,0 +1,11 @@
+// bench: vòng lặp số học thuần (mọi kiểm tràn của `i + 1` được giữ: --checks=all). 400 triệu vòng.
+ƒ sum_to(n: u32) → u64 ! ∅ {
+  μs ≔ 0u64;
+  μi ≔ 0u32;
+  ⟳ i < n ↓ n - i {
+    s ← s +% (i as u64);
+    i ← i + 1;
+  }
+  s
+}
+ƒ main() → u64 ! ∅ { sum_to(400000000) }

@@ -1,0 +1,5 @@
+// bench: đệ quy có `↓` (gọi hàm + kiểm tràn của n - 1, n - 2). fib(35) ≈ 30 triệu lời gọi.
+ƒ fib(n: u32) → u64 ! ∅ ↓ n {
+  ⎇ n < 2 { n as u64 } ⇝ { fib(n - 1) +% fib(n - 2) }
+}
+ƒ main() → u64 ! ∅ { fib(35) }
