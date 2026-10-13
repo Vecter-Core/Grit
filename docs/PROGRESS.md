@@ -507,3 +507,6 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - **Chưa làm / ghi thẳng:** hồ sơ `release` (-O2); đột biến `gt-guard`/`gt-codegen-llvm` (ADR đòi lô nhỏ 1 worker — chưa chạy vì tín dụng/thời gian; việc đầu tiên nếu Giang muốn); số thực, trait method, 128-bit mul/div (xem KNOWN_LIMITATIONS "M10").
 - **Cổng đầy đủ M10 (2026-10-13, một lần):** fmt OK; clippy 0; audit 0; 723 test pass / 0 lỗi; check_expectations OK (788 .gt, 67 mã); gt-rt 3 test. Dừng chờ Giang duyệt.
 - **M10 ĐƯỢC DUYỆT "đạt có điều kiện" (Giang, 2026-10-13):** điều kiện = chưa đột biến `gt-guard` và `gt-codegen-llvm`; chỉ có hồ sơ `dev` (-O0). Việc bù: (1) so sánh codegen ≡ thông dịch trên chương trình ngẫu nhiên; (2) đột biến chỉ `gt-guard`; (3) `release` cần ADR riêng (bộ tối ưu LLVM nằm trong TCB).
+
+## M11 (2026-10-13): Rig v0 — XONG, cổng đầy đủ xanh (742 test)
+- `crates/rig`: new/check/build/run/test/add/lock/fmt/clean, `--locked`, parser TOML con fail-closed, `rig.lock` băm SHA-256 từng gói, mã thoát riêng 10–13 (mã gritc chuyển nguyên), phụ thuộc path (vòng/trùng tên/diamond), luật tiền tố tên tệp (ADR-030). 11 test mức tiến trình + 4 unit; dự án 3 gói (hình thoi) build/run/test; tái lập SHA-256 đạt (dựng lại, sau clean, thư mục khác sau >1 s; bỏ `/Brepro` thì test ĐỎ). FB-1 luật bộ sinh; lô so sánh abort: 847 phép chạy khớp.
