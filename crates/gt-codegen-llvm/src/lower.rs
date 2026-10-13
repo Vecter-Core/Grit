@@ -131,6 +131,10 @@ enum Intr {
     FileBytes,
     OutU64,
     OutStr,
+    FsOpen,
+    ArenaNew,
+    ArenaAlloc,
+    ArenaReset,
 }
 
 struct Cg<'ctx, 'a> {
@@ -1630,6 +1634,18 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         if key.contains("Cap<Fs>") && m == "read" {
             return Some(Intr::FsRead);
         }
+        if key.contains("Cap<Fs>") && m == "open" {
+            return Some(Intr::FsOpen);
+        }
+        if key.contains("Arena") && m == "new" || key.contains("Cap<Alloc>") && m == "arena" {
+            return Some(Intr::ArenaNew);
+        }
+        if key.contains("Arena") && m == "alloc" {
+            return Some(Intr::ArenaAlloc);
+        }
+        if key.contains("Arena") && m == "reset" {
+            return Some(Intr::ArenaReset);
+        }
         if key.contains("File") && m == "len" {
             return Some(Intr::FileLen);
         }
@@ -1783,6 +1799,119 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
     ) -> R<Option<BasicValueEnum<'ctx>>> {
         match intr {
             Intr::RootCap => Ok(Some(self.lower_ty(dest_ty)?.const_zero())),
+            Intr::ArenaNew => {
+                let ft = self.ctx.i32_type().fn_type(&[], false);
+                let f = self.rt_fn("gritrt_arena_new", ft);
+                let c = llvm(self.builder.build_call(f, &[], "an"))?;
+                let Some(h) = c.try_as_basic_value().basic() else {
+                    return internal("gritrt_arena_new không trả giá trị");
+                };
+                self.tag_obl(h.as_instruction_value(), "E0405")?;
+                let a = self.lower_ty(dest_ty)?.into_struct_type().get_undef();
+                let a = llvm(self.builder.build_insert_value(a, h, 0, "arena"))?;
+                Ok(Some(a.as_basic_value_enum()))
+            }
+            Intr::ArenaAlloc => {
+                let Some(t) = gargs.first() else {
+                    return internal("Arena::alloc thiếu đối số kiểu");
+                };
+                let lt = self.lower_ty(t)?;
+                let size = self.td.get_abi_size(&lt);
+                let align = u64::from(self.td.get_abi_alignment(&lt)).max(1);
+                let i32t = self.ctx.i32_type();
+                let h = llvm(
+                    self.builder
+                        .build_load(i32t, vals[0].into_pointer_value(), "ah"),
+                )?;
+                let ft = self.ptr_type().fn_type(
+                    &[i32t.into(), self.i64t().into(), self.i64t().into()],
+                    false,
+                );
+                let f = self.rt_fn("gritrt_arena_alloc", ft);
+                let c = llvm(self.builder.build_call(
+                    f,
+                    &[
+                        h.into(),
+                        self.i64t().const_int(size, false).into(),
+                        self.i64t().const_int(align, false).into(),
+                    ],
+                    "aa",
+                ))?;
+                let Some(p) = c.try_as_basic_value().basic() else {
+                    return internal("gritrt_arena_alloc không trả giá trị");
+                };
+                self.tag_obl(p.as_instruction_value(), "E0405")?;
+                llvm(self.builder.build_store(p.into_pointer_value(), vals[1]))?;
+                Ok(Some(p))
+            }
+            Intr::ArenaReset => {
+                let i32t = self.ctx.i32_type();
+                let h = llvm(
+                    self.builder
+                        .build_load(i32t, vals[0].into_pointer_value(), "ah"),
+                )?;
+                let ft = self.ctx.void_type().fn_type(&[i32t.into()], false);
+                let f = self.rt_fn("gritrt_arena_reset", ft);
+                let c = llvm(self.builder.build_call(f, &[h.into()], ""))?;
+                self.tag_obl(c.try_as_basic_value().instruction(), "E0405")?;
+                Ok(Some(self.unit_type().const_zero()))
+            }
+            Intr::FsOpen => {
+                let (p, n) = self.split_fat(vals[1])?;
+                let i32t = self.ctx.i32_type();
+                let ft = i32t.fn_type(&[self.ptr_type().into(), self.i64t().into()], false);
+                let f = self.rt_fn("gritrt_fs_open", ft);
+                let h = self.call_basic(f, &[p.into(), n.into()])?.into_int_value();
+                // Result<File, IoError>: Ok = biến thể 0 {File}, Err = biến thể 1 {IoError}; mã lỗi âm -(k+1) ↦ IoError thứ k
+                let Ty::Adt(rd, targs) = dest_ty else {
+                    return internal("Cap<Fs>::open không trả Result");
+                };
+                let et = self.lower_ty(dest_ty)?.into_struct_type();
+                let tmp = llvm(self.builder.build_alloca(et, "open.res"))?;
+                let ok = llvm(self.builder.build_int_compare(
+                    IntPredicate::SGE,
+                    h,
+                    i32t.const_zero(),
+                    "isok",
+                ))?;
+                let okb = self.ctx.append_basic_block(fx.f, "open.ok");
+                let errb = self.ctx.append_basic_block(fx.f, "open.err");
+                let end = self.ctx.append_basic_block(fx.f, "open.end");
+                llvm(self.builder.build_conditional_branch(ok, okb, errb))?;
+                // Ok(File { x: h })
+                self.builder.position_at_end(okb);
+                let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
+                llvm(self.builder.build_store(tag, self.i64t().const_zero()))?;
+                let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
+                let v0 = self.variant_struct(*rd, targs, 0)?;
+                let f0 = llvm(self.builder.build_struct_gep(v0, pay, 0, "okf"))?;
+                let file_ty = self.lower_ty(&targs[0])?.into_struct_type();
+                let fx0 = llvm(self.builder.build_struct_gep(file_ty, f0, 0, "fx"))?;
+                llvm(self.builder.build_store(fx0, h))?;
+                llvm(self.builder.build_unconditional_branch(end))?;
+                // Err(IoError)
+                self.builder.position_at_end(errb);
+                let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
+                llvm(
+                    self.builder
+                        .build_store(tag, self.i64t().const_int(1, false)),
+                )?;
+                let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
+                let v1 = self.variant_struct(*rd, targs, 1)?;
+                let f1 = llvm(self.builder.build_struct_gep(v1, pay, 0, "errf"))?;
+                let ioe_ty = self.lower_ty(&targs[1])?.into_struct_type();
+                let etag = llvm(self.builder.build_struct_gep(ioe_ty, f1, 0, "etag"))?;
+                let neg = llvm(self.builder.build_int_neg(h, "neg"))?;
+                let k = llvm(
+                    self.builder
+                        .build_int_sub(neg, i32t.const_int(1, false), "k"),
+                )?;
+                let k64 = llvm(self.builder.build_int_z_extend(k, self.i64t(), "k64"))?;
+                llvm(self.builder.build_store(etag, k64))?;
+                llvm(self.builder.build_unconditional_branch(end))?;
+                self.builder.position_at_end(end);
+                Ok(Some(llvm(self.builder.build_load(et, tmp, "open.v"))?))
+            }
             Intr::EnvArg => {
                 let i64t = self.i64t();
                 let ptr_ty = self.ptr_type().fn_type(&[i64t.into()], false);

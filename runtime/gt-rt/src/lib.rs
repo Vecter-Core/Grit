@@ -169,6 +169,31 @@ pub unsafe extern "C" fn gritrt_fs_read(p: *const u8, n: u64) -> i32 {
     }
 }
 
+/// Như `gritrt_fs_read` nhưng KHÔNG abort: trả tay cầm (≥ 0) hoặc mã lỗi âm: -1 không có tệp, -2 bị từ chối quyền, -3 đường dẫn không hợp lệ (không UTF-8), -4 lỗi khác.
+///
+/// # Safety
+/// `p` trỏ tới `n` byte đọc được.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_fs_open(p: *const u8, n: u64) -> i32 {
+    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let Ok(path) = std::str::from_utf8(bytes) else {
+        return -3;
+    };
+    match std::fs::read(path) {
+        Ok(v) => {
+            let leaked: &'static [u8] = Box::leak(v.into_boxed_slice());
+            let mut g = files().lock().unwrap_or_else(|e| e.into_inner());
+            g.push(leaked);
+            i32::try_from(g.len() - 1).unwrap_or(-4)
+        }
+        Err(e) => match e.kind() {
+            std::io::ErrorKind::NotFound => -1,
+            std::io::ErrorKind::PermissionDenied => -2,
+            _ => -4,
+        },
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_file_len(h: i32) -> u64 {
     file_at(h).len() as u64
@@ -195,6 +220,76 @@ pub unsafe extern "C" fn gritrt_write_str(p: *const u8, n: u64) {
     let mut o = std::io::stdout().lock();
     if o.write_all(bytes).and_then(|()| o.flush()).is_err() {
         gritrt_abort(14);
+    }
+}
+
+// ---- Arena (bump allocator có khoá): `Arena::{new,alloc,reset}` của prelude. Bộ nhớ trả ra sống tới `reset`/hết tiến trình.
+
+struct ArenaState {
+    chunks: Vec<(usize, usize, usize)>, // (địa chỉ, dung lượng, đã dùng)
+}
+
+fn arenas() -> &'static std::sync::Mutex<Vec<ArenaState>> {
+    static A: std::sync::OnceLock<std::sync::Mutex<Vec<ArenaState>>> = std::sync::OnceLock::new();
+    A.get_or_init(|| std::sync::Mutex::new(Vec::new()))
+}
+
+const CHUNK: usize = 1 << 20;
+
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_arena_new() -> i32 {
+    let mut g = arenas().lock().unwrap_or_else(|e| e.into_inner());
+    g.push(ArenaState { chunks: Vec::new() });
+    i32::try_from(g.len() - 1).unwrap_or_else(|_| gritrt_abort(0))
+}
+
+/// Cấp `size` byte căn lề `align` (luỹ thừa 2 ≤ 4096), KHÔNG khởi tạo. Hết bộ nhớ ⇒ abort.
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_arena_alloc(h: i32, size: u64, align: u64) -> *mut u8 {
+    let (size, align) = (usize::try_from(size).unwrap_or(usize::MAX), usize::try_from(align).unwrap_or(0));
+    if !align.is_power_of_two() || align > 4096 {
+        gritrt_abort(0);
+    }
+    let mut g = arenas().lock().unwrap_or_else(|e| e.into_inner());
+    let Some(st) = usize::try_from(h).ok().and_then(|k| g.get_mut(k)) else {
+        gritrt_abort(0)
+    };
+    if let Some((base, cap, used)) = st.chunks.last_mut() {
+        let start = (*base + *used).next_multiple_of(align) - *base;
+        if start.checked_add(size).is_some_and(|e| e <= *cap) {
+            *used = start + size;
+            return (*base + start) as *mut u8;
+        }
+    }
+    let cap = CHUNK.max(size.saturating_add(align));
+    let Ok(layout) = std::alloc::Layout::from_size_align(cap, 4096) else {
+        gritrt_abort(0)
+    };
+    let base = unsafe { std::alloc::alloc(layout) } as usize;
+    if base == 0 {
+        gritrt_abort(0);
+    }
+    let start = base.next_multiple_of(align) - base;
+    st.chunks.push((base, cap, start + size));
+    (base + start) as *mut u8
+}
+
+/// Quay lại đầu arena (giữ chunk đầu, trả các chunk còn lại). `&!Arena` ⇒ borrowck đảm bảo không còn tham chiếu tới nội dung.
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_arena_reset(h: i32) {
+    let mut g = arenas().lock().unwrap_or_else(|e| e.into_inner());
+    let Some(st) = usize::try_from(h).ok().and_then(|k| g.get_mut(k)) else {
+        gritrt_abort(0)
+    };
+    while st.chunks.len() > 1 {
+        if let Some((base, cap, _)) = st.chunks.pop()
+            && let Ok(layout) = std::alloc::Layout::from_size_align(cap, 4096)
+        {
+            unsafe { std::alloc::dealloc(base as *mut u8, layout) };
+        }
+    }
+    if let Some(c) = st.chunks.first_mut() {
+        c.2 = 0;
     }
 }
 

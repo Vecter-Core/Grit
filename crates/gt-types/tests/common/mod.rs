@@ -77,6 +77,7 @@ pub const PRELUDE_SRC: &str = "\
 #lang(arena)
 ▢ Arena { x: i32 }
 ▢ File { x: i32 }
+⊔ IoError { NotFound, Denied, Invalid, Other }
 ⊐ <T> [T] { ƒ len(&self) → usize ! ∅ { } }
 ⊐ File {
   ƒ len(&self) → usize ! ∅ { }
@@ -90,6 +91,7 @@ pub const PRELUDE_SRC: &str = "\
 ƒ shr(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
 ⊐ Cap<Fs> {
   ƒ read(&self, p: &str) → File ! {io} { }
+  ƒ open(&self, p: &str) → Result<File, IoError> ! {io} { }
   ƒ sub(&self, p: &str) → Cap<Fs> ! {io} { }
 }
 ⊐ Cap<Net> { ƒ connect(&self, h: &str) → File ! {io} { } }

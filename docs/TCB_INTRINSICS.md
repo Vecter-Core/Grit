@@ -13,6 +13,7 @@ IR Guard (gt-guard) giữ bảng đóng `RUNTIME` của các hàm runtime tươn
 | `File::bytes(&self) → &[u8]` | `∅` | không | `gritrt_file_ptr(h)` + `gritrt_file_len(h)` ⇒ lát | như trên | lát chỉ đọc, đúng `len`, sống `'static` thực tế (mượn từ `&self` an toàn hơn cần thiết) | CHỜ GIANG |
 | `Cap<Out>::write_u64(&self, n: u64)` | `io` | `&Cap<Out>` | `gritrt_write_u64(n)` | ghi stdout thất bại ⇒ abort `io_error` | in thập phân của `n`, flush ngay; không chèn gì khác | CHỜ GIANG |
 | `Cap<Out>::write_str(&self, s: &str)` | `io` | `&Cap<Out>` | `gritrt_write_str(ptr,len)` | ghi thất bại ⇒ abort `io_error` | ghi nguyên các byte của `s`, flush ngay | CHỜ GIANG |
+| `Cap<Fs>::open(&self, p: &str) → Result<File, IoError>` | `io` | `&Cap<Fs>` | `gritrt_fs_open(ptr,len) → i32` rồi dựng `Result` (Ok(File{x:h}) khi h ≥ 0; Err(IoError k) với mã âm −(k+1)) | KHÔNG abort vì lỗi I/O (đó là điểm khác `read`); chỉ abort nếu bảng tay cầm tràn `i32` | `IoError`: NotFound(−1) / Denied(−2) / Invalid(−3, đường dẫn không UTF-8) / Other(−4); ánh xạ cố định, thứ tự biến thể của prelude là hợp đồng với runtime | CHỜ GIANG |
 
 ## B. Đồng thời / bộ nhớ (M10) — lớp nghĩa vụ: E0503 (atomic), E0502 (khoá), E0501 (spawn)
 | intrinsic | hiệu ứng | capability | hạ thành | abort | bất biến | người duyệt |
@@ -23,6 +24,13 @@ IR Guard (gt-guard) giữ bảng đóng `RUNTIME` của các hàm runtime tươn
 | `spawn(f, a)` | `detach` (chỉ prelude) | không | hộp `{f,a}` qua `gritrt_alloc` + `gritrt_spawn(tramp, hộp)` | tạo luồng thất bại ⇒ abort | `a: Send` (E0501); không có `join`; hộp không giải phóng | CHỜ GIANG |
 | `<[T]>::len`, `core::abort` | `∅` / `div` | không | trích độ dài lát / `gritrt_abort(10)` | `core::abort` luôn abort | — | CHỜ GIANG |
 
+## B2. Arena (thêm 2026-10-13) — lớp nghĩa vụ IR Guard: **E0405** (tham chiếu không thoát Arena; kiểm ở M6)
+| intrinsic | hiệu ứng | capability | hạ thành | abort | bất biến | người duyệt |
+|---|---|---|---|---|---|---|
+| `Cap<Alloc>::arena(&self) → Arena`, `Arena::new() → Arena` | `mem` | `&Cap<Alloc>` (arena) / không (new) | `gritrt_arena_new() → i32` (tay cầm trong `Arena{x}`) | bảng arena tràn `i32` | mỗi arena độc lập; tay cầm không giả mạo được ngoài prelude | CHỜ GIANG |
+| `Arena::alloc<T>(&self, v: T) → &T` | `mem` | `&Arena` | `gritrt_arena_alloc(h, size_of T, align_of T)` + `store v` | hết bộ nhớ, `align` không phải luỹ thừa 2 hoặc > 4096 ⇒ abort `unknown` | con trỏ trả về trỏ vào chunk sống tới `reset` hoặc hết tiến trình; KHÔNG chạy destructor của `T` (Phase 1 không có `Drop` người dùng); borrowck M6 (E0405) bảo đảm tham chiếu không sống quá arena | CHỜ GIANG |
+| `Arena::reset(&!self)` | `mem` | `&!Arena` | `gritrt_arena_reset(h)` | tay cầm sai | `&!` ⇒ không còn tham chiếu tới nội dung (M6); chunk đầu được giữ, phần còn lại trả cho allocator | CHỜ GIANG |
+
 ## C. Runtime `gt-rt` (staticlib, `panic = "abort"`): hàm xuất ra cho mã sinh
-`gritrt_start`, `gritrt_abort(kind)` (mã thoát **70**, kind = tên `AssertKind` hoặc `io_error`/`arg_out_of_range`/`abort`), `gritrt_report_int` (chỉ khi `GRITRT_RESULT_FILE`), `gritrt_alloc`, `gritrt_spawn`, `gritrt_mutex_lock/unlock`, `gritrt_arg_ptr/len`, `gritrt_fs_read`, `gritrt_file_len/ptr`, `gritrt_write_u64/str`. Danh sách đóng của IR Guard (`gt_guard::RUNTIME`).
+`gritrt_start`, `gritrt_abort(kind)` (mã thoát **70**, kind = tên `AssertKind` hoặc `io_error`/`arg_out_of_range`/`abort`), `gritrt_report_int` (chỉ khi `GRITRT_RESULT_FILE`), `gritrt_alloc`, `gritrt_spawn`, `gritrt_mutex_lock/unlock`, `gritrt_arg_ptr/len`, `gritrt_fs_read`, `gritrt_fs_open`, `gritrt_arena_new/alloc/reset`, `gritrt_file_len/ptr`, `gritrt_write_u64/str`. Danh sách đóng của IR Guard (`gt_guard::RUNTIME`).
 Ranh giới `unsafe` của gt-rt: ADR-031.
