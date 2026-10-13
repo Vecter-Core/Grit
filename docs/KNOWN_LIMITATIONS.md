@@ -248,3 +248,4 @@ Lập luận từng nhóm (KHÔNG phải chứng minh):
 - Bộ giải M7 không chứng minh `b[i]` cho `b` cục bộ lấy từ `f.bytes()` dù có `i < b.len()` (check runtime còn nguyên, đúng nhưng chậm hơn).
 - IR Guard không có lớp nghĩa vụ cho lời gọi runtime I/O.
 - `Cap<Env>::arg` chuyển đối số không-UTF-8 thành lossy.
+- **gt-rt `unsafe`:** danh sách ở ADR-031; chưa có test tự động đếm `unsafe` của gt-rt so với danh sách đó. Cột "người duyệt" của `docs/TCB_INTRINSICS.md` đang `CHỜ GIANG` cho mọi intrinsic.

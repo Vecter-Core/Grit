@@ -110,6 +110,7 @@ MIR(CFG)  [7] Hạ xuống MIR: basic block, place, borrow, drop
 ### 3.3 Cơ sở tin cậy (TCB) — thứ ta _buộc_ phải tin
 
 Phase 1: (1) mã gritc0, (2) `rustc` + thư viện chuẩn Rust, (3) LLVM, (4) linker, (5) OS/phần cứng, (6) các `intrinsic` trong `lib/core` (được đánh dấu `trusted`, mỗi cái kèm lý do và được người duyệt), (6b) danh sách **lang item** `#lang(…)` mà compiler gán ý nghĩa đặc biệt và chỉ lib/core được khai báo: `option`, `copy`, `range`, `secret`, `cap`, `arena`, `drop`, `range_inclusive` (ADR-018, ADR-019, ADR-020, ADR-022; mỗi mục mới cần Giang duyệt), và (M8, ADR-026/027, chỉ thị Giang 2026-10-08) `send`, `sync` (trait tự động, suy theo cấu trúc), `cell`, `mutex`, `atomic`, `atomic_int`, `ordering`; cùng marker hiệu ứng `poly`/`detach` (chỉ lib/core) và thuộc tính `#level("n")` cho cấp khoá. **Hợp đồng từng lang item** (bất biến, quyền truy cập, ordering bắt buộc tường minh) ở ADR-027 §1. **Thông dịch MIR cài các lang item này chỉ là công cụ test, NGOÀI TCB; M10 phải cài bằng atomics và khoá LLVM/hệ điều hành thật; ngữ nghĩa của thông dịch không được coi là bằng chứng cho ngữ nghĩa codegen.**
+(6c) **Intrinsic/runtime trusted của Phase 1 được liệt kê đầy đủ, kèm hợp đồng (hiệu ứng, capability, điều kiện abort, bất biến, người duyệt) ở `docs/TCB_INTRINSICS.md`**; ranh giới `unsafe` của `runtime/gt-rt` ở ADR-031.
 Phase 2 thêm/đổi: (7) SMT solver (giảm dần khi có Kernel), (8) Kernel kiểm bằng chứng. **Mục tiêu dài hạn: thu nhỏ TCB, không phải làm nó biến mất.**
 
 ---
