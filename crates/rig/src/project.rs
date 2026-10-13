@@ -73,10 +73,19 @@ fn read_manifest(dir: &Path) -> Result<(String, toml::Doc), String> {
     Ok((text, doc))
 }
 
+/// `rig.toml` đã phân tích (chỉ các khoá hợp lệ).
+#[derive(Clone, Debug)]
+pub struct Manifest {
+    pub name: String,
+    pub version: String,
+    /// (tên phụ thuộc, đường dẫn đã khai báo)
+    pub deps: Vec<(String, String)>,
+    /// nội dung đã chuẩn hoá LF
+    pub text: String,
+}
+
 /// Phân tích `rig.toml` (chỉ các khoá hợp lệ).
-pub fn parse_manifest(
-    dir: &Path,
-) -> Result<(String, String, Vec<(String, String)>, String), String> {
+pub fn parse_manifest(dir: &Path) -> Result<Manifest, String> {
     let (text, doc) = read_manifest(dir)?;
     let at = |m: &str| format!("{}: {m}", dir.join("rig.toml").display());
     for sec in doc.keys() {
@@ -135,7 +144,12 @@ pub fn parse_manifest(
             deps.push((k.clone(), p.clone()));
         }
     }
-    Ok((name, version, deps, text))
+    Ok(Manifest {
+        name,
+        version,
+        deps,
+        text,
+    })
 }
 
 fn read_sources(dir: &Path) -> Result<Vec<(String, String)>, String> {
@@ -197,7 +211,12 @@ impl Loader {
                 .collect();
             return Err(format!("phụ thuộc vòng: {}", chain.join(" → ")));
         }
-        let (name, version, deps, manifest_text) = parse_manifest(&canon)?;
+        let Manifest {
+            name,
+            version,
+            deps,
+            text: manifest_text,
+        } = parse_manifest(&canon)?;
         if let Some(e) = expect_name
             && e != name
         {

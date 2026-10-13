@@ -402,7 +402,7 @@ fn cmd_add(a: &Args) -> i32 {
         Err(c) => return c,
     };
     let dep_name = match project::parse_manifest(&dir.join(path)) {
-        Ok((n, ..)) => n,
+        Ok(m) => m.name,
         Err(e) => return fail_with(E_PROJECT, &e),
     };
     let manifest = dir.join("rig.toml");
@@ -410,8 +410,8 @@ fn cmd_add(a: &Args) -> i32 {
         Ok(t) => t.replace("\r\n", "\n"),
         Err(e) => return fail(&format!("không đọc được rig.toml: {e}")),
     };
-    let (_, _, deps, _) = match project::parse_manifest(&dir) {
-        Ok(x) => x,
+    let deps = match project::parse_manifest(&dir) {
+        Ok(m) => m.deps,
         Err(e) => return fail_with(E_PROJECT, &e),
     };
     if deps.iter().any(|(n, _)| *n == dep_name) {

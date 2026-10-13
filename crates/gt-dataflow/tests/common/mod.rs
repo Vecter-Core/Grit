@@ -65,6 +65,7 @@ pub fn body(locals: Vec<Ty>, args: usize, blocks: Vec<(Vec<Statement>, Terminato
     Body {
         key: "test::f".to_string(),
         node: NodeId::new(FileId::new(0), 0),
+        sig_node: NodeId::new(FileId::new(0), 0),
         kind: BodyKind::Fn,
         arg_count: args,
         locals: decls,
