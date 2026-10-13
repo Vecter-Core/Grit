@@ -1,0 +1,314 @@
+// json: bộ phân tích JSON (RFC 8259) nhỏ — chương trình thật thứ nhất của M12 (docs/DOGFOOD.md, công cụ 2).
+// Dùng: json.exe <tệp>. In `<tệp>: valid elements=<N> depth=<D>` hoặc `<tệp>: invalid at byte <P> (<lý do>)`.
+// Cây giá trị nằm trong ARENA (enum đệ quy qua tham chiếu arena). Chuỗi/số lưu dạng khoảng (đầu, dài) trên bộ đệm tệp: KHÔNG giải mã
+// escape và KHÔNG đổi số sang số thực (chỉ kiểm cú pháp; Phase 1 chưa có String/Vec/f64 ở backend). Lồng quá MAX_DEPTH ⇒ lỗi có kiểm soát.
+// Capability chỉ lấy ở `main` và truyền xuống.
+
+⊔ Value<'a> { Null, Bool(bool), Num(usize, usize), Str(usize, usize), Arr(&'a Node<'a>, u64), Obj(&'a Node<'a>, u64) }
+⊔ Node<'a> { Nil, Cons(&'a Value<'a>, &'a Node<'a>) }
+// Good(vị trí sau, giá trị, số nút giá trị, độ sâu) | Bad(vị trí, mã lỗi). (Không đặt tên biến thể `Ok`/`Err`: tên biến thể của enum người dùng che `Ok`/`Err` của prelude.)
+⊔ R<'a> { Good(usize, &'a Value<'a>, u64, u32), Bad(usize, u32) }
+
+ƒ is_ws(c: u8) → bool ! ∅ { c == 32u8 ∨ c == 10u8 ∨ c == 9u8 ∨ c == 13u8 }
+ƒ is_digit(c: u8) → bool ! ∅ { c >= 48u8 ∧ c <= 57u8 }
+ƒ is_hex(c: u8) → bool ! ∅ { is_digit(c) ∨ (c >= 65u8 ∧ c <= 70u8) ∨ (c >= 97u8 ∧ c <= 102u8) }
+ƒ hexval(c: u8) → u32 ! ∅ {
+  ⎇ is_digit(c) { (c as u32) - 48u32 } ⇝ { ⎇ c >= 97u8 { (c as u32) - 87u32 } ⇝ { (c as u32) - 55u32 } }
+}
+ƒ is_cont(c: u8) → bool ! ∅ { c >= 128u8 ∧ c <= 191u8 }
+
+ƒ skip_ws(b: &[u8], start: usize) → usize ! ∅ {
+  μi ≔ start;
+  ⟳ i < b.len() ∧ is_ws(b[i]) ↓ b.len() - i { i ← i + 1; }
+  i
+}
+
+ƒ match4(b: &[u8], i: usize, c0: u8, c1: u8, c2: u8, c3: u8) → bool ! ∅ {
+  i + 4 <= b.len() ∧ b[i] == c0 ∧ b[i + 1] == c1 ∧ b[i + 2] == c2 ∧ b[i + 3] == c3
+}
+
+// độ dài chuỗi UTF-8 hợp lệ bắt đầu tại i (2..4), 0 nếu sai (RFC 3629: không overlong, không surrogate, ≤ U+10FFFF)
+ƒ utf8_len(b: &[u8], i: usize) → usize ! ∅ {
+  c ≔ b[i];
+  ⎇ c >= 194u8 ∧ c <= 223u8 {
+    ⎇ i + 2 <= b.len() ∧ is_cont(b[i + 1]) { 2usize } ⇝ { 0usize }
+  } ⇝ { ⎇ c >= 224u8 ∧ c <= 239u8 {
+    ⎇ i + 3 <= b.len() ∧ is_cont(b[i + 2]) ∧ ((c == 224u8 ∧ b[i + 1] >= 160u8 ∧ b[i + 1] <= 191u8) ∨ (c == 237u8 ∧ b[i + 1] >= 128u8 ∧ b[i + 1] <= 159u8) ∨ (c != 224u8 ∧ c != 237u8 ∧ is_cont(b[i + 1]))) { 3usize } ⇝ { 0usize }
+  } ⇝ { ⎇ c >= 240u8 ∧ c <= 244u8 {
+    ⎇ i + 4 <= b.len() ∧ is_cont(b[i + 2]) ∧ is_cont(b[i + 3]) ∧ ((c == 240u8 ∧ b[i + 1] >= 144u8 ∧ b[i + 1] <= 191u8) ∨ (c == 244u8 ∧ b[i + 1] >= 128u8 ∧ b[i + 1] <= 143u8) ∨ (c >= 241u8 ∧ c <= 243u8 ∧ is_cont(b[i + 1]))) { 4usize } ⇝ { 0usize }
+  } ⇝ { 0usize } } }
+}
+
+// số JSON bắt đầu tại start: trả (vị trí sau, mã lỗi 0=ok)
+ƒ number(b: &[u8], start: usize) → (usize, u32) ! ∅ {
+  μi ≔ start;
+  μerr ≔ 0u32;
+  ⎇ i < b.len() ∧ b[i] == 45u8 { i ← i + 1; } ⇝ { }
+  ⎇ i >= b.len() { err ← 3u32; } ⇝ {
+    ⎇ b[i] == 48u8 { i ← i + 1; } ⇝ {
+      ⎇ b[i] >= 49u8 ∧ b[i] <= 57u8 {
+        i ← i + 1;
+        ⟳ i < b.len() ∧ is_digit(b[i]) ↓ b.len() - i { i ← i + 1; }
+      } ⇝ { err ← 3u32; }
+    }
+  }
+  ⎇ err == 0u32 ∧ i < b.len() ∧ b[i] == 46u8 {
+    i ← i + 1;
+    ⎇ i < b.len() ∧ is_digit(b[i]) {
+      ⟳ i < b.len() ∧ is_digit(b[i]) ↓ b.len() - i { i ← i + 1; }
+    } ⇝ { err ← 3u32; }
+  } ⇝ { }
+  ⎇ err == 0u32 ∧ i < b.len() ∧ (b[i] == 101u8 ∨ b[i] == 69u8) {
+    i ← i + 1;
+    ⎇ i < b.len() ∧ (b[i] == 43u8 ∨ b[i] == 45u8) { i ← i + 1; } ⇝ { }
+    ⎇ i < b.len() ∧ is_digit(b[i]) {
+      ⟳ i < b.len() ∧ is_digit(b[i]) ↓ b.len() - i { i ← i + 1; }
+    } ⇝ { err ← 3u32; }
+  } ⇝ { }
+  (i, err)
+}
+
+// chuỗi bắt đầu tại dấu `"` ở start: trả (vị trí sau dấu `"` đóng, 0) hoặc (vị trí byte sai, mã lỗi)
+ƒ string(b: &[u8], start: usize) → (usize, u32) ! ∅ {
+  μi ≔ start + 1;
+  μerr ≔ 0u32;
+  μepos ≔ 0usize;
+  μdone ≔ false;
+  // nhiên liệu: mỗi vòng tiến ≥ 1 byte nên (độ dài còn lại + 1) vòng luôn đủ; M8 chứng minh dừng bằng nhiên liệu vì `i ← i + n` (n từ utf8_len) không chặn dưới được
+  μfuel ≔ ((b.len() - start) as u64) + 1u64;
+  ⟳ fuel > 0u64 ∧ i < b.len() ∧ ¬done ∧ err == 0u32 ↓ fuel {
+    fuel ← fuel - 1u64;
+    c ≔ b[i];
+    ⎇ c == 34u8 { done ← true; i ← i + 1; } ⇝ {
+      ⎇ c < 32u8 { err ← 4u32; epos ← i; i ← i + 1; } ⇝ {
+        ⎇ c == 92u8 {
+          ⎇ i + 1 >= b.len() { err ← 2u32; epos ← b.len(); i ← i + 1; } ⇝ {
+            e ≔ b[i + 1];
+            ⎇ e == 34u8 ∨ e == 92u8 ∨ e == 47u8 ∨ e == 98u8 ∨ e == 102u8 ∨ e == 110u8 ∨ e == 114u8 ∨ e == 116u8 { i ← i + 2; } ⇝ {
+              ⎇ e == 117u8 {
+                ⎇ i + 6 <= b.len() ∧ is_hex(b[i + 2]) ∧ is_hex(b[i + 3]) ∧ is_hex(b[i + 4]) ∧ is_hex(b[i + 5]) {
+                  cu ≔ hexval(b[i + 2]) * 4096u32 + hexval(b[i + 3]) * 256u32 + hexval(b[i + 4]) * 16u32 + hexval(b[i + 5]);
+                  ⎇ cu >= 55296u32 ∧ cu <= 56319u32 {
+                    // surrogate cao (U+D800..U+DBFF): phải đi liền một surrogate thấp (U+DC00..U+DFFF)
+                    ⎇ i + 12 <= b.len() ∧ b[i + 6] == 92u8 ∧ b[i + 7] == 117u8 ∧ is_hex(b[i + 8]) ∧ is_hex(b[i + 9]) ∧ is_hex(b[i + 10]) ∧ is_hex(b[i + 11]) {
+                      lo ≔ hexval(b[i + 8]) * 4096u32 + hexval(b[i + 9]) * 256u32 + hexval(b[i + 10]) * 16u32 + hexval(b[i + 11]);
+                      ⎇ lo >= 56320u32 ∧ lo <= 57343u32 { i ← i + 12; } ⇝ { err ← 5u32; epos ← i; i ← i + 1; }
+                    } ⇝ { err ← 5u32; epos ← i; i ← i + 1; }
+                  } ⇝ {
+                    ⎇ cu >= 56320u32 ∧ cu <= 57343u32 { err ← 5u32; epos ← i; i ← i + 1; } ⇝ { i ← i + 6; }
+                  }
+                } ⇝ { err ← 5u32; epos ← i; i ← i + 1; }
+              } ⇝ { err ← 5u32; epos ← i; i ← i + 1; }
+            }
+          }
+        } ⇝ {
+          ⎇ c < 128u8 { i ← i + 1; } ⇝ {
+            n ≔ utf8_len(b, i);
+            ⎇ n >= 1usize { i ← i + n; } ⇝ { err ← 6u32; epos ← i; i ← i + 1; }
+          }
+        }
+      }
+    }
+  }
+  ⎇ err == 0u32 ∧ ¬done { err ← 2u32; epos ← b.len(); } ⇝ { }
+  ⎇ err != 0u32 { (epos, err) } ⇝ { (i, 0u32) }
+}
+
+ƒ nil_node<'a>(ar: &'a Arena) → &'a Node<'a> ! {mem} { ar.alloc(Node::Nil) }
+
+// mảng bắt đầu tại `[` ở start; budget = ngân sách độ sâu còn lại (≥ 1)
+ƒ arr<'a>(b: &[u8], ar: &'a Arena, start: usize, budget: u32) → R<'a> ! {mem} ↓ budget {
+  i0 ≔ skip_ws(b, start + 1);
+  ⎇ i0 < b.len() ∧ b[i0] == 93u8 {
+    R::Good(i0 + 1, ar.alloc(Value::Arr(nil_node(ar), 0u64)), 1u64, 1u32)
+  } ⇝ {
+    μpos ≔ i0;
+    μlist ≔ nil_node(ar);
+    μn ≔ 0u64;
+    μcount ≔ 1u64;
+    μmaxd ≔ 0u32;
+    μerr ≔ 0u32;
+    μerr_pos ≔ 0usize;
+    μfin ≔ false;
+    μfuel ≔ ((b.len() - i0) as u64) + 2u64;
+    ⟳ fuel > 0u64 ∧ ¬fin ∧ err == 0u32 ↓ fuel {
+      fuel ← fuel - 1u64;
+      r ≔ value(b, ar, pos, budget - 1u32);
+      ⌥ r {
+        R::Bad(p, e) ↦ { err ← e; err_pos ← p; },
+        R::Good(p, v, cnt, d) ↦ {
+          list ← ar.alloc(Node::Cons(v, list));
+          n ← n + 1u64;
+          count ← count + cnt;
+          ⎇ d > maxd { maxd ← d; } ⇝ { }
+          q ≔ skip_ws(b, p);
+          ⎇ q >= b.len() { err ← 2u32; err_pos ← q; } ⇝ {
+            ⎇ b[q] == 44u8 { pos ← q + 1; } ⇝ {
+              ⎇ b[q] == 93u8 { pos ← q + 1; fin ← true; } ⇝ { err ← 1u32; err_pos ← q; }
+            }
+          }
+        },
+      }
+    }
+    ⎇ err != 0u32 { R::Bad(err_pos, err) } ⇝ {
+      ⎇ fin { R::Good(pos, ar.alloc(Value::Arr(list, n)), count, maxd + 1u32) } ⇝ { R::Bad(pos, 2u32) }
+    }
+  }
+}
+
+// đối tượng bắt đầu tại `{` ở start: danh sách xen kẽ khoá, giá trị
+ƒ obj<'a>(b: &[u8], ar: &'a Arena, start: usize, budget: u32) → R<'a> ! {mem} ↓ budget {
+  i0 ≔ skip_ws(b, start + 1);
+  ⎇ i0 < b.len() ∧ b[i0] == 125u8 {
+    R::Good(i0 + 1, ar.alloc(Value::Obj(nil_node(ar), 0u64)), 1u64, 1u32)
+  } ⇝ {
+    μpos ≔ i0;
+    μlist ≔ nil_node(ar);
+    μn ≔ 0u64;
+    μcount ≔ 1u64;
+    μmaxd ≔ 0u32;
+    μerr ≔ 0u32;
+    μerr_pos ≔ 0usize;
+    μfin ≔ false;
+    μfuel ≔ ((b.len() - i0) as u64) + 2u64;
+    ⟳ fuel > 0u64 ∧ ¬fin ∧ err == 0u32 ↓ fuel {
+      fuel ← fuel - 1u64;
+      k ≔ skip_ws(b, pos);
+      ⎇ k >= b.len() { err ← 2u32; err_pos ← k; } ⇝ {
+        ⎇ b[k] != 34u8 { err ← 1u32; err_pos ← k; } ⇝ {
+          s ≔ string(b, k);
+          ⎇ s.1 != 0u32 { err ← s.1; err_pos ← s.0; } ⇝ {
+            key ≔ ar.alloc(Value::Str(k, s.0 - k));
+            c ≔ skip_ws(b, s.0);
+            ⎇ c >= b.len() { err ← 2u32; err_pos ← c; } ⇝ {
+              ⎇ b[c] != 58u8 { err ← 1u32; err_pos ← c; } ⇝ {
+                r ≔ value(b, ar, c + 1, budget - 1u32);
+                ⌥ r {
+                  R::Bad(p, e) ↦ { err ← e; err_pos ← p; },
+                  R::Good(p, v, cnt, d) ↦ {
+                    list ← ar.alloc(Node::Cons(v, ar.alloc(Node::Cons(key, list))));
+                    n ← n + 1u64;
+                    count ← count + cnt;
+                    ⎇ d > maxd { maxd ← d; } ⇝ { }
+                    q ≔ skip_ws(b, p);
+                    ⎇ q >= b.len() { err ← 2u32; err_pos ← q; } ⇝ {
+                      ⎇ b[q] == 44u8 { pos ← q + 1; } ⇝ {
+                        ⎇ b[q] == 125u8 { pos ← q + 1; fin ← true; } ⇝ { err ← 1u32; err_pos ← q; }
+                      }
+                    }
+                  },
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    ⎇ err != 0u32 { R::Bad(err_pos, err) } ⇝ {
+      ⎇ fin { R::Good(pos, ar.alloc(Value::Obj(list, n)), count, maxd + 1u32) } ⇝ { R::Bad(pos, 2u32) }
+    }
+  }
+}
+
+// M8: MỌI cạnh của chu trình đệ quy tương hỗ value→arr/obj→value phải giảm nghiêm ngặt ⇒ mỗi tầng lồng tiêu 2 đơn vị ngân sách; vào mảng/đối tượng cần ≥ 2.
+ƒ value<'a>(b: &[u8], ar: &'a Arena, start: usize, budget: u32) → R<'a> ! {mem} ↓ budget {
+  ⎇ budget == 0u32 { R::Bad(start, 8u32) } ⇝ {
+    i ≔ skip_ws(b, start);
+    ⎇ i >= b.len() { R::Bad(i, 2u32) } ⇝ {
+      c ≔ b[i];
+      ⎇ c == 123u8 ∨ c == 91u8 {
+        ⎇ budget < 2u32 { R::Bad(i, 8u32) } ⇝ {
+          ⎇ c == 123u8 { obj(b, ar, i, budget - 1u32) } ⇝ { arr(b, ar, i, budget - 1u32) }
+        }
+      } ⇝ {
+        ⎇ c == 34u8 {
+          s ≔ string(b, i);
+          ⎇ s.1 != 0u32 { R::Bad(s.0, s.1) } ⇝ { R::Good(s.0, ar.alloc(Value::Str(i, s.0 - i)), 1u64, 1u32) }
+        } ⇝ {
+          ⎇ c == 45u8 ∨ is_digit(c) {
+            nr ≔ number(b, i);
+            ⎇ nr.1 != 0u32 { R::Bad(nr.0, nr.1) } ⇝ { R::Good(nr.0, ar.alloc(Value::Num(i, nr.0 - i)), 1u64, 1u32) }
+          } ⇝ {
+            ⎇ match4(b, i, 116u8, 114u8, 117u8, 101u8) { R::Good(i + 4, ar.alloc(Value::Bool(true)), 1u64, 1u32) } ⇝ {
+              ⎇ i + 5 <= b.len() ∧ b[i] == 102u8 ∧ match4(b, i + 1, 97u8, 108u8, 115u8, 101u8) { R::Good(i + 5, ar.alloc(Value::Bool(false)), 1u64, 1u32) } ⇝ {
+                ⎇ match4(b, i, 110u8, 117u8, 108u8, 108u8) { R::Good(i + 4, ar.alloc(Value::Null), 1u64, 1u32) } ⇝ { R::Bad(i, 1u32) }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+ƒ reason(code: u32) → &str ! ∅ {
+  ⎇ code == 1u32 { "unexpected character" } ⇝ {
+    ⎇ code == 2u32 { "unexpected end of input" } ⇝ {
+      ⎇ code == 3u32 { "bad number" } ⇝ {
+        ⎇ code == 4u32 { "control character in string" } ⇝ {
+          ⎇ code == 5u32 { "bad escape" } ⇝ {
+            ⎇ code == 6u32 { "invalid UTF-8" } ⇝ {
+              ⎇ code == 7u32 { "trailing characters" } ⇝ { "nesting too deep" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+ƒ report(out: &Cap<Out>, path: &str, r: R) ! {io} {
+  out.write_str(path);
+  ⌥ r {
+    R::Good(_, _, count, depth) ↦ {
+      out.write_str(": valid elements=");
+      out.write_u64(count);
+      out.write_str(" depth=");
+      out.write_u64(depth as u64);
+      out.write_str("\n");
+    },
+    R::Bad(pos, code) ↦ {
+      out.write_str(": invalid at byte ");
+      out.write_u64(pos as u64);
+      out.write_str(" (");
+      out.write_str(reason(code));
+      out.write_str(")\n");
+    },
+  }
+}
+
+ƒ fail(out: &Cap<Out>, path: &str, why: &str) → ! ! {io, div} {
+  out.write_str("json: ");
+  out.write_str(path);
+  out.write_str(": ");
+  out.write_str(why);
+  out.write_str("\n");
+  core::exit(2u32)
+}
+
+ƒ main() ! {io, mem, div} {
+  env ≔ root_env();
+  fs ≔ root_fs();
+  out ≔ root_out();
+  alloc ≔ root_alloc();
+  ar ≔ alloc.arena();
+  path ≔ env.arg(1usize);
+  ⌥ fs.open(path) {
+    Ok(f) ↦ {
+      b ≔ f.bytes();
+      r ≔ value(b, &ar, 0usize, 201u32);
+      // sau giá trị chỉ được còn khoảng trắng
+      ⌥ r {
+        R::Good(p, v, count, depth) ↦ {
+          q ≔ skip_ws(b, p);
+          ⎇ q == b.len() { report(&out, path, R::Good(p, v, count, depth)); } ⇝ { report(&out, path, R::Bad(q, 7u32)); }
+        },
+        R::Bad(p, code) ↦ report(&out, path, R::Bad(p, code)),
+      }
+    },
+    Err(IoError::NotFound) ↦ fail(&out, path, "no such file"),
+    Err(IoError::Denied) ↦ fail(&out, path, "permission denied"),
+    Err(IoError::Invalid) ↦ fail(&out, path, "invalid path"),
+    Err(IoError::Other) ↦ fail(&out, path, "i/o error"),
+  }
+}

@@ -1,0 +1,9 @@
+# rig.lock — tạo bởi `rig lock`; KHÔNG sửa tay. Băm nội dung từng gói; lệch ⇒ rig từ chối build.
+version = 1
+
+[[package]]
+name = "json"
+version = "0.1.0"
+source = "root"
+deps = []
+hash = "sha256:5c6d6a50cc439b6a30a13fd773afbd3c26d2a4a65abd39f79575aa3b607d6b84"
