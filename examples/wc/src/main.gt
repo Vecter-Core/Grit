@@ -1,0 +1,28 @@
+// wc: đếm dòng, từ, byte của một tệp (dogfood M11→M12, docs/DOGFOOD.md). Dùng: wc.exe <đường-dẫn>
+ƒ main() ! {io} {
+  env ≔ root_env();
+  fs ≔ root_fs();
+  out ≔ root_out();
+  path ≔ env.arg(1usize);
+  f ≔ fs.read(path);
+  b ≔ f.bytes();
+  μlines ≔ 0u64;
+  μwords ≔ 0u64;
+  μin_word ≔ false;
+  μi ≔ 0usize;
+  ⟳ i < b.len() ↓ b.len() - i {
+    c ≔ b[i];
+    ⎇ c == 10u8 { lines ← lines + 1; } ⇝ { }
+    sp ≔ c == 32u8 ∨ c == 10u8 ∨ c == 9u8 ∨ c == 13u8;
+    ⎇ sp { in_word ← false; } ⇝ { ⎇ in_word { } ⇝ { words ← words + 1; in_word ← true; } }
+    i ← i + 1;
+  }
+  out.write_u64(lines);
+  out.write_str(" ");
+  out.write_u64(words);
+  out.write_str(" ");
+  out.write_u64(b.len() as u64);
+  out.write_str(" ");
+  out.write_str(path);
+  out.write_str("\n");
+}

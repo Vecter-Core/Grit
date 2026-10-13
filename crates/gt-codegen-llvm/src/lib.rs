@@ -50,4 +50,6 @@ pub mod abort_kind {
     pub const OVERFLOW_NEG: u64 = 11;
     pub const REM_ZERO: u64 = 12;
     pub const SLICE_RANGE: u64 = 13;
+    pub const IO_ERROR: u64 = 14;
+    pub const ARG_OOR: u64 = 15;
 }

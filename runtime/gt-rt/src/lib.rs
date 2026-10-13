@@ -18,7 +18,7 @@ use std::io::Write;
 pub const ABORT_EXIT_CODE: i32 = 70;
 
 /// Loại abort; số thứ tự là hợp đồng với codegen; TÊN trùng `AssertKind::name` của MIR (đối chiếu với thông dịch).
-pub const ABORT_KINDS: [&str; 14] = [
+pub const ABORT_KINDS: [&str; 16] = [
     "unknown",
     "overflow",
     "index_out_of_bounds",
@@ -33,6 +33,8 @@ pub const ABORT_KINDS: [&str; 14] = [
     "overflow_neg",
     "rem_by_zero",
     "slice_range",
+    "io_error",
+    "arg_out_of_range",
 ];
 
 #[unsafe(no_mangle)]
@@ -96,6 +98,105 @@ pub unsafe extern "C" fn gritrt_mutex_unlock(lock: *mut u8) {
 /// Con trỏ thô gửi qua luồng; tính `Send` do kiểm tĩnh E0501 ở compiler bảo đảm (đối số của `spawn` là `Send`).
 struct Arg(*mut u8);
 unsafe impl Send for Arg {}
+
+// ---- I/O tối thiểu cho dogfood (docs/DOGFOOD.md): đối số dòng lệnh, đọc nguyên tệp, ghi stdout. Mọi lỗi ⇒ abort (chưa có Result/IoError).
+
+fn cmdline() -> &'static Vec<Vec<u8>> {
+    static ARGS: std::sync::OnceLock<Vec<Vec<u8>>> = std::sync::OnceLock::new();
+    ARGS.get_or_init(|| {
+        std::env::args_os()
+            .map(|a| a.to_string_lossy().into_owned().into_bytes())
+            .collect()
+    })
+}
+
+fn arg_at(i: u64) -> &'static [u8] {
+    match usize::try_from(i).ok().and_then(|k| cmdline().get(k)) {
+        Some(a) => a.as_slice(),
+        None => {
+            eprintln!("arg_out_of_range: đối số #{i} không tồn tại");
+            gritrt_abort(15)
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_arg_ptr(i: u64) -> *const u8 {
+    arg_at(i).as_ptr()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_arg_len(i: u64) -> u64 {
+    arg_at(i).len() as u64
+}
+
+fn files() -> &'static std::sync::Mutex<Vec<&'static [u8]>> {
+    static FILES: std::sync::OnceLock<std::sync::Mutex<Vec<&'static [u8]>>> =
+        std::sync::OnceLock::new();
+    FILES.get_or_init(|| std::sync::Mutex::new(Vec::new()))
+}
+
+fn file_at(h: i32) -> &'static [u8] {
+    let g = files().lock().unwrap_or_else(|e| e.into_inner());
+    match usize::try_from(h).ok().and_then(|k| g.get(k)) {
+        Some(b) => b,
+        None => gritrt_abort(14),
+    }
+}
+
+/// Đọc NGUYÊN tệp vào bộ nhớ (rò rỉ có chủ đích, sống tới hết tiến trình); trả tay cầm. Lỗi (không có tệp, quyền, đường dẫn không UTF-8) ⇒ abort `io_error`.
+///
+/// # Safety
+/// `p` trỏ tới `n` byte đọc được.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_fs_read(p: *const u8, n: u64) -> i32 {
+    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let Ok(path) = std::str::from_utf8(bytes) else {
+        eprintln!("io_error: đường dẫn không phải UTF-8");
+        gritrt_abort(14)
+    };
+    match std::fs::read(path) {
+        Ok(v) => {
+            let leaked: &'static [u8] = Box::leak(v.into_boxed_slice());
+            let mut g = files().lock().unwrap_or_else(|e| e.into_inner());
+            g.push(leaked);
+            i32::try_from(g.len() - 1).unwrap_or_else(|_| gritrt_abort(14))
+        }
+        Err(e) => {
+            eprintln!("io_error: {path}: {e}");
+            gritrt_abort(14)
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_file_len(h: i32) -> u64 {
+    file_at(h).len() as u64
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_file_ptr(h: i32) -> *const u8 {
+    file_at(h).as_ptr()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_write_u64(n: u64) {
+    let mut o = std::io::stdout().lock();
+    if write!(o, "{n}").and_then(|()| o.flush()).is_err() {
+        gritrt_abort(14);
+    }
+}
+
+/// # Safety
+/// `p` trỏ tới `n` byte đọc được.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_write_str(p: *const u8, n: u64) {
+    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let mut o = std::io::stdout().lock();
+    if o.write_all(bytes).and_then(|()| o.flush()).is_err() {
+        gritrt_abort(14);
+    }
+}
 
 /// Cấp `size` byte (căn lề 16, KHÔNG khởi tạo) cho hộp tham số của `spawn`; hộp thuộc về luồng mới (không giải phóng: rò rỉ có chủ đích, nhỏ).
 #[unsafe(no_mangle)]

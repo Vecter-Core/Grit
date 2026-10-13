@@ -36,7 +36,7 @@
 
 ## 2c. M11 ĐÓNG (2026-10-13)
 - Cổng đầy đủ lần 2: fmt OK, clippy 0, audit 0, **742 test pass / 0 lỗi**, check_expectations OK (791 .gt, 67 mã). Lần 1 hỏng thật: clippy `type_complexity` (rig) + test gt-dataflow thiếu `Body.sig_node` (FB-1 làm hỏng; kiểm nhẹ của tôi đã bỏ sót gt-dataflow). Đã sửa, chạy lại.
-- Còn lại của lệnh: bước 5 dogfood (tool đếm dòng/từ/byte trong dự án Rig + docs/DOGFOOD.md). Chờ Giang đọc báo cáo M11 rồi tiếp.
+- Bước 5 dogfood XONG (2026-10-13): `examples/wc` (Grit trong dự án Rig) + docs/DOGFOOD.md; prelude thêm `Out`/`Cap<Out>`/`root_out`/`Cap<Env>::arg`/`File::bytes`; codegen 7 intrinsic mới; gt-rt `gritrt_arg_*`/`fs_read`/`file_*`/`write_*`; test crates/rig/tests/dogfood.rs (10 tệp + 32 MiB + 2 đường lỗi, khớp tham chiếu). Chưa chạy cổng đầy đủ SAU bước 5 (chỉ kiểm nhẹ: gt-types/gt-resolve/gt-driver/gt-guard/gt-codegen-llvm/rig/gt-rt xanh). Dừng chờ Giang.
 
 ## 3. Việc tiếp theo (theo thứ tự; mỗi bước nhỏ = một commit + cập nhật mục 2/3 + kiểm nhẹ: `cargo fmt`, test các crate bị đổi)
 1. `[XONG 2026-10-12]` Ghi SHA-256 gói LLVM 20.1.8 + `LLVM-C.dll` vào ADR-029 và `docs/ENVIRONMENT.md` (băm tự tính khi tải; GitHub công bố `f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f`), ghi: gritc cần `LLVM-C.dll` trên PATH khi chạy; binary do gritc sinh KHÔNG phụ thuộc `LLVM-C.dll` (phải kiểm bằng `dumpbin /dependents`); `libxml2s.lib` rỗng chỉ là workaround dự phòng.

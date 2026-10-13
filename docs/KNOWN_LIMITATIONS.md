@@ -241,3 +241,10 @@ Lập luận từng nhóm (KHÔNG phải chứng minh):
   - **lib.rs:158 `llvm.assume` (`condition → false`)**: hướng CHẤP NHẬN THÊM IR ⇒ viết test `rejects_llvm_assume` ⇒ GIẾT (kết quả cuối 39/40 giết).
   - **lib.rs:29 `callee_name` chỉ nhận `call` (`condition → false`)**: TƯƠNG ĐƯƠNG ở hướng chấp nhận: dạng chữ chỉ sinh `@tên(` cho `call`/`invoke`; `invoke` là terminator nên không đứng ngay trước `unreachable` trong cùng khối (luật 4 không bị qua mặt); với luật 3 đột biến chỉ làm Guard NGHIÊM hơn (đòi `!gt.obl` cả trên `invoke`). Còn sống có chủ đích, không có test giết được.
 - **Phạm vi chưa phủ bởi đột biến:** các nhánh `None => …` / mũi tên `"gritrt_spawn" => Some("E0501")` bị đột biến dòng-theo-dòng không sinh (tool chỉ đột biến toán tử/điều kiện/hằng); đã kiểm tay bằng test `runtime_calls_need_their_class` (xoá một mũi tên thì test đỏ). `gt-codegen-llvm` KHÔNG đột biến (điều kiện duyệt M10; thay bằng so sánh ngẫu nhiên, xem PROGRESS).
+
+## I/O tối thiểu của dogfood (2026-10-13; xem docs/DOGFOOD.md)
+- `Cap<Fs>::read` đọc NGUYÊN tệp vào bộ nhớ (không giải phóng; tệp lớn ⇒ tốn RAM tương ứng); `File::bytes` trả lát trỏ vào bộ nhớ đó. Mọi lỗi I/O/đối số ⇒ abort (mã 70, kind `io_error`/`arg_out_of_range`) kèm dòng chi tiết ở stderr; CHƯA có `Result`/`IoError`.
+- `root_*()` là hàm thường (quyền ngầm ở mức cú pháp; hiệu ứng `io` vẫn bị kiểm) — M12 chuyển sang capability do runtime cấp cho `main`.
+- Bộ giải M7 không chứng minh `b[i]` cho `b` cục bộ lấy từ `f.bytes()` dù có `i < b.len()` (check runtime còn nguyên, đúng nhưng chậm hơn).
+- IR Guard không có lớp nghĩa vụ cho lời gọi runtime I/O.
+- `Cap<Env>::arg` chuyển đối số không-UTF-8 thành lossy.

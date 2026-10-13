@@ -72,12 +72,16 @@ pub const PRELUDE_SRC: &str = "\
 ▢ Env { x: i32 }
 ▢ Clock { x: i32 }
 ▢ Alloc { x: i32 }
+▢ Out { x: i32 }
 ▢ Host { x: i32 }
 #lang(arena)
 ▢ Arena { x: i32 }
 ▢ File { x: i32 }
 ⊐ <T> [T] { ƒ len(&self) → usize ! ∅ { } }
-⊐ File { ƒ len(&self) → usize ! ∅ { } }
+⊐ File {
+  ƒ len(&self) → usize ! ∅ { }
+  ƒ bytes(&self) → &[u8] ! ∅ { }
+}
 ⊐ <T> Option<T> {
   ƒ is_some(&self) → bool ! ∅ { }
   ƒ unwrap(self) → T ! ∅ ⊳ self.is_some() { }
@@ -89,7 +93,14 @@ pub const PRELUDE_SRC: &str = "\
   ƒ sub(&self, p: &str) → Cap<Fs> ! {io} { }
 }
 ⊐ Cap<Net> { ƒ connect(&self, h: &str) → File ! {io} { } }
-⊐ Cap<Env> { ƒ var(&self, n: &str) → usize ! {io} { } }
+⊐ Cap<Env> {
+  ƒ var(&self, n: &str) → usize ! {io} { }
+  ƒ arg(&self, i: usize) → &str ! {io} { }
+}
+⊐ Cap<Out> {
+  ƒ write_u64(&self, n: u64) ! {io} { }
+  ƒ write_str(&self, s: &str) ! {io} { }
+}
 ⊐ Cap<Clock> { ƒ now(&self) → u64 ! {io} { } }
 ⊐ Cap<Alloc> { ƒ arena(&self) → Arena ! {mem} { } }
 ⊐ Host { ƒ fs() → Cap<Fs> ! {io} { } }
@@ -100,6 +111,7 @@ pub const PRELUDE_SRC: &str = "\
 ƒ root_env() → Cap<Env> ! ∅ { }
 ƒ root_clock() → Cap<Clock> ! ∅ { }
 ƒ root_alloc() → Cap<Alloc> ! ∅ { }
+ƒ root_out() → Cap<Out> ! ∅ { }
 ƒ raw_read(p: usize) → i32 ! ∅ { }
 ";
 

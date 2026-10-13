@@ -119,6 +119,14 @@ enum Intr {
     CellNew,
     CellGet,
     CellSet,
+    /// `root_fs()`/`root_env()`/… của prelude: giá trị năng lực gốc (struct rỗng về nghĩa; quyền do hiệu ứng `io` kiểm ở M8)
+    RootCap,
+    EnvArg,
+    FsRead,
+    FileLen,
+    FileBytes,
+    OutU64,
+    OutStr,
 }
 
 struct Cg<'ctx, 'a> {
@@ -1589,6 +1597,27 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         if key == "$prelude::spawn" {
             return Some(Intr::Spawn);
         }
+        if key.starts_with("$prelude::root_") {
+            return Some(Intr::RootCap);
+        }
+        if key.contains("Cap<Env>") && m == "arg" {
+            return Some(Intr::EnvArg);
+        }
+        if key.contains("Cap<Fs>") && m == "read" {
+            return Some(Intr::FsRead);
+        }
+        if key.contains("File") && m == "len" {
+            return Some(Intr::FileLen);
+        }
+        if key.contains("File") && m == "bytes" {
+            return Some(Intr::FileBytes);
+        }
+        if key.contains("Cap<Out>") && m == "write_u64" {
+            return Some(Intr::OutU64);
+        }
+        if key.contains("Cap<Out>") && m == "write_str" {
+            return Some(Intr::OutStr);
+        }
         let is = |n: &str| key.contains(n);
         Some(match (m, is("Atomic"), is("Mutex"), is("Cell")) {
             ("new", true, _, _) => Intr::AtomicNew,
@@ -1639,7 +1668,8 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     let Some(intr) = self.intr_of(&key) else {
                         return unsupported(format!("hàm không có thân MIR: {key}"));
                     };
-                    self.intrinsic(fx, intr, &key, &gargs, args, &vals, &tys)?
+                    let dest_ty = self.place(fx, dest)?.ty;
+                    self.intrinsic(fx, intr, &key, &gargs, args, &vals, &tys, &dest_ty)?
                 }
             }
             Callee::Value(o) => {
@@ -1725,8 +1755,66 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         args: &[Operand],
         vals: &[BasicValueEnum<'ctx>],
         tys: &[Ty],
+        dest_ty: &Ty,
     ) -> R<Option<BasicValueEnum<'ctx>>> {
         match intr {
+            Intr::RootCap => Ok(Some(self.lower_ty(dest_ty)?.const_zero())),
+            Intr::EnvArg => {
+                let i64t = self.i64t();
+                let ptr_ty = self.ptr_type().fn_type(&[i64t.into()], false);
+                let len_ty = i64t.fn_type(&[i64t.into()], false);
+                let (fp, fl) = (
+                    self.rt_fn("gritrt_arg_ptr", ptr_ty),
+                    self.rt_fn("gritrt_arg_len", len_ty),
+                );
+                let a = vals[1].into_int_value();
+                let p = self.call_basic(fp, &[a.into()])?;
+                let l = self.call_basic(fl, &[a.into()])?;
+                self.fat_value(p.into_pointer_value(), l.into_int_value())
+            }
+            Intr::FsRead => {
+                let (p, n) = self.split_fat(vals[1])?;
+                let i32t = self.ctx.i32_type();
+                let ft = i32t.fn_type(&[self.ptr_type().into(), self.i64t().into()], false);
+                let f = self.rt_fn("gritrt_fs_read", ft);
+                let h = self.call_basic(f, &[p.into(), n.into()])?;
+                let file = self.lower_ty(dest_ty)?.into_struct_type().get_undef();
+                let file = llvm(self.builder.build_insert_value(file, h, 0, "file"))?;
+                Ok(Some(file.as_basic_value_enum()))
+            }
+            Intr::FileLen | Intr::FileBytes => {
+                let i32t = self.ctx.i32_type();
+                let h = llvm(
+                    self.builder
+                        .build_load(i32t, vals[0].into_pointer_value(), "fh"),
+                )?;
+                let len_ty = self.i64t().fn_type(&[i32t.into()], false);
+                let fl = self.rt_fn("gritrt_file_len", len_ty);
+                let l = self.call_basic(fl, &[h.into()])?;
+                if intr == Intr::FileLen {
+                    return Ok(Some(l));
+                }
+                let ptr_ty = self.ptr_type().fn_type(&[i32t.into()], false);
+                let fp = self.rt_fn("gritrt_file_ptr", ptr_ty);
+                let p = self.call_basic(fp, &[h.into()])?;
+                self.fat_value(p.into_pointer_value(), l.into_int_value())
+            }
+            Intr::OutU64 => {
+                let ft = self.ctx.void_type().fn_type(&[self.i64t().into()], false);
+                let f = self.rt_fn("gritrt_write_u64", ft);
+                llvm(self.builder.build_call(f, &[vals[1].into()], ""))?;
+                Ok(Some(self.unit_type().const_zero()))
+            }
+            Intr::OutStr => {
+                let (p, n) = self.split_fat(vals[1])?;
+                let ft = self
+                    .ctx
+                    .void_type()
+                    .fn_type(&[self.ptr_type().into(), self.i64t().into()], false);
+                let f = self.rt_fn("gritrt_write_str", ft);
+                llvm(self.builder.build_call(f, &[p.into(), n.into()], ""))?;
+                Ok(Some(self.unit_type().const_zero()))
+            }
             Intr::Abort => {
                 let k = self.ctx.i32_type().const_int(abort_kind::EXPLICIT, false);
                 let c = llvm(self.builder.build_call(self.abort_fn, &[k.into()], ""))?;
@@ -1944,6 +2032,40 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 Ok(Some(self.unit_type().const_zero()))
             }
         }
+    }
+
+    /// gọi hàm runtime có giá trị trả về
+    fn call_basic(
+        &self,
+        f: FunctionValue<'ctx>,
+        args: &[BasicMetadataValueEnum<'ctx>],
+    ) -> R<BasicValueEnum<'ctx>> {
+        let c = llvm(self.builder.build_call(f, args, "rt"))?;
+        match c.try_as_basic_value().basic() {
+            Some(v) => Ok(v),
+            None => internal("hàm runtime không trả giá trị"),
+        }
+    }
+
+    fn fat_value(
+        &self,
+        p: PointerValue<'ctx>,
+        n: IntValue<'ctx>,
+    ) -> R<Option<BasicValueEnum<'ctx>>> {
+        let fat = self.fat_type().get_undef();
+        let fat = llvm(self.builder.build_insert_value(fat, p, 0, "f0"))?;
+        let fat = llvm(self.builder.build_insert_value(fat, n, 1, "f1"))?;
+        Ok(Some(fat.as_basic_value_enum()))
+    }
+
+    /// tách con trỏ béo `{ptr, len}`
+    fn split_fat(&self, v: BasicValueEnum<'ctx>) -> R<(PointerValue<'ctx>, IntValue<'ctx>)> {
+        let BasicValueEnum::StructValue(sv) = v else {
+            return internal("đối số kỳ vọng con trỏ béo");
+        };
+        let p = llvm(self.builder.build_extract_value(sv, 0, "p"))?;
+        let n = llvm(self.builder.build_extract_value(sv, 1, "n"))?;
+        Ok((p.into_pointer_value(), n.into_int_value()))
     }
 
     fn is_result(&self, a: &AdtDef) -> bool {
