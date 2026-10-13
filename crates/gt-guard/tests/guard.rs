@@ -254,3 +254,42 @@ fn rejects_unverifiable_ir() {
     let _f = w.func("f"); // khối bb0 không có terminator ⇒ verifier từ chối
     assert!(has(&w.check(), "LLVM verifier từ chối"), "{:?}", w.check());
 }
+
+/// Đột biến #1 (lib.rs:29 `condition → false`) KHÔNG bị test này giết và là TƯƠNG ĐƯƠNG theo hướng chấp nhận (xem KNOWN_LIMITATIONS "gt-guard"):
+/// dạng chữ chỉ cho ra `@tên(` ở lệnh `call`/`invoke`; `invoke` là terminator nên không thể đứng ngay trước `unreachable` trong cùng khối.
+/// Test này khoá hành vi mong muốn: `unreachable` sau một lệnh không phải call (dù nhắc `@gritrt_abort`) bị từ chối.
+#[test]
+fn unreachable_after_a_non_call_mentioning_abort_is_rejected() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let t = ctx.append_basic_block(f, "trap.0");
+    w.b.build_unconditional_branch(t).expect("br");
+    w.b.position_at_end(t);
+    let slot =
+        w.b.build_alloca(ctx.ptr_type(Default::default()), "s")
+            .expect("alloca");
+    // lệnh KHÔNG phải call nhưng có `@gritrt_abort` trong dạng chữ
+    w.b.build_store(slot, w.abort.as_global_value().as_pointer_value())
+        .expect("store");
+    w.b.build_unreachable().expect("u");
+    let v = w.check();
+    assert!(has(&v, "không đúng mẫu abort"), "{v:?}");
+}
+
+/// Đột biến sống sót #2 (lib.rs:158 `condition → false`): `llvm.assume` phải bị cấm (cho phép tối ưu viên suy luận từ giả định tự khẳng định).
+#[test]
+fn rejects_llvm_assume() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let assume = gt_llvm::inkwell::intrinsics::Intrinsic::find("llvm.assume")
+        .expect("intrinsic")
+        .get_declaration(&w.m, &[])
+        .expect("decl");
+    w.b.build_call(assume, &[ctx.bool_type().const_int(1, false).into()], "")
+        .expect("call");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(has(&v, "`llvm.assume` bị cấm"), "{v:?}");
+}

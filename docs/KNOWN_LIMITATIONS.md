@@ -235,3 +235,9 @@ Lập luận từng nhóm (KHÔNG phải chứng minh):
 - **TSan không dùng được** với toolchain MSVC hiện tại: đa luồng được kiểm bằng chạy lặp (4 luồng × 1000 lần, 68/68 vòng đúng) chứ không bằng bộ phát hiện đua dữ liệu. Không thay được chứng minh tuyệt đối.
 - **Chỉ x86_64-pc-windows-msvc**, LLVM 20.1.8 liên kết động (`LLVM-C.dll` trên PATH khi chạy gritc backend llvm; exe sinh ra KHÔNG cần).
 - **M10 "đạt có điều kiện" (duyệt 2026-10-13):** `gt-guard` và `gt-codegen-llvm` CHƯA qua đột biến; chỉ có hồ sơ `dev` (-O0, mọi Assert giữ). Chứng cứ thay thế: test đối chiếu thông dịch ≡ llvm, IR dựng tay cho Guard, golden IR, mẫu đa luồng. Hồ sơ `release` (-O2) KHÔNG có: sau tối ưu IR khác IR Guard đã kiểm ⇒ bộ tối ưu LLVM nằm trong TCB; cần ADR riêng trước khi làm.
+
+## gt-guard — đột biến (2026-10-13, 1 worker, `tools/mut.py`, test: `cargo test -p gt-guard`)
+- 40 đột biến sinh được trên `gt-guard/src/lib.rs` (hàm quyết định: 5 luật + từ chối): lần đầu 38 giết / 2 sống. Hai sống sót phân tích theo hướng:
+  - **lib.rs:158 `llvm.assume` (`condition → false`)**: hướng CHẤP NHẬN THÊM IR ⇒ viết test `rejects_llvm_assume` ⇒ GIẾT (kết quả cuối 39/40 giết).
+  - **lib.rs:29 `callee_name` chỉ nhận `call` (`condition → false`)**: TƯƠNG ĐƯƠNG ở hướng chấp nhận: dạng chữ chỉ sinh `@tên(` cho `call`/`invoke`; `invoke` là terminator nên không đứng ngay trước `unreachable` trong cùng khối (luật 4 không bị qua mặt); với luật 3 đột biến chỉ làm Guard NGHIÊM hơn (đòi `!gt.obl` cả trên `invoke`). Còn sống có chủ đích, không có test giết được.
+- **Phạm vi chưa phủ bởi đột biến:** các nhánh `None => …` / mũi tên `"gritrt_spawn" => Some("E0501")` bị đột biến dòng-theo-dòng không sinh (tool chỉ đột biến toán tử/điều kiện/hằng); đã kiểm tay bằng test `runtime_calls_need_their_class` (xoá một mũi tên thì test đỏ). `gt-codegen-llvm` KHÔNG đột biến (điều kiện duyệt M10; thay bằng so sánh ngẫu nhiên, xem PROGRESS).
