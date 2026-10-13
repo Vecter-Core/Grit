@@ -58,7 +58,7 @@ fn reference(data: &[u8]) -> Vec<u8> {
     if data.last() == Some(&b'\n') {
         lines.pop();
     }
-    lines.sort_by(|a, b| a.cmp(b));
+    lines.sort(); // `[u8]: Ord` = từ điển theo byte; sắp xếp ổn định của std (tương đương `sort_by(|a, b| a.cmp(b))`)
     let mut out = Vec::with_capacity(data.len() + 1);
     for l in lines {
         out.extend_from_slice(l);
