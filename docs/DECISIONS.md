@@ -888,3 +888,71 @@ Mutation riêng cho `gt-guard` (hàm quyết định chấp nhận/từ chối),
 - **Danh sách `unsafe` của gt-rt và điều kiện an toàn:** (a) `#[unsafe(no_mangle)]` trên mọi hàm xuất (bắt buộc cho liên kết; không tạo hành vi không xác định); (b) `extern "system"` tới `AcquireSRWLockExclusive/ReleaseSRWLockExclusive`: con trỏ khoá là ô 8 byte KHỞI TẠO 0 trong `Mutex` do codegen sinh, căn lề 8, sống suốt lời gọi (bất biến của codegen + M8 đảm bảo cặp lock/unlock bao quanh `with`); (c) `unsafe impl Send for Arg`: chỉ chuyển hộp `{f,a}` sang luồng mới; an toàn nhờ kiểm tĩnh `a: Send` (E0501); (d) `slice::from_raw_parts` trong `gritrt_fs_read` và `gritrt_write_str`: `(ptr,len)` đến từ MỘT lát `&str` hợp lệ của Grit (borrowck bảo đảm sống và `len` đúng); (e) `std::alloc::alloc` trong `gritrt_alloc`: layout hợp lệ (kích thước do codegen tính từ `TargetData`, căn lề 16), kiểm null ⇒ abort.
 - **Mọi lối vào có dữ liệu ngoài** (đối số dòng lệnh, nội dung tệp, đường dẫn) KHÔNG dùng `unsafe`: chỉ qua `std` an toàn; lỗi ⇒ `gritrt_abort`. Không có `unsafe` nào phụ thuộc nội dung tệp/đối số của người dùng.
 - **Hệ quả/cam kết:** thêm `unsafe` mới vào gt-rt phải cập nhật ADR này và `docs/TCB_INTRINSICS.md` cùng commit. Chưa có kiểm tra tự động cho việc đếm `unsafe` (việc tốt để làm: test đếm `unsafe` trong gt-rt so với danh sách này) — ghi KNOWN_LIMITATIONS.
+
+## ADR-032 — Nền cho công cụ thứ tư `sortlines`: đơn hình hoá, gọi qua trait, `Vec`, `String`, `f64` (DỰ THẢO viết TRƯỚC khi có mã — CHỜ GIANG DUYỆT; 2026-10-13)
+Mục tiêu: `sortlines <tệp>` đọc tệp, tách dòng theo `\n`, sắp xếp theo thứ tự BYTE, in ra. Mọi quyết định dưới đây là đề xuất fail-closed. Không cần cú pháp hay từ khoá mới ở bất kỳ mục nào.
+
+### 0. Phản biện kỹ thuật với lệnh (nói thẳng)
+- **`String` không bị `sortlines` ép buộc.** Mỗi dòng là một lát `&[u8]` trỏ vào bộ đệm tệp (như `examples/wc`); cần `Vec<&[u8]>`, một hàm so sánh byte và một thuật toán sắp xếp. `String` (sở hữu, tăng trưởng, bất biến UTF-8) chỉ cần khi chỉnh sửa chuỗi. Đề xuất: `Vec` + gọi qua trait + sắp xếp trước, `String` bước riêng (§4), `f64` cuối (§5). Hệ quả: công cụ thứ tư đến sớm hơn, rủi ro nhỏ hơn; `String` vẫn được thiết kế ở đây để khỏi làm lại.
+- **Gọi qua trait không bắt buộc ở bản đầu:** `sort_lines(&![&[u8]])` cụ thể không cần trait. `Ord` + `sort<T: Ord>` làm sau khi trait tĩnh hạ được (§2), vì đó là bài kiểm thật cho đơn hình hoá.
+- **Không có điểm nào quá nặng cho máy:** kiểm thử dùng exe nhỏ; tệp 32 MiB đã chạy tốt (wc/json/sha256).
+
+### 1. Đơn hình hoá (generic): trạng thái đo thật 2026-10-13 + thiết kế (ADR-018, lazy, ngưỡng 64)
+| ca | kết quả |
+|---|---|
+| hàm generic không ràng buộc `ƒ id<T>(x: T) → T` | HẠ ĐƯỢC (mỗi bộ đối số kiểu một hàm LLVM) |
+| ADT generic (`Option<T>`, `Pair<A,B>`, `Result<T,E>`) và impl generic | HẠ ĐƯỢC (`swap(Pair{a:1u8,b:7u32}).a` ⇒ 7) |
+| phương thức trait trên kiểu CỤ THỂ `x.m()`, `x: &S` | HẠ ĐƯỢC (M4 phân giải thành `Method::Impl`; ra 5) |
+| gọi qua ràng buộc `ƒ g<T: Tr>(x: &T) { x.m() }` | **KHÔNG hạ được:** `Callee::TraitMethod` ⇒ `Unsupported("gọi qua trait")`, gritc thoát 3, không exe |
+| đệ quy đa hình sinh `(T,u8)`, `((T,u8),u8)`, … | gritc ĐỎ `E0312` ở M4 (ngưỡng 64), không tới codegen |
+| `dyn`, closure | CẮT khỏi Phase 1 |
+
+Thiết kế:
+1. Giữ bộ thu thập instance lazy của codegen (hàng đợi từ `main` và static, không sao chép thân MIR). **Khoá instance = `(NodeId, đối số kiểu đã chuẩn hoá)`**; thứ tự xử lý tất định = sắp theo khoá (hiện là ngăn xếp theo thứ tự khám phá: tất định nhưng phụ thuộc cách duyệt).
+2. **Tên symbol ổn định** `đường-dẫn⟨đối số kiểu in chuẩn⟩` (vd `main::id⟨u8⟩`), bỏ số thứ tự `#n` hiện nay (đổi một hàm không liên quan làm đổi tên mọi hàm sau nó, làm hỏng golden/attestation vô ích).
+3. **Phòng thủ:** codegen từ chối instance có đối số lồng > 64 và tổng instance > 100 000 (cùng MAX_INSTANCES gt-types) bằng lỗi nội bộ; E0312 ở M4 đã chặn trước.
+4. **IR Guard + attestation phủ instance:** driver tính tập instance từ `TypesOutput.instances` (độc lập với codegen) và đưa cho Guard; IR phải định nghĩa ĐÚNG tập đó (thừa/thiếu ⇒ E1101); metadata `!gt.instances` (danh sách tên đã sắp) nằm trong hash attestation.
+
+### 2. Gọi qua trait tĩnh (`Callee::TraitMethod`)
+- Khi định nghĩa instance `f<T>` với `T := S`, mọi `TraitMethod{trait, member, self_ty, generics}` được thế `self_ty` rồi PHÂN GIẢI NGAY bằng `select_impl(trait, self_ty) → (impl, đối số impl)` (khớp một chiều, ≤ 1 impl khớp theo luật kết dính M4), cho ra `Inst` thường. **Không có impl khớp ⇒ ICE, không đoán** (M4 đã bảo đảm ràng buộc thoả).
+- **Một nguồn sự thật:** mở `TypeDb::select_impl` công khai trong gt-types (dùng lại hàm đang kiểm ràng buộc); codegen và thông dịch không tự cài khớp kiểu (tránh bản chép lệch, như bài học prelude 3 bản).
+- Không `dyn` ⇒ không vtable.
+- Hoàn thành khi: ca `g<T: Tr>` chạy; thông dịch cũng hạ `TraitMethod` bằng cùng `select_impl`; thông dịch ≡ exe trên chương trình trait ngẫu nhiên.
+
+### 3. `Vec<T>` dưới D26/D27: đề xuất Arena-backed
+| tiêu chí | **A. Arena-backed (đề xuất)** | B. `GlobalAlloc` + `Drop` |
+|---|---|---|
+| D26 (cấp phát truy vết tới Arena truyền tường minh) | tự nhiên: `Vec::new(&Arena)`, `push(&!self, &Arena, x)` | phải truyền capability cấp phát khắp nơi |
+| D27 (con trỏ vào Arena không thoát Arena) | `Vec<'a,T>` mang vùng của arena; `reset(&!Arena)` xung đột với mượn còn sống ⇒ E0405 đã có | không áp dụng |
+| huỷ | không cần `Drop`; giải phóng cả khối khi `reset`/hết tiến trình | cần drop elaboration thật (MIR có `Drop` nhưng codegen hiện bỏ qua): dự án lớn + TCB (free, double free) |
+| bộ nhớ | nhân đôi dung lượng cấp khối mới, khối cũ nằm tới `reset`: tổng ≤ ~2× dung lượng cuối, không rò vô hạn trong một arena | tái dùng được |
+| unsafe | gom trong intrinsic (§3.1) | nhiều hơn |
+
+- **Kiểu phần tử:** `Vec<T>` chỉ cho `T` không cần drop (arena không chạy destructor). Kiểm ở M4, mã lỗi mới do bảng quyết định.
+- **3.1 Intrinsic (TCB, `docs/TCB_INTRINSICS.md`, mỗi cái có hợp đồng + nghĩa vụ biên, cột người duyệt = `CHỜ GIANG`; `unsafe` chỉ trong lib/core/gt-rt, người dùng không viết `unsafe`):** `Vec::new(&Arena)`; `push(&!self, &Arena, T)` (có thể cấp khối mới; hết bộ nhớ/tràn ⇒ abort); `len(&self)`; `as_slice(&self) → &[T]`, `as_mut_slice(&!self) → &![T]` (lát đúng `len`, không phơi bày vùng chưa khởi tạo). Truy cập phần tử qua lát nên mang Assert biên sẵn có của M5/M7. Bố cục `{ptr, len, cap}`; sao chép khi tăng trưởng bằng `llvm.memcpy` (Guard cho phép `llvm.*`).
+- **Bất biến:** `len ≤ cap`; `ptr` trỏ vào arena còn sống; `[0,len)` đã khởi tạo; chỉ intrinsic đổi `len/cap/ptr`.
+- Hoàn thành khi: test E0405 (≥3 fail + ≥3 pass), thông dịch ≡ exe trên chương trình Vec ngẫu nhiên, tăng trưởng 10⁶ phần tử, đột biến gt-guard cho luật mới.
+
+### 4. `String` (bước riêng, sau `Vec`)
+`String<'a> { bytes: Vec<'a,u8> }` + bất biến UTF-8. Đường tạo hợp lệ duy nhất: `from_str(&Arena, &str)`, `push_str(&!self, &Arena, &str)`, `from_utf8(&Arena, &[u8]) → Result<String, Utf8Error>` (kiểm RFC 3629, viết bằng Grit, tái dùng `utf8_len` của examples/json). Không có `from_utf8_unchecked`; người dùng không tạo được trường `bytes` (cấm literal struct ngoài lib/core như `Secret`/`Cap`). `as_str` là nhìn không sao chép. So sánh theo byte (với UTF-8, thứ tự byte = thứ tự code point). `str → [u8]` chỉ qua `as_bytes` (một chiều).
+
+### 5. `f64` (sau cùng)
+- **Tối thiểu:** kiểu `f64`, literal, `+ - * /` IEEE-754 thuần (không fast-math; Guard đã cấm cờ), `< <= > >=` (NaN ⇒ false); `==`/`!=` CẤM (D4).
+- **Ép sang nguyên:** giữ cấm `as` số thực→nguyên; thay bằng intrinsic `f64::to_i64(x) → Option<i64>`: `None` nếu NaN, ±∞ hoặc ngoài miền `i64`; phần thập phân bị cắt về 0 (ghi rõ). `i64 as f64` mất chính xác khi |x| > 2⁵³ ⇒ đề xuất nghĩa vụ `CastLossy` (abort `cast_lossy`).
+- **M7 với số thực — mặc định fail-closed:** miền khoảng/zone không có mô hình số thực; giá trị `f64` là bí ẩn với M7; chia số thực cho 0 không là nghĩa vụ (IEEE cho ∞/NaN); mọi chuyển đổi qua intrinsic trả `Option`. Không thêm lý thuyết số thực (SMT là Phase 2).
+- Chưa có in thập phân đúng (Grisu/Ryu là việc lớn): ngoài phạm vi, cần ADR riêng.
+
+### 6. Sắp xếp, `Ord`, dừng (M8 ↓)
+- **Bản 1 (không trait):** sắp xếp trộn BOTTOM-UP lặp (độ rộng 1,2,4,…): vòng ngoài `width` nhân đôi, `n - width` giảm; vòng trộn dùng NHIÊN LIỆU (mẫu đã có, `core::fuel_left`, N0905) vì bước tiến phụ thuộc kết quả so sánh. Trộn đệ quy không dùng được vì `n/2` ngoài miền khoảng/zone của M8. Bộ đệm phụ nằm trong Arena. So sánh `&[u8]` theo byte viết bằng Grit (không intrinsic).
+- **Bản 2 (trait):** `⊏ Ord { ƒ cmp(&self, o: &Self) → i32 }`, `⊐ Ord for …`, `sort<T: Ord>`; chạy được sau §2. `Ordering` đã bị `atomic Ordering` của prelude chiếm tên ⇒ dùng `i32` (−1/0/1) hoặc enum tên khác (chốt khi duyệt).
+
+### 7. Thứ tự làm và kế hoạch kiểm (mỗi bước: commit + HANDOFF; cổng đầy đủ MỘT lần khi xong)
+1. **§1+§2** đơn hình hoá cứng + `select_impl` + `TraitMethod`: bộ sinh chương trình generic/trait ngẫu nhiên (generic bậc ≤ 3, trait 1–3 phương thức, 2–4 impl), thông dịch ≡ exe ≡ bộ đánh giá Rust, ≥ 100 chương trình; kiểm ĐỘ NHẠY: thay `select_impl` bằng "chọn impl đầu" ⇒ lô phải ĐỎ.
+2. **§3 `Vec`**: so với Rust `Vec` (đẩy/đọc/lát) ngẫu nhiên; tăng trưởng 10⁶; đột biến Guard.
+3. **`sortlines` bản 1** so với Python `sorted` trên byte: rỗng, thiếu `\n` cuối, CRLF (giữ `\r`), dòng trùng, dòng rỗng, byte không UTF-8, 1 MiB, 32 MiB (≥ 10⁶ dòng), 200 tệp ngẫu nhiên; thời gian báo thật.
+4. `Ord` + `sort<T: Ord>`.
+5. `String` so với Python `bytes.decode` (từ chối UTF-8 sai đúng như nhau).
+6. `f64`: vector IEEE (biên, NaN, ±0, subnormal) so với Rust `f64`.
+
+### 8. Câu hỏi chờ Giang trả lời khi duyệt
+Q66 thứ tự "`Vec` + sắp xếp + trait trước, `String` sau, `f64` cuối" thay vì ép `String` vào `sortlines`? Q67 `Vec` Arena-backed (không Drop) thay vì GlobalAlloc+Drop? Q68 cấm `Vec<T>` với `T` cần drop ở M4 (mã lỗi mới)? Q69 tên symbol `khoá⟨đối số⟩` và `!gt.instances` trong attestation? Q70 giữ cấm `as` số thực→nguyên, dùng `to_i64 → Option`? Q71 `Ord::cmp → i32` hay enum mới?
