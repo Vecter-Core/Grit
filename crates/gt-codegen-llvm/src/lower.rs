@@ -67,6 +67,10 @@ pub enum Inject {
     StripObligation,
     /// ghi attestation sai
     BadAttestation,
+    /// thêm lời gọi tới một hàm `gritrt_*` KHÔNG có trong bảng runtime
+    UnknownRuntimeCall,
+    /// thêm lời gọi tới một hàm ngoài (không phải runtime/llvm)
+    ExternalCall,
 }
 
 /// Kết quả: IR dạng chữ và object COFF.
@@ -237,6 +241,26 @@ pub fn compile(
         let bb = ctx.append_basic_block(f, "bb0");
         cg.builder.position_at_end(bb);
         llvm(cg.builder.build_unreachable())?;
+    }
+    if matches!(
+        opts.inject,
+        Some(Inject::UnknownRuntimeCall | Inject::ExternalCall)
+    ) {
+        let name = if opts.inject == Some(Inject::ExternalCall) {
+            "system"
+        } else {
+            "gritrt_exec"
+        };
+        let ext = cg
+            .module
+            .add_function(name, ctx.void_type().fn_type(&[], false), None);
+        let f = cg
+            .module
+            .add_function("gt.fault2", ctx.void_type().fn_type(&[], false), None);
+        let bb = ctx.append_basic_block(f, "bb0");
+        cg.builder.position_at_end(bb);
+        llvm(cg.builder.build_call(ext, &[], ""))?;
+        llvm(cg.builder.build_return(None))?;
     }
     let violations = guard(&cg.module);
     if !violations.is_empty() {
@@ -1802,7 +1826,8 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             Intr::OutU64 => {
                 let ft = self.ctx.void_type().fn_type(&[self.i64t().into()], false);
                 let f = self.rt_fn("gritrt_write_u64", ft);
-                llvm(self.builder.build_call(f, &[vals[1].into()], ""))?;
+                let c = llvm(self.builder.build_call(f, &[vals[1].into()], ""))?;
+                self.tag_obl(c.try_as_basic_value().instruction(), "E0310")?;
                 Ok(Some(self.unit_type().const_zero()))
             }
             Intr::OutStr => {
@@ -1812,7 +1837,8 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     .void_type()
                     .fn_type(&[self.ptr_type().into(), self.i64t().into()], false);
                 let f = self.rt_fn("gritrt_write_str", ft);
-                llvm(self.builder.build_call(f, &[p.into(), n.into()], ""))?;
+                let c = llvm(self.builder.build_call(f, &[p.into(), n.into()], ""))?;
+                self.tag_obl(c.try_as_basic_value().instruction(), "E0310")?;
                 Ok(Some(self.unit_type().const_zero()))
             }
             Intr::Abort => {
@@ -2042,7 +2068,11 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
     ) -> R<BasicValueEnum<'ctx>> {
         let c = llvm(self.builder.build_call(f, args, "rt"))?;
         match c.try_as_basic_value().basic() {
-            Some(v) => Ok(v),
+            Some(v) => {
+                // mọi hàm runtime có giá trị trả về dùng qua đây là I/O qua `Cap` ⇒ lớp E0310 (IR Guard đòi)
+                self.tag_obl(v.as_instruction_value(), "E0310")?;
+                Ok(v)
+            }
             None => internal("hàm runtime không trả giá trị"),
         }
     }

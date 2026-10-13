@@ -689,3 +689,51 @@ fn golden_ir_static_atomic_and_mutex() {
         "■ COUNT: Atomic<u32> ≔ Atomic::new(0u32);\nƒ worker(n: u32) ! ∅ { COUNT.fetch_add(n, Ordering::Relaxed); }\nƒ main() → u32 ! ∅ { worker(1u32); COUNT.load(Ordering::SeqCst) }\n",
     );
 }
+
+const IO_PROG: &str = "ƒ say(out: &Cap<Out>) ! {io} { out.write_u64(42u64); }\nƒ main() ! {io} { out ≔ root_out(); say(&out); }\n";
+
+/// Lớp nghĩa vụ I/O (E0310) ở mức tiến trình: chương trình I/O chạy đúng; IR bị bỏ nhãn / thêm lời gọi runtime lạ / hàm ngoài ⇒ ĐỎ E1101.
+#[test]
+fn io_calls_carry_a_class_and_guard_rejects_tampered_io_ir() {
+    let dir = scratch("io");
+    let f = dir.join("prog.gt");
+    std::fs::write(&f, IO_PROG).expect("ghi");
+    let exe = dir.join("io.exe");
+    let o = gritc()
+        .args(["build", "--backend=llvm", "-o"])
+        .arg(&exe)
+        .arg(&f)
+        .output()
+        .expect("chạy");
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let r = Command::new(&exe).output().expect("chạy exe");
+    assert_eq!(String::from_utf8_lossy(&r.stdout), "42");
+    for (fault, needle) in [
+        ("ir:strip-obl", "`E0310`"),
+        ("ir:runtime-call", "`gritrt_exec` không thuộc lớp nào"),
+        ("ir:external-call", "hàm ngoài `system`"),
+    ] {
+        let exe2 = dir.join("io2.exe");
+        let _ = std::fs::remove_file(&exe2);
+        let o = gritc()
+            .env("GRITC_FAULT", fault)
+            .args(["build", "--backend=llvm", "-o"])
+            .arg(&exe2)
+            .arg(&f)
+            .output()
+            .expect("chạy");
+        let err = String::from_utf8_lossy(&o.stderr).into_owned();
+        assert_eq!(o.status.code(), Some(1), "{fault}: {err}");
+        assert!(
+            err.contains("E1101") && err.contains(needle),
+            "{fault}: {err}"
+        );
+        assert!(!exe2.exists(), "{fault}: ĐỎ ⇒ KHÔNG exe");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

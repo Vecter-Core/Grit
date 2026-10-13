@@ -293,3 +293,89 @@ fn rejects_llvm_assume() {
     let v = w.check();
     assert!(has(&v, "`llvm.assume` bị cấm"), "{v:?}");
 }
+
+fn declare<'c>(w: &W<'c>, name: &str, params: usize) -> FunctionValue<'c> {
+    let ptr = w.ctx.ptr_type(Default::default());
+    let ps: Vec<_> = (0..params).map(|_| ptr.into()).collect();
+    w.m.add_function(name, w.ctx.void_type().fn_type(&ps, false), None)
+}
+
+/// Lớp I/O (E0310): mọi lời gọi runtime I/O qua `Cap` phải mang `!gt.obl = E0310`; thiếu hoặc sai lớp ⇒ từ chối.
+#[test]
+fn io_runtime_calls_need_the_capability_class() {
+    for name in [
+        "gritrt_arg_ptr",
+        "gritrt_arg_len",
+        "gritrt_fs_read",
+        "gritrt_file_len",
+        "gritrt_file_ptr",
+        "gritrt_write_u64",
+        "gritrt_write_str",
+    ] {
+        let ctx = Context::create();
+        let w = world(&ctx, true, Some(ATT));
+        let f = w.func("f");
+        let callee = declare(&w, name, 0);
+        let c = w.b.build_call(callee, &[], "").expect("call");
+        finish_ok(&w, f);
+        let inst = c.try_as_basic_value().expect_instruction("call");
+        assert!(
+            has(&w.check(), "thiếu metadata !gt.obl") && has(&w.check(), "`E0310`"),
+            "{name}: {:?}",
+            w.check()
+        );
+        w.tag(inst, "E0502"); // sai lớp
+        assert!(has(&w.check(), "cần `E0310`"), "{name}: {:?}", w.check());
+        w.tag(inst, "E0310");
+        assert_eq!(w.check(), Vec::<String>::new(), "{name}");
+    }
+}
+
+/// Bảng runtime đóng: `gritrt_*` lạ và hàm ngoài (FFI) bị từ chối; `llvm.*`, hàm có thân, và runtime không nhạy cảm thì được.
+#[test]
+fn unknown_runtime_and_external_calls_are_rejected_known_ones_accepted() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let unknown = declare(&w, "gritrt_exec", 0);
+    w.b.build_call(unknown, &[], "").expect("call");
+    let ext = declare(&w, "system", 1);
+    let p = ctx.ptr_type(Default::default()).const_null();
+    w.b.build_call(ext, &[p.into()], "").expect("call");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(has(&v, "`gritrt_exec` không thuộc lớp nào"), "{v:?}");
+    assert!(has(&v, "hàm ngoài `system`"), "{v:?}");
+
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("g");
+    for name in ["gritrt_start", "gritrt_report_int", "gritrt_alloc"] {
+        let c = declare(&w, name, 0);
+        w.b.build_call(c, &[], "").expect("call");
+    }
+    let defined = w.m.add_function(
+        "callee_with_body",
+        ctx.void_type().fn_type(&[], false),
+        None,
+    );
+    let bb = ctx.append_basic_block(defined, "bb0");
+    let here = w.b.get_insert_block().expect("blk");
+    w.b.position_at_end(bb);
+    w.b.build_return(None).expect("ret");
+    w.b.position_at_end(here);
+    w.b.build_call(defined, &[], "").expect("call");
+    let i32t = ctx.i32_type();
+    let intr = gt_llvm::inkwell::intrinsics::Intrinsic::find("llvm.uadd.with.overflow")
+        .expect("intrinsic")
+        .get_declaration(&w.m, &[i32t.into()])
+        .expect("decl");
+    w.b.build_call(
+        intr,
+        &[i32t.const_zero().into(), i32t.const_zero().into()],
+        "",
+    )
+    .expect("call");
+    finish_ok(&w, f);
+    assert_eq!(w.check(), Vec::<String>::new());
+}

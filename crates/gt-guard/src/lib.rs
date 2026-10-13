@@ -5,7 +5,10 @@
 //! 1. LLVM verifier sạch.
 //! 2. Metadata `!gt.attest` của module = attestation của lần `check` vừa rồi (MIR sau M7 + chế độ check + pass).
 //! 3. Mọi thao tác nhạy cảm mang `!gt.obl` đúng lớp: atomic load/store/rmw/cmpxchg ⇒ `E0503`; `gritrt_spawn` ⇒ `E0501`;
-//!    `gritrt_mutex_lock/unlock` ⇒ `E0502`. (Mức hạt: THEO LỚP nghĩa vụ, chưa theo từng điểm — KNOWN_LIMITATIONS.)
+//!    `gritrt_mutex_lock/unlock` ⇒ `E0502`; lời gọi runtime I/O qua `Cap` (`gritrt_arg_*`, `gritrt_fs_read`, `gritrt_file_*`, `gritrt_write_*`) ⇒ `E0310`
+//!    (nghĩa vụ capability: nguồn gốc chỉ ở `main`, hiệu ứng `io` đã kiểm). (Mức hạt: THEO LỚP nghĩa vụ, chưa theo từng điểm — KNOWN_LIMITATIONS.)
+//! 3b. MỌI lời gọi tới hàm `gritrt_*` phải nằm trong BẢNG [`RUNTIME`] (lớp hoặc "không cần lớp"); `gritrt_*` lạ ⇒ từ chối. Mọi lời gọi tới một hàm
+//!    chỉ khai báo (không có thân) phải là `llvm.*` hoặc nằm trong bảng; hàm ngoài khác ⇒ từ chối (không có FFI ngoài runtime).
 //! 4. `unreachable` chỉ đúng mẫu abort: khối tên `trap.*`, lệnh ngay trước là `call @gritrt_abort` có `noreturn`.
 //! 5. Không có cờ sinh poison/UB trên số học (`nsw`/`nuw`/`exact`/fast-math/`disjoint`/`nneg`/`samesign`) và không `llvm.assume`.
 use gt_llvm::inkwell::AtomicOrdering;
@@ -55,16 +58,35 @@ fn is_atomic(inst: &InstructionValue<'_>) -> bool {
     }
 }
 
+/// Bảng lời gọi runtime hợp lệ: (tên, lớp nghĩa vụ phải mang; `None` = không nhạy cảm). Hợp đồng với `gt-codegen-llvm` và `runtime/gt-rt`
+/// (docs/TCB_INTRINSICS.md). Thêm hàm runtime MỚI = thêm dòng ở đây (nếu quên, Guard từ chối ⇒ fail-closed).
+pub const RUNTIME: [(&str, Option<&str>); 14] = [
+    ("gritrt_abort", None),
+    ("gritrt_start", None),
+    ("gritrt_report_int", None),
+    ("gritrt_alloc", None),
+    ("gritrt_spawn", Some("E0501")),
+    ("gritrt_mutex_lock", Some("E0502")),
+    ("gritrt_mutex_unlock", Some("E0502")),
+    ("gritrt_arg_ptr", Some("E0310")),
+    ("gritrt_arg_len", Some("E0310")),
+    ("gritrt_fs_read", Some("E0310")),
+    ("gritrt_file_len", Some("E0310")),
+    ("gritrt_file_ptr", Some("E0310")),
+    ("gritrt_write_u64", Some("E0310")),
+    ("gritrt_write_str", Some("E0310")),
+];
+
 /// Lớp nghĩa vụ mà thao tác này PHẢI mang (`None`: không nhạy cảm).
 fn required_class(inst: &InstructionValue<'_>) -> Option<&'static str> {
     if is_atomic(inst) {
         return Some("E0503");
     }
-    match callee_name(inst)?.as_str() {
-        "gritrt_spawn" => Some("E0501"),
-        "gritrt_mutex_lock" | "gritrt_mutex_unlock" => Some("E0502"),
-        _ => None,
-    }
+    let name = callee_name(inst)?;
+    RUNTIME
+        .iter()
+        .find(|(n, _)| *n == name)
+        .and_then(|(_, class)| *class)
 }
 
 const UB_FLAGS: [&str; 11] = [
@@ -121,6 +143,24 @@ pub fn check_module(m: &Module<'_>, input: &GuardInput<'_>) -> Vec<String> {
                         None => v.push(format!(
                             "{fname}/{bname}: thao tác nhạy cảm thiếu metadata !{OBL_KIND} (cần `{want}`)"
                         )),
+                    }
+                }
+                // 3b. đích của mọi lời gọi: hàm trong module (có thân), `llvm.*`, hoặc bảng RUNTIME
+                if let Some(callee) = callee_name(&inst) {
+                    let known = RUNTIME.iter().any(|(n, _)| *n == callee);
+                    let defined = m
+                        .get_function(&callee)
+                        .is_some_and(|c| c.count_basic_blocks() > 0);
+                    if callee.starts_with("gritrt_") {
+                        if !known {
+                            v.push(format!(
+                                "{fname}/{bname}: lời gọi runtime `{callee}` không thuộc lớp nào (không có trong bảng RUNTIME)"
+                            ));
+                        }
+                    } else if !defined && !callee.starts_with("llvm.") {
+                        v.push(format!(
+                            "{fname}/{bname}: lời gọi hàm ngoài `{callee}` (chỉ khai báo, không phải `llvm.*` hay runtime)"
+                        ));
                     }
                 }
                 // 4. unreachable

@@ -92,6 +92,8 @@ fn inject_from_env() -> Option<Inject> {
         "unreachable" => Some(Inject::StrayUnreachable),
         "strip-obl" => Some(Inject::StripObligation),
         "attest" => Some(Inject::BadAttestation),
+        "runtime-call" => Some(Inject::UnknownRuntimeCall),
+        "external-call" => Some(Inject::ExternalCall),
         _ => None,
     }
 }
