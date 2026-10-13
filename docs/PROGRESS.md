@@ -516,3 +516,11 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - **Dự án 3 gói:** `rig lock` ⇒ 3 `[[package]]` (base chỉ MỘT lần dù đi hai đường); `rig build --locked` xanh; `rig run` thoát 0; `rig test` "t_check ... ok", "1 qua, 0 hỏng", thoát 0; test có kết quả sai ⇒ "FAILED (abort: div_by_zero)" thoát 1.
 - **Mã thoát của rig (đo bằng test mức tiến trình, `crates/rig/tests/rig.rs`):** gritc ĐỎ ⇒ 1 (chuyển nguyên, không có exe); đầu vào gritc từ chối (tên module không hợp lệ) ⇒ 3 (chuyển nguyên); `rig.lock` lệch (mọi lệnh build/check/run/test, có/không `--locked`) hoặc thiếu kèm `--locked` ⇒ 10; manifest/dự án sai (14 ca TOML, vòng, trùng tên/module, thiếu main) ⇒ 11; dùng sai lệnh/cờ ⇒ 12; IO của rig ⇒ 13.
 - Số test: crates/rig 11 mức tiến trình + 4 unit; dogfood 3 (`crates/rig/tests/dogfood.rs`).
+
+## Cổng đầy đủ sau dogfood/IR Guard I/O/Arena/JSON (2026-10-13) — dán số thật
+Bốn lần chạy `tools/gate.sh`; ba lần đầu ĐỎ thật, mỗi lần sửa rồi chạy lại:
+1. clippy `doc_lazy_continuation` ở gt-guard + 3 golden IR (prelude đổi ⇒ attestation đổi) — sửa.
+2. clippy xong, nhưng test `llvm_diff::permanent_and_small_fixed_batch` lộ **FB-2** (IR Guard từ chối nhầm hàm hợp đồng tên Unicode) — sửa bằng lấy tên qua API; test hồi quy mới.
+3. `gt-resolve` corpus ĐỎ: bản fixture prelude THỨ BA (gt-resolve/tests/common) thiếu `Out`/`root_out` — sửa.
+4. **Lần cuối: fmt OK; clippy 0; audit 0; 756 test pass / 0 lỗi; check_expectations OK (793 file `.gt`: fail 392, warn 13, pass 362; 67 mã).**
+Rút kinh nghiệm: prelude có BA bản (lib/core, fixture gt-types, fixture gt-resolve) — chỉ một cặp được test khoá bằng nhau (docs/KNOWN_LIMITATIONS: nên khoá cả gt-resolve).
