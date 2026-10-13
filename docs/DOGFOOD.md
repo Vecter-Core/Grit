@@ -35,3 +35,25 @@ Mỗi dòng = một khoảng trống/bug gặp khi viết công cụ thật. C�
 | J6 | Nhân/chia 128 bit | `Unsupported` | KHÔNG | không dùng |
 | J7 | Gọi qua trait / generic có ràng buộc | `Callee::TraitMethod` ⇒ `Unsupported` | KHÔNG nếu tránh trait | tool không dùng trait. **Codegen HIỆN hạ được generic KHÔNG ràng buộc** (đơn hình hoá hàm + ADT, đã test `id<T>`, `Option<i32>`, `Atomic<T>`, `Result<T,T>`); KHÔNG hạ được lời gọi phương thức trait (cả `⊐ Trait for T` lẫn `T: Bound` gọi `t.method()`) |
 | J8 | Đệ quy sâu làm tràn stack gốc | thiết kế | PHẢI xử lý | tham số ngân sách độ sâu `depth` (↓ depth, M8 chứng minh dừng) ⇒ lồng quá `MAX_DEPTH` trả `Err(TooDeep)` có kiểm soát, KHÔNG đệ quy sâu hơn ngân sách; stack gốc của exe 1 MiB mặc định (link.exe) đủ cho ngân sách |
+
+## Công cụ 2: kết quả (2026-10-13) — `examples/json` (Grit, ~330 dòng, dự án Rig)
+**Đo thật:** 6 test (`crates/rig/tests/dogfood_json.rs`), tất cả ĐẠT. Tool ≡ bản tham chiếu Rust (khớp TỪNG KÝ TỰ đầu ra kể cả vị trí byte lỗi và mã) trên: 49 tài liệu hợp lệ + 63 không hợp lệ viết tay, 12 chuỗi UTF-8 sai (nhị phân), số liệu đếm/độ sâu kiểm tay, lồng sâu quanh biên (1…1 000 000 tầng, mảng và đối tượng), 2 tệp lớn, **700 tài liệu đột biến ngẫu nhiên** (52 hợp lệ / 648 không). Hợp lệ khớp thêm với `serde_json` (oracle độc lập) trên mọi tài liệu có ngân sách đủ: **0 bất đồng**. Khác biệt có chủ đích duy nhất: `1e999` — đúng cú pháp RFC 8259, tool chấp nhận (chỉ kiểm cú pháp), `serde_json` từ chối vì tràn f64 ("number out of range"); test coi là đồng ý.
+**Hiệu năng (LLVM -O0, mọi check giữ, cây trong arena):** ~13 MiB trong 0.23–0.27 s ≈ 49–57 MiB/s.
+**Lồng sâu:** ngân sách 201 đơn vị, mỗi tầng tiêu 2 ⇒ tối đa **100 tầng** hợp lệ (101 ⇒ `nesting too deep` có kiểm soát, thoát 0). 1 000 000 tầng mảng/đối tượng và 5 000 000 `[` (tệp 5 MB) đều trả lỗi có kiểm soát, KHÔNG tràn stack.
+
+### Khoảng trống/bug gặp khi viết (thứ tự gặp) — "gốc" = gritc | lib | codegen | spec
+| # | triệu chứng | gốc | đã sửa? |
+|---|---|---|---|
+| 11 | định nghĩa `enum R { Ok(..), Err(..) }` làm `Ok(f)`/`Err(IoError::..)` không qualify trong CÙNG tệp báo `E0301` (pattern kiểu `R`): tên biến thể của enum người dùng CHE `Ok`/`Err` của prelude | spec (phạm vi tên; hành vi hợp lý nhưng gây bất ngờ) | không đổi ngôn ngữ; tool đặt tên `Good`/`Bad`; ghi KNOWN_LIMITATIONS |
+| 12 | `E0702` trên đệ quy tương hỗ `value ⇄ arr/obj` với `↓ budget` (chỉ GIẢM Ở MỘT CẠNH của chu trình): M8 đòi MỌI cạnh trong SCC giảm nghiêm ngặt (thử `m1/m2`: cả trọng số `2n+1`/`2n` cũng bị từ chối) | gritc (M8 bảo thủ, đúng fail-closed) | không; tool tiêu 2 đơn vị ngân sách mỗi tầng; KNOWN_LIMITATIONS |
+| 13 | `E0702` trên vòng `⟳ … ↓ len - i` khi bước tiến là `i ← i + n` với `n` là KẾT QUẢ hàm (không chặn dưới được; `len - i` có thể âm) | gritc (bộ giải M8) | không; dùng "nhiên liệu" `fuel ← fuel - 1` (dừng được chứng minh, đủ vì mỗi vòng tiến ≥ 1 byte) |
+| 14 | `(a, b) ≔ f()` (phân rã tuple trong `≔`) ⇒ `E0101 mong đợi ; hoặc }` | spec/parser (cú pháp chưa có) | không (cần cú pháp mới ⇒ OPEN_QUESTIONS); dùng `.0/.1` |
+| 15 | Không có `Vec`/`String`/`f64`: cây dùng arena + danh sách liên kết; chuỗi/số chỉ là khoảng `(đầu, dài)` — tool KHÔNG giải mã escape, KHÔNG đổi số sang số thực | lib/codegen | không (ngoài phạm vi tối thiểu); chặn mọi tool cần GIÁ TRỊ chuỗi/số |
+| 16 | Không có `argc` (thiếu đối số = abort `arg_out_of_range` mã 70, không phải lỗi dùng có kiểm soát) và không có stderr riêng (lỗi ghi ra stdout, thoát mã 2) | lib | không |
+| 17 | sự cố công cụ của tôi (không phải của gritc): ghi đè `main.gt` bằng script Python lỗi làm tệp rỗng; khôi phục từ lần ghi trước. Bài học: sửa tệp nguồn Grit bằng công cụ Write/Edit, không bằng script heredoc có `\u` | quy trình | n/a |
+
+### Khoảng trống còn lại (tổng hợp, theo thứ tự chặn công cụ TIẾP THEO)
+1. `Vec`, `String`, `f64`, gọi qua trait (`Callee::TraitMethod` ⇒ `Unsupported`), nhân/chia 128 bit — chặn mọi công cụ cần giá trị chuỗi/số, bảng băm, sắp xếp, trait.
+2. Phân rã trong `≔`; `?`; stderr; `argc`.
+3. M7 chưa chứng minh `b[i]` cho `b` cục bộ mượn từ lời gọi (check runtime giữ — chậm, không sai).
+4. Mọi người duyệt TCB mới đang `CHỜ GIANG` (docs/TCB_INTRINSICS.md).

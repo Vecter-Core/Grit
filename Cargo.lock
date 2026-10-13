@@ -367,6 +367,7 @@ dependencies = [
  "gt-fmt",
  "gt-resolve",
  "gt-span",
+ "serde_json",
 ]
 
 [[package]]

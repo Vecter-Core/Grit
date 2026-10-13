@@ -21,6 +21,9 @@ gt-resolve = { path = "../gt-resolve" }
 gt-diag = { path = "../gt-diag" }
 gt-span = { path = "../gt-span" }
 
+[dev-dependencies]
+serde_json = "1"
+
 [features]
 # Backend LLVM (cần để `rig build/run/test`); `--no-default-features` ⇒ chỉ check/lock/fmt/new/add/clean.
 default = ["llvm"]
