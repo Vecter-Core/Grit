@@ -164,22 +164,49 @@ pub fn build_exe(
 /// Chạy exe đã dựng bằng `build_exe(.., true)`: ánh xạ mã thoát (0 / 70 abort / khác ⇒ trạng thái chương trình).
 #[must_use]
 pub fn run_exe(exe: &Path) -> RunReport {
-    let mut result_file = exe.as_os_str().to_owned();
-    result_file.push(".result");
-    let result_file = PathBuf::from(result_file);
+    run_exe_timeout(exe, None)
+}
+
+/// Như [`run_exe`] nhưng quá hạn ⇒ giết tiến trình và trả [`RunEnd::Limit`] (dùng cho kiểm thử ngẫu nhiên: không để treo).
+#[must_use]
+pub fn run_exe_timeout(exe: &Path, limit: Option<std::time::Duration>) -> RunReport {
+    let side = |ext: &str| {
+        let mut p = exe.as_os_str().to_owned();
+        p.push(ext);
+        PathBuf::from(p)
+    };
+    let (result_file, out_file, err_file) = (side(".result"), side(".stdout"), side(".stderr"));
     let _ = std::fs::remove_file(&result_file);
-    let o = Command::new(exe)
-        .env("GRITRT_RESULT_FILE", &result_file)
-        .output();
+    let spawn = (|| -> std::io::Result<std::process::ExitStatus> {
+        let mut child = Command::new(exe)
+            .env("GRITRT_RESULT_FILE", &result_file)
+            .stdout(std::fs::File::create(&out_file)?)
+            .stderr(std::fs::File::create(&err_file)?)
+            .spawn()?;
+        let start = std::time::Instant::now();
+        loop {
+            if let Some(st) = child.try_wait()? {
+                return Ok(st);
+            }
+            if limit.is_some_and(|l| start.elapsed() > l) {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "quá hạn"));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    })();
     let value = std::fs::read_to_string(&result_file).ok();
-    let _ = std::fs::remove_file(&result_file);
-    match o {
-        Ok(o) => {
-            let err = String::from_utf8_lossy(&o.stderr).into_owned();
-            let out = String::from_utf8_lossy(&o.stdout).into_owned();
+    let err = std::fs::read_to_string(&err_file).unwrap_or_default();
+    let out = std::fs::read_to_string(&out_file).unwrap_or_default();
+    for f in [&result_file, &out_file, &err_file] {
+        let _ = std::fs::remove_file(f);
+    }
+    match spawn {
+        Ok(st) => {
             eprint!("{err}");
             print!("{out}");
-            let end = match o.status.code() {
+            let end = match st.code() {
                 Some(0) => RunEnd::Normal,
                 Some(70) => RunEnd::Aborted(
                     err.lines()
@@ -193,6 +220,10 @@ pub fn run_exe(exe: &Path) -> RunReport {
             };
             RunReport { end, value }
         }
+        Err(e) if e.kind() == std::io::ErrorKind::TimedOut => RunReport {
+            end: RunEnd::Limit,
+            value: None,
+        },
         Err(e) => RunReport {
             end: RunEnd::Internal(format!("không chạy được {}: {e}", exe.display())),
             value: None,

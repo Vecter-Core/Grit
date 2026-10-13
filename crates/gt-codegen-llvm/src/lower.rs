@@ -465,7 +465,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             return Ok(*f);
         }
         let body = self.body_of(inst.node)?;
-        let params = self.params_of(inst.node);
+        let params = self.params_of(body.sig_node);
         if params.len() != inst.args.len() {
             return unsupported(format!(
                 "`{}`: số đối số kiểu ({}) không khớp số tham số ({}) — có thể là thành viên trait/mặc định",
@@ -476,14 +476,14 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         }
         let sub = |ty: &Ty| subst_inst(ty, &params, &inst.args);
         let ft = match body.kind {
-            BodyKind::Fn => {
+            // thân hợp đồng `⊳`/`⊲` là hàm thuần (tham số của hàm [+ result]) → bool: hạ như hàm thường
+            BodyKind::Fn | BodyKind::Pre | BodyKind::Post => {
                 let ps: Vec<Ty> = (1..=body.arg_count)
                     .map(|i| sub(&body.locals[i].ty))
                     .collect();
                 self.fn_type(&ps, &sub(body.return_ty()))?
             }
             BodyKind::Const | BodyKind::Static => self.fn_type(&[], &sub(body.return_ty()))?,
-            BodyKind::Pre | BodyKind::Post => return unsupported("thân hợp đồng"),
         };
         let name = format!("{}#{}", body.key, self.nfuncs);
         self.nfuncs += 1;
@@ -637,7 +637,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
 
     fn define_body(&mut self, inst: &Inst, body: &'a Body) -> R<()> {
         let f = self.funcs[inst];
-        let params = self.params_of(inst.node);
+        let params = self.params_of(body.sig_node);
         let local_tys: Vec<Ty> = body
             .locals
             .iter()
@@ -669,7 +669,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             let p = llvm(self.builder.build_alloca(ty, &format!("l{i}")))?;
             fx.locals.push(p);
         }
-        if body.kind == BodyKind::Fn {
+        if matches!(body.kind, BodyKind::Fn | BodyKind::Pre | BodyKind::Post) {
             for i in 0..body.arg_count {
                 let Some(arg) = f.get_nth_param(u32::try_from(i).unwrap_or(u32::MAX)) else {
                     return internal("thiếu tham số hàm");
