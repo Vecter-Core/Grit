@@ -43,6 +43,10 @@
 - Mục 6a/6b ĐÃ LÀM ở lệnh trước (commit 58b534f và nhánh FB-1); không làm lại.
 - Việc còn: 4 (TCB intrinsic), 5 (IR Guard lớp I/O + đột biến), 1 (cổng đầy đủ MỘT lần SAU 3–5 để không chạy hai lần), 2 (PROGRESS số thật M11), 7 (JSON).
 
+## 2e. LỆNH 2026-10-13 (sau dogfood) — XONG, chờ Giang
+- Cổng đầy đủ xanh (756 test, 4 lần chạy; 3 lần đầu ĐỎ thật rồi sửa). M11 PROGRESS có SHA-256 thật. Capability: E0310 đúng, không lỗ hổng (đính chính tài liệu), điều kiện cứng 12 ở GRIT_PLAN §7. TCB: docs/TCB_INTRINSICS.md + ADR-031 (người duyệt `CHỜ GIANG`). IR Guard: bảng RUNTIME đóng + lớp E0310/E0405; đột biến 56/57 (1 tương đương). FB-1 luật bộ sinh, lô abort (847 khớp) đã làm. FB-2 (Guard tên Unicode) sửa. Công cụ 2: examples/json (6 test, ~900 tài liệu 0 bất đồng). Khoảng trống: docs/DOGFOOD.md.
+- Việc tiếp (đề xuất, chờ Giang): Vec/String/f64 hoặc gọi qua trait (chọn theo công cụ thứ ba), khoá fixture prelude gt-resolve bằng test, `argc`/stderr, hồ sơ `release` (ADR riêng).
+
 ## 3. Việc tiếp theo (theo thứ tự; mỗi bước nhỏ = một commit + cập nhật mục 2/3 + kiểm nhẹ: `cargo fmt`, test các crate bị đổi)
 1. `[XONG 2026-10-12]` Ghi SHA-256 gói LLVM 20.1.8 + `LLVM-C.dll` vào ADR-029 và `docs/ENVIRONMENT.md` (băm tự tính khi tải; GitHub công bố `f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f`), ghi: gritc cần `LLVM-C.dll` trên PATH khi chạy; binary do gritc sinh KHÔNG phụ thuộc `LLVM-C.dll` (phải kiểm bằng `dumpbin /dependents`); `libxml2s.lib` rỗng chỉ là workaround dự phòng.
 2. `[XONG 2026-10-12]` ADR-029 phụ lục: Q59–Q65 quyết định cuối; vấn đề `gritc.exe` không khởi động khi thiếu `LLVM-C.dll` ⇒ cargo feature `llvm` + nạp DLL trễ.
