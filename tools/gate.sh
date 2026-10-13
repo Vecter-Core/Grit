@@ -9,6 +9,6 @@ echo "== gt-rt (workspace riêng, M10)"; cargo fmt --manifest-path runtime/gt-rt
 echo "== fmt"; cargo fmt --all --check && echo FMT_OK
 echo "== clippy"; cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tail -5; echo "CLIPPY_EXIT=${PIPESTATUS[0]}"
 echo "== audit"; cargo audit 2>&1 | tail -3; echo "AUDIT_EXIT=${PIPESTATUS[0]}"
-echo "== test"; cargo test --workspace -- --test-threads=2 2>&1 | tee /tmp/gate_test.txt | grep -E "test result|FAILED|panicked" | awk '/test result/ {p+=$4; f+=$6} /FAILED|panicked/ {print} END {print "TEST_PASSED="p" FAILED="f}'
+echo "== test"; cargo test --workspace -- --test-threads=2 2>&1 | tee /tmp/gate_test.txt | grep -E "test result|FAILED|panicked" | awk '/test result/ {p+=$4; f+=$6; n++} /FAILED|panicked/ {print} END {print "TEST_PASSED="p" FAILED="f" SUITES="n; if (n==0) print "TEST_STAGE_INVALID: không có dòng `test result` (lỗi biên dịch/liên kết?) — KHÔNG được coi là xanh"}'
 echo "== check_expectations"; PYTHONIOENCODING=utf-8 python tools/check_expectations.py | tail -3
 [ -f tools/test_check_expectations.py ] && PYTHONIOENCODING=utf-8 python -m unittest tools/test_check_expectations.py 2>&1 | tail -3

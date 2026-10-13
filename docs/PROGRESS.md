@@ -591,3 +591,8 @@ Rút kinh nghiệm: prelude có BA bản (lib/core, fixture gt-types, fixture gt
 - **Khoảng trống/bug:** DOGFOOD T1–T8; FB-3 (E0311 oan, né `&Self`); ghi stdout tới tệp chậm (flush mỗi lời gọi) — KNOWN_LIMITATIONS.
 - **Chưa kiểm:** tràn thật của `nl·16`/`n·size`; 32 MiB toàn dòng rỗng (cố ý KHÔNG chạy, công thức bộ nhớ ở KNOWN_LIMITATIONS); đo lặp nhiều lần; bộ nhớ Rust chỉ ước tính.
 - Test các crate liên quan (gt-types, gt-resolve, gt-mir, gt-borrowck, gt-oblig, gt-guard, gt-term, gt-effects, gt-secrets, gt-conc, gt-driver, rig) không-fail-fast: 0 đỏ. Clippy workspace sạch.
+
+## CỔNG ĐẦY ĐỦ sau bước (v) và E0703 (2026-10-14) — kết quả thật (`bash tools/gate.sh /d/Grit`)
+- **Lần chạy HỢP LỆ:** gt-rt (workspace riêng) OK; `fmt` OK; `clippy -D warnings` EXIT 0; `audit` EXIT 0; **`test --workspace`: 803 đạt, 0 đỏ, 149 bộ test (SUITES=149)**; `check_expectations`: 822 tệp .gt (fail 407, warn 13, pass 376, lexer 8), 70 mã, 215 tham chiếu test, OK; unittest script 9 OK.
+- **Sự cố của chính cổng (đã sửa):** lần chạy đầu giai đoạn `test` KHÔNG biên dịch được (`link.exe: Access is denied`, lỗi thoáng qua của hệ điều hành) nhưng `gate.sh` vẫn in `TEST_PASSED= FAILED=` (rỗng) và các giai đoạn khác xanh ⇒ trông như xanh. Sửa `tools/gate.sh`: in thêm `SUITES=<số bộ test>` và `TEST_STAGE_INVALID` khi không có dòng `test result`. Lần đầu bị bỏ, lần hai là bản ghi ở trên. (Bài học: cổng không được xanh khi không có kết quả test.)
+- Không có test đỏ nào phải sửa trong lần này (3 golden IR và 1 snapshot M6 đã cập nhật có kiểm diff ở các bước trước).
