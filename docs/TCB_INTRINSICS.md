@@ -19,6 +19,10 @@ IR Guard (gt-guard) giữ bảng đóng `RUNTIME` của các hàm runtime tươn
 | `Cap<Out>::write_str(&self, s: &str)` | `io` | `&Cap<Out>` | `gritrt_write_str(ptr,len)` | ghi thất bại ⇒ abort `io_error` | ghi nguyên các byte của `s`, flush ngay | CHỜ GIANG |
 | `Cap<Fs>::open(&self, p: &str) → Result<File, IoError>` | `io` | `&Cap<Fs>` | `gritrt_fs_open(ptr,len) → i32` rồi dựng `Result` (Ok(File{x:h}) khi h ≥ 0; Err(IoError k) với mã âm −(k+1)) | KHÔNG abort vì lỗi I/O (đó là điểm khác `read`); chỉ abort nếu bảng tay cầm tràn `i32` | `IoError`: NotFound(−1) / Denied(−2) / Invalid(−3, đường dẫn không UTF-8) / Other(−4); ánh xạ cố định, thứ tự biến thể của prelude là hợp đồng với runtime | CHỜ GIANG |
 
+| `band/bor/bxor/bnot(u32…) → u32` | `∅` | không | `and`/`or`/`xor`/`not` của LLVM | không | thuần, tổng, không tràn (Q9: là HÀM lib/core, không phải toán tử) | CHỜ GIANG |
+| `shl/shr(x: u32, n: u32) → u32`, `rotr/rotl(x, n)` | `∅` | không | `shl`/`lshr` (KHÔNG cờ nuw/nsw) và `llvm.fshr/fshl(x,x,n)` | `⊳ n < 32` do M7 kiểm (chứng minh hoặc Assert `precondition` lúc chạy); codegen KIỂM LẠI `n < 32` (phòng thủ như chia cho 0) ⇒ abort `precondition`, không bao giờ để LLVM sinh poison | thuần; kết quả = phép dịch/xoay u32 chuẩn; kiểm 3 nguồn (thông dịch, exe, đánh giá Rust) trên 352 phép chạy | CHỜ GIANG |
+| `Cap<Out>::write_bytes(&self, b: &[u8])` | `io` | `&Cap<Out>` | CÙNG `gritrt_write_str(ptr,len)` với `write_str` (byte nguyên văn) | ghi thất bại ⇒ abort `io_error` | không biến đổi byte | CHỜ GIANG |
+
 ## B. Đồng thời / bộ nhớ (M10) — lớp nghĩa vụ: E0503 (atomic), E0502 (khoá), E0501 (spawn)
 | intrinsic | hiệu ứng | capability | hạ thành | abort | bất biến | người duyệt |
 |---|---|---|---|---|---|---|

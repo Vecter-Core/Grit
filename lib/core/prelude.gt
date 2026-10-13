@@ -86,6 +86,13 @@
 }
 ƒ shl(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
 ƒ shr(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
+// phép bit trên u32 (Q9: là HÀM của lib/core, không phải toán tử): AND/OR/XOR/NOT, xoay phải/trái; xoay và dịch đòi n < 32 (⊳)
+ƒ band(a: u32, b: u32) → u32 ! ∅ { }
+ƒ bor(a: u32, b: u32) → u32 ! ∅ { }
+ƒ bxor(a: u32, b: u32) → u32 ! ∅ { }
+ƒ bnot(a: u32) → u32 ! ∅ { }
+ƒ rotr(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
+ƒ rotl(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
 ⊐ Cap<Fs> {
   ƒ read(&self, p: &str) → File ! {io} { }
   ƒ open(&self, p: &str) → Result<File, IoError> ! {io} { }
@@ -100,6 +107,7 @@
 ⊐ Cap<Out> {
   ƒ write_u64(&self, n: u64) ! {io} { }
   ƒ write_str(&self, s: &str) ! {io} { }
+  ƒ write_bytes(&self, b: &[u8]) ! {io} { }
 }
 ⊐ Cap<ErrOut> {
   ƒ write_u64(&self, n: u64) ! {io} { }

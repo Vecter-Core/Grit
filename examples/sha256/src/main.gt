@@ -1,0 +1,160 @@
+// sha256: băm SHA-256 của một tệp (dogfood công cụ 3, docs/DOGFOOD.md). Dùng: sha256.exe <tệp>. In 64 chữ số hex, khoảng trắng, đường dẫn.
+// Phép bit là HÀM của lib/core (Q9): band/bor/bxor/bnot/shl/shr/rotr; cộng quấn vòng `+%`. Capability chỉ lấy ở `main` và truyền xuống.
+
+// ---- hàm của FIPS 180-4
+ƒ ch(e: u32, f: u32, g: u32) → u32 ! ∅ { bxor(band(e, f), band(bnot(e), g)) }
+ƒ maj(a: u32, b: u32, c: u32) → u32 ! ∅ { bxor(bxor(band(a, b), band(a, c)), band(b, c)) }
+ƒ big0(x: u32) → u32 ! ∅ { bxor(bxor(rotr(x, 2u32), rotr(x, 13u32)), rotr(x, 22u32)) }
+ƒ big1(x: u32) → u32 ! ∅ { bxor(bxor(rotr(x, 6u32), rotr(x, 11u32)), rotr(x, 25u32)) }
+ƒ small0(x: u32) → u32 ! ∅ { bxor(bxor(rotr(x, 7u32), rotr(x, 18u32)), shr(x, 3u32)) }
+ƒ small1(x: u32) → u32 ! ∅ { bxor(bxor(rotr(x, 17u32), rotr(x, 19u32)), shr(x, 10u32)) }
+
+// 4 byte big-endian từ b[o..o+4]
+ƒ load_be(b: &[u8], o: usize) → u32 ! ∅ {
+  bor(bor(shl(b[o] as u32, 24u32), shl(b[o + 1] as u32, 16u32)), bor(shl(b[o + 2] as u32, 8u32), b[o + 3] as u32))
+}
+
+// nén MỘT khối 64 byte b[off..off+64] vào trạng thái h (8 từ)
+ƒ compress(h: &![u32], k: &[u32], b: &[u8], off: usize) ! ∅ {
+  μw ≔ [0u32; 64];
+  μt ≔ 0usize;
+  ⟳ t < 16usize ↓ 16usize - t {
+    w[t] ← load_be(b, off + t * 4);
+    t ← t + 1;
+  }
+  ⟳ t < 64usize ↓ 64usize - t {
+    w[t] ← small1(w[t - 2]) +% w[t - 7] +% small0(w[t - 15]) +% w[t - 16];
+    t ← t + 1;
+  }
+  μva ≔ h[0];
+  μvb ≔ h[1];
+  μvc ≔ h[2];
+  μvd ≔ h[3];
+  μve ≔ h[4];
+  μvf ≔ h[5];
+  μvg ≔ h[6];
+  μvh ≔ h[7];
+  μi ≔ 0usize;
+  ⟳ i < 64usize ↓ 64usize - i {
+    t1 ≔ vh +% big1(ve) +% ch(ve, vf, vg) +% k[i] +% w[i];
+    t2 ≔ big0(va) +% maj(va, vb, vc);
+    vh ← vg;
+    vg ← vf;
+    vf ← ve;
+    ve ← vd +% t1;
+    vd ← vc;
+    vc ← vb;
+    vb ← va;
+    va ← t1 +% t2;
+    i ← i + 1;
+  }
+  h[0] ← h[0] +% va;
+  h[1] ← h[1] +% vb;
+  h[2] ← h[2] +% vc;
+  h[3] ← h[3] +% vd;
+  h[4] ← h[4] +% ve;
+  h[5] ← h[5] +% vf;
+  h[6] ← h[6] +% vg;
+  h[7] ← h[7] +% vh;
+}
+
+// sao chép phần đuôi b[full*64..] vào tail[0..rem] (hàm riêng: ít biến nguyên ⇒ miền quan hệ của M7 (≤ 24 biến) không bị giảm độ chính xác)
+ƒ copy_tail(b: &[u8], tail: &![u8], start: usize, rem: usize) ! ∅ {
+  μj ≔ 0usize;
+  ⟳ j < rem ↓ rem - j {
+    tail[j] ← b[start + j];
+    j ← j + 1;
+  }
+}
+
+// ghi độ dài (bit, 64 bit big-endian) vào 8 byte cuối của phần đuôi (kết thúc ở endo)
+ƒ put_length(tail: &![u8], endo: usize, len_bytes: usize) ! ∅ {
+  μv ≔ (len_bytes as u64) * 8u64;
+  μq ≔ 0usize;
+  ⟳ q < 8usize ∧ q < endo ↓ 8usize - q {
+    tail[endo - 1usize - q] ← (v % 256u64) as u8;
+    v ← v / 256u64;
+    q ← q + 1;
+  }
+}
+
+// băm toàn bộ b: các khối đầy đủ, rồi phần đuôi có đệm (0x80, 0..., độ dài bit 64 bit big-endian)
+ƒ digest(b: &[u8], k: &[u32], h: &![u32]) ! ∅ {
+  full ≔ b.len() / 64usize;
+  μn ≔ 0usize;
+  ⟳ n < full ↓ full - n {
+    compress(h, k, b, n * 64usize);
+    n ← n + 1;
+  }
+  rem ≔ b.len() - full * 64usize;
+  μtail ≔ [0u8; 128];
+  copy_tail(b, &!tail[..], full * 64usize, rem);
+  tail[rem] ← 128u8;
+  tblocks ≔ (⎇ rem < 56usize { 1usize } ⇝ { 2usize });
+  put_length(&!tail[..], tblocks * 64usize, b.len());
+  μm ≔ 0usize;
+  ⟳ m < tblocks ↓ tblocks - m {
+    compress(h, k, &tail[..], m * 64usize);
+    m ← m + 1;
+  }
+}
+
+ƒ hex_digit(n: u32) → u8 ! ∅ {
+  ⎇ n < 10u32 { (n + 48u32) as u8 } ⇝ { (n + 87u32) as u8 }
+}
+
+ƒ report(out: &Cap<Out>, h: &[u32], path: &str) ! {io} {
+  μhex ≔ [0u8; 64];
+  μi ≔ 0usize;
+  ⟳ i < 8usize ↓ 8usize - i {
+    w ≔ h[i];
+    μj ≔ 0usize;
+    ⟳ j < 8usize ↓ 8usize - j {
+      nib ≔ band(shr(w, ((7usize - j) * 4usize) as u32), 15u32);
+      hex[i * 8usize + j] ← hex_digit(nib);
+      j ← j + 1;
+    }
+    i ← i + 1;
+  }
+  out.write_bytes(&hex[..]);
+  out.write_str(" ");
+  out.write_str(path);
+  out.write_str("\n");
+}
+
+// lỗi ra STDERR (kết quả ra stdout); thoát mã 2
+ƒ fail(err: &Cap<ErrOut>, path: &str, why: &str) → ! ! {io, div} {
+  err.write_str("sha256: ");
+  err.write_str(path);
+  err.write_str(": ");
+  err.write_str(why);
+  err.write_str("\n");
+  core::exit(2u32)
+}
+
+ƒ usage(err: &Cap<ErrOut>) → ! ! {io, div} {
+  err.write_str("usage: sha256 <file>\n");
+  core::exit(2u32)
+}
+
+ƒ main() ! {io, div} {
+  env ≔ root_env();
+  fs ≔ root_fs();
+  out ≔ root_out();
+  err ≔ root_err();
+  ⎇ env.arg_count() < 2usize { usage(&err) } ⇝ {
+    path ≔ env.arg(1usize);
+    ⌥ fs.open(path) {
+      Ok(f) ↦ {
+        k ≔ [0x428a2f98u32, 0x71374491u32, 0xb5c0fbcfu32, 0xe9b5dba5u32, 0x3956c25bu32, 0x59f111f1u32, 0x923f82a4u32, 0xab1c5ed5u32, 0xd807aa98u32, 0x12835b01u32, 0x243185beu32, 0x550c7dc3u32, 0x72be5d74u32, 0x80deb1feu32, 0x9bdc06a7u32, 0xc19bf174u32, 0xe49b69c1u32, 0xefbe4786u32, 0x0fc19dc6u32, 0x240ca1ccu32, 0x2de92c6fu32, 0x4a7484aau32, 0x5cb0a9dcu32, 0x76f988dau32, 0x983e5152u32, 0xa831c66du32, 0xb00327c8u32, 0xbf597fc7u32, 0xc6e00bf3u32, 0xd5a79147u32, 0x06ca6351u32, 0x14292967u32, 0x27b70a85u32, 0x2e1b2138u32, 0x4d2c6dfcu32, 0x53380d13u32, 0x650a7354u32, 0x766a0abbu32, 0x81c2c92eu32, 0x92722c85u32, 0xa2bfe8a1u32, 0xa81a664bu32, 0xc24b8b70u32, 0xc76c51a3u32, 0xd192e819u32, 0xd6990624u32, 0xf40e3585u32, 0x106aa070u32, 0x19a4c116u32, 0x1e376c08u32, 0x2748774cu32, 0x34b0bcb5u32, 0x391c0cb3u32, 0x4ed8aa4au32, 0x5b9cca4fu32, 0x682e6ff3u32, 0x748f82eeu32, 0x78a5636fu32, 0x84c87814u32, 0x8cc70208u32, 0x90befffau32, 0xa4506cebu32, 0xbef9a3f7u32, 0xc67178f2u32];
+        μh ≔ [0x6a09e667u32, 0xbb67ae85u32, 0x3c6ef372u32, 0xa54ff53au32, 0x510e527fu32, 0x9b05688cu32, 0x1f83d9abu32, 0x5be0cd19u32];
+        digest(f.bytes(), &k[..], &!h[..]);
+        report(&out, &h[..], path);
+      },
+      Err(IoError::NotFound) ↦ fail(&err, path, "no such file"),
+      Err(IoError::Denied) ↦ fail(&err, path, "permission denied"),
+      Err(IoError::Invalid) ↦ fail(&err, path, "invalid path"),
+      Err(IoError::Other) ↦ fail(&err, path, "i/o error"),
+    }
+  }
+}

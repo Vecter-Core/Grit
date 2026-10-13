@@ -131,6 +131,10 @@ enum Intr {
     FileBytes,
     OutU64,
     OutStr,
+    /// `Cap<Out>::write_bytes(&[u8])`: cùng hàm runtime với `write_str` (byte nguyên văn)
+    OutBytes,
+    /// phép bit u32 của prelude: band/bor/bxor/bnot/shl/shr/rotr/rotl
+    Bit(BitOp),
     ArgCount,
     ErrU64,
     ErrStr,
@@ -139,6 +143,18 @@ enum Intr {
     ArenaNew,
     ArenaAlloc,
     ArenaReset,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BitOp {
+    And,
+    Or,
+    Xor,
+    Not,
+    Shl,
+    Shr,
+    Rotr,
+    Rotl,
 }
 
 struct Cg<'ctx, 'a> {
@@ -1633,6 +1649,22 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         if key.starts_with("$prelude::root_") {
             return Some(Intr::RootCap);
         }
+        if key.contains("Cap<Out>") && m == "write_bytes" {
+            return Some(Intr::OutBytes);
+        }
+        if let Some(op) = key.strip_prefix("$prelude::").and_then(|n| match n {
+            "band" => Some(BitOp::And),
+            "bor" => Some(BitOp::Or),
+            "bxor" => Some(BitOp::Xor),
+            "bnot" => Some(BitOp::Not),
+            "shl" => Some(BitOp::Shl),
+            "shr" => Some(BitOp::Shr),
+            "rotr" => Some(BitOp::Rotr),
+            "rotl" => Some(BitOp::Rotl),
+            _ => None,
+        }) {
+            return Some(Intr::Bit(op));
+        }
         if key.contains("Cap<Env>") && m == "arg_count" {
             return Some(Intr::ArgCount);
         }
@@ -2010,7 +2042,8 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 self.tag_obl(c.try_as_basic_value().instruction(), "E0310")?;
                 Ok(Some(self.unit_type().const_zero()))
             }
-            Intr::OutStr => {
+            Intr::Bit(op) => self.bit_op(fx, op, vals).map(Some),
+            Intr::OutStr | Intr::OutBytes => {
                 let (p, n) = self.split_fat(vals[1])?;
                 let ft = self
                     .ctx
@@ -2238,6 +2271,61 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 Ok(Some(self.unit_type().const_zero()))
             }
         }
+    }
+
+    /// Phép bit u32 (Q9). Dịch/xoay: `n < 32` là TIỀN ĐIỀU KIỆN do M7 kiểm (chứng minh hoặc Assert lúc chạy); codegen vẫn tự kiểm lại
+    /// (phòng thủ như chia cho 0): `n ≥ 32` ⇒ abort `precondition`, KHÔNG để LLVM sinh poison.
+    fn bit_op(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        op: BitOp,
+        vals: &[BasicValueEnum<'ctx>],
+    ) -> R<BasicValueEnum<'ctx>> {
+        let a = vals[0].into_int_value();
+        let b = |i: usize| vals[i].into_int_value();
+        let r = match op {
+            BitOp::And => llvm(self.builder.build_and(a, b(1), "band"))?,
+            BitOp::Or => llvm(self.builder.build_or(a, b(1), "bor"))?,
+            BitOp::Xor => llvm(self.builder.build_xor(a, b(1), "bxor"))?,
+            BitOp::Not => llvm(self.builder.build_not(a, "bnot"))?,
+            BitOp::Shl | BitOp::Shr | BitOp::Rotr | BitOp::Rotl => {
+                let n = b(1);
+                let lim = n.get_type().const_int(32, false);
+                let ok = llvm(
+                    self.builder
+                        .build_int_compare(IntPredicate::ULT, n, lim, "shamt"),
+                )?;
+                self.guard(fx, ok, abort_kind::PRECONDITION)?;
+                match op {
+                    BitOp::Shl => llvm(self.builder.build_left_shift(a, n, "shl"))?,
+                    BitOp::Shr => llvm(self.builder.build_right_shift(a, n, false, "shr"))?,
+                    _ => {
+                        let name = if op == BitOp::Rotr {
+                            "llvm.fshr"
+                        } else {
+                            "llvm.fshl"
+                        };
+                        let Some(intr) = Intrinsic::find(name) else {
+                            return internal(format!("không có intrinsic {name}"));
+                        };
+                        let Some(decl) = intr.get_declaration(&self.module, &[a.get_type().into()])
+                        else {
+                            return internal(format!("không khai báo được {name}"));
+                        };
+                        let c = llvm(self.builder.build_call(
+                            decl,
+                            &[a.into(), a.into(), n.into()],
+                            "rot",
+                        ))?;
+                        match c.try_as_basic_value().basic() {
+                            Some(v) => v.into_int_value(),
+                            None => return internal("fsh không trả giá trị"),
+                        }
+                    }
+                }
+            }
+        };
+        Ok(r.into())
     }
 
     /// gọi hàm runtime có giá trị trả về

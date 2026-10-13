@@ -431,6 +431,44 @@ impl<'a> Interp<'a> {
     /// Lang item đồng thời/mutability bên trong (`Cell`, `Mutex`, `Atomic`): CÔNG CỤ TEST, NGOÀI TCB, thực thi TUẦN TỰ. Ngữ nghĩa này KHÔNG
     /// phải bằng chứng cho ngữ nghĩa codegen (M10 phải dùng atomics/khoá LLVM thật; ADR-027 §1). `Ok(None)`: không phải intrinsic loại này.
     fn lang_ops(&mut self, key: &str, vals: &[V]) -> Result<Option<V>, Flow> {
+        // phép bit u32 của prelude (Q9): thân không có MIR; M7 đã chèn Assert `n < 32` ở chỗ gọi nên n ≥ 32 không tới được đây
+        if let Some(name) = key.strip_prefix("$prelude::")
+            && matches!(
+                name,
+                "band" | "bor" | "bxor" | "bnot" | "shl" | "shr" | "rotr" | "rotl"
+            )
+        {
+            let get = |i: usize| match vals.get(i) {
+                Some(V::Int(x, t)) => Ok((*x as u64 & 0xFFFF_FFFF, *t)),
+                _ => Err(Flow::Bug(format!("{name}: đối số không phải số nguyên"))),
+            };
+            let (a, t) = get(0)?;
+            let m = 0xFFFF_FFFFu64;
+            let r = match name {
+                "bnot" => !a & m,
+                "band" | "bor" | "bxor" => {
+                    let (b, _) = get(1)?;
+                    match name {
+                        "band" => a & b,
+                        "bor" => a | b,
+                        _ => a ^ b,
+                    }
+                }
+                _ => {
+                    let (n, _) = get(1)?;
+                    if n >= 32 {
+                        return Err(Flow::Bug(format!("{name}: n ≥ 32 không có Assert")));
+                    }
+                    match name {
+                        "shl" => (a << n) & m,
+                        "shr" => a >> n,
+                        "rotr" => ((a >> n) | (a << (32 - n))) & m,
+                        _ => ((a << n) | (a >> (32 - n))) & m,
+                    }
+                }
+            };
+            return Ok(Some(V::Int(i128::from(r), t)));
+        }
         let is = |name: &str| key.contains(name);
         let m = key.rsplit("::").next().unwrap_or("");
         if !(is("Cell") || is("Mutex") || is("Atomic")) {

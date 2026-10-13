@@ -57,3 +57,24 @@ Mỗi dòng = một khoảng trống/bug gặp khi viết công cụ thật. C�
 2. Phân rã trong `≔`; `?`; stderr; `argc`.
 3. M7 chưa chứng minh `b[i]` cho `b` cục bộ mượn từ lời gọi (check runtime giữ — chậm, không sai).
 4. Mọi người duyệt TCB mới đang `CHỜ GIANG` (docs/TCB_INTRINSICS.md).
+
+## Công cụ 3: sha256 (`examples/sha256`, Grit ~190 dòng, dự án Rig) — 2026-10-13
+### Khoảng trống THEO THỨ TỰ CHẶN, ghi trước khi code (đã thử bằng chương trình thật `p1/p2/p3`)
+| # | khoảng trống | thử | chặn? | xử lý |
+|---|---|---|---|---|
+| S1 | `band/bor/bxor/bnot/rotr/rotl` KHÔNG tồn tại (Q9 nói là hàm lib/core nhưng prelude chỉ có `shl/shr`) | `band(1u32,3u32)` ⇒ `E0201 tên chưa được định nghĩa` | CÓ | thêm 6 hàm u32 vào prelude (một nguồn) |
+| S2 | `shl/shr` có trong prelude nhưng KHÔNG hạ được ở codegen | `shl(1u32,3u32)` check XANH, backend llvm `chưa hỗ trợ: hàm không có thân MIR: $prelude::shl` | CÓ | intrinsic `Bit(op)` ở codegen (+ thông dịch `lang_ops`); `n ≥ 32` ⇒ abort `precondition` |
+| S3 | mảng cố định, `[0u32; 64]`, `u32/u64`, `+% *%` | `p3.gt` | KHÔNG (đã hạ được, đúng) | — |
+| S4 | in byte (hex) ra stdout | `write_str` chỉ nhận `&str` | nhẹ | `Cap<Out>::write_bytes(&[u8])` (cùng hàm runtime `gritrt_write_str`) |
+| S5 | u64: không có phép dịch u64 | thiết kế | KHÔNG (độ dài bit tách bằng `/ 256` và `% 256`) | ghi: chưa có họ phép bit u64/u8 |
+### Kết quả đo thật
+- **Đúng:** 5 test `crates/rig/tests/dogfood_sha256.rs` ĐẠT: 5 vector NIST viết cứng (rỗng, `abc`, 448 bit, 896 bit, 1 triệu `a`); 20 độ dài biên đệm (0,1,2,54,55,56,57,63,64,65,119,120,121,127,128,129,191,192,255,256); **200 tệp ngẫu nhiên**; 1 MiB và 32 MiB — tất cả khớp TỪNG KÝ TỰ với `hashlib` (Python/OpenSSL, độc lập).
+- **Tốc độ (LLVM -O0, mọi check giữ):** 32 MiB trong 1.46 s ≈ **21.9 MiB/s** (1 MiB: 10.9 MiB/s gồm cả khởi động).
+- **Check còn lại (báo theo lệnh 2b):** chế độ mặc định `--checks=all`: **106 check giữ** (index 42, overflow 34, `pre` 16, slice_range 7, cast_lossy 4, div_zero 2, rem_zero 1), 66 trong số đó "sẽ bị xoá nếu `proven`"; chế độ `--checks=proven`: **24 còn lại** (index 18, overflow 5, cast_lossy 1), 66 xoá. **MỌI tiền điều kiện dịch/xoay (`n < 32`) được M7 CHỨNG MINH — kể cả lượng dịch KHÔNG hằng `((7 - j) * 4) as u32` ở `report` — nên ở `proven` không còn check `precondition` nào**; ở `all` 16 check `pre` vẫn được giữ theo chính sách. Codegen còn tự kiểm `n < 32` (phòng thủ) ở mỗi phép dịch/xoay: với lượng dịch hằng IRBuilder gấp hằng thành `br i1 true`, KHÔNG thêm lệnh so sánh lúc chạy.
+- **So sánh codegen với phép bit** (`llvm_diff_bits.rs`, 4 lô × 25 biểu thức u32 ngẫu nhiên có band/bor/bxor/bnot/shl/shr/rotr/rotl với lượng dịch hằng/che mặt nạ/thô + `+% -% *%` + `+ - *`): **ba nguồn khớp (thông dịch, exe LLVM, đánh giá Rust của cây biểu thức) trên 352 phép chạy, 0 bất đồng**; abort khớp: overflow 116, precondition 51; 185 chạy thường; 12/100 chương trình bị cổng ĐỎ E0901 (hằng chắc chắn tràn) ⇒ bỏ. ĐỘ NHẠY kiểm bằng cách đổi `rotr`↔`rotl` ở codegen ⇒ lô ĐỎ (86 s), đã hoàn nguyên.
+### Bug / khoảng trống gặp khi viết
+| # | triệu chứng | gốc | đã sửa? |
+|---|---|---|---|
+| 18 | `E0702` trên vòng `⟳ j < rem ↓ rem - j` TRONG hàm có >24 biến nguyên (`digest` ban đầu): M7 giảm độ chính xác (N0605) nên mất quan hệ `j < rem` | gritc (bộ giải M7, ZONE_MAX_VARS = 24) | không đổi bộ giải; tách `copy_tail`/`put_length` thành hàm riêng ít biến (cách làm có tài liệu); KNOWN_LIMITATIONS |
+| 19 | không có phép bit u64/u8, `rotr/rotl` chỉ u32; tên theo kiểu (`bandN`) sẽ cần nếu thêm | lib | chưa (không chặn) |
+| 20 | `bnot`, `shl`... là HÀM nên biểu thức bit dài khó đọc (`bxor(bxor(rotr(..),..),..)`) | spec (Q9 có chủ đích) | không |

@@ -255,3 +255,5 @@ Lập luận từng nhóm (KHÔNG phải chứng minh):
 - **Phân rã tuple trong `≔` (`(a, b) ≔ f()`) — HOÃN (2026-10-13):** dùng `t.0`, `t.1`. Cần cú pháp mới ⇒ cần Giang duyệt; xét lại khi chương trình thật cho thấy vướng (đã gặp ở examples/json: dùng `s.0/s.1`, đọc được nhưng dài).
 - **Tên biến thể người dùng che `Ok`/`Err`/`Some`/`None` của prelude (giữ, Q17/D7):** lỗi hiện ra là E0301 (pattern kiểu `R` ≠ `Result`), KHÔNG phải E0205; nay kèm gợi ý sửa `Result::Ok` (MaybeIncorrect) và chỉ rõ enum bị che.
 - **`core::fuel_left` + mẫu nhiên liệu:** chương trình tự lo nhiên liệu đủ (≥ số vòng tối đa); M8 chứng minh dừng nhờ `fuel`; cạn ⇒ abort `fuel_exhausted` ở runtime (check còn lại ghi N0905).
+- **M7: hàm có > `ZONE_MAX_VARS` = 24 biến nguyên mất quan hệ giữa biến (N0605) ⇒ vòng `⟳ j < rem ↓ rem - j` có thể bị E0702 dù đúng** (gặp ở sha256 `digest`, 2026-10-13). Cách tránh: tách hàm. Không đổi bộ giải.
+- **Phép bit chỉ có cho `u32`** (`band bor bxor bnot shl shr rotr rotl`); chưa có u8/u64. Mọi hàm tương ứng là TCB (docs/TCB_INTRINSICS.md).
