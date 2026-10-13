@@ -57,9 +57,14 @@ fn hashes(text: &str) -> BTreeMap<String, String> {
     let mut m = BTreeMap::new();
     let mut cur: Option<String> = None;
     for l in text.lines() {
-        if let Some(n) = l.strip_prefix("name = \"").and_then(|r| r.strip_suffix('"')) {
+        if let Some(n) = l
+            .strip_prefix("name = \"")
+            .and_then(|r| r.strip_suffix('"'))
+        {
             cur = Some(n.to_string());
-        } else if let Some(h) = l.strip_prefix("hash = \"").and_then(|r| r.strip_suffix('"'))
+        } else if let Some(h) = l
+            .strip_prefix("hash = \"")
+            .and_then(|r| r.strip_suffix('"'))
             && let Some(n) = cur.take()
         {
             m.insert(n, h.to_string());

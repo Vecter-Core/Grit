@@ -105,13 +105,17 @@ pub fn parse_manifest(
         )));
     }
     if !valid_version(&version) {
-        return Err(at(&format!("phiên bản `{version}` phải dạng MAJOR.MINOR.PATCH")));
+        return Err(at(&format!(
+            "phiên bản `{version}` phải dạng MAJOR.MINOR.PATCH"
+        )));
     }
     let mut deps = Vec::new();
     if let Some(ds) = doc.get("dependencies") {
         for (k, (v, line)) in ds {
             if !valid_pkg_name(k) {
-                return Err(at(&format!("dòng {line}: tên phụ thuộc `{k}` không hợp lệ")));
+                return Err(at(&format!(
+                    "dòng {line}: tên phụ thuộc `{k}` không hợp lệ"
+                )));
             }
             let Value::Table(t) = v else {
                 return Err(at(&format!(
@@ -172,7 +176,12 @@ struct Loader {
 }
 
 impl Loader {
-    fn load(&mut self, dir: &Path, expect_name: Option<&str>, is_root: bool) -> Result<usize, String> {
+    fn load(
+        &mut self,
+        dir: &Path,
+        expect_name: Option<&str>,
+        is_root: bool,
+    ) -> Result<usize, String> {
         let canon = dir
             .canonicalize()
             .map_err(|e| format!("không tìm thấy gói tại {}: {e}", dir.display()))?;

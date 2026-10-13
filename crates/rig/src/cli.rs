@@ -1,5 +1,9 @@
-//! Dòng lệnh `rig`: new | check | build | run | test | add | lock | fmt | clean. Mã thoát (cùng bảng phân vùng với gritc):
-//! 0 qua | 1 ĐỎ (hoặc có test hỏng) | 2 ICE | 3 lỗi dùng/IO/môi trường/chưa hỗ trợ | `run`: 70 abort, 100+s trạng thái chương trình.
+//! Dòng lệnh `rig`: new | check | build | run | test | add | lock | fmt | clean.
+//!
+//! MÃ THOÁT (D17, ADR-030 §4): mã của GRITC được CHUYỂN NGUYÊN khi lỗi đến từ gritc (0 qua | 1 ĐỎ | 2 ICE | 3 lỗi dùng/IO/chưa hỗ trợ của gritc |
+//! `run`: 70 abort, 100+s). Lỗi của CHÍNH RIG dùng vùng riêng 10–13 để không lẫn nghĩa với mã 3 của gritc:
+//! 10 `rig.lock` thiếu (với `--locked`) hoặc lệch | 11 dự án/manifest sai (rig.toml, vòng, trùng tên/module, thiếu main) | 12 dùng sai lệnh | 13 IO/môi trường của rig.
+//! `rig test` có test hỏng ⇒ 1.
 use crate::lock;
 use crate::project::{self, Project};
 use gt_driver::pipeline::{CheckResult, DEFAULT_CHECKS, Options};
@@ -8,16 +12,27 @@ use gt_driver::verdict::{RunEnd, check_exit_code, run_exit_code};
 use gt_resolve::SourceInput;
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "dùng: rig <lệnh> …\n  rig new <tên>            tạo gói mới (rig.toml, src/main.gt, rig.lock)\n  rig check [--deny-yellow]  khoá + gritc check toàn bộ đồ thị gói\n  rig build [--deny-yellow]  check rồi dựng target/<tên>.exe (hai lần dựng ⇒ nhị phân giống hệt)\n  rig run                  build rồi chạy\n  rig test                 mỗi tests/*.gt là một chương trình có `main`; qua = thoát 0\n  rig add <đường-dẫn>      thêm phụ thuộc cục bộ vào rig.toml rồi khoá lại\n  rig lock                 ghi rig.lock (băm nội dung từng gói)\n  rig fmt [--check]        định dạng src/ và tests/ của gói gốc\n  rig clean                xoá target/\nMã thoát: 0 qua | 1 ĐỎ/test hỏng | 2 ICE | 3 lỗi dùng/IO/môi trường | run: 70 abort, 100+s trạng thái chương trình\n";
+const USAGE: &str = "dùng: rig <lệnh> …\n  rig new <tên>            tạo gói mới (rig.toml, src/main.gt, rig.lock)\n  rig check [[--locked] [--deny-yellow]  khoá + gritc check toàn bộ đồ thị gói\n  rig build [--locked] [--deny-yellow]  check rồi dựng target/<tên>.exe (hai lần dựng ⇒ nhị phân giống hệt)\n  rig run                  build rồi chạy\n  rig test                 mỗi tests/*.gt là một chương trình có `main`; qua = thoát 0\n  rig add <đường-dẫn>      thêm phụ thuộc cục bộ vào rig.toml rồi khoá lại\n  rig lock                 ghi rig.lock (băm nội dung từng gói)\n  rig fmt [--check]        định dạng src/ và tests/ của gói gốc\n  rig clean                xoá target/\nMã thoát: mã gritc chuyển nguyên (0 qua | 1 ĐỎ/test hỏng | 2 ICE | 3 lỗi của gritc | run: 70 abort, 100+s) | mã riêng của rig: 10 rig.lock thiếu/lệch | 11 dự án/manifest sai | 12 dùng sai | 13 IO/môi trường\n";
+
+/// Mã thoát của lỗi do CHÍNH rig (không lẫn với mã gritc 0–3/70/71/100+).
+pub const E_LOCK: i32 = 10;
+pub const E_PROJECT: i32 = 11;
+pub const E_USAGE: i32 = 12;
+pub const E_IO: i32 = 13;
 
 fn usage_err(msg: &str) -> i32 {
     eprintln!("rig: {msg}\n{USAGE}");
-    3
+    E_USAGE
 }
 
-fn fail(msg: &str) -> i32 {
+fn fail_with(code: i32, msg: &str) -> i32 {
     eprintln!("rig: {msg}");
-    3
+    code
+}
+
+/// lỗi IO/môi trường của rig
+fn fail(msg: &str) -> i32 {
+    fail_with(E_IO, msg)
 }
 
 struct Args {
@@ -25,6 +40,7 @@ struct Args {
     pos: Vec<String>,
     deny_yellow: bool,
     check: bool,
+    locked: bool,
 }
 
 fn parse(args: &[String]) -> Result<Args, String> {
@@ -35,11 +51,13 @@ fn parse(args: &[String]) -> Result<Args, String> {
         pos: Vec::new(),
         deny_yellow: false,
         check: false,
+        locked: false,
     };
     for s in it {
         match s.as_str() {
             "--deny-yellow" => a.deny_yellow = true,
             "--check" => a.check = true,
+            "--locked" => a.locked = true,
             x if x.starts_with('-') => return Err(format!("đối số lạ `{x}`")),
             x => a.pos.push(x.to_string()),
         }
@@ -48,15 +66,24 @@ fn parse(args: &[String]) -> Result<Args, String> {
 }
 
 /// Đọc dự án + ĐỐI CHIẾU rig.lock (chưa có ⇒ tạo và báo; lệch ⇒ từ chối, mã 3).
-fn load_locked(dir: &Path) -> Result<Project, i32> {
-    let p = project::load(dir).map_err(|e| fail(&e))?;
+fn load_locked(dir: &Path, locked: bool) -> Result<Project, i32> {
+    let p = project::load(dir).map_err(|e| fail_with(E_PROJECT, &e))?;
     let lock_path = dir.join("rig.lock");
     match std::fs::read_to_string(&lock_path) {
-        Ok(existing) => lock::verify(&p, &existing).map_err(|e| fail(&e))?,
+        Ok(existing) => lock::verify(&p, &existing).map_err(|e| fail_with(E_LOCK, &e))?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound && locked => {
+            return Err(fail_with(
+                E_LOCK,
+                "--locked: không có rig.lock (chạy `rig lock` trước)",
+            ));
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             std::fs::write(&lock_path, lock::render(&p))
                 .map_err(|e| fail(&format!("không ghi được rig.lock: {e}")))?;
-            eprintln!("rig: chưa có rig.lock — đã tạo (băm nội dung {} gói)", p.pkgs.len());
+            eprintln!(
+                "rig: chưa có rig.lock — đã tạo (băm nội dung {} gói)",
+                p.pkgs.len()
+            );
         }
         Err(e) => return Err(fail(&format!("không đọc được rig.lock: {e}"))),
     }
@@ -80,7 +107,11 @@ fn gate(sources: &[(String, String)], deny_yellow: bool) -> Result<CheckResult, 
             fault: None,
         },
     )
-    .map_err(|e| fail(&format!("đầu vào không hợp lệ: {e}")))?;
+    .map_err(|e| {
+        // lỗi đầu vào do gritc từ chối (vd tên module không hợp lệ): chuyển mã 3 của gritc
+        eprintln!("rig: gritc: đầu vào không hợp lệ: {e}");
+        3
+    })?;
     eprint!("{}", human_report(&res, false));
     if !res.verdict.allows_output() {
         return Err(check_exit_code(res.verdict));
@@ -95,7 +126,7 @@ fn compile(res: &mut CheckResult, out: &Path) -> Result<(), i32> {
         return Err(2);
     };
     if let Err(e) = gt_driver::runner::find_main(&art.obl.bodies) {
-        return Err(fail(&e));
+        return Err(fail_with(E_PROJECT, &e));
     }
     let att = gt_driver::pipeline::attestation(res, &format!("{:#?}", art.obl.bodies));
     if let Some(parent) = out.parent() {
@@ -119,7 +150,9 @@ fn compile(res: &mut CheckResult, out: &Path) -> Result<(), i32> {
 
 #[cfg(not(feature = "llvm"))]
 fn compile(_res: &mut CheckResult, _out: &Path) -> Result<(), i32> {
-    Err(fail("bản rig này dựng không có backend llvm (--no-default-features)"))
+    Err(fail(
+        "bản rig này dựng không có backend llvm (--no-default-features)",
+    ))
 }
 
 fn exe_path(dir: &Path, name: &str) -> PathBuf {
@@ -135,7 +168,7 @@ fn cmd_check(a: &Args) -> i32 {
         Ok(d) => d,
         Err(c) => return c,
     };
-    let p = match load_locked(&dir) {
+    let p = match load_locked(&dir, a.locked) {
         Ok(p) => p,
         Err(c) => return c,
     };
@@ -146,7 +179,7 @@ fn cmd_check(a: &Args) -> i32 {
 }
 
 fn build_root(a: &Args, dir: &Path) -> Result<(Project, PathBuf), i32> {
-    let p = load_locked(dir)?;
+    let p = load_locked(dir, a.locked)?;
     let mut res = gate(&p.sources(false), a.deny_yellow)?;
     let out = exe_path(dir, &p.root().name);
     compile(&mut res, &out)?;
@@ -180,7 +213,9 @@ fn cmd_run(a: &Args) -> i32 {
         Ok(st) => match st.code() {
             Some(0) => 0,
             Some(70) => run_exit_code(&RunEnd::Aborted(String::new())),
-            Some(c) => run_exit_code(&RunEnd::ProgramExit(u8::try_from(c.clamp(1, 255)).unwrap_or(255))),
+            Some(c) => run_exit_code(&RunEnd::ProgramExit(
+                u8::try_from(c.clamp(1, 255)).unwrap_or(255),
+            )),
             None => 2,
         },
         Err(e) => fail(&format!("không chạy được {}: {e}", out.display())),
@@ -193,7 +228,7 @@ fn cmd_test(a: &Args) -> i32 {
         Ok(d) => d,
         Err(c) => return c,
     };
-    let p = match load_locked(&dir) {
+    let p = match load_locked(&dir, a.locked) {
         Ok(p) => p,
         Err(c) => return c,
     };
@@ -220,7 +255,10 @@ fn cmd_test(a: &Args) -> i32 {
         let stem = name.trim_end_matches(".gt");
         let mut srcs = p.sources(true);
         if srcs.iter().any(|(n, _)| n == name) {
-            return fail(&format!("tests/{name} trùng tên module với một tệp src/"));
+            return fail_with(
+                E_PROJECT,
+                &format!("tests/{name} trùng tên module với một tệp src/"),
+            );
         }
         srcs.push((name.clone(), text.clone()));
         srcs.sort();
@@ -243,11 +281,17 @@ fn cmd_test(a: &Args) -> i32 {
         };
         let mut res = match res {
             Ok(r) => r,
-            Err(e) => return fail(&format!("tests/{name}: đầu vào không hợp lệ: {e}")),
+            Err(e) => {
+                eprintln!("rig: gritc: tests/{name}: đầu vào không hợp lệ: {e}");
+                return 3;
+            }
         };
         if !res.verdict.allows_output() {
             eprint!("{}", human_report(&res, false));
-            println!("test {stem} ... FAILED (cổng gritc: {})", res.verdict.name());
+            println!(
+                "test {stem} ... FAILED (cổng gritc: {})",
+                res.verdict.name()
+            );
             ice |= check_exit_code(res.verdict) == 2;
             failed += 1;
             continue;
@@ -278,11 +322,7 @@ fn cmd_test(a: &Args) -> i32 {
         }
     }
     println!("kết quả: {pass} qua, {failed} hỏng");
-    if ice {
-        2
-    } else {
-        i32::from(failed > 0)
-    }
+    if ice { 2 } else { i32::from(failed > 0) }
 }
 
 #[cfg(not(feature = "llvm"))]
@@ -297,7 +337,7 @@ fn cmd_lock() -> i32 {
     };
     let p = match project::load(&dir) {
         Ok(p) => p,
-        Err(e) => return fail(&e),
+        Err(e) => return fail_with(E_PROJECT, &e),
     };
     match std::fs::write(dir.join("rig.lock"), lock::render(&p)) {
         Ok(()) => {
@@ -313,9 +353,10 @@ fn cmd_new(a: &Args) -> i32 {
         return usage_err("`rig new` cần đúng một tên gói");
     };
     if !project::valid_name(name) {
-        return fail(&format!(
-            "tên gói `{name}` không hợp lệ (chữ thường/số/`_`, bắt đầu bằng chữ cái)"
-        ));
+        return fail_with(
+            E_PROJECT,
+            &format!("tên gói `{name}` không hợp lệ (chữ thường/số/`_`, bắt đầu bằng chữ cái)"),
+        );
     }
     let dir = match cwd() {
         Ok(d) => d.join(name),
@@ -343,7 +384,7 @@ fn cmd_new(a: &Args) -> i32 {
     }
     let p = match project::load(&dir) {
         Ok(p) => p,
-        Err(e) => return fail(&e),
+        Err(e) => return fail_with(E_PROJECT, &e),
     };
     if let Err(e) = std::fs::write(dir.join("rig.lock"), lock::render(&p)) {
         return fail(&format!("không ghi được rig.lock: {e}"));
@@ -362,7 +403,7 @@ fn cmd_add(a: &Args) -> i32 {
     };
     let dep_name = match project::parse_manifest(&dir.join(path)) {
         Ok((n, ..)) => n,
-        Err(e) => return fail(&e),
+        Err(e) => return fail_with(E_PROJECT, &e),
     };
     let manifest = dir.join("rig.toml");
     let original = match std::fs::read_to_string(&manifest) {
@@ -371,10 +412,10 @@ fn cmd_add(a: &Args) -> i32 {
     };
     let (_, _, deps, _) = match project::parse_manifest(&dir) {
         Ok(x) => x,
-        Err(e) => return fail(&e),
+        Err(e) => return fail_with(E_PROJECT, &e),
     };
     if deps.iter().any(|(n, _)| *n == dep_name) {
-        return fail(&format!("đã có phụ thuộc `{dep_name}`"));
+        return fail_with(E_PROJECT, &format!("đã có phụ thuộc `{dep_name}`"));
     }
     let entry = format!(
         "{dep_name} = {{ path = \"{}\" }}\n",
@@ -414,7 +455,10 @@ fn cmd_add(a: &Args) -> i32 {
         Err(e) => {
             // hoàn nguyên: không để rig.toml hỏng
             let _ = std::fs::write(&manifest, original);
-            fail(&format!("không thêm được `{dep_name}`: {e} (đã hoàn nguyên rig.toml)"))
+            fail_with(
+                E_PROJECT,
+                &format!("không thêm được `{dep_name}`: {e} (đã hoàn nguyên rig.toml)"),
+            )
         }
     }
 }
@@ -425,7 +469,7 @@ fn cmd_fmt(a: &Args) -> i32 {
         Err(c) => return c,
     };
     if let Err(e) = project::load(&dir) {
-        return fail(&e);
+        return fail_with(E_PROJECT, &e);
     }
     let mut code = 0;
     for sub in ["src", "tests"] {
@@ -462,7 +506,9 @@ fn cmd_fmt(a: &Args) -> i32 {
                             let _ = std::fs::remove_file(&tmp);
                             return fail(&format!("không ghi được {}: {e}", f.display()));
                         }
-                        eprintln!("rig fmt: đã định dạng {sub}/{name} (chạy `rig lock` nếu là gói đã khoá)");
+                        eprintln!(
+                            "rig fmt: đã định dạng {sub}/{name} (chạy `rig lock` nếu là gói đã khoá)"
+                        );
                     }
                 }
                 Err(e) => {
@@ -484,7 +530,10 @@ fn cmd_clean() -> i32 {
         Err(c) => return c,
     };
     if !dir.join("rig.toml").is_file() {
-        return fail("không có rig.toml ở thư mục hiện tại (không xoá gì)");
+        return fail_with(
+            E_PROJECT,
+            "không có rig.toml ở thư mục hiện tại (không xoá gì)",
+        );
     }
     let t = dir.join("target");
     if t.exists() {
