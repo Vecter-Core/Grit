@@ -1,0 +1,92 @@
+// sortlines: sắp xếp các dòng của một tệp theo thứ tự BYTE và in ra (dogfood công cụ thứ tư, docs/DOGFOOD.md). Dùng: sortlines <đường-dẫn>
+// Quy ước (README.md; bản tham chiếu Rust trong test dùng y hệt): chỉ tách theo byte `\n`; `\r` là một byte của dòng; mỗi dòng ra được in
+// kèm `\n` (kể cả dòng cuối của tệp không có `\n` cuối); tệp rỗng ra rỗng; so sánh từ điển theo byte; sắp xếp trộn ỔN ĐỊNH (msort.gt).
+// Bộ nhớ: hai `Vec<Line>` (danh sách dòng và bộ đệm trộn) trên HAI Arena, mỗi Vec `reserve(số dòng)` MỘT lần ⇒ mỗi Arena cần đúng một khối
+// `số_dòng · 16 + 8` byte (số dòng ≤ độ_dài_tệp + 1; công thức: ADR-034 phụ lục). Phép nhân kích thước có kiểm tràn (abort `overflow`).
+// Lỗi mở tệp hoặc thiếu đối số in ra stderr, thoát mã 2 (như wc).
+
+▢ Line<'a> { b: &'a [u8] }
+⊐ <'a> Copy for Line<'a> { }
+⊐ <'a> Ord for Line<'a> {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { msort::cmp_bytes(self.b, o.b) }
+}
+
+// số dòng: số byte `\n` cộng một nếu byte cuối (khi tệp không rỗng) không phải `\n`
+ƒ count_lines(b: &[u8]) → usize ! ∅ {
+  μn ≔ 0usize;
+  μi ≔ 0usize;
+  ⟳ i < b.len() ↓ b.len() - i {
+    ⎇ b[i] == 10u8 { n ← n + 1; } ⇝ { }
+    i ← i + 1;
+  }
+  ⎇ b.len() > 0usize {
+    ⎇ b[b.len() - 1] == 10u8 { n } ⇝ { n + 1 }
+  } ⇝ { n }
+}
+
+ƒ fail(err: &Cap<ErrOut>, path: &str, why: &str) → ! ! {io, div} {
+  err.write_str("sortlines: ");
+  err.write_str(path);
+  err.write_str(": ");
+  err.write_str(why);
+  err.write_str("\n");
+  core::exit(2u32)
+}
+
+ƒ usage(err: &Cap<ErrOut>) → ! ! {io, div} {
+  err.write_str("usage: sortlines <file>\n");
+  core::exit(2u32)
+}
+
+ƒ sort_and_print(b: &[u8], alloc: &Cap<Alloc>, out: &Cap<Out>, err: &Cap<ErrOut>, path: &str) ! {io, div, mem} {
+  nl ≔ count_lines(b);
+  // kích thước một Vec = số dòng · 16 byte: nhân CÓ KIỂM TRÀN (abort `overflow`, không quấn vòng); từ chối trước khi cấp phát nếu > 64 GiB
+  bytes ≔ (nl as u64) * 16u64;
+  ⎇ bytes > 68719476736u64 { fail(err, path, "too many lines") } ⇝ { }
+  μa1 ≔ alloc.arena();
+  μa2 ≔ alloc.arena();
+  μx ≔ Vec::new(&!a1);
+  μy ≔ Vec::new(&!a2);
+  x.reserve(nl);
+  y.reserve(nl);
+  μstart ≔ 0usize;
+  μi ≔ 0usize;
+  ⟳ i < b.len() ↓ b.len() - i {
+    ⎇ b[i] == 10u8 {
+      x.push(Line { b: &b[start..i] });
+      y.push(Line { b: &b[0..0] });
+      start ← i + 1;
+    } ⇝ { }
+    i ← i + 1;
+  }
+  ⎇ start < b.len() {
+    x.push(Line { b: &b[start..b.len()] });
+    y.push(Line { b: &b[0..0] });
+  } ⇝ { }
+  msort::sort(x.as_mut_slice(), y.as_mut_slice());
+  s ≔ x.as_slice();
+  μk ≔ 0usize;
+  ⟳ k < s.len() ↓ s.len() - k {
+    out.write_bytes(s[k].b);
+    out.write_str("\n");
+    k ← k + 1;
+  }
+}
+
+ƒ main() ! {io, div, mem} {
+  env ≔ root_env();
+  fs ≔ root_fs();
+  out ≔ root_out();
+  err ≔ root_err();
+  alloc ≔ root_alloc();
+  ⎇ env.arg_count() < 2usize { usage(&err) } ⇝ {
+    path ≔ env.arg(1usize);
+    ⌥ fs.open(path) {
+      Ok(f) ↦ { sort_and_print(f.bytes(), &alloc, &out, &err, path); },
+      Err(IoError::NotFound) ↦ fail(&err, path, "no such file"),
+      Err(IoError::Denied) ↦ fail(&err, path, "permission denied"),
+      Err(IoError::Invalid) ↦ fail(&err, path, "invalid path"),
+      Err(IoError::Other) ↦ fail(&err, path, "i/o error"),
+    }
+  }
+}

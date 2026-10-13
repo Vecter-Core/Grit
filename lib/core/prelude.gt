@@ -129,6 +129,7 @@
 ⊐ <'a, T> Vec<'a, T> {
   ƒ new(a: &!'a Arena) → Vec<'a, T> ! {mem} { }
   ƒ push(&!self, x: T) ! {mem} { }
+  ƒ reserve(&!self, n: usize) ! {mem} { }
   ƒ len(&self) → usize ! ∅ { }
   ƒ as_slice(&self) → &[T] ! ∅ { }
   ƒ as_mut_slice(&!self) → &![T] ! ∅ { }

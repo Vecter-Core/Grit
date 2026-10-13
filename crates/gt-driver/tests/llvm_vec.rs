@@ -269,3 +269,49 @@ fn checks_report_lists_arena_exhaustion_sites() {
         );
     }
 }
+
+/// `reserve(n)`: một lần cấp khối đủ `n` phần tử (không gấp đôi); nội dung cũ được giữ; `n ≤ cap` không làm gì; hai backend khớp.
+#[test]
+fn reserve_preallocates_and_keeps_contents() {
+    let src = "ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&!ar);
+  v.push(7u64);
+  v.push(8u64);
+  v.reserve(1000usize);
+  v.reserve(10usize);
+  μi ≔ 0u64;
+  ⟳ i < 1000u64 ↓ 1000u64 - i { v.push(i); i ← i + 1u64; }
+  s ≔ v.as_slice();
+  s[0] *% 1000000u64 +% s[1] *% 10000u64 +% s[2] +% s[1001] +% (v.len() as u64)
+}
+";
+    // 7·10⁶ + 8·10⁴ + 0 + 999 + 1002 = 7 082 001
+    both(src, "7082001");
+}
+
+/// công thức cỡ của sortlines: `reserve(n)` cho Vec cần ĐÚNG một khối `n·16 + align` ⇒ với giới hạn = khối đó chạy được, ít hơn 1 byte
+/// thì abort `arena_exhausted` (kiểm chặt: công thức không dư thừa, không thiếu).
+#[test]
+fn reserve_arena_demand_is_exactly_one_block() {
+    let src = "▢ L<'a> { b: &'a [u8], n: u64 }
+ƒ main() → u64 ! {mem} {
+  e ≔ [0u8];
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&!ar);
+  v.reserve(100000usize);
+  μi ≔ 0u64;
+  ⟳ i < 100000u64 ↓ 100000u64 - i { v.push(L { b: &e[0..0], n: i }); i ← i + 1u64; }
+  v.len() as u64
+}
+";
+    // khối = 100000·24 (L = {&[u8], u64} = 24 byte) + 8 (căn lề 8) = 2_400_008 > chunk 1 MiB
+    let ok = run_env(src, "llvm", &[("GRITRT_ARENA_LIMIT", "2400008")]);
+    assert_eq!((ok.exit, ok.value.as_str()), (0, "100000"), "{ok:?}");
+    let tight = run_env(src, "llvm", &[("GRITRT_ARENA_LIMIT", "2400007")]);
+    assert_eq!(
+        (tight.exit, tight.kind.as_str()),
+        (70, "arena_exhausted"),
+        "{tight:?}"
+    );
+}

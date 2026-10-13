@@ -582,3 +582,12 @@ Rút kinh nghiệm: prelude có BA bản (lib/core, fixture gt-types, fixture gt
 - **1d:** thêm `wide_elements_24_and_32_bytes_match_stable_sort_at_scale` (`llvm_sort.rs`): 4 bố cục × 50 000 phần tử trên exe, khoá trong 0..200 (rất nhiều trùng), khớp `sort_by_key` ổn định ở cả 4 (5,8 s).
 - **Gặp khi làm:** FB-3 — `o: &Line<'a>` trong `⊐ <'a> Ord for Line<'a>` bị E0311 oan (SAI TÍCH CỰC; né bằng `&Self`); hồ sơ ở FIELD_BUGS, chưa sửa.
 - **Chưa kiểm:** phần tử có enum/Option/mảng; kích thước thật `size_of` (không có trong Grit — suy từ bố cục LLVM tự nhiên).
+
+## Bước (v) lệnh ADR-032 — công cụ thứ tư `sortlines` (2026-10-14)
+- **Công cụ:** `examples/sortlines` (Grit: `main.gt` + `msort.gt`, dự án Rig; README ghi quy ước). Thêm `Vec::reserve(n)` (intrinsic TCB §B3, một lần cấp khối, cùng đường kiểm tràn/hết Arena với `push`) để có công thức cỡ Arena: mỗi Arena đúng một khối `max(1 MiB, số_dòng·16 + 8)`.
+- **Đúng (7 test `rig/tests/dogfood_sortlines.rs` ĐẠT, khớp TỪNG BYTE với tham chiếu Rust `sort_by` theo byte):** 15 ca nhỏ (rỗng, `\n`, một dòng, dòng rỗng xen kẽ, CRLF, không `\n` cuối, UTF-8/byte cao/NUL, trùng, tiền tố, `\r` đơn); một dòng dài 1 MiB ×3; 1 MiB và 32 MiB văn bản ngẫu nhiên; 10⁶ dòng ngắn; 4 MiB toàn dòng rỗng; đường lỗi (mã 2, stderr); công thức Arena KIỂM CHẶT (giới hạn = khối ⇒ chạy đúng; ít hơn 1 byte ⇒ abort có loại `arena_exhausted`, mã 70). Thêm 2 test `llvm_vec`: `reserve` giữ nội dung/hai backend khớp; nhu cầu Arena đúng một khối.
+- **Ổn định:** KHÔNG quan sát được ở sortlines (so toàn dòng) ⇒ không tuyên bố; đã kiểm ở (iii).
+- **Hiệu năng (-O0, mọi check giữ, ống pipe; không phải cổng):** 1 MiB 0,31 s (×7,2 so Rust `sort_by`); 32 MiB 7,24 s (×3,6; đỉnh 86 MiB); 10⁶ dòng ngắn 3,63 s (×6,8; 39 MiB); 4 MiB toàn dòng rỗng 7,20 s (×27; 136 MiB). Chi tiết và phương sai chưa đo ở DOGFOOD.
+- **Khoảng trống/bug:** DOGFOOD T1–T8; FB-3 (E0311 oan, né `&Self`); ghi stdout tới tệp chậm (flush mỗi lời gọi) — KNOWN_LIMITATIONS.
+- **Chưa kiểm:** tràn thật của `nl·16`/`n·size`; 32 MiB toàn dòng rỗng (cố ý KHÔNG chạy, công thức bộ nhớ ở KNOWN_LIMITATIONS); đo lặp nhiều lần; bộ nhớ Rust chỉ ước tính.
+- Test các crate liên quan (gt-types, gt-resolve, gt-mir, gt-borrowck, gt-oblig, gt-guard, gt-term, gt-effects, gt-secrets, gt-conc, gt-driver, rig) không-fail-fast: 0 đỏ. Clippy workspace sạch.

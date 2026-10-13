@@ -78,3 +78,28 @@ Mỗi dòng = một khoảng trống/bug gặp khi viết công cụ thật. C�
 | 18 | `E0702` trên vòng `⟳ j < rem ↓ rem - j` TRONG hàm có >24 biến nguyên (`digest` ban đầu): M7 giảm độ chính xác (N0605) nên mất quan hệ `j < rem` | gritc (bộ giải M7, ZONE_MAX_VARS = 24) | không đổi bộ giải; tách `copy_tail`/`put_length` thành hàm riêng ít biến (cách làm có tài liệu); KNOWN_LIMITATIONS |
 | 19 | không có phép bit u64/u8, `rotr/rotl` chỉ u32; tên theo kiểu (`bandN`) sẽ cần nếu thêm | lib | chưa (không chặn) |
 | 20 | `bnot`, `shl`... là HÀM nên biểu thức bit dài khó đọc (`bxor(bxor(rotr(..),..),..)`) | spec (Q9 có chủ đích) | không |
+
+## Công cụ 4: sortlines (`examples/sortlines`, Grit: main.gt ~100 dòng + msort.gt ~90 dòng, dự án Rig) — 2026-10-14
+### Khoảng trống THEO THỨ TỰ CHẶN (ghi khi làm; hầu hết đã đóng ở các bước ADR-032 (i)–(iii))
+| # | khoảng trống | chặn? | xử lý |
+|---|---|---|---|
+| T1 | gọi phương thức qua ràng buộc generic `x.m()` ⇒ codegen thoát 3 | CÓ | bước (i): `select_impl` một nguồn, đơn hình hoá, symbol ASCII, Guard luật instance |
+| T2 | không có `Vec`/mảng tăng trưởng | CÓ | bước (ii): `Vec<'a,T>` trên Arena + E0318 + `arena_exhausted` |
+| T3 | không có `Ord`/`Ordering`/sắp xếp | CÓ | bước (iii): prelude `Ordering`/`Ord`, `msort.gt` |
+| T4 | `Vec::push` gấp đôi ⇒ không có công thức cỡ Arena | nhẹ | thêm `Vec::reserve` (TCB §B3), công thức ADR-034 phụ lục |
+| T5 | `⊐ <'a> Ord for Line<'a>` với `o: &Line<'a>` ⇒ E0311 oan (FB-3) | nhẹ | né bằng `&Self`; chưa sửa gốc |
+| T6 | M7 không chứng minh được vòng bước tiến biến/nhân đôi (`lo += 2w`, `width *= 2`) | nhẹ | mẫu nhiên liệu (KNOWN_LIMITATIONS) |
+| T7 | `Vec` rỗng không suy ra kiểu phần tử (E0301) | nhẹ | luôn có ít nhất một `push`/chú thích |
+| T8 | ghi stdout tới TỆP rất chậm (flush mỗi lời gọi) | không (đúng nhưng chậm) | ghi KNOWN_LIMITATIONS; chưa đệm |
+### Kết quả đo thật (7 test `crates/rig/tests/dogfood_sortlines.rs` ĐẠT, so với bản tham chiếu Rust `sort_by` theo byte, khớp TỪNG BYTE)
+- **Đúng:** 15 ca nhỏ (rỗng, chỉ `\n`, một dòng có/không `\n` cuối, dòng rỗng xen kẽ, CRLF thuần và lẫn, không xuống dòng cuối, UTF-8 + 😀, byte cao 0xff/0x80/0x7f, NUL, trùng lặp, tiền tố, `\r` đơn); một dòng dài 1 MiB (3 ca, gồm hai dòng chung tiền tố 1 MiB); 1 MiB và 32 MiB văn bản ngẫu nhiên (có NUL, 0xff, CR, 0xc3); 10⁶ dòng ngắn; 4 MiB toàn dòng rỗng (4 194 304 dòng) + 1000 dòng rỗng; đường lỗi (thiếu tệp ⇒ mã 2 + `sortlines: <tệp>: no such file` ở stderr, stdout rỗng; thiếu đối số ⇒ `usage: sortlines <file>`, mã 2); công thức Arena (xem ADR-034 phụ lục).
+- **Tính ổn định KHÔNG quan sát được** khi so toàn dòng (hai dòng bằng nhau về byte không phân biệt được) nên sortlines KHÔNG tuyên bố đã kiểm ổn định. Tính ổn định của `sort` đã kiểm riêng ở `gt-driver/tests/llvm_sort.rs` bằng hash theo chỉ số gốc (4 bố cục rộng 24/32 byte × 50 000 phần tử, 60 mảng ngẫu nhiên, 10⁶ phần tử, độ nhạy đã thử).
+- **Hiệu năng so với Rust `sort_by` (đo, -O0, mọi check giữ; KHÔNG phải cổng; ống pipe, một lần chạy mỗi ca, máy dev):**
+
+| ca | sortlines.gt | Rust sort_by | tỉ lệ thời gian | đỉnh working set (sortlines) / ước tính Rust |
+|---|---|---|---|---|
+| 1 MiB văn bản | 0,31 s | 0,043 s | ×7,2 | 7 / 3 MiB |
+| 32 MiB văn bản | 7,24 s | 2,03 s | ×3,6 | 86 / 89 MiB |
+| 10⁶ dòng ngắn (4,5 MB) | 3,63 s | 0,54 s | ×6,8 | 39 / 24 MiB |
+| 4 MiB toàn dòng rỗng | 7,20 s | 0,27 s | ×27 | 136 / 72 MiB |
+- Rust: thời gian đo TRONG tiến trình thử (không gồm khởi động); bộ nhớ Rust là ƯỚC TÍNH (tệp·2 + 16·dòng), không đo; sortlines.gt thời gian gồm khởi động tiến trình + đọc/ghi. Chưa đo lặp lại nhiều lần nên bỏ qua phương sai.

@@ -83,7 +83,8 @@ pub fn checks_report(
                     ..
                 } = &t.kind
                 && keys.get(node).is_some_and(|k| {
-                    (k.starts_with("$prelude::Vec<") && k.ends_with("::push"))
+                    (k.starts_with("$prelude::Vec<")
+                        && (k.ends_with("::push") || k.ends_with("::reserve")))
                         || k == "$prelude::Arena::alloc"
                 })
             {

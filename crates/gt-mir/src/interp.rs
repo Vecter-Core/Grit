@@ -514,6 +514,18 @@ impl<'a> Interp<'a> {
                 p.push(Step::Field(1));
                 Ok(V::Ref(*fr, *l, p))
             }
+            ("reserve", [V::Ref(fr, l, path), V::Int(n, _)]) => {
+                // chỉ ghi nhận dung lượng (thông dịch không có bố cục/giới hạn bộ nhớ)
+                let mut cp = path.clone();
+                cp.push(Step::Field(3));
+                let V::Int(cap, t) = self.get(*fr, *l, &cp)? else {
+                    return Err(bug("cap không phải số nguyên"));
+                };
+                if *n > cap {
+                    self.set_at(*fr, *l, &cp, V::Int(*n, t))?;
+                }
+                Ok(V::Unit)
+            }
             ("push", [V::Ref(fr, l, path), x]) => {
                 let mut items = path.clone();
                 items.push(Step::Field(1));

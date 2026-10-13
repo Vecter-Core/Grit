@@ -147,6 +147,7 @@ enum Intr {
     ArenaReset,
     VecNew,
     VecPush,
+    VecReserve,
     VecLen,
     VecAsSlice,
     VecAsMutSlice,
@@ -1675,6 +1676,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             return match m {
                 "new" => Some(Intr::VecNew),
                 "push" => Some(Intr::VecPush),
+                "reserve" => Some(Intr::VecReserve),
                 "len" => Some(Intr::VecLen),
                 "as_slice" => Some(Intr::VecAsSlice),
                 "as_mut_slice" => Some(Intr::VecAsMutSlice),
@@ -2004,6 +2006,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 self.fat_value(p, n)
             }
             Intr::VecPush => self.vec_push(fx, gargs, vals),
+            Intr::VecReserve => self.vec_reserve(fx, gargs, vals),
             Intr::FsOpen => {
                 let (p, n) = self.split_fat(vals[1])?;
                 let i32t = self.ctx.i32_type();
@@ -2478,6 +2481,100 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             .into_struct_type())
     }
 
+    /// Cấp khối MỚI đủ `ncap` phần tử trong Arena của Vec, sao chép `len` phần tử cũ, cập nhật `ptr/cap` (dùng chung cho `push` và
+    /// `reserve`). `ncap·size` tràn ⇒ abort `overflow`; hết Arena ⇒ abort `arena_exhausted` (runtime). Gọi khi `ncap > cap`.
+    fn vec_grow_to(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        vt: StructType<'ctx>,
+        base: PointerValue<'ctx>,
+        ncap: IntValue<'ctx>,
+        size: u64,
+        align: u32,
+    ) -> R<()> {
+        let i64t = self.i64t();
+        let ptr_p = llvm(self.builder.build_struct_gep(vt, base, 1, "ptr.p"))?;
+        let len_p = llvm(self.builder.build_struct_gep(vt, base, 2, "len.p"))?;
+        let cap_p = llvm(self.builder.build_struct_gep(vt, base, 3, "cap.p"))?;
+        let len = llvm(self.builder.build_load(i64t, len_p, "len"))?.into_int_value();
+        let sz = i64t.const_int(size, false);
+        let by = self
+            .call_intrinsic("llvm.umul.with.overflow", ncap, sz)?
+            .into_struct_value();
+        let by_v = llvm(self.builder.build_extract_value(by, 0, "bytes"))?.into_int_value();
+        let by_o = llvm(self.builder.build_extract_value(by, 1, "bytes.o"))?.into_int_value();
+        let ok = llvm(self.builder.build_not(by_o, "bytes.ok"))?;
+        self.guard(fx, ok, abort_kind::OVERFLOW)?;
+        // handle của Arena: Vec.arena -> &!Arena -> { i32 }
+        let ar_p = llvm(self.builder.build_struct_gep(vt, base, 0, "arena.p"))?;
+        let ar =
+            llvm(self.builder.build_load(self.ptr_type(), ar_p, "arena"))?.into_pointer_value();
+        let i32t = self.ctx.i32_type();
+        let h = llvm(self.builder.build_load(i32t, ar, "ah"))?;
+        let ft = self
+            .ptr_type()
+            .fn_type(&[i32t.into(), i64t.into(), i64t.into()], false);
+        let f = self.rt_fn("gritrt_arena_alloc", ft);
+        let c = llvm(self.builder.build_call(
+            f,
+            &[
+                h.into(),
+                by_v.into(),
+                i64t.const_int(u64::from(align), false).into(),
+            ],
+            "va",
+        ))?;
+        let Some(np) = c.try_as_basic_value().basic() else {
+            return internal("gritrt_arena_alloc không trả giá trị");
+        };
+        self.tag_obl(np.as_instruction_value(), "E0405")?;
+        let np = np.into_pointer_value();
+        let old =
+            llvm(self.builder.build_load(self.ptr_type(), ptr_p, "old"))?.into_pointer_value();
+        // len ≤ cap và cap*size không tràn (đã kiểm ở lần cấp trước) ⇒ len*size không tràn
+        let used = llvm(self.builder.build_int_mul(len, sz, "used"))?;
+        llvm(self.builder.build_memcpy(np, align, old, align, used))?;
+        llvm(self.builder.build_store(ptr_p, np))?;
+        llvm(self.builder.build_store(cap_p, ncap))?;
+        Ok(())
+    }
+
+    /// `Vec::reserve(&!self, n)`: bảo đảm `cap ≥ n` bằng MỘT lần cấp khối (không gấp đôi); `n ≤ cap` thì không làm gì.
+    fn vec_reserve(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        gargs: &[Ty],
+        vals: &[BasicValueEnum<'ctx>],
+    ) -> R<Option<BasicValueEnum<'ctx>>> {
+        let [vp, n] = vals else {
+            return internal("Vec::reserve: sai số đối số");
+        };
+        let Some(et) = gargs.first() else {
+            return internal("Vec::reserve thiếu đối số kiểu");
+        };
+        let vt = self.vec_struct(gargs)?;
+        let elem = self.lower_ty(et)?;
+        let size = self.td.get_abi_size(&elem);
+        let align = self.td.get_abi_alignment(&elem).max(1);
+        let base = vp.into_pointer_value();
+        let cap_p = llvm(self.builder.build_struct_gep(vt, base, 3, "cap.p"))?;
+        let cap = llvm(self.builder.build_load(self.i64t(), cap_p, "cap"))?.into_int_value();
+        let need = llvm(self.builder.build_int_compare(
+            IntPredicate::UGT,
+            n.into_int_value(),
+            cap,
+            "need",
+        ))?;
+        let grow = self.ctx.append_basic_block(fx.f, "vec.reserve");
+        let done = self.ctx.append_basic_block(fx.f, "vec.reserved");
+        llvm(self.builder.build_conditional_branch(need, grow, done))?;
+        self.builder.position_at_end(grow);
+        self.vec_grow_to(fx, vt, base, n.into_int_value(), size, align)?;
+        llvm(self.builder.build_unconditional_branch(done))?;
+        self.builder.position_at_end(done);
+        Ok(Some(self.unit_type().const_zero()))
+    }
+
     /// `Vec::push` (TCB, docs/TCB_INTRINSICS.md): tăng trưởng gấp đôi (tối thiểu 4) bằng cách cấp khối MỚI trong Arena rồi `memcpy`;
     /// tràn `cap*2` hoặc `cap*size` ⇒ abort `overflow`; hết Arena ⇒ abort `arena_exhausted` (từ runtime). Bất biến: `len ≤ cap`,
     /// `[0,len)` đã khởi tạo, `ptr` thuộc Arena còn sống (M6 giữ `&!Arena` độc quyền).
@@ -2528,45 +2625,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     .build_int_compare(IntPredicate::ULT, dbl_v, four, "small"),
             )?;
         let ncap = llvm(self.builder.build_select(is_small, four, dbl_v, "ncap"))?.into_int_value();
-        let sz = i64t.const_int(size, false);
-        let by = self
-            .call_intrinsic("llvm.umul.with.overflow", ncap, sz)?
-            .into_struct_value();
-        let by_v = llvm(self.builder.build_extract_value(by, 0, "bytes"))?.into_int_value();
-        let by_o = llvm(self.builder.build_extract_value(by, 1, "bytes.o"))?.into_int_value();
-        let ok = llvm(self.builder.build_not(by_o, "bytes.ok"))?;
-        self.guard(fx, ok, abort_kind::OVERFLOW)?;
-        // handle của Arena: Vec.arena -> &!Arena -> { i32 }
-        let ar_p = llvm(self.builder.build_struct_gep(vt, base, 0, "arena.p"))?;
-        let ar =
-            llvm(self.builder.build_load(self.ptr_type(), ar_p, "arena"))?.into_pointer_value();
-        let i32t = self.ctx.i32_type();
-        let h = llvm(self.builder.build_load(i32t, ar, "ah"))?;
-        let ft = self
-            .ptr_type()
-            .fn_type(&[i32t.into(), i64t.into(), i64t.into()], false);
-        let f = self.rt_fn("gritrt_arena_alloc", ft);
-        let c = llvm(self.builder.build_call(
-            f,
-            &[
-                h.into(),
-                by_v.into(),
-                i64t.const_int(u64::from(align), false).into(),
-            ],
-            "va",
-        ))?;
-        let Some(np) = c.try_as_basic_value().basic() else {
-            return internal("gritrt_arena_alloc không trả giá trị");
-        };
-        self.tag_obl(np.as_instruction_value(), "E0405")?;
-        let np = np.into_pointer_value();
-        let old =
-            llvm(self.builder.build_load(self.ptr_type(), ptr_p, "old"))?.into_pointer_value();
-        // len ≤ cap và cap*size không tràn (đã kiểm ở lần cấp trước) ⇒ len*size không tràn
-        let used = llvm(self.builder.build_int_mul(len, sz, "used"))?;
-        llvm(self.builder.build_memcpy(np, align, old, align, used))?;
-        llvm(self.builder.build_store(ptr_p, np))?;
-        llvm(self.builder.build_store(cap_p, ncap))?;
+        self.vec_grow_to(fx, vt, base, ncap, size, align)?;
         llvm(self.builder.build_unconditional_branch(store))?;
         // ---- ghi phần tử và tăng len
         self.builder.position_at_end(store);
