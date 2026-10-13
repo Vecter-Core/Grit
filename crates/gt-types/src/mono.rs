@@ -7,7 +7,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// Ngưỡng độ lồng kiểu của tham số instance (đệ quy đa hình → E0312).
 pub const MAX_INSTANCE_DEPTH: u32 = 64;
-const MAX_INSTANCES: usize = 100_000;
+/// Cận TỔNG số instance của một chương trình (khác ngưỡng độ sâu: chặn cả chương trình KHÔNG đệ quy nhưng lồng tham số kiểu để nổ
+/// số instance). Vượt ⇒ ĐỎ E0317.
+pub const MAX_PROGRAM_INSTANCES: usize = 10_000;
 
 /// Một instance: hàm/thành viên (NodeId) + tham số kiểu cụ thể (generics của impl rồi của hàm).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -52,6 +54,7 @@ impl Env<'_> {
             }
         }
         let mut reported: BTreeSet<NodeId> = BTreeSet::new();
+        let mut capped = false;
         while let Some(inst) = queue.pop() {
             let Some(ps) = params.get(&inst.node).cloned() else {
                 continue;
@@ -72,31 +75,28 @@ impl Env<'_> {
                         if st.has_param() || st.has_infer() {
                             continue;
                         }
-                        let Some(tm) = self
-                            .db
-                            .traits
-                            .get(td)
-                            .and_then(|t| t.members.get(*mi))
-                            .map(|m| m.name.clone())
-                        else {
+                        let Some(r) = self.db.resolve_trait_method(*td, *mi, &st, &args) else {
                             continue;
                         };
-                        let mut inf = crate::infer::InferCtx::new();
-                        let Some((ii, iargs)) = self.db.find_impl(&mut inf, *td, &st, 0) else {
-                            continue;
-                        };
-                        let Some(m) = self.db.impls[ii].members.iter().find(|m| m.name == tm)
-                        else {
-                            continue;
-                        };
-                        let mut all: Vec<Ty> = iargs.iter().map(|a| inf.resolve(a)).collect();
-                        all.extend(args);
-                        (m.node, all)
+                        r
                     }
                     _ => continue,
                 };
-                if args.iter().any(|a| a.depth() > MAX_INSTANCE_DEPTH) || seen.len() > MAX_INSTANCES
-                {
+                if seen.len() > MAX_PROGRAM_INSTANCES {
+                    let at = bodies
+                        .iter()
+                        .find(|b| b.node == callee)
+                        .map_or(gt_span::Span::new(0, 0), |b| b.sig.span);
+                    self.err(
+                        "E0317",
+                        callee,
+                        at,
+                        format!("chương trình sinh quá {MAX_PROGRAM_INSTANCES} instance sau đơn hình hoá (bùng nổ tổ hợp kiểu)"),
+                    );
+                    capped = true;
+                    break;
+                }
+                if args.iter().any(|a| a.depth() > MAX_INSTANCE_DEPTH) {
                     if reported.insert(callee) {
                         let name = bodies
                             .iter()
@@ -116,8 +116,50 @@ impl Env<'_> {
                     queue.push(ni);
                 }
             }
+            if capped {
+                break;
+            }
         }
         self.out_calls = calls;
         seen.into_iter().collect()
     }
+}
+
+/// Tên instance cho IR: `symbol` TOÀN ASCII (`[A-Za-z0-9_.]`) = phần đọc được đã làm sạch + `.` + băm FNV-1a 64 bit (16 hex) của khoá
+/// CHUẨN; `readable` là dạng đọc được (có thể chứa Unicode) — nằm trong metadata `!gt.instances` (ADR-032 phụ lục A, Q69).
+#[must_use]
+pub fn instance_name(key: &str, args: &[Ty], defs: &[gt_resolve::Def]) -> (String, String) {
+    let list = |f: &dyn Fn(&Ty) -> String| args.iter().map(f).collect::<Vec<_>>().join(", ");
+    let readable = if args.is_empty() {
+        key.to_string()
+    } else {
+        format!("{key}<{}>", list(&|t| t.render(defs)))
+    };
+    let canon = format!("{key}<{}>", list(&|t| t.canon(defs)));
+    let mut clean: String = readable
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    clean.truncate(80);
+    (
+        format!("{clean}.{:016x}", fnv1a64(canon.as_bytes())),
+        readable,
+    )
+}
+
+/// FNV-1a 64 bit (tự cài: `DefaultHasher` không bảo đảm ổn định giữa các bản Rust).
+#[must_use]
+pub fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in bytes {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
 }

@@ -3,12 +3,12 @@ source_filename = "grit"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-@gt.attestation = constant [65 x i8] c"55f479c54beef26ebecb7d862301cf451ac211dd4fbcb4f124f11da1cdcbca96\00"
+@gt.attestation = constant [65 x i8] c"819be2869a463c16149b33c9225e5c74cfce4d1adb5a541974616256fd8ff8c1\00"
 
 ; Function Attrs: noreturn
 declare void @gritrt_abort(i32) #0
 
-define i64 @"prog::main#0"() {
+define i64 @prog__main.06e433423c68530e() {
 alloca:
   %l0 = alloca i64, align 8
   %l1 = alloca [3 x i64], align 8
@@ -52,7 +52,7 @@ bb1:                                              ; preds = %bb0
   %f1 = insertvalue { ptr, i64 } %f0, i64 %sublen, 1
   store { ptr, i64 } %f1, ptr %l2, align 8
   %ld11 = load { ptr, i64 }, ptr %l2, align 8
-  %call = call i64 @"prog::sum#1"({ ptr, i64 } %ld11)
+  %call = call i64 @prog__sum.f4efe6fc43b0edbe({ ptr, i64 } %ld11)
   store i64 %call, ptr %l0, align 8
   br label %bb2
 
@@ -65,7 +65,7 @@ trap.0:                                           ; preds = %bb0
   unreachable
 }
 
-define i64 @"prog::sum#1"({ ptr, i64 } %0) {
+define i64 @prog__sum.f4efe6fc43b0edbe({ ptr, i64 } %0) {
 alloca:
   %l0 = alloca i64, align 8
   %l1 = alloca { ptr, i64 }, align 8
@@ -191,7 +191,7 @@ declare { i64, i1 } @llvm.uadd.with.overflow.i64(i64, i64) #1
 
 define void @gt_entry() {
 entry:
-  %main = call i64 @"prog::main#0"()
+  %main = call i64 @prog__main.06e433423c68530e()
   ret void
 }
 
@@ -207,5 +207,7 @@ attributes #0 = { noreturn }
 attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 
 !gt.attest = !{!0}
+!gt.instances = !{!1}
 
-!0 = !{!"55f479c54beef26ebecb7d862301cf451ac211dd4fbcb4f124f11da1cdcbca96"}
+!0 = !{!"819be2869a463c16149b33c9225e5c74cfce4d1adb5a541974616256fd8ff8c1"}
+!1 = !{!"prog__main.06e433423c68530e=prog::main", !"prog__sum.f4efe6fc43b0edbe=prog::sum"}

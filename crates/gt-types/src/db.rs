@@ -115,6 +115,58 @@ impl TypeDb {
         Some((found[0], args))
     }
 
+    /// MỘT NGUỒN SỰ THẬT chọn impl (ADR-032 §2): impl duy nhất của `trait_def` cho kiểu CỤ THỂ `ty` (không tham số/biến suy diễn),
+    /// trả (chỉ số impl, đối số của impl đã giải). `None` nếu không có hoặc không duy nhất. Mono, codegen và thông dịch dùng hàm này;
+    /// KHÔNG nơi nào tự cài khớp kiểu.
+    #[must_use]
+    pub fn select_impl(&self, trait_def: DefId, ty: &Ty) -> Option<(usize, Vec<Ty>)> {
+        if select_impl_fault() || ty.has_param() || ty.has_infer() {
+            return None;
+        }
+        let mut inf = InferCtx::new();
+        let (i, args) = self.find_impl(&mut inf, trait_def, ty, 0)?;
+        Some((i, args.iter().map(|a| inf.resolve(a)).collect()))
+    }
+
+    /// Phân giải `trait_def::member` trên `self_ty` cụ thể thành (NodeId thành viên của impl, đối số instance = đối số impl ++ `method_args`).
+    #[must_use]
+    pub fn resolve_trait_method(
+        &self,
+        trait_def: DefId,
+        member: usize,
+        self_ty: &Ty,
+        method_args: &[Ty],
+    ) -> Option<(NodeId, Vec<Ty>)> {
+        let name = &self.traits.get(&trait_def)?.members.get(member)?.name;
+        let (ii, mut all) = self.select_impl(trait_def, self_ty)?;
+        let m = self.impls[ii].members.iter().find(|m| &m.name == name)?;
+        all.extend(method_args.iter().cloned());
+        Some((m.node, all))
+    }
+
+    /// Thứ tự tham số kiểu của instance của hàm/thành viên `node`: generics của impl (nếu có) rồi của hàm.
+    #[must_use]
+    pub fn fn_params(&self, node: NodeId) -> Vec<crate::ty::ParamId> {
+        for imp in &self.impls {
+            for m in &imp.members {
+                if m.node == node {
+                    return imp
+                        .generics
+                        .iter()
+                        .chain(m.generics.iter())
+                        .map(|g| g.id)
+                        .collect();
+                }
+            }
+        }
+        for (sig, _) in self.fns.values() {
+            if sig.node == node {
+                return sig.generics.iter().map(|g| g.id).collect();
+            }
+        }
+        Vec::new()
+    }
+
     /// `ty: trait_def` có thoả không? `scope` là các ràng buộc có hiệu lực (cho tham số kiểu).
     pub(crate) fn satisfies_bound(
         &self,
@@ -273,4 +325,18 @@ impl TypeDb {
         }
         None
     }
+}
+
+thread_local! {
+    static SELECT_FAULT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Chốt kiểm thử (ADR-032 phụ lục A, 5b): làm `select_impl` luôn trả `None` trên luồng hiện tại để chứng minh đường ICE E9901 của
+/// codegen/thông dịch. KHÔNG dùng ngoài test.
+pub fn set_select_impl_fault_for_test(on: bool) {
+    SELECT_FAULT.with(|c| c.set(on));
+}
+
+fn select_impl_fault() -> bool {
+    SELECT_FAULT.with(std::cell::Cell::get)
 }

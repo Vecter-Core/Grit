@@ -128,7 +128,7 @@ fn compile(res: &mut CheckResult, out: &Path) -> Result<(), i32> {
     if let Err(e) = gt_driver::runner::find_main(&art.obl.bodies) {
         return Err(fail_with(E_PROJECT, &e));
     }
-    let att = gt_driver::pipeline::attestation(res, &format!("{:#?}", art.obl.bodies));
+    let att = gt_driver::pipeline::attestation(res, &gt_driver::pipeline::mir_dump(art));
     if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| fail(&format!("không tạo được {}: {e}", parent.display())))?;

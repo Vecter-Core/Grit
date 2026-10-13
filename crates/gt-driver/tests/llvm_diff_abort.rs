@@ -264,7 +264,7 @@ fn run_prog(kind: &str, seed: u64, t: &mut Tally, dir: &std::path::Path) {
         let exe = dir.join(format!("a{seed}.exe"));
         {
             let art = res.open_gate().expect("cổng mở");
-            let att = attestation(&res, &format!("{:#?}", art.obl.bodies));
+            let att = attestation(&res, &gt_driver::pipeline::mir_dump(art));
             if let Err(e) = build_exe(art, &exe, true, &att) {
                 if e.exit_code() == 3 {
                     t.unsupported += 1;

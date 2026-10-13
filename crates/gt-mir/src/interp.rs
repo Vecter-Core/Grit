@@ -3,7 +3,7 @@
 //! hoặc chưa gán ⇒ lỗi của MIR (`Bug`), tới `Unreachable` ⇒ `Bug`.
 use crate::*;
 use gt_ast::NodeId;
-use gt_types::{IntTy, Ty};
+use gt_types::{IntTy, ParamId, Ty, TypesOutput};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum V {
@@ -68,12 +68,16 @@ fn from_bits(bits: u128, t: IntTy) -> i128 {
 
 struct Frame {
     locals: Vec<V>,
+    /// môi trường kiểu của instance đang chạy (tham số, đối số) — chỉ cần để phân giải gọi qua trait (ADR-032 §2)
+    env: (Vec<ParamId>, Vec<Ty>),
 }
 
 pub struct Interp<'a> {
     pub mir: &'a MirOutput,
     frames: Vec<Frame>,
     fuel: u64,
+    /// bảng kiểu (impl) — cần để chạy gọi qua trait; không có thì gọi qua trait là `Bug`
+    types: Option<&'a TypesOutput>,
     /// vết các `Assert` đã chạy: (khoá thân, khối, đạt?) — để oracle M7 kiểm "tới được ⇒ sai"
     pub asserts: Vec<(String, u32, bool)>,
 }
@@ -92,8 +96,16 @@ impl<'a> Interp<'a> {
             mir,
             frames: Vec::new(),
             fuel,
+            types: None,
             asserts: Vec::new(),
         }
+    }
+
+    /// Cho thông dịch dùng bảng impl của M4 (MỘT nguồn với codegen: `TypeDb::resolve_trait_method`).
+    #[must_use]
+    pub fn with_types(mut self, t: &'a TypesOutput) -> Self {
+        self.types = Some(t);
+        self
     }
 
     pub fn call_key(&mut self, key: &str, args: Vec<V>) -> Outcome {
@@ -104,6 +116,10 @@ impl<'a> Interp<'a> {
     }
 
     fn run(&mut self, b: &'a Body, args: Vec<V>) -> Outcome {
+        self.run_env(b, args, (Vec::new(), Vec::new()))
+    }
+
+    fn run_env(&mut self, b: &'a Body, args: Vec<V>, env: (Vec<ParamId>, Vec<Ty>)) -> Outcome {
         if self.frames.len() > 200 {
             return Outcome::Bug("đệ quy quá sâu".to_string());
         }
@@ -111,7 +127,7 @@ impl<'a> Interp<'a> {
         for (i, a) in args.into_iter().enumerate() {
             locals[i + 1] = a;
         }
-        self.frames.push(Frame { locals });
+        self.frames.push(Frame { locals, env });
         let r = self.exec(b);
         let fr = self.frames.pop();
         match r {
@@ -122,6 +138,30 @@ impl<'a> Interp<'a> {
             Flow::Abort(k) => Outcome::Abort(k),
             Flow::Bug(m) => Outcome::Bug(m),
             Flow::Fuel => Outcome::OutOfFuel,
+        }
+    }
+
+    /// thế tham số kiểu của khung hiện tại vào `ty`
+    fn sub_env(&self, ty: &Ty) -> Ty {
+        let Some(fr) = self.frames.last() else {
+            return ty.clone();
+        };
+        let (ps, args) = &fr.env;
+        ty.subst(&|p| {
+            ps.iter()
+                .position(|q| *q == p)
+                .and_then(|i| args.get(i).cloned())
+        })
+    }
+
+    /// môi trường kiểu của callee: tham số của `node` ↦ đối số đã thế theo khung hiện tại
+    fn callee_env(&self, node: NodeId, generics: &[Ty]) -> (Vec<ParamId>, Vec<Ty>) {
+        match self.types {
+            Some(t) => (
+                t.db.fn_params(node),
+                generics.iter().map(|g| self.sub_env(g)).collect(),
+            ),
+            None => (Vec::new(), Vec::new()),
         }
     }
 
@@ -210,17 +250,37 @@ impl<'a> Interp<'a> {
                             Err(e) => return e,
                         }
                     }
-                    let node = match callee {
-                        Callee::Fn { node, .. } => *node,
+                    let (node, env) = match callee {
+                        Callee::Fn { node, generics } => {
+                            let env = self.callee_env(*node, generics);
+                            (*node, env)
+                        }
                         Callee::Value(o) => match self.operand(o) {
-                            Ok(V::Fn(n)) => n,
+                            Ok(V::Fn(n)) => (n, (Vec::new(), Vec::new())),
                             Ok(other) => return Flow::Bug(format!("gọi giá trị {other:?}")),
                             Err(e) => return e,
                         },
-                        Callee::TraitMethod { .. } => {
-                            return Flow::Bug(
-                                "gọi qua trait (ngoài phạm vi thông dịch)".to_string(),
-                            );
+                        Callee::TraitMethod {
+                            trait_def,
+                            member,
+                            self_ty,
+                            generics,
+                        } => {
+                            let Some(t) = self.types else {
+                                return Flow::Bug(
+                                    "gọi qua trait cần bảng kiểu (Interp::with_types)".to_string(),
+                                );
+                            };
+                            let st = self.sub_env(self_ty);
+                            let ga: Vec<Ty> = generics.iter().map(|g| self.sub_env(g)).collect();
+                            let Some((n, all)) =
+                                t.db.resolve_trait_method(*trait_def, *member, &st, &ga)
+                            else {
+                                return Flow::Bug(format!(
+                                    "E9901: không phân giải được phương thức trait trên `{st:?}`"
+                                ));
+                            };
+                            (n, (t.db.fn_params(n), all))
                         }
                     };
                     let Some(cb) = self.mir.bodies.iter().find(|x| x.node == node) else {
@@ -290,7 +350,7 @@ impl<'a> Interp<'a> {
                         }
                         return Flow::Bug(format!("không có thân MIR cho {k}"));
                     };
-                    match self.run(cb, vals) {
+                    match self.run_env(cb, vals, env) {
                         Outcome::Value(v) => {
                             if let Err(e) = self.write(dest, v) {
                                 return e;

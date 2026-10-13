@@ -277,7 +277,7 @@ fn run_one(seed: u64, t: &mut Tally, dir: &std::path::Path) {
         let exe = dir.join(format!("b{seed}.exe"));
         {
             let art = res.open_gate().expect("cổng mở");
-            let att = attestation(&res, &format!("{:#?}", art.obl.bodies));
+            let att = attestation(&res, &gt_driver::pipeline::mir_dump(art));
             if let Err(err) = build_exe(art, &exe, true, &att) {
                 t.mismatch += 1;
                 t.detail.push(format!("#{seed}: llvm lỗi {err}\n{source}"));

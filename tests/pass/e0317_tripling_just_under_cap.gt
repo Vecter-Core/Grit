@@ -1,0 +1,12 @@
+// expect: pass
+// note: chuỗi 8 tầng, 3 kiểu mỗi tầng: sát dưới cận (9841 instance của f0..f8, không đệ quy; cận 10000)
+ƒ f0<T: Copy>(x: T) ! ∅ { f1((x, 1u8)); f1((x, 1u16)); f1((x, 1u32)); }
+ƒ f1<T: Copy>(x: T) ! ∅ { f2((x, 1u8)); f2((x, 1u16)); f2((x, 1u32)); }
+ƒ f2<T: Copy>(x: T) ! ∅ { f3((x, 1u8)); f3((x, 1u16)); f3((x, 1u32)); }
+ƒ f3<T: Copy>(x: T) ! ∅ { f4((x, 1u8)); f4((x, 1u16)); f4((x, 1u32)); }
+ƒ f4<T: Copy>(x: T) ! ∅ { f5((x, 1u8)); f5((x, 1u16)); f5((x, 1u32)); }
+ƒ f5<T: Copy>(x: T) ! ∅ { f6((x, 1u8)); f6((x, 1u16)); f6((x, 1u32)); }
+ƒ f6<T: Copy>(x: T) ! ∅ { f7((x, 1u8)); f7((x, 1u16)); f7((x, 1u32)); }
+ƒ f7<T: Copy>(x: T) ! ∅ { f8((x, 1u8)); f8((x, 1u16)); f8((x, 1u32)); }
+ƒ f8<T: Copy>(x: T) ! ∅ { }
+ƒ main() ! ∅ { f0(1u8); }

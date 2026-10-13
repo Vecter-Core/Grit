@@ -94,6 +94,7 @@ fn inject_from_env() -> Option<Inject> {
         "attest" => Some(Inject::BadAttestation),
         "runtime-call" => Some(Inject::UnknownRuntimeCall),
         "external-call" => Some(Inject::ExternalCall),
+        "instance" => Some(Inject::RogueInstance),
         _ => None,
     }
 }
@@ -108,6 +109,8 @@ pub fn build_exe(
 ) -> Result<(), NativeError> {
     check_llvm_dll()?;
     let rt = rt_lib()?;
+    crate::runner::apply_types_fault_from_env();
+    let allowed = gt_codegen_llvm::expected_instances(&art.types, &art.obl.bodies);
     let compiled = gt_codegen_llvm::compile(
         &art.types,
         &art.obl.bodies,
@@ -117,7 +120,15 @@ pub fn build_exe(
             attestation: attestation.to_string(),
             inject: inject_from_env(),
         },
-        &|m| gt_guard::check_module(m, &gt_guard::GuardInput { attestation }),
+        &|m| {
+            gt_guard::check_module(
+                m,
+                &gt_guard::GuardInput {
+                    attestation,
+                    instances: &allowed,
+                },
+            )
+        },
     )
     .map_err(|e| match e {
         CodegenError::Guard(v) => NativeError::Guard(v),

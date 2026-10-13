@@ -18,8 +18,8 @@ pub use check::{CallRec, CallSite, CallTarget};
 pub use collect::{
     AdtDef, AdtKind, FieldInfo, FnSigInfo, GParam, ImplDef, Lang, TraitDef, VariantInfo,
 };
-pub use db::TypeDb;
-pub use mono::{Instance, MAX_INSTANCE_DEPTH};
+pub use db::{TypeDb, set_select_impl_fault_for_test};
+pub use mono::{Instance, MAX_INSTANCE_DEPTH, MAX_PROGRAM_INSTANCES, fnv1a64, instance_name};
 pub use region::{RegionRef, RegionSig};
 pub use traits::Bound;
 pub use traits::MethodRes;

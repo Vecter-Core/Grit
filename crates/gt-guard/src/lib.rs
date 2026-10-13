@@ -21,11 +21,30 @@ use gt_llvm::inkwell::values::{AnyValue, CallSiteValue, InstructionOpcode, Instr
 pub struct GuardInput<'a> {
     /// attestation (M9) của lần `check` vừa rồi
     pub attestation: &'a str,
+    /// Tập symbol ĐƯỢC PHÉP định nghĩa (tính độc lập với codegen từ bảng instance của M4: `gt_codegen_llvm::expected_instances`).
+    pub instances: &'a [String],
 }
 
 /// Tên metadata module/lệnh — hợp đồng với codegen.
 pub const ATTEST_KEY: &str = "gt.attest";
 pub const OBL_KIND: &str = "gt.obl";
+/// Metadata module: bảng `symbol=dạng đọc được` của mọi instance đã định nghĩa (ADR-032 phụ lục A, Q69).
+pub const INSTANCES_KEY: &str = "gt.instances";
+/// Hàm vào của chương trình (do codegen sinh, không thuộc bảng instance).
+pub const ENTRY_FN: &str = "gt_entry";
+/// Hàm `main` của C (gọi `gritrt_start(gt_entry)`).
+pub const C_MAIN_FN: &str = "main";
+/// Tiền tố hàm bọc `spawn` (`gt.tramp.<số>`), do codegen sinh, không thuộc bảng instance.
+pub const TRAMP_PREFIX: &str = "gt.tramp.";
+
+/// Hàm hỗ trợ do codegen sinh (không phải instance): chỉ đúng ba dạng này.
+fn support_fn(name: &str) -> bool {
+    name == ENTRY_FN
+        || name == C_MAIN_FN
+        || name
+            .strip_prefix(TRAMP_PREFIX)
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+}
 
 /// Tên hàm đích của lệnh `call` TRỰC TIẾP (qua API LLVM, không qua dạng chữ: tên có ký tự không ASCII như `h⊲0` được LLVM in dạng thoát
 /// `\E2\8A\B2` nên so tên theo dạng chữ sẽ SAI — lỗi FB-2). Gọi gián tiếp (con trỏ hàm) hoặc không phải `call` ⇒ `None`.
@@ -85,6 +104,55 @@ pub const RUNTIME: [(&str, Option<&str>); 22] = [
     ("gritrt_write_str", Some("E0310")),
 ];
 
+/// Tên symbol hợp lệ: toàn ASCII `[A-Za-z0-9_.]` (FB-2: tên Unicode làm Guard/bộ liên kết/trình gỡ lỗi rối).
+fn ascii_symbol(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'.')
+}
+
+/// Luật instance: (a) mọi tên hàm toàn ASCII; (b) mọi hàm ĐỊNH NGHĨA (trừ `gt_entry`) thuộc tập cho phép; (c) có ít nhất một instance;
+/// (d) `!gt.instances` liệt kê ĐÚNG tập hàm đã định nghĩa (bảng ánh xạ ngược không lệch IR).
+fn instance_violations(m: &Module<'_>, input: &GuardInput<'_>) -> Vec<String> {
+    let mut v: Vec<String> = Vec::new();
+    let mut defined: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for f in m.get_functions() {
+        let name = f.get_name().to_string_lossy().into_owned();
+        if !ascii_symbol(&name) {
+            v.push(format!("tên hàm không phải ASCII an toàn: {name:?}"));
+        }
+        if f.count_basic_blocks() == 0 || support_fn(&name) {
+            continue;
+        }
+        if !input.instances.contains(&name) {
+            v.push(format!("hàm `{name}` không thuộc bảng instance của M4"));
+        }
+        defined.insert(name);
+    }
+    if defined.is_empty() {
+        v.push("IR không định nghĩa instance nào".to_string());
+    }
+    let listed: std::collections::BTreeSet<String> = m
+        .get_global_metadata(INSTANCES_KEY)
+        .iter()
+        .flat_map(|md| md.get_node_values().unwrap_or_default())
+        .filter_map(|x| {
+            let mv = x.into_metadata_value();
+            mv.get_string_value().map(|s| {
+                let t = String::from_utf8_lossy(s).into_owned();
+                t.split('=').next().unwrap_or("").to_string()
+            })
+        })
+        .collect();
+    if listed != defined {
+        v.push(format!(
+            "!gt.instances lệch IR: metadata {listed:?}, hàm đã định nghĩa {defined:?}"
+        ));
+    }
+    v
+}
+
 /// Lớp nghĩa vụ mà thao tác này PHẢI mang (`None`: không nhạy cảm).
 fn required_class(inst: &InstructionValue<'_>) -> Option<&'static str> {
     if is_atomic(inst) {
@@ -132,6 +200,8 @@ pub fn check_module(m: &Module<'_>, input: &GuardInput<'_>) -> Vec<String> {
             input.attestation
         )),
     }
+
+    v.extend(instance_violations(m, input));
 
     let noreturn_kind = Attribute::get_named_enum_kind_id("noreturn");
     for f in m.get_functions() {

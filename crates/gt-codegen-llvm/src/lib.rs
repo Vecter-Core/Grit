@@ -7,7 +7,7 @@
 //! * Thông dịch MIR KHÔNG phải bằng chứng cho codegen; codegen có test riêng chạy nhị phân thật.
 mod lower;
 
-pub use lower::{Compiled, Inject, Options, compile};
+pub use lower::{Compiled, Inject, Options, compile, expected_instances};
 
 use std::fmt;
 

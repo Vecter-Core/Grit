@@ -259,9 +259,25 @@ impl Ty {
     /// Viết kiểu cho người đọc (tên ADT lấy từ bảng định nghĩa; chỉ phần cuối của đường dẫn).
     #[must_use]
     pub fn render(&self, defs: &[Def]) -> String {
+        self.render_with(defs, false)
+    }
+
+    /// Dạng CHUẨN không nhập nhằng (đường dẫn đầy đủ của ADT): chỉ để băm khoá instance (ADR-032 phụ lục A, Q69).
+    #[must_use]
+    pub fn canon(&self, defs: &[Def]) -> String {
+        self.render_with(defs, true)
+    }
+
+    fn render_with(&self, defs: &[Def], full: bool) -> String {
         let name = |d: &DefId| -> String {
             defs.get(d.index())
-                .map(|x| x.path.rsplit("::").next().unwrap_or(&x.path).to_string())
+                .map(|x| {
+                    if full {
+                        x.path.clone()
+                    } else {
+                        x.path.rsplit("::").next().unwrap_or(&x.path).to_string()
+                    }
+                })
                 .unwrap_or_else(|| "?".to_string())
         };
         match self {
@@ -272,26 +288,26 @@ impl Ty {
             Ty::Str => "str".to_string(),
             Ty::Never => "!".to_string(),
             Ty::Tuple(v) if v.is_empty() => "()".to_string(),
-            Ty::Tuple(v) if v.len() == 1 => format!("({},)", v[0].render(defs)),
+            Ty::Tuple(v) if v.len() == 1 => format!("({},)", v[0].render_with(defs, full)),
             Ty::Tuple(v) => format!(
                 "({})",
                 v.iter()
-                    .map(|t| t.render(defs))
+                    .map(|t| t.render_with(defs, full))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            Ty::Array(t, n) => format!("[{}; {n}]", t.render(defs)),
-            Ty::Slice(t) => format!("[{}]", t.render(defs)),
-            Ty::Ref(false, t) => format!("&{}", t.render(defs)),
-            Ty::Ref(true, t) => format!("&!{}", t.render(defs)),
-            Ty::RawPtr(false, t) => format!("*□ {}", t.render(defs)),
-            Ty::RawPtr(true, t) => format!("*μ {}", t.render(defs)),
+            Ty::Array(t, n) => format!("[{}; {n}]", t.render_with(defs, full)),
+            Ty::Slice(t) => format!("[{}]", t.render_with(defs, full)),
+            Ty::Ref(false, t) => format!("&{}", t.render_with(defs, full)),
+            Ty::Ref(true, t) => format!("&!{}", t.render_with(defs, full)),
+            Ty::RawPtr(false, t) => format!("*□ {}", t.render_with(defs, full)),
+            Ty::RawPtr(true, t) => format!("*μ {}", t.render_with(defs, full)),
             Ty::Adt(d, a) if a.is_empty() => name(d),
             Ty::Adt(d, a) => format!(
                 "{}<{}>",
                 name(d),
                 a.iter()
-                    .map(|t| t.render(defs))
+                    .map(|t| t.render_with(defs, full))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
@@ -304,10 +320,10 @@ impl Ty {
                 format!(
                     "ƒ({}) → {} ! {eff}",
                     p.iter()
-                        .map(|t| t.render(defs))
+                        .map(|t| t.render_with(defs, full))
                         .collect::<Vec<_>>()
                         .join(", "),
-                    r.render(defs)
+                    r.render_with(defs, full)
                 )
             }
             Ty::Param(p) if p.index == SELF_INDEX => "Self".to_string(),

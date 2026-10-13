@@ -71,6 +71,8 @@ pub enum Inject {
     UnknownRuntimeCall,
     /// thêm lời gọi tới một hàm ngoài (không phải runtime/llvm)
     ExternalCall,
+    /// định nghĩa thêm một hàm KHÔNG thuộc bảng instance (hàm lạ, vô hại về hành vi)
+    RogueInstance,
 }
 
 /// Kết quả: IR dạng chữ và object COFF.
@@ -176,6 +178,8 @@ struct Cg<'ctx, 'a> {
     strings: BTreeMap<String, GlobalValue<'ctx>>,
     inject: Option<Inject>,
     tramps: BTreeMap<Ty, FunctionValue<'ctx>>,
+    /// symbol ASCII → (instance, dạng đọc được): phát hiện va chạm băm và là nguồn của `!gt.instances`
+    inst_names: BTreeMap<String, (Inst, String)>,
 }
 
 /// Biên dịch cả chương trình. Gọi SAU khi cổng phán quyết cho phép (xanh/vàng) — chính hàm này không kiểm lại M4–M9.
@@ -229,6 +233,7 @@ pub fn compile(
         strings: BTreeMap::new(),
         inject: opts.inject,
         tramps: BTreeMap::new(),
+        inst_names: BTreeMap::new(),
     };
 
     let main = find_main(bodies)?;
@@ -265,6 +270,14 @@ pub fn compile(
         let bb = ctx.append_basic_block(f, "bb0");
         cg.builder.position_at_end(bb);
         llvm(cg.builder.build_unreachable())?;
+    }
+    if opts.inject == Some(Inject::RogueInstance) {
+        let f = cg
+            .module
+            .add_function("rogue.fn", ctx.void_type().fn_type(&[], false), None);
+        let bb = ctx.append_basic_block(f, "bb0");
+        cg.builder.position_at_end(bb);
+        llvm(cg.builder.build_return(None))?;
     }
     if matches!(
         opts.inject,
@@ -495,24 +508,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
 
     /// Thứ tự tham số kiểu của một thân: generics của impl (nếu thành viên) rồi của hàm.
     fn params_of(&self, node: NodeId) -> Vec<ParamId> {
-        for imp in &self.t.db.impls {
-            for m in &imp.members {
-                if m.node == node {
-                    return imp
-                        .generics
-                        .iter()
-                        .chain(m.generics.iter())
-                        .map(|g| g.id)
-                        .collect();
-                }
-            }
-        }
-        for (sig, _) in self.t.db.fns.values() {
-            if sig.node == node {
-                return sig.generics.iter().map(|g| g.id).collect();
-            }
-        }
-        Vec::new()
+        self.t.db.fn_params(node)
     }
 
     /// Khai báo (lần đầu) một instance có thân MIR và xếp hàng để định nghĩa.
@@ -541,7 +537,16 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             }
             BodyKind::Const | BodyKind::Static => self.fn_type(&[], &sub(body.return_ty()))?,
         };
-        let name = format!("{}#{}", body.key, self.nfuncs);
+        let (name, readable) = gt_types::instance_name(&body.key, &inst.args, &self.t.resolve.defs);
+        if let Some((other, _)) = self.inst_names.get(&name)
+            && other != inst
+        {
+            return internal(format!(
+                "va chạm tên symbol `{name}` giữa hai instance khác nhau"
+            ));
+        }
+        self.inst_names
+            .insert(name.clone(), (inst.clone(), readable));
         self.nfuncs += 1;
         let f = self.module.add_function(&name, ft, None);
         self.funcs.insert(inst.clone(), f);
@@ -668,6 +673,18 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             .ctx
             .metadata_node(&[self.ctx.metadata_string(&att).into()]);
         llvm(self.module.add_global_metadata("gt.attest", &node))?;
+        // `!gt.instances`: bảng ánh xạ ngược symbol ASCII → dạng đọc được (sắp theo symbol ⇒ tất định)
+        let entries: Vec<_> = self
+            .inst_names
+            .iter()
+            .map(|(sym, (_, readable))| {
+                self.ctx
+                    .metadata_string(&format!("{sym}={readable}"))
+                    .into()
+            })
+            .collect();
+        let inodes = self.ctx.metadata_node(&entries);
+        llvm(self.module.add_global_metadata("gt.instances", &inodes))?;
         let init = self.ctx.const_string(opts.attestation.as_bytes(), true);
         let g = self
             .module
@@ -1777,7 +1794,34 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 ))?;
                 c.try_as_basic_value().basic()
             }
-            Callee::TraitMethod { .. } => return unsupported("gọi qua trait"),
+            Callee::TraitMethod {
+                trait_def,
+                member,
+                self_ty,
+                generics,
+            } => {
+                // đơn hình hoá: thế tham số của instance đang hạ rồi phân giải NGAY bằng bảng impl (ADR-032 §2); không có impl khớp
+                // dù M4 đã kiểm ràng buộc ⇒ ICE (E9901), không đoán
+                let st = Self::sub(fx, self_ty);
+                let gargs: Vec<Ty> = generics.iter().map(|g| Self::sub(fx, g)).collect();
+                let Some((node, all)) = self
+                    .t
+                    .db
+                    .resolve_trait_method(*trait_def, *member, &st, &gargs)
+                else {
+                    return internal(format!(
+                        "E9901: không phân giải được phương thức trait trên `{st:?}` (M4 đã đảm bảo impl tồn tại)"
+                    ));
+                };
+                if !self.has_body(node) {
+                    return unsupported("phương thức trait của impl không có thân MIR");
+                }
+                let f = self.get_fn(&Inst { node, args: all })?;
+                let mv: Vec<BasicMetadataValueEnum<'ctx>> =
+                    vals.iter().map(|v| (*v).into()).collect();
+                let c = llvm(self.builder.build_call(f, &mv, "tcall"))?;
+                c.try_as_basic_value().basic()
+            }
         };
         match target {
             Some(t) => {
@@ -2446,3 +2490,29 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
 
 #[allow(dead_code)]
 fn _assert_traits(_: &dyn BasicValue<'_>, _: Local) {}
+
+/// Tập symbol mà IR ĐƯỢC PHÉP định nghĩa (IR Guard đối chiếu, ADR-032 phụ lục A): tính ĐỘC LẬP với việc hạ, từ bảng instance của M4
+/// (`TypesOutput.instances`) và các thân MIR (thân hợp đồng ánh về hàm của nó qua `sig_node`). Đã sắp, không trùng.
+#[must_use]
+pub fn expected_instances(t: &TypesOutput, bodies: &[Body]) -> Vec<String> {
+    let mut out: BTreeSet<String> = BTreeSet::new();
+    for b in bodies {
+        if matches!(b.kind, BodyKind::Const | BodyKind::Static) {
+            // `□`/`■` không generic: không nằm trong bảng instance, luôn đúng một instance không đối số
+            out.insert(gt_types::instance_name(&b.key, &[], &t.resolve.defs).0);
+            continue;
+        }
+        if matches!(b.kind, BodyKind::Pre | BodyKind::Post)
+            && t.file_name(b.sig_node) == "<prelude>"
+            && t.db.fn_params(b.sig_node).is_empty()
+        {
+            // hợp đồng của hàm PRELUDE không generic (vd `shl`: `⊳ n < 32`): prelude không có trong bảng instance
+            out.insert(gt_types::instance_name(&b.key, &[], &t.resolve.defs).0);
+            continue;
+        }
+        for i in t.instances.iter().filter(|i| i.node == b.sig_node) {
+            out.insert(gt_types::instance_name(&b.key, &i.args, &t.resolve.defs).0);
+        }
+    }
+    out.into_iter().collect()
+}

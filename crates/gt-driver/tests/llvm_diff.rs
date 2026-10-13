@@ -156,7 +156,7 @@ fn one(seed: u64, t: &mut Tally, dir: &std::path::Path) -> bool {
         let exe = dir.join(format!("p{seed}.exe"));
         let att = {
             let art = res.open_gate().expect("cổng mở");
-            let att = attestation(&res, &format!("{:#?}", art.obl.bodies));
+            let att = attestation(&res, &gt_driver::pipeline::mir_dump(art));
             match build_exe(art, &exe, true, &att) {
                 Ok(()) => {}
                 Err(e) => {

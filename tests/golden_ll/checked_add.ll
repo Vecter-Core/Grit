@@ -3,18 +3,18 @@ source_filename = "grit"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-@gt.attestation = constant [65 x i8] c"5ea76342d8a47db0d15ae0aab548b4c0fd754fae1bb65c18a02337240ea15e9e\00"
+@gt.attestation = constant [65 x i8] c"5e1c75422734fbdc5f0c2d7f86f022aa775621268852649f433f914954107668\00"
 
 ; Function Attrs: noreturn
 declare void @gritrt_abort(i32) #0
 
-define i8 @"prog::main#0"() {
+define i8 @prog__main.06e433423c68530e() {
 alloca:
   %l0 = alloca i8, align 1
   br label %bb0
 
 bb0:                                              ; preds = %alloca
-  %call = call i8 @"prog::add#1"(i8 -56, i8 100)
+  %call = call i8 @prog__add.f016c5565df880da(i8 -56, i8 100)
   store i8 %call, ptr %l0, align 1
   br label %bb1
 
@@ -23,7 +23,7 @@ bb1:                                              ; preds = %bb0
   ret i8 %ret
 }
 
-define i8 @"prog::add#1"(i8 %0, i8 %1) {
+define i8 @prog__add.f016c5565df880da(i8 %0, i8 %1) {
 alloca:
   %l0 = alloca i8, align 1
   %l1 = alloca i8, align 1
@@ -59,7 +59,7 @@ declare { i8, i1 } @llvm.uadd.with.overflow.i8(i8, i8) #1
 
 define void @gt_entry() {
 entry:
-  %main = call i8 @"prog::main#0"()
+  %main = call i8 @prog__main.06e433423c68530e()
   ret void
 }
 
@@ -75,5 +75,7 @@ attributes #0 = { noreturn }
 attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 
 !gt.attest = !{!0}
+!gt.instances = !{!1}
 
-!0 = !{!"5ea76342d8a47db0d15ae0aab548b4c0fd754fae1bb65c18a02337240ea15e9e"}
+!0 = !{!"5e1c75422734fbdc5f0c2d7f86f022aa775621268852649f433f914954107668"}
+!1 = !{!"prog__add.f016c5565df880da=prog::add", !"prog__main.06e433423c68530e=prog::main"}

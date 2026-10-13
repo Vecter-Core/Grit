@@ -4,12 +4,12 @@ target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:
 target triple = "x86_64-pc-windows-msvc"
 
 @"static.prog::COUNT" = global { i32 } zeroinitializer
-@gt.attestation = constant [65 x i8] c"10260aaf6a614d7d22be0d27c4e82471af004aab380367fd0e9c88facdfbf2cd\00"
+@gt.attestation = constant [65 x i8] c"0f01c290cca8d8fa0b41859eeb8dc15589a0a1fe3c7c37f56814526811e8ff07\00"
 
 ; Function Attrs: noreturn
 declare void @gritrt_abort(i32) #0
 
-define i32 @"prog::main#0"() {
+define i32 @prog__main.06e433423c68530e() {
 alloca:
   %l0 = alloca i32, align 4
   %l1 = alloca {}, align 8
@@ -18,7 +18,7 @@ alloca:
   br label %bb0
 
 bb0:                                              ; preds = %alloca
-  %call = call {} @"prog::worker#1"(i32 1)
+  %call = call {} @prog__worker.c0e26e01e9729395(i32 1)
   store {} %call, ptr %l1, align 1
   br label %bb1
 
@@ -29,7 +29,7 @@ bb1:                                              ; preds = %bb0
   store ptr @"static.prog::COUNT", ptr %l4, align 8
   %ld = load ptr, ptr %l4, align 8
   %ld1 = load { i64, [0 x i64] }, ptr %l3, align 8
-  %aload = load atomic i32, ptr %ld seq_cst, align 4, !gt.obl !1
+  %aload = load atomic i32, ptr %ld seq_cst, align 4, !gt.obl !2
   store i32 %aload, ptr %l0, align 4
   br label %bb2
 
@@ -38,7 +38,7 @@ bb2:                                              ; preds = %bb1
   ret i32 %ret
 }
 
-define {} @"prog::worker#1"(i32 %0) {
+define {} @prog__worker.c0e26e01e9729395(i32 %0) {
 alloca:
   %l0 = alloca {}, align 8
   %l1 = alloca i32, align 4
@@ -56,7 +56,7 @@ bb0:                                              ; preds = %alloca
   %ld = load ptr, ptr %l5, align 8
   %ld1 = load i32, ptr %l1, align 4
   %ld2 = load { i64, [0 x i64] }, ptr %l4, align 8
-  %1 = atomicrmw add ptr %ld, i32 %ld1 monotonic, align 4, !gt.obl !1
+  %1 = atomicrmw add ptr %ld, i32 %ld1 monotonic, align 4, !gt.obl !2
   store i32 %1, ptr %l2, align 4
   br label %bb1
 
@@ -66,7 +66,7 @@ bb1:                                              ; preds = %bb0
   ret {} %ret
 }
 
-define { i32 } @"prog::COUNT#2"() {
+define { i32 } @prog__COUNT.64a39aefa184457a() {
 alloca:
   %l0 = alloca { i32 }, align 8
   br label %bb0
@@ -82,9 +82,9 @@ bb1:                                              ; preds = %bb0
 
 define void @gt_entry() {
 entry:
-  %sinit = call { i32 } @"prog::COUNT#2"()
+  %sinit = call { i32 } @prog__COUNT.64a39aefa184457a()
   store { i32 } %sinit, ptr @"static.prog::COUNT", align 4
-  %main = call i32 @"prog::main#0"()
+  %main = call i32 @prog__main.06e433423c68530e()
   ret void
 }
 
@@ -99,6 +99,8 @@ entry:
 attributes #0 = { noreturn }
 
 !gt.attest = !{!0}
+!gt.instances = !{!1}
 
-!0 = !{!"10260aaf6a614d7d22be0d27c4e82471af004aab380367fd0e9c88facdfbf2cd"}
-!1 = !{!"E0503"}
+!0 = !{!"0f01c290cca8d8fa0b41859eeb8dc15589a0a1fe3c7c37f56814526811e8ff07"}
+!1 = !{!"prog__COUNT.64a39aefa184457a=prog::COUNT", !"prog__main.06e433423c68530e=prog::main", !"prog__worker.c0e26e01e9729395=prog::worker"}
+!2 = !{!"E0503"}

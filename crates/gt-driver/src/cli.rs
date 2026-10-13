@@ -195,7 +195,7 @@ fn build_llvm(cli: &Cli, mut res: CheckResult, path: &str) -> i32 {
             .map_or_else(|| "out".to_string(), |s| s.to_string_lossy().into_owned());
         format!("{stem}.exe")
     });
-    let att = crate::pipeline::attestation(&res, &format!("{:#?}", art.obl.bodies));
+    let att = crate::pipeline::attestation(&res, &crate::pipeline::mir_dump(art));
     if let Err(e) = crate::native::build_exe(art, Path::new(&out), false, &att) {
         return native_failure(&mut res, cli, &e);
     }
@@ -224,7 +224,7 @@ fn run_llvm(
         return Err(usage_err(&format!("không tạo được {}: {e}", dir.display())));
     }
     let exe = dir.join("prog.exe");
-    let att = crate::pipeline::attestation(res, &format!("{:#?}", art.obl.bodies));
+    let att = crate::pipeline::attestation(res, &crate::pipeline::mir_dump(art));
     let r = match crate::native::build_exe(art, &exe, true, &att) {
         Ok(()) => Ok(crate::native::run_exe(&exe)),
         Err(e) => Err(native_failure(res, cli, &e)),

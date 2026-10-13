@@ -411,6 +411,26 @@ fn finish(
     }
 }
 
+/// Văn bản MIR sau M7 + BẢNG INSTANCE (ADR-032 phụ lục A): attestation băm cả hai, nên đổi tập instance ⇒ đổi attestation.
+#[must_use]
+pub fn mir_dump(art: &Artifacts) -> String {
+    let mut names: Vec<String> = art
+        .types
+        .instances
+        .iter()
+        .filter_map(|i| {
+            let key = art.types.fn_keys.get(&i.node)?;
+            Some(gt_types::instance_name(key, &i.args, &art.types.resolve.defs).0)
+        })
+        .collect();
+    names.sort();
+    format!(
+        "{:#?}\ninstances {}\n",
+        art.obl.bodies,
+        sha256_hex(names.join("\n").as_bytes())
+    )
+}
+
 /// Bản ghi attestation (ADR-028 §5): băm nguồn + phiên bản gritc + chế độ check + danh sách pass + MIR sau M7.
 #[must_use]
 pub fn attestation(res: &CheckResult, mir_dump: &str) -> String {

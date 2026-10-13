@@ -1,5 +1,5 @@
 //! IR Guard (ADR-029 §6): mỗi luật có test CHẤP NHẬN và test TỪ CHỐI trên IR dựng tay ("IR bị sửa tay bị từ chối").
-use gt_guard::{ATTEST_KEY, GuardInput, OBL_KIND, check_module};
+use gt_guard::{ATTEST_KEY, GuardInput, INSTANCES_KEY, OBL_KIND, check_module};
 use gt_llvm::inkwell::AtomicOrdering;
 use gt_llvm::inkwell::AtomicRMWBinOp;
 use gt_llvm::inkwell::attributes::{Attribute, AttributeLoc};
@@ -15,6 +15,8 @@ struct W<'c> {
     m: Module<'c>,
     b: Builder<'c>,
     abort: FunctionValue<'c>,
+    /// tên hàm đã định nghĩa qua `func` (tập cho phép và nội dung `!gt.instances` mặc định của harness)
+    names: std::cell::RefCell<Vec<String>>,
 }
 
 fn world<'a>(ctx: &'a Context, noreturn: bool, attest: Option<&str>) -> W<'a> {
@@ -35,7 +37,13 @@ fn world<'a>(ctx: &'a Context, noreturn: bool, attest: Option<&str>) -> W<'a> {
         let node = ctx.metadata_node(&[ctx.metadata_string(a).into()]);
         m.add_global_metadata(ATTEST_KEY, &node).expect("metadata");
     }
-    W { ctx, m, b, abort }
+    W {
+        ctx,
+        m,
+        b,
+        abort,
+        names: std::cell::RefCell::new(Vec::new()),
+    }
 }
 
 impl<'c> W<'c> {
@@ -45,6 +53,7 @@ impl<'c> W<'c> {
             .add_function(name, self.ctx.void_type().fn_type(&[], false), None);
         let bb = self.ctx.append_basic_block(f, "bb0");
         self.b.position_at_end(bb);
+        self.names.borrow_mut().push(name.to_string());
         f
     }
 
@@ -70,8 +79,28 @@ impl<'c> W<'c> {
             .expect("set");
     }
 
+    /// ghi `!gt.instances` đúng theo các hàm đã tạo (test muốn lệch thì dùng `check_with`)
     fn check(&self) -> Vec<String> {
-        check_module(&self.m, &GuardInput { attestation: ATT })
+        let names = self.names.borrow().clone();
+        let entries: Vec<_> = names
+            .iter()
+            .map(|n| self.ctx.metadata_string(&format!("{n}={n}")).into())
+            .collect();
+        self.m
+            .add_global_metadata(INSTANCES_KEY, &self.ctx.metadata_node(&entries))
+            .expect("metadata");
+        self.check_with(&names)
+    }
+
+    /// kiểm với tập cho phép tuỳ ý (không thêm metadata)
+    fn check_with(&self, allowed: &[String]) -> Vec<String> {
+        check_module(
+            &self.m,
+            &GuardInput {
+                attestation: ATT,
+                instances: allowed,
+            },
+        )
     }
 }
 
@@ -359,6 +388,7 @@ fn unknown_runtime_and_external_calls_are_rejected_known_ones_accepted() {
         ctx.void_type().fn_type(&[], false),
         None,
     );
+    w.names.borrow_mut().push("callee_with_body".to_string());
     let bb = ctx.append_basic_block(defined, "bb0");
     let here = w.b.get_insert_block().expect("blk");
     w.b.position_at_end(bb);
@@ -396,11 +426,12 @@ fn unicode_named_functions_are_resolved_by_api_not_by_printed_text() {
     w.b.position_at_end(here);
     w.b.build_call(defined, &[], "").expect("call");
     finish_ok(&w, f);
-    assert_eq!(
-        w.check(),
-        Vec::<String>::new(),
-        "hàm Unicode có thân phải được chấp nhận"
-    );
+    w.names.borrow_mut().push("main::h⊲0#3".to_string());
+    // lời gọi tới hàm Unicode CÓ THÂN được nhận ra bằng API (không còn báo "lời gọi hàm ngoài"); riêng TÊN không ASCII bị luật
+    // symbol từ chối (Q69: codegen không bao giờ sinh tên như vậy nữa)
+    let v = w.check();
+    assert!(!has(&v, "lời gọi hàm ngoài"), "{v:?}");
+    assert!(has(&v, "không phải ASCII"), "{v:?}");
 
     let ctx = Context::create();
     let w = world(&ctx, true, Some(ATT));
@@ -411,4 +442,134 @@ fn unicode_named_functions_are_resolved_by_api_not_by_printed_text() {
     finish_ok(&w, f);
     let v = w.check();
     assert!(has(&v, "lời gọi hàm ngoài `hàm_ngoài⊳1`"), "{v:?}");
+}
+
+#[test]
+fn rejects_function_outside_instance_table() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    finish_ok(&w, f);
+    let g = w.func("rogue");
+    finish_ok(&w, g);
+    // metadata liệt kê cả hai, nhưng bảng của M4 chỉ cho `f`
+    let entries: Vec<_> = ["f", "rogue"]
+        .iter()
+        .map(|n| ctx.metadata_string(&format!("{n}={n}")).into())
+        .collect();
+    w.m.add_global_metadata(INSTANCES_KEY, &ctx.metadata_node(&entries))
+        .expect("md");
+    let v = w.check_with(&["f".to_string()]);
+    assert!(has(&v, "không thuộc bảng instance"), "{v:?}");
+}
+
+#[test]
+fn rejects_non_ascii_function_name() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("h⊲0");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(has(&v, "không phải ASCII"), "{v:?}");
+}
+
+#[test]
+fn rejects_instances_metadata_that_disagrees_with_the_ir() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    finish_ok(&w, f);
+    // metadata nói `g` mà IR định nghĩa `f`
+    let node = ctx.metadata_node(&[ctx.metadata_string("g=g").into()]);
+    w.m.add_global_metadata(INSTANCES_KEY, &node).expect("md");
+    let v = w.check_with(&["f".to_string(), "g".to_string()]);
+    assert!(has(&v, "!gt.instances lệch IR"), "{v:?}");
+    // thiếu hẳn metadata cũng bị từ chối
+    let ctx2 = Context::create();
+    let w2 = world(&ctx2, true, Some(ATT));
+    let f2 = w2.func("f");
+    finish_ok(&w2, f2);
+    let v2 = w2.check_with(&["f".to_string()]);
+    assert!(has(&v2, "!gt.instances lệch IR"), "{v2:?}");
+}
+
+#[test]
+fn rejects_module_without_any_instance() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let v = w.check();
+    assert!(has(&v, "không định nghĩa instance nào"), "{v:?}");
+}
+
+#[test]
+fn entry_function_is_allowed_outside_the_table() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    finish_ok(&w, f);
+    let node = ctx.metadata_node(&[ctx.metadata_string("f=f").into()]);
+    w.m.add_global_metadata(INSTANCES_KEY, &node).expect("md");
+    let e = w.func("gt_entry");
+    finish_ok(&w, e);
+    // `gt_entry` KHÔNG nằm trong tập cho phép lẫn metadata mà vẫn được chấp nhận
+    assert_eq!(w.check_with(&["f".to_string()]), Vec::<String>::new());
+}
+
+/// Hàm hỗ trợ do codegen sinh: `main` của C và `gt.tramp.<số>` được chấp nhận ngoài bảng instance; dạng gần giống thì không.
+#[test]
+fn support_functions_are_accepted_only_in_their_exact_forms() {
+    let build = |extra: &[&str]| -> Vec<String> {
+        let ctx = Context::create();
+        let w = world(&ctx, true, Some(ATT));
+        let f = w.func("f");
+        finish_ok(&w, f);
+        let node = ctx.metadata_node(&[ctx.metadata_string("f=f").into()]);
+        w.m.add_global_metadata(INSTANCES_KEY, &node).expect("md");
+        for n in extra {
+            let g = w.func(n);
+            finish_ok(&w, g);
+        }
+        w.check_with(&["f".to_string()])
+    };
+    assert_eq!(
+        build(&["main", "gt.tramp.0", "gt.tramp.12"]),
+        Vec::<String>::new()
+    );
+    for bad in [
+        "gt.tramp.",
+        "gt.trampX",
+        "gt.tramp.1x",
+        "gt.tramp",
+        "Main",
+        "gt_entry2",
+    ] {
+        let v = build(&[bad]);
+        assert!(has(&v, "không thuộc bảng instance"), "{bad}: {v:?}");
+    }
+}
+
+/// Tên hàm chỉ KHAI BÁO (runtime/llvm) cũng phải toàn ASCII; ký tự `-`, khoảng trắng, `$`, dấu nháy bị từ chối.
+#[test]
+fn symbol_charset_is_strict() {
+    for bad in ["a-b", "a b", "a$b", "a\"b", ""] {
+        let ctx = Context::create();
+        let w = world(&ctx, true, Some(ATT));
+        let f = w.func("f");
+        finish_ok(&w, f);
+        if !bad.is_empty() {
+            w.m.add_function(bad, ctx.void_type().fn_type(&[], false), None);
+        }
+        let v = w.check();
+        if bad.is_empty() {
+            assert!(!has(&v, "không phải ASCII"), "{v:?}");
+        } else {
+            assert!(has(&v, "không phải ASCII"), "{bad}: {v:?}");
+        }
+    }
+    // ký tự hợp lệ: chữ, số, `_`, `.`
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("Ab_9.z");
+    finish_ok(&w, f);
+    assert_eq!(w.check(), Vec::<String>::new());
 }

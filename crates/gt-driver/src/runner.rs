@@ -37,6 +37,14 @@ pub fn find_main(bodies: &[Body]) -> Result<&Body, String> {
     }
 }
 
+/// `GRITC_FAULT=types:select-impl`: làm `TypeDb::select_impl` luôn thất bại SAU khi M4 xong, để chứng minh đường ICE E9901 của codegen/thông
+/// dịch (ADR-032 phụ lục A, 5b). Chỉ làm gritc từ chối thêm; không bao giờ làm đầu ra tốt hơn.
+pub fn apply_types_fault_from_env() {
+    if std::env::var("GRITC_FAULT").as_deref() == Ok("types:select-impl") {
+        gt_types::set_select_impl_fault_for_test(true);
+    }
+}
+
 /// Chạy `main` bằng thông dịch tham chiếu trên MIR SAU M7 (đã áp chế độ check).
 #[must_use]
 pub fn run_main(art: Artifacts) -> RunReport {
@@ -46,7 +54,7 @@ pub fn run_main(art: Artifacts) -> RunReport {
 /// Như [`run_main`] nhưng chọn nhiên liệu (cho test giới hạn bộ chạy).
 #[must_use]
 pub fn run_main_with(art: Artifacts, fuel: u64) -> RunReport {
-    let Artifacts { mir, obl, .. } = art;
+    let Artifacts { mir, obl, types } = art;
     let mut mir = mir;
     mir.bodies = obl.bodies;
     let key = match find_main(&mir.bodies) {
@@ -58,7 +66,8 @@ pub fn run_main_with(art: Artifacts, fuel: u64) -> RunReport {
             };
         }
     };
-    let mut it = Interp::new(&mir, fuel);
+    apply_types_fault_from_env();
+    let mut it = Interp::new(&mir, fuel).with_types(&types);
     match it.call_key(&key, Vec::new()) {
         Outcome::Value(v) => RunReport {
             end: RunEnd::Normal,
@@ -86,7 +95,7 @@ pub fn run_main_with(art: Artifacts, fuel: u64) -> RunReport {
 /// Văn bản gói: tiêu đề + attestation + MIR sau M7 (Debug tất định).
 #[must_use]
 pub fn package_text(res: &CheckResult, art: &Artifacts) -> (String, String) {
-    let dump = format!("{:#?}", art.obl.bodies);
+    let dump = crate::pipeline::mir_dump(art);
     let att = attestation(res, &dump);
     let mut s = String::new();
     s.push_str("GTMIR1\n");
