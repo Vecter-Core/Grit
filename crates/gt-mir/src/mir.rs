@@ -59,6 +59,9 @@ pub struct Body {
     /// Đường dẫn đủ tên (vd `main::f`, `main::S::get`, `main::<S as T>::m`).
     pub key: String,
     pub node: NodeId,
+    /// Nút của hàm/thành viên mà chữ ký (và `RegionSig`) của thân này lấy từ đó: = `node` với hàm/const/static; với thân hợp đồng
+    /// `⊳`/`⊲` là hàm chứa hợp đồng (FB-1: tra `RegionSig` theo nút hợp đồng làm borrowck báo ICE giả).
+    pub sig_node: NodeId,
     pub kind: BodyKind,
     pub arg_count: usize,
     pub locals: Vec<LocalDecl>,

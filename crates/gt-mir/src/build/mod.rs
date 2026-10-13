@@ -70,6 +70,7 @@ impl<'t> Builder<'t> {
         let body = Body {
             key,
             node,
+            sig_node: node,
             kind,
             arg_count: 0,
             locals: Vec::new(),
@@ -528,6 +529,7 @@ pub(crate) fn build_contract(
         BodyKind::Pre
     };
     let (mut b, ret) = start_fn(t, key, c.id, f, self_ty, fn_node, kind, Some(Ty::Bool))?;
+    b.body.sig_node = fn_node;
     if c.kind == gt_ast::ContractKind::Post {
         let nd = b.needs_drop(&ret);
         let l = b.decl(ret, LocalKind::Arg(Some("result".into())), false, c.span);

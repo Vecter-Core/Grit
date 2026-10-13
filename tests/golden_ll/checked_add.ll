@@ -3,7 +3,7 @@ source_filename = "grit"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-@gt.attestation = constant [65 x i8] c"a76fd87fbfc00cd55edddbf03c6cd1f37124b5ff209446228b155ad1132dc3bd\00"
+@gt.attestation = constant [65 x i8] c"14da450c864a6cd8cfda6a74f3f669b5d71f5674914ce4d9724b4fb30ea37a60\00"
 
 ; Function Attrs: noreturn
 declare void @gritrt_abort(i32) #0
@@ -76,4 +76,4 @@ attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memo
 
 !gt.attest = !{!0}
 
-!0 = !{!"a76fd87fbfc00cd55edddbf03c6cd1f37124b5ff209446228b155ad1132dc3bd"}
+!0 = !{!"14da450c864a6cd8cfda6a74f3f669b5d71f5674914ce4d9724b4fb30ea37a60"}

@@ -1,0 +1,4 @@
+// expect: pass
+// note: FB-1 — ⊳ với tham số `&u32` (tham chiếu thường, hai tham số tham chiếu)
+ƒ h(a: &u32, b: &u32, p: u32) → u32 ! ∅ ⊳ p >= 1u32 { *a +% p }
+ƒ main() → u32 ! ∅ { x ≔ 5u32; y ≔ 6u32; h(&x, &y, 2u32) }

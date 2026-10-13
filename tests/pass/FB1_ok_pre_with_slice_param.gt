@@ -1,0 +1,4 @@
+// expect: pass
+// note: FB-1 — hợp đồng ⊳ trên hàm có tham số tham chiếu/lát từng gây ICE giả trong borrowck (RegionSig tra theo nút hợp đồng)
+ƒ h(xs: &[u32], p: u32) → u32 ! ∅ ⊳ p <= 3u32 { p }
+ƒ main() → u32 ! ∅ { a ≔ [1u32, 2, 3]; h(&a[..], 2u32) }

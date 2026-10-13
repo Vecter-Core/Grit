@@ -132,7 +132,7 @@ impl<'a> Gen<'a> {
     }
 
     fn setup_universals(&mut self) {
-        let rsig = self.t.regions.get(&self.body.node).cloned();
+        let rsig = self.t.regions.get(&self.body.sig_node).cloned();
         let body = self.body;
         for i in 1..=body.arg_count {
             let regs = &body.locals[i].regions;

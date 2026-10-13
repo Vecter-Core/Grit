@@ -1,0 +1,4 @@
+// expect: pass
+// note: FB-1 — ⊲ (thân Post có thêm tham số `result`) với tham số lát: vị trí region của tham số vẫn khớp chữ ký hàm
+ƒ h(xs: &[u32], p: u32) → u32 ! ∅ ⊲ result == p { p }
+ƒ main() → u32 ! ∅ { a ≔ [1u32, 2, 3]; h(&a[..], 2u32) }
