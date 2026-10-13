@@ -17,6 +17,7 @@ gt-stack = { path = "../gt-stack" }
 
 [dev-dependencies]
 gt-parser = { path = "../gt-parser" }
+gt-borrowck = { path = "../gt-borrowck" }
 
 [lints]
 workspace = true

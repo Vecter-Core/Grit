@@ -144,6 +144,16 @@ fn one_program(seed: u64, cov: &mut Cov, stats: &mut obgen::GenStats) {
         common::mir_codes(&m),
         p.src
     );
+    // LƯỚI THÊM (FB-1, 2026-10-13): chương trình sinh ra có `⊳`/`⊲` cùng tham số tham chiếu/lát; borrowck KHÔNG được báo ICE (E9901) trên chúng.
+    // (Chương trình sinh ngẫu nhiên có thể bị borrowck từ chối bằng E04xx hợp lệ — vd gán lát sang lát khác region — nên chỉ cấm ICE.)
+    let bck = gt_borrowck::check_program(&t, &m);
+    assert!(
+        !bck.diagnostics.iter().any(|d| d.code.as_str() == "E9901"),
+        "#{seed}: ICE trong borrowck {:?}
+{}",
+        bck.diagnostics.iter().map(|d| d.message.clone()).collect::<Vec<_>>(),
+        p.src
+    );
     let o_ref = analyze_program(&t, &m, &mut ZeroProver);
     let o_new = analyze_program(&t, &m, &mut ZoneProver::new(24));
     assert!(

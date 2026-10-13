@@ -189,6 +189,7 @@ name = "gt-oblig"
 version = "0.1.0"
 dependencies = [
  "gt-ast",
+ "gt-borrowck",
  "gt-diag",
  "gt-mir",
  "gt-parser",
