@@ -379,3 +379,36 @@ fn unknown_runtime_and_external_calls_are_rejected_known_ones_accepted() {
     finish_ok(&w, f);
     assert_eq!(w.check(), Vec::<String>::new());
 }
+
+/// FB-2 (hồi quy): tên hàm có ký tự không ASCII (`h⊲0` — hợp đồng) phải được nhận ra là hàm CÓ THÂN trong module; trước đây Guard so tên theo
+/// dạng chữ đã thoát của LLVM nên từ chối nhầm lời gọi hợp lệ. Ngược lại hàm CHỈ KHAI BÁO tên Unicode vẫn bị từ chối.
+#[test]
+fn unicode_named_functions_are_resolved_by_api_not_by_printed_text() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let defined =
+        w.m.add_function("main::h⊲0#3", ctx.void_type().fn_type(&[], false), None);
+    let bb = ctx.append_basic_block(defined, "bb0");
+    let here = w.b.get_insert_block().expect("blk");
+    w.b.position_at_end(bb);
+    w.b.build_return(None).expect("ret");
+    w.b.position_at_end(here);
+    w.b.build_call(defined, &[], "").expect("call");
+    finish_ok(&w, f);
+    assert_eq!(
+        w.check(),
+        Vec::<String>::new(),
+        "hàm Unicode có thân phải được chấp nhận"
+    );
+
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let ext =
+        w.m.add_function("hàm_ngoài⊳1", ctx.void_type().fn_type(&[], false), None);
+    w.b.build_call(ext, &[], "").expect("call");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(has(&v, "lời gọi hàm ngoài `hàm_ngoài⊳1`"), "{v:?}");
+}

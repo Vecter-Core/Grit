@@ -737,3 +737,12 @@ fn io_calls_carry_a_class_and_guard_rejects_tampered_io_ir() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// FB-2 (hồi quy mức tiến trình): hàm hợp đồng `⊳`/`⊲` được gọi như hàm thường có tên Unicode trong IR; IR Guard không được từ chối.
+#[test]
+fn contract_functions_with_unicode_symbol_names_pass_the_guard() {
+    check_value(
+        "ƒ h(p: u32) → u32 ! ∅ ⊳ p < 10u32 ⊲ result >= 0u32 { p }\nƒ entry(a: u32) → u32 ! ∅ { h(a) }\nƒ main() → u32 ! ∅ { entry(3u32) }\n",
+        "3",
+    );
+}

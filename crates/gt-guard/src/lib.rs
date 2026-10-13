@@ -7,14 +7,14 @@
 //! 3. Mọi thao tác nhạy cảm mang `!gt.obl` đúng lớp: atomic load/store/rmw/cmpxchg ⇒ `E0503`; `gritrt_spawn` ⇒ `E0501`;
 //!    `gritrt_mutex_lock/unlock` ⇒ `E0502`; lời gọi runtime I/O qua `Cap` (`gritrt_arg_*`, `gritrt_fs_read`, `gritrt_file_*`, `gritrt_write_*`) ⇒ `E0310`
 //!    (nghĩa vụ capability: nguồn gốc chỉ ở `main`, hiệu ứng `io` đã kiểm). (Mức hạt: THEO LỚP nghĩa vụ, chưa theo từng điểm — KNOWN_LIMITATIONS.)
-//! 3b. MỌI lời gọi tới hàm `gritrt_*` phải nằm trong BẢNG [`RUNTIME`] (lớp hoặc "không cần lớp"); `gritrt_*` lạ ⇒ từ chối. Mọi lời gọi tới một hàm
+//! 3. (b) MỌI lời gọi tới hàm `gritrt_*` phải nằm trong BẢNG [`RUNTIME`] (lớp hoặc "không cần lớp"); `gritrt_*` lạ ⇒ từ chối. Mọi lời gọi tới một hàm
 //!    chỉ khai báo (không có thân) phải là `llvm.*` hoặc nằm trong bảng; hàm ngoài khác ⇒ từ chối (không có FFI ngoài runtime).
 //! 4. `unreachable` chỉ đúng mẫu abort: khối tên `trap.*`, lệnh ngay trước là `call @gritrt_abort` có `noreturn`.
 //! 5. Không có cờ sinh poison/UB trên số học (`nsw`/`nuw`/`exact`/fast-math/`disjoint`/`nneg`/`samesign`) và không `llvm.assume`.
 use gt_llvm::inkwell::AtomicOrdering;
 use gt_llvm::inkwell::attributes::{Attribute, AttributeLoc};
 use gt_llvm::inkwell::module::Module;
-use gt_llvm::inkwell::values::{AnyValue, InstructionOpcode, InstructionValue};
+use gt_llvm::inkwell::values::{AnyValue, CallSiteValue, InstructionOpcode, InstructionValue};
 
 /// Đầu vào độc lập với codegen.
 #[derive(Clone, Copy, Debug)]
@@ -27,15 +27,15 @@ pub struct GuardInput<'a> {
 pub const ATTEST_KEY: &str = "gt.attest";
 pub const OBL_KIND: &str = "gt.obl";
 
-/// Tên hàm đích của `call` (từ dạng chữ của lệnh: `... call ... @name(...)`).
+/// Tên hàm đích của lệnh `call` TRỰC TIẾP (qua API LLVM, không qua dạng chữ: tên có ký tự không ASCII như `h⊲0` được LLVM in dạng thoát
+/// `\E2\8A\B2` nên so tên theo dạng chữ sẽ SAI — lỗi FB-2). Gọi gián tiếp (con trỏ hàm) hoặc không phải `call` ⇒ `None`.
 fn callee_name(inst: &InstructionValue<'_>) -> Option<String> {
     if inst.get_opcode() != InstructionOpcode::Call {
         return None;
     }
-    let text = inst.print_to_string().to_string();
-    let after = text.split_once('@')?.1;
-    let end = after.find('(')?;
-    Some(after[..end].trim_matches('"').to_string())
+    let call = CallSiteValue::try_from(*inst).ok()?;
+    let f = call.get_called_fn_value()?;
+    Some(f.get_name().to_string_lossy().into_owned())
 }
 
 fn obl_class(m: &Module<'_>, inst: &InstructionValue<'_>) -> Option<String> {
