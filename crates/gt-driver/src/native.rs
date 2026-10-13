@@ -131,7 +131,9 @@ pub fn build_exe(
     std::fs::write(&obj, &compiled.object)
         .map_err(|e| NativeError::Link(format!("không ghi được {}: {e}", obj.display())))?;
     let mut cmd = linker()?;
+    // /Brepro: bỏ dấu thời gian khỏi PE ⇒ cùng nguồn cho cùng nhị phân (tái lập, M11); không sinh PDB nên không rò đường dẫn
     cmd.arg("/NOLOGO")
+        .arg("/Brepro")
         .arg("/SUBSYSTEM:CONSOLE")
         .arg(format!("/OUT:{}", out.display()))
         .arg(&obj)
