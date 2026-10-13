@@ -306,6 +306,7 @@ fn assert_kind(cx: &PrintCx<'_>, k: &AssertKind) -> String {
         AssertKind::Precondition => "precondition".to_string(),
         AssertKind::Postcondition => "postcondition".to_string(),
         AssertKind::Invariant => "invariant".to_string(),
+        AssertKind::Fuel => "fuel_exhausted".to_string(),
     }
 }
 

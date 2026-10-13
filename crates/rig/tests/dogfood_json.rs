@@ -775,12 +775,22 @@ fn json_tool_error_paths_and_missing_args() {
         .output()
         .expect("chạy");
     assert_eq!(o.status.code(), Some(2));
-    let out = String::from_utf8_lossy(&o.stdout).into_owned();
+    let e = String::from_utf8_lossy(&o.stderr).into_owned();
     assert!(
-        out.starts_with("json: ") && out.ends_with(": no such file\n"),
-        "{out}"
+        e.starts_with("json: ")
+            && e.ends_with(
+                ": no such file
+"
+            ),
+        "{e}"
     );
+    assert!(o.stdout.is_empty(), "lỗi không được in ra stdout");
     let o = Command::new(&exe).output().expect("chạy");
-    assert_eq!(o.status.code(), Some(70));
-    assert!(String::from_utf8_lossy(&o.stderr).contains("abort: arg_out_of_range"));
+    assert_eq!(o.status.code(), Some(2));
+    assert_eq!(
+        String::from_utf8_lossy(&o.stderr),
+        "usage: json <file>
+"
+    );
+    assert!(o.stdout.is_empty());
 }

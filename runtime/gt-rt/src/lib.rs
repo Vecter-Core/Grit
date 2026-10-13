@@ -18,7 +18,7 @@ use std::io::Write;
 pub const ABORT_EXIT_CODE: i32 = 70;
 
 /// Loại abort; số thứ tự là hợp đồng với codegen; TÊN trùng `AssertKind::name` của MIR (đối chiếu với thông dịch).
-pub const ABORT_KINDS: [&str; 16] = [
+pub const ABORT_KINDS: [&str; 17] = [
     "unknown",
     "overflow",
     "index_out_of_bounds",
@@ -35,6 +35,7 @@ pub const ABORT_KINDS: [&str; 16] = [
     "slice_range",
     "io_error",
     "arg_out_of_range",
+    "fuel_exhausted",
 ];
 
 #[unsafe(no_mangle)]
@@ -128,6 +129,12 @@ fn arg_at(i: u64) -> &'static [u8] {
     }
 }
 
+/// Số đối số dòng lệnh (kể cả tên chương trình ở chỉ số 0).
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_arg_count() -> u64 {
+    cmdline().len() as u64
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_arg_ptr(i: u64) -> *const u8 {
     arg_at(i).as_ptr()
@@ -216,6 +223,28 @@ pub extern "C" fn gritrt_file_ptr(h: i32) -> *const u8 {
 pub extern "C" fn gritrt_write_u64(n: u64) {
     let mut o = std::io::stdout().lock();
     if write!(o, "{n}").and_then(|()| o.flush()).is_err() {
+        gritrt_abort(14);
+    }
+}
+
+/// Như `gritrt_write_u64` nhưng ra stderr (không đệm).
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_ewrite_u64(n: u64) {
+    let mut o = std::io::stderr().lock();
+    if write!(o, "{n}").and_then(|()| o.flush()).is_err() {
+        gritrt_abort(14);
+    }
+}
+
+/// Như `gritrt_write_str` nhưng ra stderr.
+///
+/// # Safety
+/// `p` trỏ tới `n` byte đọc được.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_ewrite_str(p: *const u8, n: u64) {
+    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let mut o = std::io::stderr().lock();
+    if o.write_all(bytes).and_then(|()| o.flush()).is_err() {
         gritrt_abort(14);
     }
 }

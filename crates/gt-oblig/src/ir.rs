@@ -173,6 +173,8 @@ pub enum ObKind {
     Post,
     /// bất biến `⋈` ở đầu vòng lặp
     Invariant,
+    /// nhiên liệu còn `> 0` khi thoát vòng kiểu "nhiên liệu" (`core::fuel_left`)
+    Fuel,
     /// biến thể `↓` (người dùng viết) giảm nghiêm ngặt và bị chặn dưới (M8): E0702
     Variant,
     /// biến thể TỰ SUY từ điều kiện `while` giảm nghiêm ngặt (M8): không chứng minh được ⇒ E0701
@@ -195,6 +197,7 @@ impl ObKind {
             ObKind::Pre => "pre",
             ObKind::Post => "post",
             ObKind::Invariant => "invariant",
+            ObKind::Fuel => "fuel",
             ObKind::Variant => "variant",
             ObKind::LoopBound => "loop_bound",
         }

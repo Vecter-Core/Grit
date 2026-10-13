@@ -1,0 +1,9 @@
+// expect: pass
+// note: vòng đọc theo vị trí với nhiên liệu = số byte còn lại + 1 (mẫu của examples/json): sau vòng, `fuel > 0` không chứng minh được ⇒ N0905
+ƒ scan(b: &[u8]) → usize ! ∅ {
+  μi ≔ 0usize;
+  μfuel ≔ (b.len() as u64) + 2u64;
+  ⟳ fuel > 0u64 ∧ i < b.len() ↓ fuel { fuel ← fuel - 1u64; i ← i + 1; }
+  core::fuel_left(fuel);
+  i
+}

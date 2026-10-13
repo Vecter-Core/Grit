@@ -990,6 +990,7 @@ impl<'a> Ctx<'a> {
             AssertKind::Precondition => ObKind::Pre,
             AssertKind::Postcondition => ObKind::Post,
             AssertKind::Invariant => ObKind::Invariant,
+            AssertKind::Fuel => ObKind::Fuel,
         }
     }
 
@@ -1796,6 +1797,7 @@ impl Judge<'_> {
                         ObKind::Pre => "N0901",
                         ObKind::Post => "N0902",
                         ObKind::Invariant => "N0904",
+                        ObKind::Fuel => "N0905",
                         _ => "N0604",
                     },
                 },

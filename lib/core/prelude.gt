@@ -68,6 +68,8 @@
 ▢ Clock { x: i32 }
 ▢ Alloc { x: i32 }
 ▢ Out { x: i32 }
+// stderr riêng. Tên `ErrOut` (không phải `Err`) vì `Err` là biến thể của `Result` và sẽ bị che/che khuất (xem DOGFOOD #11).
+▢ ErrOut { x: i32 }
 ▢ Host { x: i32 }
 #lang(arena)
 ▢ Arena { x: i32 }
@@ -93,8 +95,13 @@
 ⊐ Cap<Env> {
   ƒ var(&self, n: &str) → usize ! {io} { }
   ƒ arg(&self, i: usize) → &str ! {io} { }
+  ƒ arg_count(&self) → usize ! {io} { }
 }
 ⊐ Cap<Out> {
+  ƒ write_u64(&self, n: u64) ! {io} { }
+  ƒ write_str(&self, s: &str) ! {io} { }
+}
+⊐ Cap<ErrOut> {
   ƒ write_u64(&self, n: u64) ! {io} { }
   ƒ write_str(&self, s: &str) ! {io} { }
 }
@@ -105,6 +112,8 @@
 ▦ core {
   ◈ ƒ abort(msg: &str) → ! ! {div} { }
   ◈ ƒ exit(code: u32) → ! ! {div} { }
+  // nhiên liệu của vòng lặp: gọi SAU vòng lặp `⟳ fuel > 0 … ↓ fuel`; `fuel == 0` (cạn) ⇒ abort `fuel_exhausted` (check lúc chạy, M7 có thể xoá, ghi chú N0905)
+  ◈ ƒ fuel_left(n: u64) ! ∅ { }
   // KHÔNG ◈: hàm riêng của module, chỉ để test E0203 (quy tắc nhìn thấy) của gt-resolve dùng chính prelude thật
   ƒ hidden() ! ∅ { }
 }
@@ -114,4 +123,5 @@
 ƒ root_clock() → Cap<Clock> ! ∅ { }
 ƒ root_alloc() → Cap<Alloc> ! ∅ { }
 ƒ root_out() → Cap<Out> ! ∅ { }
+ƒ root_err() → Cap<ErrOut> ! ∅ { }
 ƒ raw_read(p: usize) → i32 ! ∅ { }

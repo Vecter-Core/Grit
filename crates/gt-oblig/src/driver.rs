@@ -97,6 +97,7 @@ fn definite_msg(k: &ObKind) -> &'static str {
         ObKind::Pre => "tiền điều kiện luôn sai tại điểm gọi",
         ObKind::Post => "hậu điều kiện luôn sai",
         ObKind::Invariant => "bất biến vòng lặp luôn sai khi tới đầu vòng",
+        ObKind::Fuel => "nhiên liệu luôn cạn khi thoát vòng",
         ObKind::Variant => "biến thể `↓` luôn không giảm",
         ObKind::LoopBound => "biến thể tự suy luôn không giảm",
     }
@@ -114,6 +115,9 @@ fn note_msg(code: &str) -> &'static str {
         "N0902" => "không chứng minh được hậu điều kiện: kiểm tra lúc chạy ở mọi điểm thoát",
         "N0903" => "lượng từ có biên được kiểm lúc chạy bằng vòng lặp",
         "N0904" => "không chứng minh được bất biến vòng lặp: kiểm tra lúc chạy ở đầu mỗi vòng",
+        "N0905" => {
+            "không chứng minh được nhiên liệu còn sau vòng lặp: kiểm tra lúc chạy (abort `fuel_exhausted` nếu cạn)"
+        }
         _ => "kiểm tra giữ lại lúc chạy",
     }
 }

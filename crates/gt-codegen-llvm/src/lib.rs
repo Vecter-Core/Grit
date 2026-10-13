@@ -52,4 +52,5 @@ pub mod abort_kind {
     pub const SLICE_RANGE: u64 = 13;
     pub const IO_ERROR: u64 = 14;
     pub const ARG_OOR: u64 = 15;
+    pub const FUEL: u64 = 16;
 }

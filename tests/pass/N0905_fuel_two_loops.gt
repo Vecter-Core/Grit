@@ -1,0 +1,13 @@
+// expect: pass
+// note: hai vòng nhiên liệu độc lập ⇒ hai check N0905
+ƒ g(a: u64, b: u64) → u64 ! ∅ {
+  μf1 ≔ a;
+  μx ≔ 0u64;
+  ⟳ f1 > 0u64 ∧ x < 10u64 ↓ f1 { f1 ← f1 - 1u64; x ← x + 1u64; }
+  core::fuel_left(f1);
+  μf2 ≔ b;
+  μy ≔ 0u64;
+  ⟳ f2 > 0u64 ∧ y < 10u64 ↓ f2 { f2 ← f2 - 1u64; y ← y + 1u64; }
+  core::fuel_left(f2);
+  x + y
+}

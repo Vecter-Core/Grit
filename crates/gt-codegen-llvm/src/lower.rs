@@ -131,6 +131,9 @@ enum Intr {
     FileBytes,
     OutU64,
     OutStr,
+    ArgCount,
+    ErrU64,
+    ErrStr,
     Exit,
     FsOpen,
     ArenaNew,
@@ -1612,6 +1615,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             AssertKind::Precondition => abort_kind::PRECONDITION,
             AssertKind::Postcondition => abort_kind::POSTCONDITION,
             AssertKind::Invariant => abort_kind::INVARIANT,
+            AssertKind::Fuel => abort_kind::FUEL,
         }
     }
 
@@ -1628,6 +1632,15 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         }
         if key.starts_with("$prelude::root_") {
             return Some(Intr::RootCap);
+        }
+        if key.contains("Cap<Env>") && m == "arg_count" {
+            return Some(Intr::ArgCount);
+        }
+        if key.contains("Cap<ErrOut>") && m == "write_u64" {
+            return Some(Intr::ErrU64);
+        }
+        if key.contains("Cap<ErrOut>") && m == "write_str" {
+            return Some(Intr::ErrStr);
         }
         if key.contains("Cap<Env>") && m == "arg" {
             return Some(Intr::EnvArg);
@@ -1966,6 +1979,29 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 let fp = self.rt_fn("gritrt_file_ptr", ptr_ty);
                 let p = self.call_basic(fp, &[h.into()])?;
                 self.fat_value(p.into_pointer_value(), l.into_int_value())
+            }
+            Intr::ArgCount => {
+                let ft = self.i64t().fn_type(&[], false);
+                let f = self.rt_fn("gritrt_arg_count", ft);
+                Ok(Some(self.call_basic(f, &[])?))
+            }
+            Intr::ErrU64 => {
+                let ft = self.ctx.void_type().fn_type(&[self.i64t().into()], false);
+                let f = self.rt_fn("gritrt_ewrite_u64", ft);
+                let c = llvm(self.builder.build_call(f, &[vals[1].into()], ""))?;
+                self.tag_obl(c.try_as_basic_value().instruction(), "E0310")?;
+                Ok(Some(self.unit_type().const_zero()))
+            }
+            Intr::ErrStr => {
+                let (p, n) = self.split_fat(vals[1])?;
+                let ft = self
+                    .ctx
+                    .void_type()
+                    .fn_type(&[self.ptr_type().into(), self.i64t().into()], false);
+                let f = self.rt_fn("gritrt_ewrite_str", ft);
+                let c = llvm(self.builder.build_call(f, &[p.into(), n.into()], ""))?;
+                self.tag_obl(c.try_as_basic_value().instruction(), "E0310")?;
+                Ok(Some(self.unit_type().const_zero()))
             }
             Intr::OutU64 => {
                 let ft = self.ctx.void_type().fn_type(&[self.i64t().into()], false);

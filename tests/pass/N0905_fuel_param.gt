@@ -1,0 +1,9 @@
+// expect: pass
+// note: nhiên liệu là tham số: M7 không chứng minh `fuel > 0` sau vòng ⇒ check lúc chạy + ghi chú N0905 (abort `fuel_exhausted` nếu cạn)
+ƒ f(n: u64) → u64 ! ∅ {
+  μfuel ≔ n;
+  μi ≔ 0u64;
+  ⟳ fuel > 0u64 ∧ i < 1000u64 ↓ fuel { fuel ← fuel - 1u64; i ← i + 1u64; }
+  core::fuel_left(fuel);
+  i
+}

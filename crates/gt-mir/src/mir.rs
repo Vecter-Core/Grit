@@ -425,6 +425,8 @@ pub enum AssertKind {
     Postcondition,
     /// `⋈ P` ở đầu vòng lặp (M5 phát; chỉ runtime ở Phase 1, M7 xoá nếu chứng minh được)
     Invariant,
+    /// `core::fuel_left(n)`: nhiên liệu của vòng lặp kiểu "nhiên liệu" phải còn `n > 0` khi thoát vòng; cạn ⇒ abort `fuel_exhausted`
+    Fuel,
 }
 
 impl AssertKind {
@@ -441,6 +443,7 @@ impl AssertKind {
             AssertKind::Precondition => "precondition",
             AssertKind::Postcondition => "postcondition",
             AssertKind::Invariant => "invariant",
+            AssertKind::Fuel => "fuel_exhausted",
         }
     }
 }

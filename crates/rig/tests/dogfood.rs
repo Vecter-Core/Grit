@@ -149,33 +149,39 @@ fn wc_handles_a_large_file_and_reports_throughput() {
 fn wc_error_paths_are_controlled() {
     let exe = build_wc();
     let d = tmp("err");
-    // không có tệp ⇒ Result::Err(NotFound): in lý do, thoát mã 2 (KHÔNG abort)
+    // không có tệp ⇒ Result::Err(NotFound): lý do ra STDERR, STDOUT rỗng, thoát mã 2 (KHÔNG abort)
     let o = Command::new(&exe)
         .arg(d.join("khong_co.txt"))
         .output()
         .expect("chạy");
     assert_eq!(o.status.code(), Some(2));
-    let out = String::from_utf8_lossy(&o.stdout).into_owned();
+    let e = String::from_utf8_lossy(&o.stderr).into_owned();
     assert!(
-        out.starts_with("wc: ")
-            && out.ends_with(
+        e.starts_with("wc: ")
+            && e.ends_with(
                 ": no such file
 "
             ),
-        "{out}"
+        "{e}"
     );
-    assert!(o.stderr.is_empty(), "không abort ⇒ stderr rỗng");
-    // đường dẫn là THƯ MỤC ⇒ lỗi hệ điều hành khác (không phải NotFound): vẫn lỗi có kiểm soát mã 2
+    assert!(o.stdout.is_empty(), "lỗi không được in ra stdout");
+    // đường dẫn là THƯ MỤC ⇒ lỗi hệ điều hành khác NotFound: vẫn lỗi có kiểm soát mã 2, ra stderr
     let o = Command::new(&exe).arg(&d).output().expect("chạy");
     assert_eq!(
         o.status.code(),
         Some(2),
         "{}",
-        String::from_utf8_lossy(&o.stdout)
+        String::from_utf8_lossy(&o.stderr)
     );
-    assert!(String::from_utf8_lossy(&o.stdout).starts_with("wc: "));
-    // thiếu đối số: vẫn abort (chưa có argc) mã 70
+    assert!(String::from_utf8_lossy(&o.stderr).starts_with("wc: "));
+    assert!(o.stdout.is_empty());
+    // thiếu đối số ⇒ thông báo cách dùng ra stderr, mã 2 (không còn abort thô)
     let o = Command::new(&exe).output().expect("chạy");
-    assert_eq!(o.status.code(), Some(70));
-    assert!(String::from_utf8_lossy(&o.stderr).contains("abort: arg_out_of_range"));
+    assert_eq!(o.status.code(), Some(2));
+    assert_eq!(
+        String::from_utf8_lossy(&o.stderr),
+        "usage: wc <file>
+"
+    );
+    assert!(o.stdout.is_empty());
 }

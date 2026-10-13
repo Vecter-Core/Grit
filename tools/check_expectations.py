@@ -39,7 +39,7 @@ DOC_REQUIRED = [
 ]
 # Ghi chú (N) của M7: docs/errors/<mã>.md với >=3 mẫu `pass` (mỗi mẫu PHẢI phát đúng ghi chú đó: kiểm bằng gt-oblig/tests/corpus.rs).
 NOTE_DOC_REQUIRED = [
-    "N0601", "N0602", "N0603", "N0604", "N0605", "N0901", "N0902", "N0903", "N0904", "N1401",
+    "N0601", "N0602", "N0603", "N0604", "N0605", "N0901", "N0902", "N0903", "N0904", "N0905", "N1401",
 ]
 # Cảnh báo VÀNG (S) của M9: docs/errors/<mã>.md với >=3 mẫu `warn` (đúng "warn <mã>") và >=3 mẫu `pass`.
 S_DOC_REQUIRED = ["S101", "S102", "S201", "S202"]

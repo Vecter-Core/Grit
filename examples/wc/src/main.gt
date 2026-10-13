@@ -28,12 +28,18 @@
   out.write_str("\n");
 }
 
-ƒ fail(out: &Cap<Out>, path: &str, why: &str) → ! ! {io, div} {
-  out.write_str("wc: ");
-  out.write_str(path);
-  out.write_str(": ");
-  out.write_str(why);
-  out.write_str("\n");
+// lỗi ra STDERR (kết quả ra stdout); thoát mã 2
+ƒ fail(err: &Cap<ErrOut>, path: &str, why: &str) → ! ! {io, div} {
+  err.write_str("wc: ");
+  err.write_str(path);
+  err.write_str(": ");
+  err.write_str(why);
+  err.write_str("\n");
+  core::exit(2u32)
+}
+
+ƒ usage(err: &Cap<ErrOut>) → ! ! {io, div} {
+  err.write_str("usage: wc <file>\n");
   core::exit(2u32)
 }
 
@@ -41,16 +47,19 @@
   env ≔ root_env();
   fs ≔ root_fs();
   out ≔ root_out();
-  path ≔ env.arg(1usize);
-  ⌥ fs.open(path) {
-    Ok(f) ↦ {
-      b ≔ f.bytes();
-      r ≔ count(b);
-      report(&out, r.0, r.1, b.len() as u64, path);
-    },
-    Err(IoError::NotFound) ↦ fail(&out, path, "no such file"),
-    Err(IoError::Denied) ↦ fail(&out, path, "permission denied"),
-    Err(IoError::Invalid) ↦ fail(&out, path, "invalid path"),
-    Err(IoError::Other) ↦ fail(&out, path, "i/o error"),
+  err ≔ root_err();
+  ⎇ env.arg_count() < 2usize { usage(&err) } ⇝ {
+    path ≔ env.arg(1usize);
+    ⌥ fs.open(path) {
+      Ok(f) ↦ {
+        b ≔ f.bytes();
+        r ≔ count(b);
+        report(&out, r.0, r.1, b.len() as u64, path);
+      },
+      Err(IoError::NotFound) ↦ fail(&err, path, "no such file"),
+      Err(IoError::Denied) ↦ fail(&err, path, "permission denied"),
+      Err(IoError::Invalid) ↦ fail(&err, path, "invalid path"),
+      Err(IoError::Other) ↦ fail(&err, path, "i/o error"),
+    }
   }
 }

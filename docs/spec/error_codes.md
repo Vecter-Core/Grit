@@ -72,6 +72,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | N0902 | Hậu điều kiện `⊲` hạ thành runtime ở mọi điểm thoát | M7 | — |
 | N0903 | Lượng từ có biên hạ thành vòng lặp lúc chạy | M7 | — |
 | N0904 | Bất biến `⋈` hạ thành runtime | M7 | — |
+| N0905 | Nhiên liệu còn sau vòng lặp (`core::fuel_left`) hạ thành runtime; cạn ⇒ abort `fuel_exhausted` | M7 | — |
 | N1401 | `#allow` không tắt cảnh báo nào | M9 | pass/N1401_ok_unused_allow_one |
 
 Ghi chú: plan ghi match-đầy-đủ và capability thuộc "E01xx/E03xx/E06xx" / "E03xx/E08xx" mơ hồ → đề xuất

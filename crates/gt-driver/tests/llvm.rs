@@ -746,3 +746,28 @@ fn contract_functions_with_unicode_symbol_names_pass_the_guard() {
         "3",
     );
 }
+
+/// Nhiên liệu cạn là một loại abort RIÊNG (`fuel_exhausted`), hai backend khớp, và check xuất hiện trong báo cáo "check còn lại" (loại `fuel`, ghi chú N0905).
+#[test]
+fn fuel_exhaustion_is_its_own_abort_kind_and_is_reported() {
+    let src = "ƒ entry(n: u64) → u64 ! ∅ {\n  μfuel ≔ n;\n  μi ≔ 0u64;\n  ⟳ fuel > 0u64 ∧ i < 1000u64 ↓ fuel { fuel ← fuel - 1u64; i ← i + 1u64; }\n  core::fuel_left(fuel);\n  i\n}\nƒ main() → u64 ! ∅ { entry(5u64) }\n";
+    check_abort(src, "fuel_exhausted");
+    // đủ nhiên liệu: chạy bình thường, kết quả 1000
+    let ok = src.replace("entry(5u64)", "entry(2000u64)");
+    check_value(&ok, "1000");
+    // báo cáo: check kiểu `fuel` còn lại (không chứng minh được) + ghi chú N0905
+    let dir = scratch("fuel");
+    let f = dir.join("prog.gt");
+    std::fs::write(&f, src).expect("ghi");
+    let o = gritc()
+        .args(["check", "--json"])
+        .arg(&f)
+        .output()
+        .expect("chạy");
+    let text = String::from_utf8_lossy(&o.stdout).into_owned();
+    assert!(
+        text.contains("\"kind\":\"fuel\"") && text.contains("N0905"),
+        "{text}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

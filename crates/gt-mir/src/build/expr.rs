@@ -1421,6 +1421,30 @@ impl Builder<'_> {
             self.assign(dest.clone(), rv);
             return Ok(());
         }
+        // `core::fuel_left(n)` (lang của prelude): kiểm `n > 0` như một `Assert` loại Fuel (abort `fuel_exhausted`; M7 có thể xoá nếu chứng minh được)
+        if let ExprKind::Path(p) = &callee.kind
+            && let Some(Res::Def(d)) = self.res_of(p.id)
+            && self.t.defs()[d.index()].path == "$prelude::core::fuel_left"
+            && args.len() == 1
+        {
+            let es: Vec<&Expr> = args.iter().collect();
+            let ops = self.seq_operands(&es, true)?;
+            let t = self.temp(Ty::Bool);
+            self.assign(
+                Place::local(t),
+                Rvalue::BinaryOp(
+                    BinOp::Gt,
+                    ops[0].clone(),
+                    Operand::Const(Const::Int {
+                        bits: 0,
+                        ty: gt_types::IntTy::U64,
+                    }),
+                ),
+            );
+            self.assert(Operand::Copy(Place::local(t)), true, AssertKind::Fuel)?;
+            self.assign_unit_if_unit(dest)?;
+            return Ok(());
+        }
         // hàm/hàm kết hợp gọi trực tiếp, hoặc giá trị kiểu hàm
         let c = match (&callee.kind, self.t.sites.get(&callee.id).cloned()) {
             (ExprKind::Path(_), Some(site)) => Self::callee_of(&site),

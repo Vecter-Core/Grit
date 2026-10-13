@@ -75,7 +75,7 @@
   μepos ≔ 0usize;
   μdone ≔ false;
   // nhiên liệu: mỗi vòng tiến ≥ 1 byte nên (độ dài còn lại + 1) vòng luôn đủ; M8 chứng minh dừng bằng nhiên liệu vì `i ← i + n` (n từ utf8_len) không chặn dưới được
-  μfuel ≔ ((b.len() - start) as u64) + 1u64;
+  μfuel ≔ ((b.len() - start) as u64) + 2u64;
   ⟳ fuel > 0u64 ∧ i < b.len() ∧ ¬done ∧ err == 0u32 ↓ fuel {
     fuel ← fuel - 1u64;
     c ≔ b[i];
@@ -110,6 +110,7 @@
       }
     }
   }
+  core::fuel_left(fuel);
   ⎇ err == 0u32 ∧ ¬done { err ← 2u32; epos ← b.len(); } ⇝ { }
   ⎇ err != 0u32 { (epos, err) } ⇝ { (i, 0u32) }
 }
@@ -150,6 +151,7 @@
         },
       }
     }
+    core::fuel_left(fuel);
     ⎇ err != 0u32 { R::Bad(err_pos, err) } ⇝ {
       ⎇ fin { R::Good(pos, ar.alloc(Value::Arr(list, n)), count, maxd + 1u32) } ⇝ { R::Bad(pos, 2u32) }
     }
@@ -204,6 +206,7 @@
         }
       }
     }
+    core::fuel_left(fuel);
     ⎇ err != 0u32 { R::Bad(err_pos, err) } ⇝ {
       ⎇ fin { R::Good(pos, ar.alloc(Value::Obj(list, n)), count, maxd + 1u32) } ⇝ { R::Bad(pos, 2u32) }
     }
@@ -277,12 +280,18 @@
   }
 }
 
-ƒ fail(out: &Cap<Out>, path: &str, why: &str) → ! ! {io, div} {
-  out.write_str("json: ");
-  out.write_str(path);
-  out.write_str(": ");
-  out.write_str(why);
-  out.write_str("\n");
+// lỗi ra STDERR (kết quả ra stdout); thoát mã 2
+ƒ fail(err: &Cap<ErrOut>, path: &str, why: &str) → ! ! {io, div} {
+  err.write_str("json: ");
+  err.write_str(path);
+  err.write_str(": ");
+  err.write_str(why);
+  err.write_str("\n");
+  core::exit(2u32)
+}
+
+ƒ usage(err: &Cap<ErrOut>) → ! ! {io, div} {
+  err.write_str("usage: json <file>\n");
   core::exit(2u32)
 }
 
@@ -290,25 +299,28 @@
   env ≔ root_env();
   fs ≔ root_fs();
   out ≔ root_out();
+  err ≔ root_err();
   alloc ≔ root_alloc();
   ar ≔ alloc.arena();
-  path ≔ env.arg(1usize);
-  ⌥ fs.open(path) {
-    Ok(f) ↦ {
-      b ≔ f.bytes();
-      r ≔ value(b, &ar, 0usize, 201u32);
-      // sau giá trị chỉ được còn khoảng trắng
-      ⌥ r {
-        R::Good(p, v, count, depth) ↦ {
-          q ≔ skip_ws(b, p);
-          ⎇ q == b.len() { report(&out, path, R::Good(p, v, count, depth)); } ⇝ { report(&out, path, R::Bad(q, 7u32)); }
-        },
-        R::Bad(p, code) ↦ report(&out, path, R::Bad(p, code)),
-      }
-    },
-    Err(IoError::NotFound) ↦ fail(&out, path, "no such file"),
-    Err(IoError::Denied) ↦ fail(&out, path, "permission denied"),
-    Err(IoError::Invalid) ↦ fail(&out, path, "invalid path"),
-    Err(IoError::Other) ↦ fail(&out, path, "i/o error"),
+  ⎇ env.arg_count() < 2usize { usage(&err) } ⇝ {
+    path ≔ env.arg(1usize);
+    ⌥ fs.open(path) {
+      Ok(f) ↦ {
+        b ≔ f.bytes();
+        r ≔ value(b, &ar, 0usize, 201u32);
+        // sau giá trị chỉ được còn khoảng trắng
+        ⌥ r {
+          R::Good(p, v, count, depth) ↦ {
+            q ≔ skip_ws(b, p);
+            ⎇ q == b.len() { report(&out, path, R::Good(p, v, count, depth)); } ⇝ { report(&out, path, R::Bad(q, 7u32)); }
+          },
+          R::Bad(p, code) ↦ report(&out, path, R::Bad(p, code)),
+        }
+      },
+      Err(IoError::NotFound) ↦ fail(&err, path, "no such file"),
+      Err(IoError::Denied) ↦ fail(&err, path, "permission denied"),
+      Err(IoError::Invalid) ↦ fail(&err, path, "invalid path"),
+      Err(IoError::Other) ↦ fail(&err, path, "i/o error"),
+    }
   }
 }
