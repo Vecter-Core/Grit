@@ -1,0 +1,14 @@
+// expect: pass
+// note: sau khi Vec hết sống, Arena dùng lại được (reset, Vec thứ hai)
+ƒ fill(a: &!Arena) → u64 ! {mem} {
+  μv ≔ Vec::new(a);
+  v.push(7u64);
+  v.push(8u64);
+  v.as_slice()[0] +% v.as_slice()[1]
+}
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  n ≔ fill(&!ar);
+  ar.reset();
+  n +% fill(&!ar)
+}

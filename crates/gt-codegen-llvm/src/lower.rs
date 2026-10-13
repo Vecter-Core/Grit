@@ -145,6 +145,11 @@ enum Intr {
     ArenaNew,
     ArenaAlloc,
     ArenaReset,
+    VecNew,
+    VecPush,
+    VecLen,
+    VecAsSlice,
+    VecAsMutSlice,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1666,6 +1671,16 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         if key.starts_with("$prelude::root_") {
             return Some(Intr::RootCap);
         }
+        if key.starts_with("$prelude::Vec<") {
+            return match m {
+                "new" => Some(Intr::VecNew),
+                "push" => Some(Intr::VecPush),
+                "len" => Some(Intr::VecLen),
+                "as_slice" => Some(Intr::VecAsSlice),
+                "as_mut_slice" => Some(Intr::VecAsMutSlice),
+                _ => None,
+            };
+        }
         if key.contains("Cap<Out>") && m == "write_bytes" {
             return Some(Intr::OutBytes);
         }
@@ -1960,6 +1975,35 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 self.tag_obl(c.try_as_basic_value().instruction(), "E0405")?;
                 Ok(Some(self.unit_type().const_zero()))
             }
+            Intr::VecNew => {
+                // Vec { arena: &!Arena, ptr: null, len: 0, cap: 0 } — không cấp phát cho tới `push` đầu tiên
+                let vt = self.lower_ty(dest_ty)?.into_struct_type();
+                let v = vt.get_undef();
+                let v = llvm(self.builder.build_insert_value(v, vals[0], 0, "v.arena"))?;
+                let null = self.ptr_type().const_null();
+                let v = llvm(self.builder.build_insert_value(v, null, 1, "v.ptr"))?;
+                let z = self.i64t().const_zero();
+                let v = llvm(self.builder.build_insert_value(v, z, 2, "v.len"))?;
+                let v = llvm(self.builder.build_insert_value(v, z, 3, "v.cap"))?;
+                Ok(Some(v.as_basic_value_enum()))
+            }
+            Intr::VecLen => {
+                let vt = self.vec_struct(gargs)?;
+                let base = vals[0].into_pointer_value();
+                let lp = llvm(self.builder.build_struct_gep(vt, base, 2, "len.p"))?;
+                Ok(Some(llvm(self.builder.build_load(self.i64t(), lp, "len"))?))
+            }
+            Intr::VecAsSlice | Intr::VecAsMutSlice => {
+                let vt = self.vec_struct(gargs)?;
+                let base = vals[0].into_pointer_value();
+                let pp = llvm(self.builder.build_struct_gep(vt, base, 1, "ptr.p"))?;
+                let p =
+                    llvm(self.builder.build_load(self.ptr_type(), pp, "ptr"))?.into_pointer_value();
+                let lp = llvm(self.builder.build_struct_gep(vt, base, 2, "len.p"))?;
+                let n = llvm(self.builder.build_load(self.i64t(), lp, "len"))?.into_int_value();
+                self.fat_value(p, n)
+            }
+            Intr::VecPush => self.vec_push(fx, gargs, vals),
             Intr::FsOpen => {
                 let (p, n) = self.split_fat(vals[1])?;
                 let i32t = self.ctx.i32_type();
@@ -2422,6 +2466,120 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             _ => Lang::Cell,
         };
         self.t.db.lang.get(&l).copied()
+    }
+
+    /// kiểu LLVM của `Vec<'a, T>` với `gargs = [T]`
+    fn vec_struct(&self, gargs: &[Ty]) -> R<StructType<'ctx>> {
+        let Some(def) = self.t.db.lang.get(&Lang::Vec).copied() else {
+            return internal("thiếu lang item `vec`");
+        };
+        Ok(self
+            .lower_ty(&Ty::Adt(def, gargs.to_vec()))?
+            .into_struct_type())
+    }
+
+    /// `Vec::push` (TCB, docs/TCB_INTRINSICS.md): tăng trưởng gấp đôi (tối thiểu 4) bằng cách cấp khối MỚI trong Arena rồi `memcpy`;
+    /// tràn `cap*2` hoặc `cap*size` ⇒ abort `overflow`; hết Arena ⇒ abort `arena_exhausted` (từ runtime). Bất biến: `len ≤ cap`,
+    /// `[0,len)` đã khởi tạo, `ptr` thuộc Arena còn sống (M6 giữ `&!Arena` độc quyền).
+    fn vec_push(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        gargs: &[Ty],
+        vals: &[BasicValueEnum<'ctx>],
+    ) -> R<Option<BasicValueEnum<'ctx>>> {
+        let [vp, x] = vals else {
+            return internal("Vec::push: sai số đối số");
+        };
+        let Some(et) = gargs.first() else {
+            return internal("Vec::push thiếu đối số kiểu");
+        };
+        let vt = self.vec_struct(gargs)?;
+        let elem = self.lower_ty(et)?;
+        let size = self.td.get_abi_size(&elem);
+        let align = self.td.get_abi_alignment(&elem).max(1);
+        let i64t = self.i64t();
+        let base = vp.into_pointer_value();
+        let ptr_p = llvm(self.builder.build_struct_gep(vt, base, 1, "ptr.p"))?;
+        let len_p = llvm(self.builder.build_struct_gep(vt, base, 2, "len.p"))?;
+        let cap_p = llvm(self.builder.build_struct_gep(vt, base, 3, "cap.p"))?;
+        let len = llvm(self.builder.build_load(i64t, len_p, "len"))?.into_int_value();
+        let cap = llvm(self.builder.build_load(i64t, cap_p, "cap"))?.into_int_value();
+        let full = llvm(
+            self.builder
+                .build_int_compare(IntPredicate::EQ, len, cap, "full"),
+        )?;
+        let grow = self.ctx.append_basic_block(fx.f, "vec.grow");
+        let store = self.ctx.append_basic_block(fx.f, "vec.store");
+        llvm(self.builder.build_conditional_branch(full, grow, store))?;
+        // ---- tăng trưởng
+        self.builder.position_at_end(grow);
+        let two = i64t.const_int(2, false);
+        let dbl = self
+            .call_intrinsic("llvm.umul.with.overflow", cap, two)?
+            .into_struct_value();
+        let dbl_v = llvm(self.builder.build_extract_value(dbl, 0, "dbl"))?.into_int_value();
+        let dbl_o = llvm(self.builder.build_extract_value(dbl, 1, "dbl.o"))?.into_int_value();
+        let ok = llvm(self.builder.build_not(dbl_o, "dbl.ok"))?;
+        self.guard(fx, ok, abort_kind::OVERFLOW)?;
+        let four = i64t.const_int(4, false);
+        let is_small =
+            llvm(
+                self.builder
+                    .build_int_compare(IntPredicate::ULT, dbl_v, four, "small"),
+            )?;
+        let ncap = llvm(self.builder.build_select(is_small, four, dbl_v, "ncap"))?.into_int_value();
+        let sz = i64t.const_int(size, false);
+        let by = self
+            .call_intrinsic("llvm.umul.with.overflow", ncap, sz)?
+            .into_struct_value();
+        let by_v = llvm(self.builder.build_extract_value(by, 0, "bytes"))?.into_int_value();
+        let by_o = llvm(self.builder.build_extract_value(by, 1, "bytes.o"))?.into_int_value();
+        let ok = llvm(self.builder.build_not(by_o, "bytes.ok"))?;
+        self.guard(fx, ok, abort_kind::OVERFLOW)?;
+        // handle của Arena: Vec.arena -> &!Arena -> { i32 }
+        let ar_p = llvm(self.builder.build_struct_gep(vt, base, 0, "arena.p"))?;
+        let ar =
+            llvm(self.builder.build_load(self.ptr_type(), ar_p, "arena"))?.into_pointer_value();
+        let i32t = self.ctx.i32_type();
+        let h = llvm(self.builder.build_load(i32t, ar, "ah"))?;
+        let ft = self
+            .ptr_type()
+            .fn_type(&[i32t.into(), i64t.into(), i64t.into()], false);
+        let f = self.rt_fn("gritrt_arena_alloc", ft);
+        let c = llvm(self.builder.build_call(
+            f,
+            &[
+                h.into(),
+                by_v.into(),
+                i64t.const_int(u64::from(align), false).into(),
+            ],
+            "va",
+        ))?;
+        let Some(np) = c.try_as_basic_value().basic() else {
+            return internal("gritrt_arena_alloc không trả giá trị");
+        };
+        self.tag_obl(np.as_instruction_value(), "E0405")?;
+        let np = np.into_pointer_value();
+        let old =
+            llvm(self.builder.build_load(self.ptr_type(), ptr_p, "old"))?.into_pointer_value();
+        // len ≤ cap và cap*size không tràn (đã kiểm ở lần cấp trước) ⇒ len*size không tràn
+        let used = llvm(self.builder.build_int_mul(len, sz, "used"))?;
+        llvm(self.builder.build_memcpy(np, align, old, align, used))?;
+        llvm(self.builder.build_store(ptr_p, np))?;
+        llvm(self.builder.build_store(cap_p, ncap))?;
+        llvm(self.builder.build_unconditional_branch(store))?;
+        // ---- ghi phần tử và tăng len
+        self.builder.position_at_end(store);
+        let cur =
+            llvm(self.builder.build_load(self.ptr_type(), ptr_p, "cur"))?.into_pointer_value();
+        let slot = self.gep(elem, cur, &[len])?;
+        llvm(self.builder.build_store(slot, *x))?;
+        let nl = llvm(
+            self.builder
+                .build_int_add(len, i64t.const_int(1, false), "len1"),
+        )?;
+        llvm(self.builder.build_store(len_p, nl))?;
+        Ok(Some(self.unit_type().const_zero()))
     }
 
     fn rt_fn(&mut self, name: &str, ty: FunctionType<'ctx>) -> FunctionValue<'ctx> {

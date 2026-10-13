@@ -83,6 +83,8 @@ pub struct CallRec {
     pub callee: Option<NodeId>,
     pub args: Vec<Ty>,
     pub trait_method: Option<(DefId, usize, Ty)>,
+    /// vị trí lời gọi (cho chẩn đoán E0318)
+    pub span: Span,
 }
 
 pub(crate) struct Checker<'e, 'a> {
@@ -97,6 +99,8 @@ pub(crate) struct Checker<'e, 'a> {
     pub locals: BTreeMap<LocalId, LocalInfo>,
     pub loops: Vec<bool>,
     pub scope: Vec<Bound>,
+    /// đã báo E0318 trong hàm này
+    pub vec_drop_reported: bool,
     pub oblig: Vec<Oblig>,
     pub types: BTreeMap<NodeId, Ty>,
     pub methods: Vec<(NodeId, MethodRes)>,
@@ -131,6 +135,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             locals: BTreeMap::new(),
             loops: Vec::new(),
             scope: Vec::new(),
+            vec_drop_reported: false,
             oblig: Vec::new(),
             types: BTreeMap::new(),
             methods: Vec::new(),
@@ -641,12 +646,53 @@ impl<'e, 'a> Checker<'e, 'a> {
             self.env.out_sites.insert(n, s);
         }
         let calls = std::mem::take(&mut self.calls);
+        let scope = self.scope.clone();
         for mut c in calls {
             c.args = c.args.iter().map(|t| self.infer.resolve(t)).collect();
+            self.check_vec_element(&c, &scope);
             if let Some((_, _, t)) = &mut c.trait_method {
                 *t = self.infer.resolve(t);
             }
             self.env.out_calls.push(c);
+        }
+    }
+
+    /// E0318 (ADR-032 phụ lục A, 3b): thành viên của `Vec<'a, T>` chỉ dùng được khi `T` KHÔNG cần drop (arena không chạy destructor).
+    /// Tham số kiểu `T` chưa biết coi là cần drop trừ khi có ràng buộc `Copy` trong phạm vi (fail-closed).
+    fn check_vec_element(&mut self, c: &CallRec, scope: &[Bound]) {
+        let Some(callee) = c.callee else {
+            return;
+        };
+        let Some(imp) = self
+            .env
+            .db
+            .impls
+            .iter()
+            .find(|i| i.members.iter().any(|m| m.node == callee))
+        else {
+            return;
+        };
+        let Ty::Adt(d, _) = &imp.self_ty else {
+            return;
+        };
+        if self.env.db.adts.get(d).and_then(|a| a.lang) != Some(Lang::Vec) {
+            return;
+        }
+        let Some(t) = c.args.first() else {
+            return;
+        };
+        if !self.vec_drop_reported
+            && self.env.db.needs_drop(t)
+            && !self.env.db.is_copy_resolved(t, scope)
+        {
+            self.vec_drop_reported = true; // một chẩn đoán cho mỗi hàm (tránh lặp ở `new`/`push`/…)
+            let shown = t.render(self.env.defs());
+            self.err(
+                "E0318",
+                c.caller,
+                c.span,
+                format!("`Vec<_, {shown}>`: `{shown}` cần drop (Drop tường minh/Arena/tham số kiểu không Copy) nhưng Vec trên Arena không chạy destructor"),
+            );
         }
     }
 

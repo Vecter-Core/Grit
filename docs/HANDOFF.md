@@ -54,7 +54,7 @@
 ## 2h. Lệnh sau duyệt ADR-032 (2026-10-13) — tiến độ
 - Mục 0 XONG (PROGRESS: sha256 + cổng 0d: 3 golden đỏ do băm attestation, đã sửa). ADR-032 phụ lục A đã ghi (ba chỗ sửa: Vec giữ `&!Arena`; MAX_PROGRAM_INSTANCES/E0317; `Ordering` so sánh: Giang chốt dùng đúng tên, enum nguyên tử đổi `AtomicOrdering` — XONG).
 - **(i) XONG, chờ báo/duyệt:** gọi qua trait + symbol ASCII băm + `!gt.instances` + Guard luật instance (41/41 đột biến giết) + E0317. Cổng đầy đủ chạy MỘT lần sau (v).
-- Việc tiếp: (ii) Vec trên Arena (E0318 cấm T cần drop; abort `arena_exhausted` kind 17; TCB; ADR-031), (iii) Ord/Cmp + so sánh &[u8] + sắp xếp trộn, (iv) mở rộng bộ sinh so sánh, (v) `sortlines`, (vi) ghi bug.
+- **(ii) XONG (chờ báo):** `Vec<'a,T>` trên Arena, E0318, `arena_exhausted`=17, TCB §B3, ADR-031/032 cập nhật. Việc tiếp: (3) điều tra E0703 khi gọi trait trong impl generic (M8; sau (ii)), rồi (iii) Ord/Ordering/sắp xếp trộn, (iv) bộ sinh, (v) sortlines, (vi) ghi bug. [cũ] (ii) Vec trên Arena (E0318 cấm T cần drop; abort `arena_exhausted` kind 17; TCB; ADR-031), (iii) Ord/Cmp + so sánh &[u8] + sắp xếp trộn, (iv) mở rộng bộ sinh so sánh, (v) `sortlines`, (vi) ghi bug.
 
 ## 3. Việc tiếp theo (theo thứ tự; mỗi bước nhỏ = một commit + cập nhật mục 2/3 + kiểm nhẹ: `cargo fmt`, test các crate bị đổi)
 1. `[XONG 2026-10-12]` Ghi SHA-256 gói LLVM 20.1.8 + `LLVM-C.dll` vào ADR-029 và `docs/ENVIRONMENT.md` (băm tự tính khi tải; GitHub công bố `f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f`), ghi: gritc cần `LLVM-C.dll` trên PATH khi chạy; binary do gritc sinh KHÔNG phụ thuộc `LLVM-C.dll` (phải kiểm bằng `dumpbin /dependents`); `libxml2s.lib` rỗng chỉ là workaround dự phòng.

@@ -379,7 +379,7 @@ fn run_passes(
         }
         None => Vec::new(),
     };
-    let cr = obl.as_ref().map(|o| checks_report(o, checks));
+    let cr = obl.as_ref().map(|o| checks_report(o, checks, &m.keys));
     let arts = obl.map(|o| Artifacts {
         types: t,
         mir: m,

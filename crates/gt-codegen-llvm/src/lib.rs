@@ -53,4 +53,5 @@ pub mod abort_kind {
     pub const IO_ERROR: u64 = 14;
     pub const ARG_OOR: u64 = 15;
     pub const FUEL: u64 = 16;
+    pub const ARENA_EXHAUSTED: u64 = 17;
 }

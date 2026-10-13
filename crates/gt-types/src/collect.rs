@@ -23,6 +23,8 @@ pub enum Lang {
     Drop,
     /// `Arena`: vùng nhớ; mượn `&Arena` sinh region "gốc Arena" cho M6 (E0405 khác E0404).
     Arena,
+    /// `Vec<'a, T>`: mảng tăng trưởng trong Arena (ADR-032 phụ lục A); literal ngoài lib/core bị cấm (E0313), `T` không được cần drop (E0318).
+    Vec,
     /// `Send` (M8): trait TỰ ĐỘNG — kiểu có thể chuyển sang luồng khác; suy cấu trúc (send.rs), cấm viết `⊐ Send for`.
     Send,
     /// Kiểu có MUTABILITY BÊN TRONG (`&self` ghi được): gt-borrowck coi mọi vị trí region bên trong là BẤT BIẾN, kể cả qua `&`
@@ -56,6 +58,7 @@ impl Lang {
             "secret" => Lang::Secret,
             "cap" => Lang::Cap,
             "arena" => Lang::Arena,
+            "vec" => Lang::Vec,
             "drop" => Lang::Drop,
             "send" => Lang::Send,
             "cell" => Lang::Cell,

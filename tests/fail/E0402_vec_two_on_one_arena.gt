@@ -1,0 +1,10 @@
+// expect: fail E0402
+// note: Vec giữ &!Arena độc quyền: hai Vec trên cùng một Arena cùng sống bị từ chối
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μa ≔ Vec::new(&!ar);
+  μb ≔ Vec::new(&!ar);
+  a.push(1u64);
+  b.push(2u64);
+  a.len() as u64
+}

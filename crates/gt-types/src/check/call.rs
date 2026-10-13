@@ -85,6 +85,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                     callee: Some(sig.node),
                     args: args.clone(),
                     trait_method: None,
+                    span: e.span,
                 });
                 self.sites.push((
                     e.id,
@@ -210,6 +211,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                     callee: None,
                     args: targs.clone(),
                     trait_method: Some((*d, mi, self_ty.clone())),
+                    span: e.span,
                 });
                 self.sites.push((
                     e.id,
@@ -267,7 +269,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         for (t, tr) in &pick.bounds {
             self.push_oblig(t.clone(), *tr, e.id, e.span);
         }
-        self.record_pick(e.id, pick);
+        self.record_pick(e.id, e.span, pick);
         let mut ps: Vec<Ty> = Vec::new();
         match pick.self_kind {
             Some(SelfKind::Value) => ps.push(pick.recv_self.clone()),
@@ -285,7 +287,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         Ty::Fn(ps, Box::new(pick.ret.clone()), Vec::new())
     }
 
-    fn record_pick(&mut self, node: NodeId, pick: &Pick) {
+    fn record_pick(&mut self, node: NodeId, span: gt_span::Span, pick: &Pick) {
         self.record_pick_site(node, pick, false);
         self.methods.push((node, pick.res.clone()));
         match &pick.res {
@@ -309,6 +311,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                     callee,
                     args: all,
                     trait_method: None,
+                    span,
                 });
             }
             MethodRes::TraitMethod {
@@ -321,6 +324,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                     callee: None,
                     args: pick.generics.clone(),
                     trait_method: Some((*trait_def, *member, self_ty.clone())),
+                    span,
                 });
             }
         }
@@ -482,7 +486,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         for (t, tr) in &pick.bounds {
             self.push_oblig(t.clone(), *tr, e.id, e.span);
         }
-        self.record_pick(e.id, &pick);
+        self.record_pick(e.id, e.span, &pick);
         self.record_pick_site(e.id, &pick, true);
         let mut cap_ps = vec![pick.recv_self.clone()];
         cap_ps.extend(pick.params.iter().cloned());

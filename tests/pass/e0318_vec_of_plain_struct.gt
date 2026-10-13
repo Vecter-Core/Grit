@@ -1,0 +1,9 @@
+// expect: pass
+// note: struct không có Drop và không chứa kiểu cần drop
+▢ P { x: i32, y: i32 }
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&!ar);
+  v.push(P { x: 1, y: 2 });
+  v.len() as u64
+}

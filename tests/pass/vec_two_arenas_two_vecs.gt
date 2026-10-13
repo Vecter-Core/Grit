@@ -1,0 +1,12 @@
+// expect: pass
+// note: hai Vec cùng sống cần HAI Arena (hệ quả cho sortlines: danh sách dòng và bộ đệm trộn)
+ƒ main() → u64 ! {mem} {
+  μa1 ≔ Arena::new();
+  μa2 ≔ Arena::new();
+  μx ≔ Vec::new(&!a1);
+  μy ≔ Vec::new(&!a2);
+  x.push(1u64);
+  y.push(2u64);
+  x.push(3u64);
+  x.len() as u64 +% y.len() as u64
+}

@@ -1,0 +1,10 @@
+// expect: pass
+// note: tham chiếu phần tử/lát hết sống trước push ⇒ hợp lệ
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&!ar);
+  v.push(1u64);
+  first ≔ v.as_slice()[0];
+  v.push(first +% 1u64);
+  v.as_slice()[1]
+}

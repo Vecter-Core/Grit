@@ -1,0 +1,4 @@
+// expect: fail E0318
+// note: tham số kiểu T không có ràng buộc Copy ⇒ coi là cần drop (fail-closed)
+ƒ mk<'a, T>(a: &!'a Arena, w: T) → Vec<'a, T> ! {mem} { Vec::new(a) }
+ƒ main() ! {mem} { μar ≔ Arena::new(); mk(&!ar, 1u8); }

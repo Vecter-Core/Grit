@@ -490,6 +490,56 @@ impl<'a> Interp<'a> {
 
     /// Lang item đồng thời/mutability bên trong (`Cell`, `Mutex`, `Atomic`): CÔNG CỤ TEST, NGOÀI TCB, thực thi TUẦN TỰ. Ngữ nghĩa này KHÔNG
     /// phải bằng chứng cho ngữ nghĩa codegen (M10 phải dùng atomics/khoá LLVM thật; ADR-027 §1). `Ok(None)`: không phải intrinsic loại này.
+    /// `Vec<'a, T>` (ADR-032 phụ lục A) trên thông dịch: giá trị `Adt(0, [arena, Array(phần tử), len, cap])`; `Array` luôn có đúng `len`
+    /// phần tử. Không mô phỏng hết Arena/tràn kích thước (thông dịch không có bố cục): các abort đó chỉ kiểm trên exe.
+    fn vec_op(&mut self, m: &str, vals: &[V]) -> Result<V, Flow> {
+        let bug = |t: &str| Flow::Bug(format!("Vec::{m}: {t}"));
+        match (m, vals) {
+            ("new", [arena]) => Ok(V::Adt(
+                0,
+                vec![
+                    arena.clone(),
+                    V::Array(Vec::new()),
+                    V::Int(0, IntTy::Usize),
+                    V::Int(0, IntTy::Usize),
+                ],
+            )),
+            ("len", [V::Ref(fr, l, path)]) => {
+                let mut p = path.clone();
+                p.push(Step::Field(2));
+                self.get(*fr, *l, &p)
+            }
+            ("as_slice" | "as_mut_slice", [V::Ref(fr, l, path)]) => {
+                let mut p = path.clone();
+                p.push(Step::Field(1));
+                Ok(V::Ref(*fr, *l, p))
+            }
+            ("push", [V::Ref(fr, l, path), x]) => {
+                let mut items = path.clone();
+                items.push(Step::Field(1));
+                let V::Array(mut a) = self.get(*fr, *l, &items)? else {
+                    return Err(bug("trường phần tử không phải mảng"));
+                };
+                a.push(x.clone());
+                let n = a.len() as i128;
+                self.set_at(*fr, *l, &items, V::Array(a))?;
+                let mut lp = path.clone();
+                lp.push(Step::Field(2));
+                self.set_at(*fr, *l, &lp, V::Int(n, IntTy::Usize))?;
+                let mut cp = path.clone();
+                cp.push(Step::Field(3));
+                let V::Int(cap, t) = self.get(*fr, *l, &cp)? else {
+                    return Err(bug("cap không phải số nguyên"));
+                };
+                if n > cap {
+                    self.set_at(*fr, *l, &cp, V::Int((cap * 2).max(4), t))?;
+                }
+                Ok(V::Unit)
+            }
+            _ => Err(bug("đối số không đúng dạng")),
+        }
+    }
+
     fn lang_ops(&mut self, key: &str, vals: &[V]) -> Result<Option<V>, Flow> {
         // phép bit u32 của prelude (Q9): thân không có MIR; M7 đã chèn Assert `n < 32` ở chỗ gọi nên n ≥ 32 không tới được đây
         if let Some(name) = key.strip_prefix("$prelude::")
@@ -531,6 +581,17 @@ impl<'a> Interp<'a> {
         }
         let is = |name: &str| key.contains(name);
         let m = key.rsplit("::").next().unwrap_or("");
+        if key.starts_with("$prelude::Vec<") {
+            return self.vec_op(m, vals).map(Some);
+        }
+        if key == "$prelude::Arena::new" || key == "$prelude::Arena::reset" {
+            // Arena của thông dịch: tay cầm 0, không giới hạn bộ nhớ; `reset` không làm gì (M6 đã bảo đảm không còn tham chiếu vào nội dung)
+            return Ok(Some(if m == "new" {
+                V::Adt(0, vec![V::Int(0, IntTy::I32)])
+            } else {
+                V::Unit
+            }));
+        }
         if !(is("Cell") || is("Mutex") || is("Atomic")) {
             return Ok(None);
         }

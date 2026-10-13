@@ -626,15 +626,15 @@ impl<'e, 'a> Checker<'e, 'a> {
             );
             return Ty::Err;
         };
-        let forged =
-            matches!(adt.lang, Some(Lang::Secret | Lang::Cap)) && !self.env.is_prelude(e.id.file());
+        let forged = matches!(adt.lang, Some(Lang::Secret | Lang::Cap | Lang::Vec))
+            && !self.env.is_prelude(e.id.file());
         if forged {
             let name = self.env.defs()[d.index()].path.clone();
             self.err(
                 "E0313",
                 e.id,
                 e.span,
-                format!("không thể tạo `{name}` bằng literal: kiểu capability/secret phải do `lib/core` cấp (D29)"),
+                format!("không thể tạo `{name}` bằng literal: kiểu capability/secret/Vec phải do `lib/core` cấp (D29, ADR-032)"),
             );
         }
         let mut seen: Vec<&str> = Vec::new();

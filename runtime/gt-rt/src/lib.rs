@@ -18,7 +18,7 @@ use std::io::Write;
 pub const ABORT_EXIT_CODE: i32 = 70;
 
 /// Loại abort; số thứ tự là hợp đồng với codegen; TÊN trùng `AssertKind::name` của MIR (đối chiếu với thông dịch).
-pub const ABORT_KINDS: [&str; 17] = [
+pub const ABORT_KINDS: [&str; 18] = [
     "unknown",
     "overflow",
     "index_out_of_bounds",
@@ -36,6 +36,7 @@ pub const ABORT_KINDS: [&str; 17] = [
     "io_error",
     "arg_out_of_range",
     "fuel_exhausted",
+    "arena_exhausted",
 ];
 
 #[unsafe(no_mangle)]
@@ -266,6 +267,20 @@ struct ArenaState {
     chunks: Vec<(usize, usize, usize)>, // (địa chỉ, dung lượng, đã dùng)
 }
 
+/// Loại abort `arena_exhausted` (hết bộ nhớ của Arena hoặc vượt giới hạn); số thứ tự khớp `ABORT_KINDS`/`gt-codegen-llvm`.
+const ARENA_EXHAUSTED: i32 = 17;
+
+/// Giới hạn TỔNG dung lượng chunk của MỘT arena (byte), đọc một lần từ biến môi trường `GRITRT_ARENA_LIMIT`; mặc định không giới hạn.
+/// Chỉ làm `alloc` thất bại SỚM hơn (fail-closed): dùng để kiểm thử `arena_exhausted` và để chặn ngốn bộ nhớ.
+fn arena_limit() -> Option<usize> {
+    static L: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
+    *L.get_or_init(|| {
+        std::env::var("GRITRT_ARENA_LIMIT")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+    })
+}
+
 fn arenas() -> &'static std::sync::Mutex<Vec<ArenaState>> {
     static A: std::sync::OnceLock<std::sync::Mutex<Vec<ArenaState>>> = std::sync::OnceLock::new();
     A.get_or_init(|| std::sync::Mutex::new(Vec::new()))
@@ -302,12 +317,16 @@ pub extern "C" fn gritrt_arena_alloc(h: i32, size: u64, align: u64) -> *mut u8 {
         }
     }
     let cap = CHUNK.max(size.saturating_add(align));
+    let held: usize = st.chunks.iter().map(|c| c.1).fold(0, usize::saturating_add);
+    if arena_limit().is_some_and(|l| held.saturating_add(cap) > l) {
+        gritrt_abort(ARENA_EXHAUSTED);
+    }
     let Ok(layout) = std::alloc::Layout::from_size_align(cap, 4096) else {
-        gritrt_abort(0)
+        gritrt_abort(ARENA_EXHAUSTED)
     };
     let base = unsafe { std::alloc::alloc(layout) } as usize;
     if base == 0 {
-        gritrt_abort(0);
+        gritrt_abort(ARENA_EXHAUSTED);
     }
     let start = base.next_multiple_of(align) - base;
     st.chunks.push((base, cap, start + size));

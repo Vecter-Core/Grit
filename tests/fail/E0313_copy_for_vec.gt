@@ -1,0 +1,4 @@
+// expect: fail E0313
+// note: Vec giữ &! duy nhất và con trỏ của TCB: không bao giờ Copy
+⊐ <'a, T> Copy for Vec<'a, T> { }
+ƒ main() ! ∅ { }

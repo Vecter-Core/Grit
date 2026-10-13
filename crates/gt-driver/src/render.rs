@@ -19,7 +19,7 @@ pub struct CheckItem {
     pub func: String,
     pub kind: &'static str,
     pub span: (u32, u32),
-    /// `kept_not_proven` | `kept_mode_all` | `inserted_mode_all` | `deleted_proven`
+    /// `kept_not_proven` | `kept_mode_all` | `inserted_mode_all` | `deleted_proven` | `intrinsic_runtime` (abort bên trong intrinsic, vd `arena_exhausted`)
     pub status: &'static str,
     pub solver: Option<&'static str>,
 }
@@ -33,9 +33,14 @@ pub struct ChecksReport {
     pub would_delete: Vec<CheckItem>,
 }
 
-/// Dựng báo cáo check từ kết quả M7 (tất định: theo thân rồi theo thứ tự nghĩa vụ).
+/// Dựng báo cáo check từ kết quả M7 (tất định: theo thân rồi theo thứ tự nghĩa vụ). `keys`: tên đầy đủ theo NodeId, để nhận ra các lời
+/// gọi intrinsic của prelude có thể abort `arena_exhausted` lúc chạy (`Vec::push`, `Arena::alloc`; ADR-032 phụ lục A, 3c).
 #[must_use]
-pub fn checks_report(obl: &OblOutput, mode: Checks) -> ChecksReport {
+pub fn checks_report(
+    obl: &OblOutput,
+    mode: Checks,
+    keys: &std::collections::BTreeMap<gt_ast::NodeId, String>,
+) -> ChecksReport {
     let mut r = ChecksReport {
         mode: if mode == Checks::All { "all" } else { "proven" },
         ..ChecksReport::default()
@@ -65,6 +70,32 @@ pub fn checks_report(obl: &OblOutput, mode: Checks) -> ChecksReport {
                 }
                 Status::Lowered { .. } => r.kept.push(item("kept_not_proven", None)),
                 Status::DefinitelyFalse | Status::Rejected { .. } => {}
+            }
+        }
+    }
+    // intrinsic có thể hết Arena lúc chạy: KHÔNG chứng minh được (phụ thuộc bộ nhớ thật), KHÔNG chèn Assert; luôn còn lại
+    for b in &obl.bodies {
+        let mut n = 0usize;
+        for bb in &b.blocks {
+            if let Some(t) = &bb.terminator
+                && let gt_mir::TerminatorKind::Call {
+                    callee: gt_mir::Callee::Fn { node, .. },
+                    ..
+                } = &t.kind
+                && keys.get(node).is_some_and(|k| {
+                    (k.starts_with("$prelude::Vec<") && k.ends_with("::push"))
+                        || k == "$prelude::Arena::alloc"
+                })
+            {
+                r.kept.push(CheckItem {
+                    id: format!("{}#arena{n}", b.key),
+                    func: b.key.clone(),
+                    kind: "arena_exhausted",
+                    span: (t.source.span.start, t.source.span.end),
+                    status: "intrinsic_runtime",
+                    solver: None,
+                });
+                n += 1;
             }
         }
     }
