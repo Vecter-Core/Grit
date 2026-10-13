@@ -47,6 +47,10 @@
 - Cổng đầy đủ xanh (756 test, 4 lần chạy; 3 lần đầu ĐỎ thật rồi sửa). M11 PROGRESS có SHA-256 thật. Capability: E0310 đúng, không lỗ hổng (đính chính tài liệu), điều kiện cứng 12 ở GRIT_PLAN §7. TCB: docs/TCB_INTRINSICS.md + ADR-031 (người duyệt `CHỜ GIANG`). IR Guard: bảng RUNTIME đóng + lớp E0310/E0405; đột biến 56/57 (1 tương đương). FB-1 luật bộ sinh, lô abort (847 khớp) đã làm. FB-2 (Guard tên Unicode) sửa. Công cụ 2: examples/json (6 test, ~900 tài liệu 0 bất đồng). Khoảng trống: docs/DOGFOOD.md.
 - Việc tiếp (đề xuất, chờ Giang): Vec/String/f64 hoặc gọi qua trait (chọn theo công cụ thứ ba), khoá fixture prelude gt-resolve bằng test, `argc`/stderr, hồ sơ `release` (ADR riêng).
 
+## 2f. Lệnh sau 364ac3c — tiến độ
+- Bước 0 XONG (PROGRESS có số FB-1 luật bộ sinh + lô abort). Bước 1 XONG: (a) prelude MỘT nguồn (`lib/core/prelude.gt`; fixture gt-types/gt-resolve `include_str!`; test `prelude_has_a_single_source`; thêm `core::hidden` riêng để test E0203), (b) `Cap<Env>::arg_count`, `Cap<ErrOut>`/`root_err` (đặt tên ErrOut vì `Err` là biến thể Result), wc/json lỗi ra stderr + usage mã 2, (c) `core::fuel_left` ⇒ `AssertKind::Fuel`/`ObKind::Fuel`, abort `fuel_exhausted` (mã kind 16), note N0905 + docs + 3 mẫu pass, báo cáo check kind `fuel`, (d) phân rã tuple hoãn (KNOWN_LIMITATIONS), (e) LƯU Ý: lỗi che tên biến thể là E0301 (không phải E0205): nay có gợi ý `Result::Ok`.
+- Việc tiếp: bước 2 (sha256), bước 3 (ADR công cụ thứ tư, chưa code, rồi DỪNG).
+
 ## 3. Việc tiếp theo (theo thứ tự; mỗi bước nhỏ = một commit + cập nhật mục 2/3 + kiểm nhẹ: `cargo fmt`, test các crate bị đổi)
 1. `[XONG 2026-10-12]` Ghi SHA-256 gói LLVM 20.1.8 + `LLVM-C.dll` vào ADR-029 và `docs/ENVIRONMENT.md` (băm tự tính khi tải; GitHub công bố `f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f`), ghi: gritc cần `LLVM-C.dll` trên PATH khi chạy; binary do gritc sinh KHÔNG phụ thuộc `LLVM-C.dll` (phải kiểm bằng `dumpbin /dependents`); `libxml2s.lib` rỗng chỉ là workaround dự phòng.
 2. `[XONG 2026-10-12]` ADR-029 phụ lục: Q59–Q65 quyết định cuối; vấn đề `gritc.exe` không khởi động khi thiếu `LLVM-C.dll` ⇒ cargo feature `llvm` + nạp DLL trễ.

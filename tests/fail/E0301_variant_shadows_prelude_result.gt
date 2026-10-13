@@ -1,0 +1,5 @@
+// expect: fail E0301
+// note: enum người dùng có biến thể `Ok`/`Err` che `Ok`/`Err` của `Result` (prelude) trong pattern không qualify ⇒ E0301 kèm gợi ý `Result::Ok` (dogfood #11)
+⊔ R { Ok(u32), Err(u32) }
+ƒ f(x: Result<u32, u32>) → u32 ! ∅ { ⌥ x { Ok(v) ↦ v, Err(e) ↦ e } }
+ƒ main() → u32 ! ∅ { f(Result::Ok(1u32)) }

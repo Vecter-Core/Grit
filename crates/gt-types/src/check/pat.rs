@@ -66,6 +66,53 @@ impl<'e, 'a> Checker<'e, 'a> {
         );
     }
 
+    /// Pattern biến thể KHÔNG qualify khớp một enum người dùng nhưng kiểu cần là enum khác CÓ biến thể cùng tên (vd người dùng định nghĩa
+    /// `Ok`/`Err` làm `Result` của prelude bị che, D7/Q17): báo E0301 kèm gợi ý viết đầy đủ `Enum::Biến`. `true` nếu đã báo.
+    fn shadow_hint(&mut self, p: &Pattern, vd: DefId, want: &Ty, got: &Ty) -> bool {
+        let (path_span, unqualified) = match &p.kind {
+            PatternKind::Variant { path, .. } => (path.span, path.segments.len() == 1),
+            PatternKind::Binding(ident) => (ident.span, true),
+            _ => return false,
+        };
+        if !unqualified {
+            return false;
+        }
+        let short = |d: DefId| -> String {
+            let p = &self.env.defs()[d.index()].path;
+            p.rsplit("::").next().unwrap_or(p).to_string()
+        };
+        let name = short(vd);
+        let Ty::Adt(wd, _) = self.infer.resolve(want) else {
+            return false;
+        };
+        let has_same = self.env.db.adts.get(&wd).is_some_and(
+            |a| matches!(&a.kind, AdtKind::Enum(vs) if vs.iter().any(|v| v.name == name)),
+        );
+        if !has_same {
+            return false;
+        }
+        let want_enum = short(wd);
+        let user_enum = self.env.defs()[vd.index()]
+            .parent
+            .map_or_else(String::new, short);
+        let (sw, sg) = (self.show(want), self.show(got));
+        let full = format!("{want_enum}::{name}");
+        self.err_sugg(
+            "E0301",
+            p.id,
+            p.span,
+            format!(
+                "pattern có kiểu `{sg}` không khớp kiểu cần `{sw}`: tên biến thể `{name}` của enum `{user_enum}` che `{name}` của `{want_enum}` (D7); viết `{full}` hoặc đổi tên biến thể của `{user_enum}`"
+            ),
+            Suggestion::new(
+                format!("viết đầy đủ tên enum: `{full}`"),
+                Applicability::MaybeIncorrect,
+                vec![gt_diag::Edit::new(path_span, full.clone())],
+            ),
+        );
+        true
+    }
+
     fn lit_pat(&mut self, p: &Pattern, l: &Lit, ty: &Ty) -> XPat {
         let lt = self.expr_lit_type(l);
         if !self.infer.unify(&lt, ty) {
@@ -170,7 +217,9 @@ impl<'e, 'a> Checker<'e, 'a> {
         let targs = fresh_args(&mut self.infer, &adt.generics);
         let aty = Ty::Adt(adt.def, targs.clone());
         if !self.infer.unify(&aty, ty) {
-            self.pat_mismatch(p, ty, &aty);
+            if !self.shadow_hint(p, vd, ty, &aty) {
+                self.pat_mismatch(p, ty, &aty);
+            }
             self.bind_all(args);
             return XPat::Wild;
         }
