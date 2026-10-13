@@ -131,6 +131,7 @@ enum Intr {
     FileBytes,
     OutU64,
     OutStr,
+    Exit,
     FsOpen,
     ArenaNew,
     ArenaAlloc,
@@ -1634,6 +1635,9 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         if key.contains("Cap<Fs>") && m == "read" {
             return Some(Intr::FsRead);
         }
+        if key.ends_with("core::exit") {
+            return Some(Intr::Exit);
+        }
         if key.contains("Cap<Fs>") && m == "open" {
             return Some(Intr::FsOpen);
         }
@@ -1799,6 +1803,17 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
     ) -> R<Option<BasicValueEnum<'ctx>>> {
         match intr {
             Intr::RootCap => Ok(Some(self.lower_ty(dest_ty)?.const_zero())),
+            Intr::Exit => {
+                let ft = self
+                    .ctx
+                    .void_type()
+                    .fn_type(&[self.ctx.i32_type().into()], false);
+                let f = self.rt_fn("gritrt_exit", ft);
+                f.add_attribute(AttributeLoc::Function, noreturn(self.ctx));
+                let c = llvm(self.builder.build_call(f, &[vals[0].into()], ""))?;
+                c.add_attribute(AttributeLoc::Function, noreturn(self.ctx));
+                Ok(None)
+            }
             Intr::ArenaNew => {
                 let ft = self.ctx.i32_type().fn_type(&[], false);
                 let f = self.rt_fn("gritrt_arena_new", ft);

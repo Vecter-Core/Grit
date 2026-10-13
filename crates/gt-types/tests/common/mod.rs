@@ -107,7 +107,10 @@ pub const PRELUDE_SRC: &str = "\
 ⊐ Cap<Alloc> { ƒ arena(&self) → Arena ! {mem} { } }
 ⊐ Host { ƒ fs() → Cap<Fs> ! {io} { } }
 ⊐ Arena { ƒ new() → Arena ! {mem} { } ƒ alloc<T>(&self, v: T) → &T ! {mem} { } ƒ reset(&!self) ! {mem} { } }
-▦ core { ◈ ƒ abort(msg: &str) → ! ! {div} { } }
+▦ core {
+  ◈ ƒ abort(msg: &str) → ! ! {div} { }
+  ◈ ƒ exit(code: u32) → ! ! {div} { }
+}
 ƒ root_fs() → Cap<Fs> ! ∅ { }
 ƒ root_net() → Cap<Net> ! ∅ { }
 ƒ root_env() → Cap<Env> ! ∅ { }

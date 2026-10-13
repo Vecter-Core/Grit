@@ -1,5 +1,5 @@
 // wc: đếm dòng, từ, byte của một tệp (dogfood M11→M12, docs/DOGFOOD.md). Dùng: wc.exe <đường-dẫn>
-// Capability chỉ lấy ở `main` (E0310) rồi TRUYỀN XUỐNG hàm cần dùng.
+// Capability chỉ lấy ở `main` (E0310) rồi TRUYỀN XUỐNG hàm cần dùng. Lỗi mở tệp ⇒ in lý do ra stdout và thoát mã 2 (không abort).
 
 // đếm trên lát byte: trả (dòng, từ)
 ƒ count(b: &[u8]) → (u64, u64) ! ∅ {
@@ -28,13 +28,29 @@
   out.write_str("\n");
 }
 
-ƒ main() ! {io} {
+ƒ fail(out: &Cap<Out>, path: &str, why: &str) → ! ! {io, div} {
+  out.write_str("wc: ");
+  out.write_str(path);
+  out.write_str(": ");
+  out.write_str(why);
+  out.write_str("\n");
+  core::exit(2u32)
+}
+
+ƒ main() ! {io, div} {
   env ≔ root_env();
   fs ≔ root_fs();
   out ≔ root_out();
   path ≔ env.arg(1usize);
-  f ≔ fs.read(path);
-  b ≔ f.bytes();
-  r ≔ count(b);
-  report(&out, r.0, r.1, b.len() as u64, path);
+  ⌥ fs.open(path) {
+    Ok(f) ↦ {
+      b ≔ f.bytes();
+      r ≔ count(b);
+      report(&out, r.0, r.1, b.len() as u64, path);
+    },
+    Err(IoError::NotFound) ↦ fail(&out, path, "no such file"),
+    Err(IoError::Denied) ↦ fail(&out, path, "permission denied"),
+    Err(IoError::Invalid) ↦ fail(&out, path, "invalid path"),
+    Err(IoError::Other) ↦ fail(&out, path, "i/o error"),
+  }
 }

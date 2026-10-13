@@ -146,20 +146,35 @@ fn wc_handles_a_large_file_and_reports_throughput() {
 }
 
 #[test]
-fn wc_error_paths_abort_with_code_70_and_a_named_kind() {
+fn wc_error_paths_are_controlled() {
     let exe = build_wc();
     let d = tmp("err");
+    // không có tệp ⇒ Result::Err(NotFound): in lý do, thoát mã 2 (KHÔNG abort)
     let o = Command::new(&exe)
         .arg(d.join("khong_co.txt"))
         .output()
         .expect("chạy");
-    assert_eq!(o.status.code(), Some(70));
-    let e = String::from_utf8_lossy(&o.stderr).into_owned();
+    assert_eq!(o.status.code(), Some(2));
+    let out = String::from_utf8_lossy(&o.stdout).into_owned();
     assert!(
-        e.contains("io_error") && e.contains("abort: io_error"),
-        "{e}"
+        out.starts_with("wc: ")
+            && out.ends_with(
+                ": no such file
+"
+            ),
+        "{out}"
     );
-    assert!(o.stdout.is_empty(), "không in gì khi lỗi");
+    assert!(o.stderr.is_empty(), "không abort ⇒ stderr rỗng");
+    // đường dẫn là THƯ MỤC ⇒ lỗi hệ điều hành khác (không phải NotFound): vẫn lỗi có kiểm soát mã 2
+    let o = Command::new(&exe).arg(&d).output().expect("chạy");
+    assert_eq!(
+        o.status.code(),
+        Some(2),
+        "{}",
+        String::from_utf8_lossy(&o.stdout)
+    );
+    assert!(String::from_utf8_lossy(&o.stdout).starts_with("wc: "));
+    // thiếu đối số: vẫn abort (chưa có argc) mã 70
     let o = Command::new(&exe).output().expect("chạy");
     assert_eq!(o.status.code(), Some(70));
     assert!(String::from_utf8_lossy(&o.stderr).contains("abort: arg_out_of_range"));

@@ -49,6 +49,14 @@ pub extern "C" fn gritrt_abort(kind: i32) -> ! {
     std::process::exit(ABORT_EXIT_CODE)
 }
 
+/// `core::exit(code)`: dừng tiến trình NGAY với trạng thái `code` (không unwinding); khác `abort` (mã 70) — là thoát CÓ KIỂM SOÁT của chương trình.
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_exit(code: u32) -> ! {
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    std::process::exit(i32::try_from(code.min(255)).unwrap_or(255))
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_start(main: extern "C" fn()) -> i32 {
     main();
@@ -246,7 +254,10 @@ pub extern "C" fn gritrt_arena_new() -> i32 {
 /// Cấp `size` byte căn lề `align` (luỹ thừa 2 ≤ 4096), KHÔNG khởi tạo. Hết bộ nhớ ⇒ abort.
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_arena_alloc(h: i32, size: u64, align: u64) -> *mut u8 {
-    let (size, align) = (usize::try_from(size).unwrap_or(usize::MAX), usize::try_from(align).unwrap_or(0));
+    let (size, align) = (
+        usize::try_from(size).unwrap_or(usize::MAX),
+        usize::try_from(align).unwrap_or(0),
+    );
     if !align.is_power_of_two() || align > 4096 {
         gritrt_abort(0);
     }

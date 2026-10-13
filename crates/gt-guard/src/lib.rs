@@ -60,8 +60,9 @@ fn is_atomic(inst: &InstructionValue<'_>) -> bool {
 
 /// Bảng lời gọi runtime hợp lệ: (tên, lớp nghĩa vụ phải mang; `None` = không nhạy cảm). Hợp đồng với `gt-codegen-llvm` và `runtime/gt-rt`
 /// (docs/TCB_INTRINSICS.md). Thêm hàm runtime MỚI = thêm dòng ở đây (nếu quên, Guard từ chối ⇒ fail-closed).
-pub const RUNTIME: [(&str, Option<&str>); 18] = [
+pub const RUNTIME: [(&str, Option<&str>); 19] = [
     ("gritrt_abort", None),
+    ("gritrt_exit", None),
     ("gritrt_start", None),
     ("gritrt_report_int", None),
     ("gritrt_alloc", None),

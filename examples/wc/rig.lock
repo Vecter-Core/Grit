@@ -6,4 +6,4 @@ name = "wc"
 version = "0.1.0"
 source = "root"
 deps = []
-hash = "sha256:c5a4d5b84d5c01f13d37f7db55798eabeba5a34f014dec249e1d7d86ec543401"
+hash = "sha256:a25974ddc6d1e19190464750190ef662e5eebd6a54420c8e9732a38b803b83c9"
