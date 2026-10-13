@@ -1,0 +1,9 @@
+// expect: fail E0703
+// note: TỪ CHỐI OAN ghi nhận (ADR-033): chương trình dừng nhưng M8 coi `fwd → mọi impl → W::a → fwd` là vòng; chưa có cách né ngoài hiệu ứng div
+⊏ A { ƒ a(&self) → i32 ! ∅; }
+▢ S { }
+▢ W<T> { i: T }
+⊐ A for S { ƒ a(&self) → i32 ! ∅ { 1 } }
+ƒ fwd<T: A>(x: &T) → i32 ! ∅ { x.a() }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i32 ! ∅ { fwd(&self.i) } }
+ƒ main() → i32 ! ∅ { w ≔ W { i: S { } }; w.a() }

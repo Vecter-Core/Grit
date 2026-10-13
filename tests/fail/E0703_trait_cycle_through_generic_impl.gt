@@ -1,0 +1,8 @@
+// expect: fail E0703
+// note: vòng THẬT qua impl generic: X::a → W<X>::a → X::a (vô hạn); bản sửa ngây thơ "bỏ cạnh impl gọi impl của tham số kiểu" sẽ làm mất soundness (ADR-033)
+⊏ A { ƒ a(&self) → i32 ! ∅; }
+▢ X { }
+▢ W<T> { i: T }
+⊐ A for X { ƒ a(&self) → i32 ! ∅ { w ≔ W { i: X { } }; w.a() } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i32 ! ∅ { self.i.a() } }
+ƒ main() → i32 ! ∅ { x ≔ X { }; x.a() }
