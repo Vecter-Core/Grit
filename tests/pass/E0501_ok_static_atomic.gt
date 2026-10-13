@@ -1,5 +1,5 @@
 // expect: pass
 // note: bộ đếm nguyên tử dùng chung qua static
 ■ COUNT: Atomic<u32> ≔ Atomic::new(0u32);
-ƒ worker(n: u32) ! ∅ { COUNT.fetch_add(n, Ordering::Relaxed); }
+ƒ worker(n: u32) ! ∅ { COUNT.fetch_add(n, AtomicOrdering::Relaxed); }
 ƒ main() ! ∅ { spawn(worker, 1u32); spawn(worker, 2u32); }

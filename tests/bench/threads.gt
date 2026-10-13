@@ -9,7 +9,7 @@
   μi ≔ 0u32;
   ⟳ i < 500000 ↓ 500000 - i {
     SUM.with(add_one, 1u64);
-    COUNT.fetch_add(1u64, Ordering::Release);
+    COUNT.fetch_add(1u64, AtomicOrdering::Release);
     i ← i + 1;
   }
 }
@@ -19,8 +19,8 @@
   spawn(worker, 2u32);
   spawn(worker, 3u32);
   μspin ≔ 0u64;
-  ⟳ spin < 4000000000u64 ∧ COUNT.load(Ordering::Acquire) < 2000000 ↓ 4000000000 - spin {
+  ⟳ spin < 4000000000u64 ∧ COUNT.load(AtomicOrdering::Acquire) < 2000000 ↓ 4000000000 - spin {
     spin ← spin + 1;
   }
-  COUNT.load(Ordering::SeqCst) +% SUM.with(read, 0u64)
+  COUNT.load(AtomicOrdering::SeqCst) +% SUM.with(read, 0u64)
 }

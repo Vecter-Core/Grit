@@ -397,7 +397,7 @@ fn string_literal_is_a_fat_pointer() {
     );
 }
 
-const THREADS: &str = "#level(\"1\")\n▢ Lo { }\n■ COUNT: Atomic<u64> ≔ Atomic::new(0u64);\n■ SUM: Mutex<u64, Lo> ≔ Mutex::new(0u64);\nƒ add_one(v: &!u64, n: u64) → u64 ! ∅ { *v ← *v +% n; *v }\nƒ read(v: &!u64, n: u64) → u64 ! ∅ { *v }\nƒ worker(n: u32) ! {lock(Lo)} {\n  μi ≔ 0u32;\n  ⟳ i < 1000 ↓ 1000 - i {\n    SUM.with(add_one, 1u64);\n    COUNT.fetch_add(1u64, Ordering::Release);\n    i ← i + 1;\n  }\n}\nƒ main() → u64 ! {lock(Lo)} {\n  spawn(worker, 0u32);\n  spawn(worker, 1u32);\n  spawn(worker, 2u32);\n  spawn(worker, 3u32);\n  μspin ≔ 0u64;\n  ⟳ spin < 4000000000u64 ∧ COUNT.load(Ordering::Acquire) < 4000 ↓ 4000000000 - spin {\n    spin ← spin + 1;\n  }\n  COUNT.load(Ordering::SeqCst) +% SUM.with(read, 0u64)\n}\n";
+const THREADS: &str = "#level(\"1\")\n▢ Lo { }\n■ COUNT: Atomic<u64> ≔ Atomic::new(0u64);\n■ SUM: Mutex<u64, Lo> ≔ Mutex::new(0u64);\nƒ add_one(v: &!u64, n: u64) → u64 ! ∅ { *v ← *v +% n; *v }\nƒ read(v: &!u64, n: u64) → u64 ! ∅ { *v }\nƒ worker(n: u32) ! {lock(Lo)} {\n  μi ≔ 0u32;\n  ⟳ i < 1000 ↓ 1000 - i {\n    SUM.with(add_one, 1u64);\n    COUNT.fetch_add(1u64, AtomicOrdering::Release);\n    i ← i + 1;\n  }\n}\nƒ main() → u64 ! {lock(Lo)} {\n  spawn(worker, 0u32);\n  spawn(worker, 1u32);\n  spawn(worker, 2u32);\n  spawn(worker, 3u32);\n  μspin ≔ 0u64;\n  ⟳ spin < 4000000000u64 ∧ COUNT.load(AtomicOrdering::Acquire) < 4000 ↓ 4000000000 - spin {\n    spin ← spin + 1;\n  }\n  COUNT.load(AtomicOrdering::SeqCst) +% SUM.with(read, 0u64)\n}\n";
 
 /// Đa luồng THẬT: 4 luồng HĐH × 1000 lần (khoá thật + atomic thật). Không có đua dữ liệu thì tổng luôn 8000; lặp nhiều lần để lộ lỗi.
 #[test]
@@ -686,7 +686,7 @@ fn golden_ir_slice_bounds() {
 fn golden_ir_static_atomic_and_mutex() {
     golden(
         "static_atomic",
-        "■ COUNT: Atomic<u32> ≔ Atomic::new(0u32);\nƒ worker(n: u32) ! ∅ { COUNT.fetch_add(n, Ordering::Relaxed); }\nƒ main() → u32 ! ∅ { worker(1u32); COUNT.load(Ordering::SeqCst) }\n",
+        "■ COUNT: Atomic<u32> ≔ Atomic::new(0u32);\nƒ worker(n: u32) ! ∅ { COUNT.fetch_add(n, AtomicOrdering::Relaxed); }\nƒ main() → u32 ! ∅ { worker(1u32); COUNT.load(AtomicOrdering::SeqCst) }\n",
     );
 }
 

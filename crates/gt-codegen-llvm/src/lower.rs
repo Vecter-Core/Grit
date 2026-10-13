@@ -335,7 +335,7 @@ struct Fx<'ctx, 'b> {
     locals: Vec<PointerValue<'ctx>>,
     blocks: Vec<BasicBlock<'ctx>>,
     traps: usize,
-    /// local gán đúng một lần bằng aggregate không trường của `Ordering` ⇒ chỉ số biến thể (hằng lúc biên dịch)
+    /// local gán đúng một lần bằng aggregate không trường của `AtomicOrdering` ⇒ chỉ số biến thể (hằng lúc biên dịch)
     ord_consts: BTreeMap<usize, u32>,
     /// local tạm gán MỘT lần từ `Const::Item(static)` ⇒ là BÍ DANH của static (KHÔNG sao chép)
     static_alias: BTreeMap<usize, NodeId>,
@@ -774,11 +774,11 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         Ok(())
     }
 
-    /// Quét thân: (a) local gán một lần bằng `Ordering::X` ⇒ hằng; (b) local TẠM gán một lần từ `Const::Item(static)` ⇒ bí danh.
+    /// Quét thân: (a) local gán một lần bằng `AtomicOrdering::X` ⇒ hằng; (b) local TẠM gán một lần từ `Const::Item(static)` ⇒ bí danh.
     fn prescan(&mut self, fx: &mut Fx<'ctx, 'a>) -> R<()> {
         let body = fx.body;
         let mut assigns: BTreeMap<usize, usize> = BTreeMap::new();
-        let ord_def = self.t.db.lang.get(&Lang::Ordering).copied();
+        let ord_def = self.t.db.lang.get(&Lang::AtomicOrdering).copied();
         let mut ord: BTreeMap<usize, u32> = BTreeMap::new();
         let mut stat: BTreeMap<usize, NodeId> = BTreeMap::new();
         for bd in &body.blocks {
@@ -1845,7 +1845,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
 
     // ---------------------------------------------------------------- lang item / runtime
 
-    /// Chỉ số biến thể hằng của đối số `Ordering` thứ `i` (phải là local gán một lần bằng `Ordering::X`).
+    /// Chỉ số biến thể hằng của đối số `AtomicOrdering` thứ `i` (phải là local gán một lần bằng `AtomicOrdering::X`).
     fn ordering_arg(&self, fx: &Fx<'ctx, '_>, args: &[Operand], i: usize) -> R<AtomicOrdering> {
         let v = match args.get(i) {
             Some(Operand::Copy(p) | Operand::Move(p)) if p.projection.is_empty() => {
@@ -1864,7 +1864,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             2 => AtomicOrdering::Release,
             3 => AtomicOrdering::AcquireRelease,
             4 => AtomicOrdering::SequentiallyConsistent,
-            _ => return internal("biến thể Ordering lạ"),
+            _ => return internal("biến thể AtomicOrdering lạ"),
         })
     }
 

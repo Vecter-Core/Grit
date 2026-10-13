@@ -45,56 +45,56 @@ fn only(src: &str, code: &str) {
 #[test]
 fn atomic_orderings_must_be_literal_and_valid() {
     // hợp lệ
-    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(Ordering::Acquire) }");
-    ok("ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, Ordering::Release); }");
-    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.fetch_add(1u32, Ordering::AcqRel) }");
+    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(AtomicOrdering::Acquire) }");
+    ok("ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, AtomicOrdering::Release); }");
+    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.fetch_add(1u32, AtomicOrdering::AcqRel) }");
     ok(
-        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, Ordering::AcqRel, Ordering::Acquire) }",
+        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, AtomicOrdering::AcqRel, AtomicOrdering::Acquire) }",
     );
-    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { o ≔ Ordering::SeqCst; a.load(o) }");
+    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { o ≔ AtomicOrdering::SeqCst; a.load(o) }");
     // load với Release/AcqRel
     only(
-        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(Ordering::Release) }",
+        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(AtomicOrdering::Release) }",
         "E0503",
     );
     only(
-        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(Ordering::AcqRel) }",
+        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(AtomicOrdering::AcqRel) }",
         "E0503",
     );
     // store với Acquire/AcqRel
     only(
-        "ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, Ordering::Acquire); }",
+        "ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, AtomicOrdering::Acquire); }",
         "E0503",
     );
     only(
-        "ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, Ordering::AcqRel); }",
+        "ƒ f(a: &Atomic<u32>) ! ∅ { a.store(1u32, AtomicOrdering::AcqRel); }",
         "E0503",
     );
     // compare_exchange: thất bại Release/AcqRel, SeqCst khi thành công yếu hơn, Acquire khi thành công Relaxed/Release
     only(
-        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, Ordering::SeqCst, Ordering::Release) }",
+        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, AtomicOrdering::SeqCst, AtomicOrdering::Release) }",
         "E0503",
     );
     only(
-        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, Ordering::AcqRel, Ordering::SeqCst) }",
+        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, AtomicOrdering::AcqRel, AtomicOrdering::SeqCst) }",
         "E0503",
     );
     only(
-        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, Ordering::Relaxed, Ordering::Acquire) }",
+        "ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, AtomicOrdering::Relaxed, AtomicOrdering::Acquire) }",
         "E0503",
     );
     // ordering không viết thẳng (tính toán / tham số) ⇒ không đoán
     only(
-        "ƒ f(a: &Atomic<u32>, o: Ordering) → u32 ! ∅ { a.load(o) }",
+        "ƒ f(a: &Atomic<u32>, o: AtomicOrdering) → u32 ! ∅ { a.load(o) }",
         "E0503",
     );
     only(
-        "ƒ pick(c: bool) → Ordering ! ∅ { ⎇ c { Ordering::Acquire } ⇝ { Ordering::SeqCst } }\nƒ f(a: &Atomic<u32>, c: bool) → u32 ! ∅ { a.load(pick(c)) }",
+        "ƒ pick(c: bool) → AtomicOrdering ! ∅ { ⎇ c { AtomicOrdering::Acquire } ⇝ { AtomicOrdering::SeqCst } }\nƒ f(a: &Atomic<u32>, c: bool) → u32 ! ∅ { a.load(pick(c)) }",
         "E0503",
     );
     // cú pháp kết hợp cũng đi qua cùng kiểm tra
     only(
-        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { Atomic::load(a, Ordering::Release) }",
+        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { Atomic::load(a, AtomicOrdering::Release) }",
         "E0503",
     );
 }
@@ -103,32 +103,32 @@ fn atomic_orderings_must_be_literal_and_valid() {
 fn ordering_tracing_is_exact_and_scans_every_call() {
     // biến gán hai lần: không truy được một biến thể duy nhất ⇒ E0503 (dù giá trị cuối hợp lệ)
     only(
-        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { μo ≔ Ordering::Release; o ← Ordering::Acquire; a.load(o) }",
+        "ƒ f(a: &Atomic<u32>) → u32 ! ∅ { μo ≔ AtomicOrdering::Release; o ← AtomicOrdering::Acquire; a.load(o) }",
         "E0503",
     );
     // chuỗi sao chép vẫn truy được
-    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { o ≔ Ordering::Acquire; p ≔ o; q ≔ p; a.load(q) }");
+    ok("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { o ≔ AtomicOrdering::Acquire; p ≔ o; q ≔ p; a.load(q) }");
     // lời gọi hỏng nằm SAU các khối/lời gọi khác (không dừng quét sớm)
     only(
-        "ƒ g() ! ∅ { }\nƒ f(a: &Atomic<u32>, c: bool) → u32 ! ∅ { g(); ⎇ c { g(); } g(); a.load(Ordering::Release) }",
+        "ƒ g() ! ∅ { }\nƒ f(a: &Atomic<u32>, c: bool) → u32 ! ∅ { g(); ⎇ c { g(); } g(); a.load(AtomicOrdering::Release) }",
         "E0503",
     );
     // impl khác (của người dùng) đứng cạnh: vẫn tìm đúng impl của Atomic
     only(
-        "▢ S { v: u32 }\n⊐ S { ƒ m(&self) ! ∅ { } ƒ n(&self) ! ∅ { } }\nƒ f(a: &Atomic<u32>, s: &S) ! ∅ { s.m(); a.store(1u32, Ordering::Acquire); }",
+        "▢ S { v: u32 }\n⊐ S { ƒ m(&self) ! ∅ { } ƒ n(&self) ! ∅ { } }\nƒ f(a: &Atomic<u32>, s: &S) ! ∅ { s.m(); a.store(1u32, AtomicOrdering::Acquire); }",
         "E0503",
     );
-    // hàm của người dùng nhận Ordering KHÔNG phải atomic: không bị kiểm
+    // hàm của người dùng nhận AtomicOrdering KHÔNG phải atomic: không bị kiểm
     ok(
-        "▢ S { v: u32 }\n⊐ S { ƒ m(&self, o: Ordering) ! ∅ { } }\nƒ f(s: &S, o: Ordering) ! ∅ { s.m(o); }",
+        "▢ S { v: u32 }\n⊐ S { ƒ m(&self, o: AtomicOrdering) ! ∅ { } }\nƒ f(s: &S, o: AtomicOrdering) ! ∅ { s.m(o); }",
     );
     // đúng MỘT chẩn đoán cho mỗi lời gọi sai
     assert_eq!(
-        codes("ƒ f(a: &Atomic<u32>, o: Ordering) → u32 ! ∅ { a.load(o) }"),
+        codes("ƒ f(a: &Atomic<u32>, o: AtomicOrdering) → u32 ! ∅ { a.load(o) }"),
         vec!["E0503"]
     );
     assert_eq!(
-        codes("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(Ordering::Release) }"),
+        codes("ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(AtomicOrdering::Release) }"),
         vec!["E0503"]
     );
 }

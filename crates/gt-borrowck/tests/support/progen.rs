@@ -470,7 +470,7 @@ impl Gen {
                     raw(format!("{y} ≔ Atomic::new({ky}u32);")),
                     raw(format!("{m} ← &{y};")),
                 ],
-                format!("{m}.fetch_add(1u32, Ordering::SeqCst);"),
+                format!("{m}.fetch_add(1u32, AtomicOrdering::SeqCst);"),
             )
         } else {
             out.push(raw(format!("μ{z} ≔ {kz};")));

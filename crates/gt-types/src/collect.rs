@@ -35,7 +35,7 @@ pub enum Lang {
     /// trait đánh dấu kiểu được phép đặt trong `Atomic<T>` (prelude impl cho bool và số nguyên).
     AtomicInt,
     /// `enum Ordering { Relaxed, Acquire, Release, AcqRel, SeqCst }`.
-    Ordering,
+    AtomicOrdering,
     /// `Sync` (M8): trait TỰ ĐỘNG, suy theo cấu trúc (send.rs), cấm viết `⊐ Sync for`.
     Sync,
 }
@@ -62,7 +62,7 @@ impl Lang {
             "mutex" => Lang::Mutex,
             "atomic" => Lang::Atomic,
             "atomic_int" => Lang::AtomicInt,
-            "ordering" => Lang::Ordering,
+            "atomic_ordering" => Lang::AtomicOrdering,
             "sync" => Lang::Sync,
             _ => return None,
         })

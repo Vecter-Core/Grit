@@ -1,3 +1,3 @@
 // expect: fail E0503
 // note: load không nhận Release
-ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(Ordering::Release) }
+ƒ f(a: &Atomic<u32>) → u32 ! ∅ { a.load(AtomicOrdering::Release) }

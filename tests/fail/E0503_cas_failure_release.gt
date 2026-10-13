@@ -1,3 +1,3 @@
 // expect: fail E0503
 // note: compare_exchange: thứ tự thất bại không được là Release
-ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, Ordering::SeqCst, Ordering::Release) }
+ƒ f(a: &Atomic<u32>) → Result<u32, u32> ! ∅ { a.compare_exchange(1u32, 2u32, AtomicOrdering::SeqCst, AtomicOrdering::Release) }

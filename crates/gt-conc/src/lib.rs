@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 //! Memory ordering của atomics (M8 nửa 2, ADR-027 §4): E0503.
 //!
-//! Mọi thao tác của `Atomic<T>` nhận `Ordering` TƯỜNG MINH (không tham số mặc định ⇒ thiếu là lỗi arity thường). Ở đây kiểm:
-//! (1) đối số ordering phải truy ngược được về MỘT biến thể viết thẳng (`Ordering::Acquire`, hoặc biến cục bộ gán đúng một lần từ nó);
+//! Mọi thao tác của `Atomic<T>` nhận `AtomicOrdering` TƯỜNG MINH (không tham số mặc định ⇒ thiếu là lỗi arity thường). Ở đây kiểm:
+//! (1) đối số ordering phải truy ngược được về MỘT biến thể viết thẳng (`AtomicOrdering::Acquire`, hoặc biến cục bộ gán đúng một lần từ nó);
 //! không truy được ⇒ E0503 (fail-closed: không đoán); (2) tổ hợp hợp lệ: `load` ∈ {Relaxed, Acquire, SeqCst}; `store` ∈ {Relaxed, Release,
 //! SeqCst}; `compare_exchange`: thứ tự thất bại ∈ {Relaxed, Acquire, SeqCst} và không mạnh hơn thứ tự thành công. Kiểm ở MIR để mọi cú pháp
 //! gọi (`a.load(o)`, `Atomic::load(&a, o)`) cùng đi qua một chỗ.
@@ -22,7 +22,7 @@ fn mk(t: &TypesOutput, node: gt_ast::NodeId, span: Span, msg: String) -> Diagnos
     Diagnostic::new(c, &t.file_name(node), span, msg)
 }
 
-/// Truy ngược một toán hạng về chỉ số biến thể `Ordering` (qua tối đa vài lần sao chép, mỗi local chỉ gán MỘT lần).
+/// Truy ngược một toán hạng về chỉ số biến thể `AtomicOrdering` (qua tối đa vài lần sao chép, mỗi local chỉ gán MỘT lần).
 fn variant_of(b: &Body, op: &Operand, ord_def: gt_resolve::DefId, depth: u32) -> Option<u32> {
     if depth > 8 {
         return None;
@@ -65,7 +65,7 @@ fn variant_of(b: &Body, op: &Operand, ord_def: gt_resolve::DefId, depth: u32) ->
 }
 
 pub fn check_orderings(t: &TypesOutput, m: &MirOutput, bag: &mut Diagnostics) {
-    let Some(&ord_def) = t.db.lang.get(&Lang::Ordering) else {
+    let Some(&ord_def) = t.db.lang.get(&Lang::AtomicOrdering) else {
         return;
     };
     for b in m.bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
@@ -95,7 +95,7 @@ pub fn check_orderings(t: &TypesOutput, m: &MirOutput, bag: &mut Diagnostics) {
                 continue;
             };
             let off = usize::from(sig.self_kind.is_some());
-            // các tham số kiểu `Ordering` (vị trí trong danh sách đối số)
+            // các tham số kiểu `AtomicOrdering` (vị trí trong danh sách đối số)
             let mut ords: Vec<(usize, Option<u32>)> = Vec::new();
             for (i, p) in sig.params.iter().enumerate() {
                 if matches!(p, Ty::Adt(d, _) if *d == ord_def) {
@@ -112,7 +112,7 @@ pub fn check_orderings(t: &TypesOutput, m: &MirOutput, bag: &mut Diagnostics) {
                         b.node,
                         span,
                         format!(
-                            "đối số memory ordering của `{}` phải viết thẳng là một biến thể (`Ordering::Acquire`…), không tính toán được",
+                            "đối số memory ordering của `{}` phải viết thẳng là một biến thể (`AtomicOrdering::Acquire`…), không tính toán được",
                             sig.name
                         ),
                     ));

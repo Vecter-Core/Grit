@@ -218,9 +218,9 @@ fn mutex_atomic_and_cell_intrinsics_run_sequentially() {
           c ≔ Cell::new(7u32);\n\
           r1 ≔ m.with(addn, n);\n\
           r2 ≔ m.with(addn, n);\n\
-          a.fetch_add(n, Ordering::SeqCst);\n\
+          a.fetch_add(n, AtomicOrdering::SeqCst);\n\
           c.set(c.get() +% 1u32);\n\
-          r2 +% a.load(Ordering::SeqCst) +% c.get() +% r1\n\
+          r2 +% a.load(AtomicOrdering::SeqCst) +% c.get() +% r1\n\
         }";
     let (_t, m) = mir(src);
     let mut it = Interp::new(&m, 100_000);

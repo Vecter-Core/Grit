@@ -52,7 +52,7 @@
 - Bước 2 (sha256) XONG: examples/sha256 + 5 test (NIST, biên đệm, 200 tệp, 1/32 MiB vs hashlib), phép bit u32, write_bytes, so sánh 3 nguồn (352 chạy), số liệu ở DOGFOOD/CODEGEN_DIFF_RESULTS. Bước 3 XONG: ADR-032 DỰ THẢO (chưa có mã) — DỪNG CHỜ GIANG DUYỆT (Q66–Q71). Chưa chạy cổng đầy đủ sau bước 1–3; chạy MỘT lần khi Giang duyệt và làm tiếp. Cổng 0d: 167 đạt + 3 golden đỏ (attestation do prelude lớn thêm) đã sửa, llvm 29/29; xem PROGRESS. Đang làm (i) theo lệnh sau ADR-032 phụ lục A.
 
 ## 2h. Lệnh sau duyệt ADR-032 (2026-10-13) — tiến độ
-- Mục 0 XONG (PROGRESS: sha256 + cổng 0d: 3 golden đỏ do băm attestation, đã sửa). ADR-032 phụ lục A đã ghi (ba chỗ sửa: Vec giữ `&!Arena`; MAX_PROGRAM_INSTANCES/E0317; `Ordering` đã bị enum nguyên tử chiếm ⇒ tạm `Cmp`, CẦN GIANG CHỐT trước (iii)).
+- Mục 0 XONG (PROGRESS: sha256 + cổng 0d: 3 golden đỏ do băm attestation, đã sửa). ADR-032 phụ lục A đã ghi (ba chỗ sửa: Vec giữ `&!Arena`; MAX_PROGRAM_INSTANCES/E0317; `Ordering` so sánh: Giang chốt dùng đúng tên, enum nguyên tử đổi `AtomicOrdering` — XONG).
 - **(i) XONG, chờ báo/duyệt:** gọi qua trait + symbol ASCII băm + `!gt.instances` + Guard luật instance (41/41 đột biến giết) + E0317. Cổng đầy đủ chạy MỘT lần sau (v).
 - Việc tiếp: (ii) Vec trên Arena (E0318 cấm T cần drop; abort `arena_exhausted` kind 17; TCB; ADR-031), (iii) Ord/Cmp + so sánh &[u8] + sắp xếp trộn, (iv) mở rộng bộ sinh so sánh, (v) `sortlines`, (vi) ghi bug.
 

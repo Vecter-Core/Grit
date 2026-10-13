@@ -19,8 +19,8 @@ fn basic_mutex_and_atomic_typecheck() {
     ok(&format!(
         "{LV}ƒ bump(v: &!u32, n: u32) → u32 ! ∅ {{ *v ← *v +% n; *v }}\nƒ go(m: &Mutex<u32, Lo>) → u32 ! {{lock(Lo)}} {{ m.with(bump, 1u32) }}"
     ));
-    ok("ƒ go(a: &Atomic<u32>) → u32 ! ∅ { a.fetch_add(1u32, Ordering::SeqCst) }");
-    ok("ƒ go(a: &Atomic<bool>) ! ∅ { a.store(true, Ordering::Release); }");
+    ok("ƒ go(a: &Atomic<u32>) → u32 ! ∅ { a.fetch_add(1u32, AtomicOrdering::SeqCst) }");
+    ok("ƒ go(a: &Atomic<bool>) ! ∅ { a.store(true, AtomicOrdering::Release); }");
 }
 
 #[test]
