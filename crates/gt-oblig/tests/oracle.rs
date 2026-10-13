@@ -151,7 +151,10 @@ fn one_program(seed: u64, cov: &mut Cov, stats: &mut obgen::GenStats) {
         !bck.diagnostics.iter().any(|d| d.code.as_str() == "E9901"),
         "#{seed}: ICE trong borrowck {:?}
 {}",
-        bck.diagnostics.iter().map(|d| d.message.clone()).collect::<Vec<_>>(),
+        bck.diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>(),
         p.src
     );
     let o_ref = analyze_program(&t, &m, &mut ZeroProver);
