@@ -296,15 +296,19 @@ fn batch() {
 /// Seed đã lộ bất đồng thật + một lô nhỏ cố định: chạy trong cổng đầy đủ (rẻ).
 #[test]
 fn permanent_and_small_fixed_batch() {
-    let mut seeds: Vec<u64> = PERMANENT.to_vec();
-    seeds.extend(1..=8);
-    let t = run_seeds(&seeds);
-    println!("{}", summary(&t));
+    // seed cố định bắt đầu từ 1: lấy 5 chương trình QUA CỔNG (bỏ ĐỎ) + các seed đã từng lộ bất đồng
+    let mut t = run_seeds(PERMANENT);
+    let (t2, _) = run_until(1, 5);
+    t.programs += t2.programs;
+    t.equal += t2.equal;
+    t.mismatch += t2.mismatch;
+    t.detail.extend(t2.detail.clone());
+    println!("{}", summary(&t2));
     assert_eq!(t.mismatch, 0, "bất đồng: {:#?}", t.detail);
     assert!(
-        t.equal >= 10,
+        t2.equal >= 10,
         "quá ít phép so sánh có nghĩa ({}): {}",
-        t.equal,
-        summary(&t)
+        t2.equal,
+        summary(&t2)
     );
 }
