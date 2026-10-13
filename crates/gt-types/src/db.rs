@@ -123,6 +123,16 @@ impl TypeDb {
         if select_impl_fault() || ty.has_param() || ty.has_infer() {
             return None;
         }
+        if select_impl_first() {
+            // CHỈ ĐỂ KIỂM ĐỘ NHẠY CỦA BỘ SINH (ADR-034): chọn impl ĐẦU của trait, bỏ qua kiểu
+            let i = self
+                .impls
+                .iter()
+                .position(|m| m.trait_ref.as_ref().map(|t| t.trait_def) == Some(trait_def))?;
+            let mut inf = InferCtx::new();
+            let args = fresh_args(&mut inf, &self.impls[i].generics);
+            return Some((i, args.iter().map(|a| inf.resolve(a)).collect()));
+        }
         let mut inf = InferCtx::new();
         let (i, args) = self.find_impl(&mut inf, trait_def, ty, 0)?;
         Some((i, args.iter().map(|a| inf.resolve(a)).collect()))
@@ -329,6 +339,16 @@ impl TypeDb {
 
 thread_local! {
     static SELECT_FAULT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static SELECT_FIRST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Chốt kiểm thử độ nhạy (ADR-034): `select_impl` luôn chọn impl ĐẦU của trait trên luồng hiện tại. KHÔNG dùng ngoài test.
+pub fn set_select_impl_first_for_test(on: bool) {
+    SELECT_FIRST.with(|c| c.set(on));
+}
+
+fn select_impl_first() -> bool {
+    SELECT_FIRST.with(std::cell::Cell::get)
 }
 
 /// Chốt kiểm thử (ADR-032 phụ lục A, 5b): làm `select_impl` luôn trả `None` trên luồng hiện tại để chứng minh đường ICE E9901 của
