@@ -8,4 +8,4 @@ error[E0205]: biến `Option` che khuất tên cấp module (item, nhập hoặc
   |   ^^^^^^ tên mới
   = label: bị che khuất ở đây (<prelude>)
 ## [1] json
-{"code":"E0205","level":"error","message":"biến `Option` che khuất tên cấp module (item, nhập hoặc prelude) cùng tên (D7: cấm shadowing)","file":"main.gt","span":{"start":{"offset":97,"line":4,"col":3},"end":{"offset":103,"line":4,"col":9}},"span_label":"tên mới","labels":[{"file":"<prelude>","span":{"start":{"offset":4,"line":null,"col":null},"end":{"offset":10,"line":null,"col":null}},"message":"bị che khuất ở đây"}],"notes":[],"suggestions":[]}
+{"code":"E0205","level":"error","message":"biến `Option` che khuất tên cấp module (item, nhập hoặc prelude) cùng tên (D7: cấm shadowing)","file":"main.gt","span":{"start":{"offset":97,"line":4,"col":3},"end":{"offset":103,"line":4,"col":9}},"span_label":"tên mới","labels":[{"file":"<prelude>","span":{"start":{"offset":344,"line":null,"col":null},"end":{"offset":350,"line":null,"col":null}},"message":"bị che khuất ở đây"}],"notes":[],"suggestions":[]}

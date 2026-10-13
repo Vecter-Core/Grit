@@ -2,85 +2,8 @@
 //! Dùng chung cho test gt-resolve: fixture prelude (ADR-017c — resolver KHÔNG có tên nào viết cứng) và các hàm chạy.
 use gt_resolve::{Prelude, ResolveOutput, SourceInput, resolve_program};
 
-/// Prelude giả lập `lib/core` (M12). Mọi tên Option/Some/None/… đến từ đây, không từ resolver.
-pub const PRELUDE_SRC: &str = "\
-⊔ Option<T> { None, Some(T) }
-⊔ Result<T, E> { Ok(T), Err(E) }
-⊏ Copy { }
-⊏ Drop { }
-⊏ Send { }
-ƒ spawn<A: Send>(f: ƒ(A) ! {detach}, a: A) ! {detach} { }
-#lang(cell)
-▢ Cell<T> { v: T }
-⊐ <T> Cell<T> {
-  ƒ new(v: T) → Cell<T> ! ∅ { }
-  ƒ set(&self, x: T) ! ∅ { }
-  ƒ get(&self) → T ! ∅ { }
-}
-#lang(sync)
-⊏ Sync { }
-#lang(ordering)
-⊔ Ordering { Relaxed, Acquire, Release, AcqRel, SeqCst }
-#lang(atomic_int)
-⊏ AtomicInt { }
-⊐ AtomicInt for bool { }
-⊐ AtomicInt for i32 { }
-⊐ AtomicInt for u32 { }
-⊐ AtomicInt for i64 { }
-⊐ AtomicInt for u64 { }
-⊐ AtomicInt for usize { }
-#lang(atomic)
-▢ Atomic<T: AtomicInt> { v: T }
-⊐ <T: AtomicInt> Atomic<T> {
-  ƒ new(v: T) → Atomic<T> ! ∅ { }
-  ƒ load(&self, o: Ordering) → T ! ∅ { }
-  ƒ store(&self, v: T, o: Ordering) ! ∅ { }
-  ƒ swap(&self, v: T, o: Ordering) → T ! ∅ { }
-  ƒ fetch_add(&self, v: T, o: Ordering) → T ! ∅ { }
-  ƒ fetch_sub(&self, v: T, o: Ordering) → T ! ∅ { }
-  ƒ compare_exchange(&self, cur: T, new: T, s: Ordering, f: Ordering) → Result<T, T> ! ∅ { }
-}
-#lang(mutex)
-▢ Mutex<T, L> { v: T }
-⊐ <T, L> Mutex<T, L> {
-  ƒ new(v: T) → Mutex<T, L> ! ∅ { }
-  ƒ with<R: Send, Arg: Send>(&self, f: ƒ(&!T, Arg) → R ! {poly}, a: Arg) → R ! {poly, lock(L)} { }
-}
-▢ Buf { n: i32 }
-ƒ mk_buf() → Buf ! ∅ { }
-▢ Guard { ◈ inner: Buf, ◈ n: i32 }
-ƒ mk_guard() → Guard ! ∅ { }
-▢ Range<T> { start: T, end: T }
-⊐ <T> Option<T> {
-  ƒ is_some(&self) → bool ! ∅ { }
-  ƒ unwrap(self) → T ! ∅ ⊳ self.is_some() { }
-}
-ƒ shl(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
-ƒ shr(x: u32, n: u32) → u32 ! ∅ ⊳ n < 32 { }
-▢ Secret<T> { v: T }
-⊐ <T> Secret<T> { ƒ declassify(self) → T ! ∅ { } }
-▢ Cap<T> { v: T }
-▢ Fs { x: i32 }
-▢ Net { x: i32 }
-▢ Env { x: i32 }
-▢ Clock { x: i32 }
-▢ Alloc { x: i32 }
-▢ Out { x: i32 }
-▢ Host { x: i32 }
-▢ File { x: i32 }
-▢ Arena { x: i32 }
-▦ core {
-  ◈ ƒ abort() ! ∅ { }
-  ƒ hidden() ! ∅ { }
-}
-ƒ root_fs() → Cap<Fs> ! ∅ { }
-ƒ root_net() → Cap<Net> ! ∅ { }
-ƒ root_env() → Cap<Env> ! ∅ { }
-ƒ root_clock() → Cap<Clock> ! ∅ { }
-ƒ root_alloc() → Cap<Alloc> ! ∅ { }
-ƒ root_out() → Cap<Out> ! ∅ { }
-ƒ raw_read(p: usize) → i32 ! ∅ { }
-";
+/// MỘT nguồn prelude duy nhất cho gritc và mọi test: `lib/core/prelude.gt` (giả lập `lib/core`, M12). Không có bản chép tay (khoá bởi `gt-driver/tests/gate.rs::prelude_has_a_single_source`).
+pub const PRELUDE_SRC: &str = include_str!("../../../../lib/core/prelude.gt");
 
 pub fn prelude() -> Prelude {
     Prelude::from_source(PRELUDE_SRC).expect("prelude hợp lệ")

@@ -105,6 +105,8 @@
 ▦ core {
   ◈ ƒ abort(msg: &str) → ! ! {div} { }
   ◈ ƒ exit(code: u32) → ! ! {div} { }
+  // KHÔNG ◈: hàm riêng của module, chỉ để test E0203 (quy tắc nhìn thấy) của gt-resolve dùng chính prelude thật
+  ƒ hidden() ! ∅ { }
 }
 ƒ root_fs() → Cap<Fs> ! ∅ { }
 ƒ root_net() → Cap<Net> ! ∅ { }

@@ -28,16 +28,46 @@ const GOOD: &str = "ƒ main() → u32 ! ∅ { 1u32 + 2u32 }";
 const RED: &str = "ƒ main() → u8 ! ∅ { x: u8 ≔ 300; x }";
 const YELLOW: &str = "ƒ main() → &str ! ∅ { k ≔ \"AKIAIOSFODNN7EXAMPLE\"; k }";
 
+/// Prelude có ĐÚNG MỘT nguồn: `lib/core/prelude.gt`. Hai fixture test (gt-types, gt-resolve) phải `include_str!` đúng tệp đó và KHÔNG còn bản chép tay
+/// (trước đây có 3 bản; bản thứ ba của gt-resolve bị bỏ sót khi thêm `Out`/`root_out` và chỉ lộ ở cổng đầy đủ).
 #[test]
-fn prelude_file_only_adds_a_header_to_the_fixture() {
-    let file = gt_driver::pipeline::prelude_text();
-    let body: Vec<&str> = file.lines().filter(|l| !l.starts_with("//")).collect();
-    let fx = fixture::PRELUDE_SRC.replace("\r\n", "\n");
-    let fx: Vec<&str> = fx.lines().collect();
+fn prelude_has_a_single_source() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let file = std::fs::read_to_string(root.join("lib/core/prelude.gt")).expect("đọc prelude");
     assert_eq!(
-        body, fx,
-        "prelude của gritc khác fixture ngoài phần tiêu đề comment"
+        file.replace("\r\n", "\n"),
+        gt_driver::pipeline::prelude_text().replace("\r\n", "\n"),
+        "driver phải nhúng đúng lib/core/prelude.gt"
     );
+    for fx in [
+        "crates/gt-types/tests/common/mod.rs",
+        "crates/gt-resolve/tests/common/mod.rs",
+    ] {
+        let t = std::fs::read_to_string(root.join(fx)).expect("đọc fixture");
+        assert!(
+            t.contains("include_str!(\"../../../../lib/core/prelude.gt\")"),
+            "{fx} phải đọc prelude từ lib/core/prelude.gt"
+        );
+    }
+    // không có bản chép tay nào khác trong mã Rust: dấu hiệu = chữ ký `root_fs` viết nguyên văn
+    let mut stack = vec![root.join("crates")];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).expect("đọc thư mục").flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                if !matches!(e.file_name().to_str(), Some("target" | "fuzz")) {
+                    stack.push(p);
+                }
+            } else if p.extension().is_some_and(|x| x == "rs") && !p.ends_with("gate.rs") {
+                let t = std::fs::read_to_string(&p).unwrap_or_default();
+                assert!(
+                    !t.contains("ƒ root_fs() → Cap<Fs>"),
+                    "{} chứa một bản chép tay của prelude",
+                    p.display()
+                );
+            }
+        }
+    }
 }
 
 #[test]
