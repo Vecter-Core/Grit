@@ -17,6 +17,10 @@
 ⊏ Sync { }
 #lang(atomic_ordering)
 ⊔ AtomicOrdering { Relaxed, Acquire, Release, AcqRel, SeqCst }
+// Kết quả so sánh ba chiều (ADR-032, Q71): enum thay cho số để không có giá trị không hợp lệ. Enum nguyên tử là `AtomicOrdering`.
+⊔ Ordering { Less, Equal, Greater }
+// Thứ tự toàn phần do NGƯỜI DÙNG cài (`⊐ Ord for X`); lib/core không cài sẵn cho kiểu nào (thân prelude không có MIR).
+⊏ Ord { ƒ cmp(&self, o: &Self) → Ordering ! ∅; }
 #lang(atomic_int)
 ⊏ AtomicInt { }
 ⊐ AtomicInt for bool { }

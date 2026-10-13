@@ -560,3 +560,11 @@ Rút kinh nghiệm: prelude có BA bản (lib/core, fixture gt-types, fixture gt
 - **Số check:** mỗi `push`/`Arena::alloc` thêm đúng 1 mục `arena_exhausted` (không xoá được). `s ≔ v.as_slice()` rồi lặp cục bộ: `s[j]` KHÔNG được chứng minh; truyền lát cho hàm nhận `&[T]` thì chứng minh được (đo ở ADR-032 phụ lục B).
 - **Chưa kiểm:** đường tràn `2·cap`/`cap·size`; thông dịch không mô phỏng hết Arena (chỉ kiểm exe); cổng đầy đủ chạy MỘT lần sau sortlines.
 - Test các crate đổi: gt-types, gt-resolve, gt-borrowck, gt-mir, gt-oblig, gt-guard, gt-conc, gt-diag, gt-term, gt-effects, gt-secrets, gt-dataflow, gt-driver, rig, gt-codegen-llvm: xanh (3 golden IR + 1 snapshot M6 cập nhật có kiểm diff). Clippy workspace + gt-rt sạch.
+
+## Bước (iii) lệnh ADR-032 — `Ord`/`Ordering` + sắp xếp trộn bằng Grit (2026-10-14)
+- **Prelude:** `Ordering { Less, Equal, Greater }`, trait `Ord` (không impl sẵn). **`examples/sortlines/src/msort.gt`:** `sort<T: Ord + Copy>` trộn bottom-up ổn định + `cmp_bytes` (so sánh byte), Grit thuần, gọi qua trait (bước (i)) và `Vec` trên hai Arena (bước (ii)).
+- **Đúng (`gt-driver/tests/llvm_sort.rs`, 4 test, ĐẠT; ~99 s):** so với `sort_by_key` ổn định của Rust (hash dãy (khoá, chỉ số gốc) ⇒ kiểm cả ổn định): biên n = 0,1,2,3 và 4…65 (luỹ thừa 2 và ±1; tăng dần/giảm dần/toàn bằng nhau) ⇒ 14×3 + 5 ca; 60 mảng ngẫu nhiên n ≤ 200 nhiều khoá trùng (20 ca đầu cũng chạy ở thông dịch ⇒ khớp exe); 20 000 phần tử trên exe; `cmp_bytes` 12 cặp (rỗng, tiền tố, byte cao 0x7f/0x80/0xff, UTF-8) ở cả hai backend. **Độ nhạy:** đổi `le` thành so sánh chặt (mất ổn định) ⇒ test ngẫu nhiên ĐỎ (đã hoàn nguyên).
+- **Dừng (M8):** vòng trộn chứng minh được; hai vòng bước tiến không chặn dưới dùng nhiên liệu (đo: `lo ← lo + w + w`, `width ← width + width` ⇒ E0702 khi không có nhiên liệu).
+- **Check còn lại** (mẫu 1 phần tử): `all` 33, `proven` 20 (`merge_runs` index 6, `pass` overflow 6, `sort` index 2 + overflow 1, `main` index 1, `arena_exhausted` 2, `fuel` 2).
+- Test các crate liên quan (gt-types, gt-resolve, gt-mir, gt-borrowck, gt-oblig, gt-guard, gt-term, gt-effects, gt-secrets, gt-conc, gt-driver, rig) không-fail-fast: 0 đỏ (3 golden IR đổi attestation). Clippy gt-driver sạch.
+- **Chưa kiểm:** phần tử to hơn 16 byte; thời gian ở 10⁶ dòng (đo ở sortlines); `T` không `Copy` (sort chỉ cho `Copy`).

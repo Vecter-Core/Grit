@@ -1,0 +1,15 @@
+// expect: pass
+// note: Ord/Ordering của prelude: impl người dùng, gọi qua ràng buộc generic T: Ord (ADR-032)
+▢ K { v: u64 }
+⊐ Copy for K { }
+⊐ Ord for K {
+  ƒ cmp(&self, o: &K) → Ordering ! ∅ {
+    ⎇ self.v < o.v { Ordering::Less } ⇝ { ⎇ self.v > o.v { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+ƒ le<T: Ord>(a: &T, b: &T) → bool ! ∅ { ⌥ a.cmp(b) { Ordering::Greater ↦ false, _ ↦ true } }
+ƒ main() → u64 ! ∅ {
+  a ≔ K { v: 3 };
+  b ≔ K { v: 5 };
+  ⎇ le(&a, &b) { 1u64 } ⇝ { 0u64 }
+}
