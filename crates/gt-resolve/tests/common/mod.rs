@@ -65,6 +65,7 @@ pub const PRELUDE_SRC: &str = "\
 ▢ Env { x: i32 }
 ▢ Clock { x: i32 }
 ▢ Alloc { x: i32 }
+▢ Out { x: i32 }
 ▢ Host { x: i32 }
 ▢ File { x: i32 }
 ▢ Arena { x: i32 }
@@ -77,6 +78,7 @@ pub const PRELUDE_SRC: &str = "\
 ƒ root_env() → Cap<Env> ! ∅ { }
 ƒ root_clock() → Cap<Clock> ! ∅ { }
 ƒ root_alloc() → Cap<Alloc> ! ∅ { }
+ƒ root_out() → Cap<Out> ! ∅ { }
 ƒ raw_read(p: usize) → i32 ! ∅ { }
 ";
 
