@@ -349,3 +349,163 @@ fn one_million_elements_never_exhaust_fuel() {
     println!("10^6 phần tử (gồm biên dịch): {:.1} s", dt.as_secs_f64());
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// Phần tử RỘNG (24 và 32 byte, căn lề hỗn hợp) cỡ lớn trên exe, đối chiếu `sort_by_key` ổn định của Rust (lệnh 2026-10-14, 1d):
+/// 50 000 phần tử mỗi kiểu; khoá trong 0..200 (rất nhiều trùng); các trường còn lại suy từ chỉ số ⇒ ổn định quan sát được qua hash.
+#[test]
+fn wide_elements_24_and_32_bytes_match_stable_sort_at_scale() {
+    // (tên, trường (tên, kiểu, modulo cho phép cast), chỉ số khoá)
+    type Def = (&'static str, Vec<(&'static str, &'static str, u64)>, usize);
+    let defs: Vec<Def> = vec![
+        (
+            "S24a",
+            vec![("x", "u64", 0), ("y", "u8", 255), ("z", "u64", 0)],
+            1,
+        ),
+        (
+            "S24b",
+            vec![
+                ("p", "u8", 255),
+                ("q", "u64", 0),
+                ("r", "u8", 255),
+                ("s", "u32", 4_294_967_295),
+            ],
+            1,
+        ),
+        (
+            "S32a",
+            vec![
+                ("a", "u8", 255),
+                ("b", "u64", 0),
+                ("c", "u16", 65_535),
+                ("d", "u64", 0),
+            ],
+            1,
+        ),
+        (
+            "S32b",
+            vec![
+                ("a", "u32", 4_294_967_295),
+                ("b", "u64", 0),
+                ("c", "u8", 255),
+                ("d", "u8", 255),
+                ("e", "u64", 0),
+            ],
+            1,
+        ),
+    ];
+    const N: u64 = 50_000;
+    for (name, fields, key) in defs {
+        let decl: Vec<String> = fields.iter().map(|(n, t, _)| format!("{n}: {t}")).collect();
+        let kn = fields[key].0;
+        // giá trị trường i-th của phần tử số `i` (Grit và Rust giống hệt)
+        let init: Vec<String> = fields
+            .iter()
+            .enumerate()
+            .map(|(fi, (n, t, m))| {
+                if fi == key {
+                    format!("{n}: ((i *% 2654435761u64) % 200u64) as {t}")
+                } else if *m == 0 {
+                    format!("{n}: i *% {}u64", 3 + 2 * fi as u64)
+                } else {
+                    format!("{n}: ((i *% {}u64) % {m}u64) as {t}", 3 + 2 * fi as u64)
+                }
+            })
+            .collect();
+        let hs: String = fields
+            .iter()
+            .enumerate()
+            .map(|(fi, (n, _, _))| {
+                format!(
+                    " h ← h *% 1000003u64 +% (s.{n} as u64) *% {}u64;",
+                    2 * fi + 3
+                )
+            })
+            .collect();
+        let src = format!(
+            "▢ {name} {{ {decl} }}
+⊐ Copy for {name} {{ }}
+⊐ Ord for {name} {{
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {{
+    ⎇ self.{kn} < o.{kn} {{ Ordering::Less }} ⇝ {{ ⎇ self.{kn} > o.{kn} {{ Ordering::Greater }} ⇝ {{ Ordering::Equal }} }}
+  }}
+}}
+ƒ sh(s: &{name}) → u64 ! ∅ {{ μh ≔ 0u64;{hs} h }}
+ƒ main() → u64 ! {{mem}} {{
+  μar1 ≔ Arena::new();
+  μar2 ≔ Arena::new();
+  μx ≔ Vec::new(&!ar1);
+  μy ≔ Vec::new(&!ar2);
+  μi ≔ 0u64;
+  ⟳ i < {N}u64 ↓ {N}u64 - i {{
+    x.push({name} {{ {init} }});
+    y.push({name} {{ {init} }});
+    i ← i + 1u64;
+  }}
+  msort::sort(x.as_mut_slice(), y.as_mut_slice());
+  t ≔ x.as_slice();
+  μr ≔ 0u64;
+  μk ≔ 0usize;
+  ⟳ k < t.len() ↓ t.len() - k {{ r ← r *% 31u64 +% sh(&t[k]); k ← k + 1usize; }}
+  r
+}}
+",
+            decl = decl.join(", "),
+            init = init.join(", ")
+        );
+        // mô hình Rust
+        let elem = |i: u64| -> Vec<u64> {
+            fields
+                .iter()
+                .enumerate()
+                .map(|(fi, (_, _, m))| {
+                    if fi == key {
+                        i.wrapping_mul(2_654_435_761) % 200
+                    } else if *m == 0 {
+                        i.wrapping_mul(3 + 2 * fi as u64)
+                    } else {
+                        i.wrapping_mul(3 + 2 * fi as u64) % m
+                    }
+                })
+                .collect()
+        };
+        let mut v: Vec<Vec<u64>> = (0..N).map(elem).collect();
+        v.sort_by_key(|f| f[key]);
+        let mut r = 0u64;
+        for f in &v {
+            let mut h = 0u64;
+            for (fi, x) in f.iter().enumerate() {
+                h = h
+                    .wrapping_mul(1_000_003)
+                    .wrapping_add(x.wrapping_mul(2 * fi as u64 + 3));
+            }
+            r = r.wrapping_mul(31).wrapping_add(h);
+        }
+        let d = scratch("wide");
+        std::fs::write(d.join("msort.gt"), MSORT).expect("ghi");
+        std::fs::write(d.join("main.gt"), &src).expect("ghi");
+        let o = gritc()
+            .args(["run", "--json", "--backend=llvm"])
+            .arg(&d)
+            .output()
+            .expect("chạy gritc");
+        let text = String::from_utf8_lossy(&o.stdout).into_owned();
+        let line = text
+            .lines()
+            .rev()
+            .find(|l| l.starts_with('{'))
+            .unwrap_or("");
+        let j: serde_json::Value = serde_json::from_str(line).unwrap_or_else(|e| {
+            panic!(
+                "{name}: JSON ({e}): {text}\n{}",
+                String::from_utf8_lossy(&o.stderr)
+            )
+        });
+        assert_eq!(
+            j["run"]["value"].as_str().unwrap_or(""),
+            r.to_string(),
+            "{name}: {text}"
+        );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+}

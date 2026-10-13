@@ -575,3 +575,10 @@ Rút kinh nghiệm: prelude có BA bản (lib/core, fixture gt-types, fixture gt
 - **Độ nhạy (luật bộ sinh, bắt buộc):** `select_impl` đổi thành "chọn impl đầu của trait" (`GT_GTV_FIRST=1`, lô 1–25) ⇒ **10/25 bất đồng** (bound_call, impl_generic, multi_trait; ghi dưới suite `generic-trait-vec-SENSITIVITY-select-first`); bộ sinh tự phát hiện. Đã hoàn nguyên (cờ chỉ bật trong test, thread-local).
 - **Số tính tay vẫn giữ** ở `llvm_generics.rs` (2258, 61, 19) để giảm rủi ro hiểu nhầm ngữ nghĩa chung giữa mô hình và bộ sinh (cùng một người viết).
 - **Chưa kiểm:** gọi trait trong thân impl generic (M8 từ chối, ADR-033); phần tử Vec kiểu mảng/enum/Option; hai Vec cùng chương trình với khoá khác kiểu; thông dịch không mô phỏng hết Arena (kịch bản cạn chỉ exe).
+
+## Mục 1 lệnh sortlines — kiểu phần tử của sortlines (2026-10-14)
+- **4 lô × 25 = 100 chương trình** (suite `generic-trait-vec-elem`, `docs/CODEGEN_DIFF_RESULTS.jsonl`), ba nguồn (mô hình Rust, thông dịch, exe): **`vec_big_sort` 50/50 so sánh được, `vec_line_sort` 49/50**; bị bỏ 1 (`vec_line_sort`: ĐỎ E0301 — chương trình 0 dòng nên kiểu phần tử của `Vec` không suy ra được; tỉ lệ bỏ 2%); **bất đồng 0**. Ngưỡng ≥ 30 đạt cho cả hai loại.
+- `vec_line_sort`: `Vec<Line<'a>>` (16 byte, `⊐ Ord` so byte), push/đọc/sắp xếp bằng `sort`; kỳ vọng `Vec<Vec<u8>>::sort`. `vec_big_sort`: struct 24 và 32 byte căn lề hỗn hợp (4 bố cục), push/ghi/sắp xếp, kỳ vọng `sort_by_key` ổn định.
+- **1d:** thêm `wide_elements_24_and_32_bytes_match_stable_sort_at_scale` (`llvm_sort.rs`): 4 bố cục × 50 000 phần tử trên exe, khoá trong 0..200 (rất nhiều trùng), khớp `sort_by_key` ổn định ở cả 4 (5,8 s).
+- **Gặp khi làm:** FB-3 — `o: &Line<'a>` trong `⊐ <'a> Ord for Line<'a>` bị E0311 oan (SAI TÍCH CỰC; né bằng `&Self`); hồ sơ ở FIELD_BUGS, chưa sửa.
+- **Chưa kiểm:** phần tử có enum/Option/mảng; kích thước thật `size_of` (không có trong Grit — suy từ bố cục LLVM tự nhiên).

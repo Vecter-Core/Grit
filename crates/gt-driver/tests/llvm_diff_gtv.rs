@@ -20,6 +20,11 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::process::Command;
 
+const MSORT: &str = include_str!("../../../examples/sortlines/src/msort.gt");
+
+/// loại cho kiểu phần tử của sortlines (ADR-034 cập nhật): `GT_GTV_SET=elem`
+const KINDS_ELEM: [&str; 2] = ["vec_line_sort", "vec_big_sort"];
+
 const KINDS: [&str; 7] = [
     "generic_unbounded",
     "bound_call",
@@ -439,6 +444,267 @@ fn gen_vec_exhaust(rng: &mut Rng) -> (String, Want) {
     )
 }
 
+// ------------------------------------------------------------------------------------------------ phần tử của sortlines
+
+/// bảng bảy byte: dòng ngắn trên bảng chữ cái nhỏ (nhiều trùng, NUL, byte cao 0x7f/0x80/0xff)
+const ALPHA: [u8; 6] = [0, 1, 65, 127, 128, 255];
+
+fn lhash(line: &[u8]) -> u64 {
+    let mut h = 0u64;
+    for b in line {
+        h = h
+            .wrapping_mul(257)
+            .wrapping_add(u64::from(*b))
+            .wrapping_add(1);
+    }
+    h
+}
+
+fn arr_lit(b: &[u8]) -> String {
+    if b.is_empty() {
+        "[0u8]".to_string()
+    } else {
+        format!(
+            "[{}]",
+            b.iter()
+                .map(|x| format!("{x}u8"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+/// `Vec` của kiểu bọc `Line<'a> { b: &'a [u8] }` cài `⊐ Ord` (so sánh byte), push, sắp xếp bằng `msort::sort`, đọc lại qua lát.
+fn gen_line_sort(rng: &mut Rng) -> (String, Want) {
+    let n = rng.below(31) as usize;
+    let lines: Vec<Vec<u8>> = (0..n)
+        .map(|_| {
+            let len = rng.below(7) as usize;
+            (0..len)
+                .map(|_| ALPHA[rng.below(ALPHA.len() as u64) as usize])
+                .collect()
+        })
+        .collect();
+    let mut body = String::from("  e ≔ [0u8];\n");
+    for (i, l) in lines.iter().enumerate() {
+        body.push_str(&format!("  l{i} ≔ {};\n", arr_lit(l)));
+    }
+    body.push_str("  μar1 ≔ Arena::new();\n  μar2 ≔ Arena::new();\n  μx ≔ Vec::new(&!ar1);\n  μy ≔ Vec::new(&!ar2);\n");
+    for (i, l) in lines.iter().enumerate() {
+        let r = if l.is_empty() { "0..0" } else { ".." };
+        body.push_str(&format!(
+            "  x.push(Line {{ b: &l{i}[{r}] }});\n  y.push(Line {{ b: &e[0..0] }});\n"
+        ));
+    }
+    let src = format!(
+        "▢ Line<'a> {{ b: &'a [u8] }}
+⊐ <'a> Copy for Line<'a> {{ }}
+⊐ <'a> Ord for Line<'a> {{
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {{ msort::cmp_bytes(self.b, o.b) }}
+}}
+ƒ lhash(b: &[u8]) → u64 ! ∅ {{ μh ≔ 0u64; μj ≔ 0usize; ⟳ j < b.len() ↓ b.len() - j {{ h ← h *% 257u64 +% (b[j] as u64) +% 1u64; j ← j + 1usize; }} h }}
+ƒ main() → u64 ! {{mem}} {{
+{body}  msort::sort(x.as_mut_slice(), y.as_mut_slice());
+  s ≔ x.as_slice();
+  μh ≔ 0u64;
+  μk ≔ 0usize;
+  ⟳ k < s.len() ↓ s.len() - k {{ h ← h *% 1000003u64 +% lhash(s[k].b) +% (s[k].b.len() as u64); k ← k + 1usize; }}
+  h
+}}
+"
+    );
+    let mut sorted = lines.clone();
+    sorted.sort(); // Vec<u8>::cmp = từ điển theo byte
+    let mut h = 0u64;
+    for l in &sorted {
+        h = h
+            .wrapping_mul(1_000_003)
+            .wrapping_add(lhash(l))
+            .wrapping_add(l.len() as u64);
+    }
+    (src, Ok(h.to_string()))
+}
+
+/// struct lớn hơn 16 byte với căn lề hỗn hợp: (tên, các trường (tên, kiểu, số bit), chỉ số trường khoá)
+type BigDef = (
+    &'static str,
+    [(&'static str, &'static str, u32); 5],
+    usize,
+    usize,
+);
+
+/// 24 byte: {u64,u8,u64} và {u8,u64,u8,u32}; 32 byte: {u8,u64,u16,u64} và {u32,u64,u8,u8,u64}; trường thừa (kiểu "") không dùng
+const BIGS: [BigDef; 4] = [
+    (
+        "S24a",
+        [
+            ("x", "u64", 64),
+            ("y", "u8", 8),
+            ("z", "u64", 64),
+            ("", "", 0),
+            ("", "", 0),
+        ],
+        1,
+        0,
+    ),
+    (
+        "S24b",
+        [
+            ("p", "u8", 8),
+            ("q", "u64", 64),
+            ("r", "u8", 8),
+            ("s", "u32", 32),
+            ("", "", 0),
+        ],
+        1,
+        1,
+    ),
+    (
+        "S32a",
+        [
+            ("a", "u8", 8),
+            ("b", "u64", 64),
+            ("c", "u16", 16),
+            ("d", "u64", 64),
+            ("", "", 0),
+        ],
+        1,
+        1,
+    ),
+    (
+        "S32b",
+        [
+            ("a", "u32", 32),
+            ("b", "u64", 64),
+            ("c", "u8", 8),
+            ("d", "u8", 8),
+            ("e", "u64", 64),
+        ],
+        1,
+        1,
+    ),
+];
+
+fn big_lit(def: &BigDef, f: &[u64; 5]) -> String {
+    let fields: Vec<String> = def
+        .1
+        .iter()
+        .enumerate()
+        .filter(|(_, (n, _, _))| !n.is_empty())
+        .map(|(i, (n, t, _))| format!("{n}: {}{t}", f[i]))
+        .collect();
+    format!("{} {{ {} }}", def.0, fields.join(", "))
+}
+
+fn big_hash(def: &BigDef, f: &[u64; 5]) -> u64 {
+    let mut h = 0u64;
+    for (i, (n, _, _)) in def.1.iter().enumerate() {
+        if !n.is_empty() {
+            h = h
+                .wrapping_mul(1_000_003)
+                .wrapping_add(f[i].wrapping_mul(2 * i as u64 + 3));
+        }
+    }
+    h
+}
+
+fn gen_big_sort(rng: &mut Rng) -> (String, Want) {
+    let def = &BIGS[rng.below(BIGS.len() as u64) as usize];
+    let key = def.2;
+    let n = rng.below(50) as usize;
+    let sample = |rng: &mut Rng| -> [u64; 5] {
+        let mut f = [0u64; 5];
+        for (i, (nm, _, bits)) in def.1.iter().enumerate() {
+            if nm.is_empty() {
+                continue;
+            }
+            let v = rng.next();
+            f[i] = if i == key {
+                v % 5 // nhiều khoá trùng ⇒ ổn định quan sát được qua các trường còn lại
+            } else if *bits == 64 {
+                v
+            } else {
+                v & ((1u64 << bits) - 1)
+            };
+        }
+        f
+    };
+    let mut model: Vec<[u64; 5]> = Vec::new();
+    let mut body = String::new();
+    let mut nset = 0;
+    for _ in 0..n {
+        let f = sample(rng);
+        body.push_str(&format!("  x.push({});\n", big_lit(def, &f)));
+        model.push(f);
+        if rng.chance(15) {
+            let idx = rng.below(model.len() as u64) as usize;
+            let g = sample(rng);
+            body.push_str(&format!(
+                "  m{nset} ≔ x.as_mut_slice();\n  m{nset}[{idx}] ← {};\n",
+                big_lit(def, &g)
+            ));
+            model[idx] = g;
+            nset += 1;
+        }
+    }
+    let ph = big_lit(def, &[0; 5]);
+    let mut pad = String::new();
+    for _ in 0..model.len() {
+        pad.push_str(&format!("  y.push({ph});\n"));
+    }
+    let fields_decl: Vec<String> = def
+        .1
+        .iter()
+        .filter(|(n, _, _)| !n.is_empty())
+        .map(|(n, t, _)| format!("{n}: {t}"))
+        .collect();
+    let kname = def.1[key].0;
+    // hash theo từng trường (cùng công thức với big_hash)
+    let mut hs = String::from("μh ≔ 0u64;");
+    for (i, (n, _, _)) in def.1.iter().enumerate() {
+        if !n.is_empty() {
+            hs.push_str(&format!(
+                " h ← h *% 1000003u64 +% (s.{n} as u64) *% {}u64;",
+                2 * i + 3
+            ));
+        }
+    }
+    let src = format!(
+        "▢ {name} {{ {decl} }}
+⊐ Copy for {name} {{ }}
+⊐ Ord for {name} {{
+  ƒ cmp(&self, o: &{name}) → Ordering ! ∅ {{
+    ⎇ self.{k} < o.{k} {{ Ordering::Less }} ⇝ {{ ⎇ self.{k} > o.{k} {{ Ordering::Greater }} ⇝ {{ Ordering::Equal }} }}
+  }}
+}}
+ƒ sh(s: &{name}) → u64 ! ∅ {{ {hs} h }}
+ƒ main() → u64 ! {{mem}} {{
+  μar1 ≔ Arena::new();
+  μar2 ≔ Arena::new();
+  μx ≔ Vec::new(&!ar1);
+  μy ≔ Vec::new(&!ar2);
+{body}{pad}  msort::sort(x.as_mut_slice(), y.as_mut_slice());
+  t ≔ x.as_slice();
+  μr ≔ 0u64;
+  μk ≔ 0usize;
+  ⟳ k < t.len() ↓ t.len() - k {{ r ← r *% 31u64 +% sh(&t[k]); k ← k + 1usize; }}
+  r +% (x.len() as u64)
+}}
+",
+        name = def.0,
+        decl = fields_decl.join(", "),
+        k = kname,
+    );
+    let mut sorted = model.clone();
+    sorted.sort_by_key(|f| f[key]); // ổn định
+    let mut r = 0u64;
+    for f in &sorted {
+        r = r.wrapping_mul(31).wrapping_add(big_hash(def, f));
+    }
+    r = r.wrapping_add(sorted.len() as u64);
+    (src, Ok(r.to_string()))
+}
+
 // ------------------------------------------------------------------------------------------------ chạy
 
 #[derive(Default)]
@@ -485,15 +751,21 @@ fn run_one(kind: &'static str, seed: u64, t: &mut Tally, dir: &std::path::Path) 
         "vec_ops" => gen_vec_ops(&mut rng),
         "vec_index_oob" => gen_vec_oob(&mut rng),
         "vec_arena_exhausted" => gen_vec_exhaust(&mut rng),
+        "vec_line_sort" => gen_line_sort(&mut rng),
+        "vec_big_sort" => gen_big_sort(&mut rng),
         k => gen_generic(k, &mut rng),
     };
-    let mut res = match check(
-        &[SourceInput {
-            name: "main.gt".into(),
-            text: source.clone(),
-        }],
-        &Options::default(),
-    ) {
+    let mut inputs = vec![SourceInput {
+        name: "main.gt".into(),
+        text: source.clone(),
+    }];
+    if source.contains("msort::") {
+        inputs.push(SourceInput {
+            name: "msort.gt".into(),
+            text: MSORT.to_string(),
+        });
+    }
+    let mut res = match check(&inputs, &Options::default()) {
         Ok(r) => r,
         Err(err) => {
             t.mismatch += 1;
@@ -581,7 +853,12 @@ fn run_batch(start: u64, count: u64) -> Tally {
     }
     let mut t = Tally::default();
     for s in start..start + count {
-        run_one(KINDS[(s % KINDS.len() as u64) as usize], s, &mut t, &dir);
+        let set: &[&'static str] = if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "elem") {
+            &KINDS_ELEM
+        } else {
+            &KINDS
+        };
+        run_one(set[(s % set.len() as u64) as usize], s, &mut t, &dir);
     }
     gt_types::set_select_impl_first_for_test(false);
     let _ = std::fs::remove_dir_all(&dir);
@@ -600,7 +877,9 @@ fn summary(t: &Tally) -> String {
 fn batch() {
     let (start, count) = (env_u64("GT_GTV_START", 1), env_u64("GT_GTV_COUNT", 25));
     let t = run_batch(start, count);
-    let tag = if std::env::var("GT_GTV_FIRST").is_ok_and(|v| v == "1") {
+    let tag = if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "elem") {
+        "generic-trait-vec-elem"
+    } else if std::env::var("GT_GTV_FIRST").is_ok_and(|v| v == "1") {
         "generic-trait-vec-SENSITIVITY-select-first"
     } else {
         "generic-trait-vec"
