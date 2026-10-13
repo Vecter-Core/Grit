@@ -234,3 +234,4 @@ Lập luận từng nhóm (KHÔNG phải chứng minh):
 - **Thứ tự khởi tạo `static`** chỉ theo phụ thuộc TRỰC TIẾP trong thân khởi tạo; static đọc static khác QUA hàm gọi trong initializer có thể sai thứ tự (chưa có test phản ví dụ; ghi để biết).
 - **TSan không dùng được** với toolchain MSVC hiện tại: đa luồng được kiểm bằng chạy lặp (4 luồng × 1000 lần, 68/68 vòng đúng) chứ không bằng bộ phát hiện đua dữ liệu. Không thay được chứng minh tuyệt đối.
 - **Chỉ x86_64-pc-windows-msvc**, LLVM 20.1.8 liên kết động (`LLVM-C.dll` trên PATH khi chạy gritc backend llvm; exe sinh ra KHÔNG cần).
+- **M10 "đạt có điều kiện" (duyệt 2026-10-13):** `gt-guard` và `gt-codegen-llvm` CHƯA qua đột biến; chỉ có hồ sơ `dev` (-O0, mọi Assert giữ). Chứng cứ thay thế: test đối chiếu thông dịch ≡ llvm, IR dựng tay cho Guard, golden IR, mẫu đa luồng. Hồ sơ `release` (-O2) KHÔNG có: sau tối ưu IR khác IR Guard đã kiểm ⇒ bộ tối ưu LLVM nằm trong TCB; cần ADR riêng trước khi làm.

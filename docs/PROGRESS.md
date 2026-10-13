@@ -506,3 +506,4 @@ Ghi vào `.claude/skills/grit-contract.md` §3.3 (luật) và `docs/KNOWN_LIMITA
 - **Benchmark nền** (số thật): `docs/BENCHMARK.md` (exe -O0, mọi check giữ; ~20× chậm hơn Rust -O ở fib, ngang Rust -O0 ở vòng lặp/slice; thông dịch ~2000× chậm hơn exe).
 - **Chưa làm / ghi thẳng:** hồ sơ `release` (-O2); đột biến `gt-guard`/`gt-codegen-llvm` (ADR đòi lô nhỏ 1 worker — chưa chạy vì tín dụng/thời gian; việc đầu tiên nếu Giang muốn); số thực, trait method, 128-bit mul/div (xem KNOWN_LIMITATIONS "M10").
 - **Cổng đầy đủ M10 (2026-10-13, một lần):** fmt OK; clippy 0; audit 0; 723 test pass / 0 lỗi; check_expectations OK (788 .gt, 67 mã); gt-rt 3 test. Dừng chờ Giang duyệt.
+- **M10 ĐƯỢC DUYỆT "đạt có điều kiện" (Giang, 2026-10-13):** điều kiện = chưa đột biến `gt-guard` và `gt-codegen-llvm`; chỉ có hồ sơ `dev` (-O0). Việc bù: (1) so sánh codegen ≡ thông dịch trên chương trình ngẫu nhiên; (2) đột biến chỉ `gt-guard`; (3) `release` cần ADR riêng (bộ tối ưu LLVM nằm trong TCB).

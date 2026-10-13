@@ -868,3 +868,7 @@ Mutation riêng cho `gt-guard` (hàm quyết định chấp nhận/từ chối),
 - **Nạp trễ đã kiểm:** chạy chế độ `noop` với PATH KHÔNG có LLVM ⇒ exit 0 (không đòi `LLVM-C.dll`); chế độ đầy đủ với PATH có `D:\Tools\llvm-20.1.8\bin` ⇒ exit 0.
 - **Phát hiện (bẫy):** `no-llvm-linking` của `llvm-sys` bỏ luôn shim C ⇒ liên kết hỏng với 10 ký hiệu chưa giải `LLVM_Initialize{All,Native}*` (hàm inline của `llvm-c/Target.h`). **Cách xử lý:** `gt-codegen-llvm` tự định nghĩa 10 hàm `#[unsafe(no_mangle)] extern "C"` bằng Rust, gọi `LLVMInitializeX86*` do DLL xuất (chỉ X86 — đúng phạm vi Phase 1; target khác ⇒ chưa hỗ trợ, không đoán). Mã spike nằm ở scratchpad; bản chính thức vào `crates/gt-codegen-llvm/src/shim.rs`.
 - **Hệ quả:** chỉ hỗ trợ `x86_64-pc-windows-msvc` ở M10; thêm target khác phải thêm vào shim có chủ đích.
+
+### ADR-029 — duyệt M10 và hồ sơ `release` (2026-10-13)
+- Giang duyệt M10 "đạt có điều kiện": chưa đột biến `gt-guard`/`gt-codegen-llvm`, chỉ có hồ sơ `dev`.
+- **Hồ sơ `release` (-O2) chưa làm.** Lý do kỹ thuật: IR Guard kiểm IR TRƯỚC tối ưu; sau khi LLVM chạy pass tối ưu, IR đã khác bản Guard đã chấp nhận (LLVM có thể sinh `nsw`/`nuw`, `unreachable` từ suy luận về hành vi không xác định, loại bỏ/di chuyển atomics trong giới hạn mô hình bộ nhớ). Do đó bộ tối ưu LLVM nằm trong TCB của hồ sơ `release`. Cần ADR riêng, tối thiểu phải quyết: chạy Guard sau tối ưu hay không (và luật nào còn hợp lệ), tập pass được phép, bằng chứng `dev ≡ release` trên bộ đối chiếu, và việc mọi `Assert` còn nguyên (D3).
