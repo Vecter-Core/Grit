@@ -38,6 +38,11 @@
 - Cổng đầy đủ lần 2: fmt OK, clippy 0, audit 0, **742 test pass / 0 lỗi**, check_expectations OK (791 .gt, 67 mã). Lần 1 hỏng thật: clippy `type_complexity` (rig) + test gt-dataflow thiếu `Body.sig_node` (FB-1 làm hỏng; kiểm nhẹ của tôi đã bỏ sót gt-dataflow). Đã sửa, chạy lại.
 - Bước 5 dogfood XONG (2026-10-13): `examples/wc` (Grit trong dự án Rig) + docs/DOGFOOD.md; prelude thêm `Out`/`Cap<Out>`/`root_out`/`Cap<Env>::arg`/`File::bytes`; codegen 7 intrinsic mới; gt-rt `gritrt_arg_*`/`fs_read`/`file_*`/`write_*`; test crates/rig/tests/dogfood.rs (10 tệp + 32 MiB + 2 đường lỗi, khớp tham chiếu). Chưa chạy cổng đầy đủ SAU bước 5 (chỉ kiểm nhẹ: gt-types/gt-resolve/gt-driver/gt-guard/gt-codegen-llvm/rig/gt-rt xanh). Dừng chờ Giang.
 
+## 2d. Lệnh 2026-10-13 (sau dogfood) — tiến độ
+- Mục 3 XONG: kiểm 3a: hàm thường gọi `root_fs()`/`root_out()` bị E0310 ĐÚNG (không có lỗ hổng) ⇒ đã đính chính KNOWN_LIMITATIONS/DOGFOOD (báo cáo bước 5 sai câu đó), thêm 2 mẫu hồi quy `E0310_root_out_in_helper`/`E0310_ok_out_passed_down`, wc nay lấy cap ở `main` và truyền `&Cap<Out>` xuống `report`, thêm điều kiện cứng 12 vào GRIT_PLAN §7.
+- Mục 6a/6b ĐÃ LÀM ở lệnh trước (commit 58b534f và nhánh FB-1); không làm lại.
+- Việc còn: 4 (TCB intrinsic), 5 (IR Guard lớp I/O + đột biến), 1 (cổng đầy đủ MỘT lần SAU 3–5 để không chạy hai lần), 2 (PROGRESS số thật M11), 7 (JSON).
+
 ## 3. Việc tiếp theo (theo thứ tự; mỗi bước nhỏ = một commit + cập nhật mục 2/3 + kiểm nhẹ: `cargo fmt`, test các crate bị đổi)
 1. `[XONG 2026-10-12]` Ghi SHA-256 gói LLVM 20.1.8 + `LLVM-C.dll` vào ADR-029 và `docs/ENVIRONMENT.md` (băm tự tính khi tải; GitHub công bố `f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f`), ghi: gritc cần `LLVM-C.dll` trên PATH khi chạy; binary do gritc sinh KHÔNG phụ thuộc `LLVM-C.dll` (phải kiểm bằng `dumpbin /dependents`); `libxml2s.lib` rỗng chỉ là workaround dự phòng.
 2. `[XONG 2026-10-12]` ADR-029 phụ lục: Q59–Q65 quyết định cuối; vấn đề `gritc.exe` không khởi động khi thiếu `LLVM-C.dll` ⇒ cargo feature `llvm` + nạp DLL trễ.

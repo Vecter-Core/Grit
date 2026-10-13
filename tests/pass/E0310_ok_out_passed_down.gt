@@ -1,0 +1,4 @@
+// expect: pass
+// note: `main` lấy `Cap<Out>` từ nguồn gốc rồi truyền xuống hàm cần dùng (D29)
+ƒ say(out: &Cap<Out>) ! {io} { out.write_u64(1u64); }
+ƒ main() ! {io} { out ≔ root_out(); say(&out); }

@@ -409,6 +409,8 @@ Chỉ chuyển khi đạt **tất cả**:
 10. **Điều kiện cứng về đột biến chưa giải quyết của M7 (Giang, 2026-10-08):** M9 KHÔNG được coi là xong nếu còn đột biến của `gt-oblig/src/analysis.rs` (đường quyết định xoá/giữ) chưa giải quyết theo hướng "xoá thêm check" (làm bộ giải xoá nhiều check hơn đúng — nguy hiểm; hướng "giữ thừa check" chỉ tốn hiệu năng). Ngoài ra M9 PHẢI có chế độ **giữ mọi check** (không xoá check nào, kể cả check đã chứng minh), hoạt động đúng và có test, và chế độ này là MẶC ĐỊNH khi dùng thử Grit thật cho tới khi điều kiện trên được giải quyết. Đây là đề xuất của Giang để đánh giá trong ADR của M9 (chưa triển khai ở M7). Danh sách đột biến chưa giải quyết: `KNOWN_LIMITATIONS.md`, mục "gt-oblig".
 11. **Điều kiện cứng về lỗ hổng đã biết của M4/M5 (Giang, 2026-10-06):** trước M7, literal ngoài phạm vi kiểu (`x: u8 ≔ 300`) LỌT qua M4 (E0601 thuộc M7), và thiếu đường trả về (E0307) thuộc M5. Vì vậy **M9 không được coi là xong, và `gritc` không được sinh binary**, nếu E0601 (M7) chưa được triển khai và qua test; tương tự nếu E0307 (M5) chưa triển khai. Đây là cổng chặn, không phải ghi chú.
 
+12. **Điều kiện cứng về mô hình capability (Giang, 2026-10-13):** KHÔNG được tuyên bố mô hình capability là an toàn khi còn BẤT KỲ hàm không phải `main` cấp cao của tệp gọi được (hoặc nhắc tới) một hàm nguồn capability như `root_*`/`Host::fs()`. Hiện E0310 chặn điều này (kiểm 2026-10-13 cho `root_fs` và `root_out`, test hồi quy ở `tests/fail/E0310_*`); mọi nguồn capability MỚI thêm vào prelude/`lib/core` phải có mẫu `fail` E0310 (gọi từ hàm thường) và mẫu `pass` (nhận qua tham số) trước khi được coi là xong.
+
 ---
 
 ## 8. GIAI ĐOẠN 2 — ASCEND (hướng tới triết lý đầy đủ)

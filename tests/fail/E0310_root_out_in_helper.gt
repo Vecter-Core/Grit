@@ -1,0 +1,4 @@
+// expect: fail E0310
+// note: hàm thường (không phải main) gọi nguồn capability `root_out()` ⇒ E0310 (D29); dogfood 2026-10-13
+ƒ say() ! {io} { out ≔ root_out(); out.write_u64(1u64); }
+ƒ main() ! {io} { say(); }

@@ -244,7 +244,7 @@ Lập luận từng nhóm (KHÔNG phải chứng minh):
 
 ## I/O tối thiểu của dogfood (2026-10-13; xem docs/DOGFOOD.md)
 - `Cap<Fs>::read` đọc NGUYÊN tệp vào bộ nhớ (không giải phóng; tệp lớn ⇒ tốn RAM tương ứng); `File::bytes` trả lát trỏ vào bộ nhớ đó. Mọi lỗi I/O/đối số ⇒ abort (mã 70, kind `io_error`/`arg_out_of_range`) kèm dòng chi tiết ở stderr; CHƯA có `Result`/`IoError`.
-- `root_*()` là hàm thường (quyền ngầm ở mức cú pháp; hiệu ứng `io` vẫn bị kiểm) — M12 chuyển sang capability do runtime cấp cho `main`.
+- `root_*()` là hàm nguồn capability của prelude (giả lập M12); **E0310 (D28/D29) chỉ cho `main` cấp cao của tệp gọi hoặc nhắc tới chúng** — đã kiểm 2026-10-13: hàm thường gọi `root_fs()`/`root_out()` bị ĐỎ E0310. (Câu cũ "gọi ở đâu cũng được" trong báo cáo bước 5 là SAI.) Còn lại: capability gốc vẫn do hàm prelude trả (chưa do runtime cấp cho `main`) — M12.
 - Bộ giải M7 không chứng minh `b[i]` cho `b` cục bộ lấy từ `f.bytes()` dù có `i < b.len()` (check runtime còn nguyên, đúng nhưng chậm hơn).
 - IR Guard không có lớp nghĩa vụ cho lời gọi runtime I/O.
 - `Cap<Env>::arg` chuyển đối số không-UTF-8 thành lossy.
