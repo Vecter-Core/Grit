@@ -524,3 +524,8 @@ Bốn lần chạy `tools/gate.sh`; ba lần đầu ĐỎ thật, mỗi lần s�
 3. `gt-resolve` corpus ĐỎ: bản fixture prelude THỨ BA (gt-resolve/tests/common) thiếu `Out`/`root_out` — sửa.
 4. **Lần cuối: fmt OK; clippy 0; audit 0; 756 test pass / 0 lỗi; check_expectations OK (793 file `.gt`: fail 392, warn 13, pass 362; 67 mã).**
 Rút kinh nghiệm: prelude có BA bản (lib/core, fixture gt-types, fixture gt-resolve) — chỉ một cặp được test khoá bằng nhau (docs/KNOWN_LIMITATIONS: nên khoá cả gt-resolve).
+
+## Bổ sung số liệu theo lệnh 2026-10-13: luật bộ sinh FB-1 và lô abort ít phủ
+- **FB-1, luật bộ sinh:** oracle M7 (`gt-oblig/tests/oracle.rs`) nay chạy thêm `gt_borrowck::check_program` trên MỌI chương trình sinh ra (bộ sinh `obgen` đã sinh sẵn hàm có `⊳`/`⊲` cùng tham số lát/tham chiếu) và cấm E9901. KIỂM BẰNG TẮT BẢN SỬA: đổi `regions.rs` về `regions.get(&body.node)` ⇒ oracle ĐỎ ngay ở **seed #1** (thông báo "ICE trong borrowck `main::h1⊳0` … tham số không khớp RegionSig", 0.01 s); bật lại ⇒ XANH (198.59 s cả bộ). Lý do lọt lưới cũ ghi ở `docs/FIELD_BUGS.md` (FB-1): oracle M7 không chạy borrowck, oracle M6 không sinh hợp đồng, corpus không có tổ hợp.
+- **Lô so sánh abort ít phủ** (`gt-driver/tests/llvm_diff_abort.rs`, lô 25 chương trình, ghi vào `docs/CODEGEN_DIFF_RESULTS.jsonl`, dòng `suite":"abort-targeted"`): 6 lô (index, divrem ×4, pre) = 150 chương trình, **847 phép chạy exe thật, 847 khớp thông dịch, 0 bất đồng**. Số lần abort đã so khớp: `index_out_of_bounds` **90**, `rem_by_zero` **64**, `div_by_zero` **38**, `precondition` **74** (mục tiêu ≥ 30 mỗi loại: đạt). Còn lại bình thường: chạy thường không abort.
+- Cột "người duyệt" của `docs/TCB_INTRINSICS.md` giữ nguyên `CHỜ GIANG`.
