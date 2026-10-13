@@ -4,7 +4,7 @@ target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:
 target triple = "x86_64-pc-windows-msvc"
 
 @"static.prog::COUNT" = global { i32 } zeroinitializer
-@gt.attestation = constant [65 x i8] c"be3fec7f31f2e022c28b3a0972f363bbf7a7e0c162e8f2e1f9b461c9cee4b535\00"
+@gt.attestation = constant [65 x i8] c"10260aaf6a614d7d22be0d27c4e82471af004aab380367fd0e9c88facdfbf2cd\00"
 
 ; Function Attrs: noreturn
 declare void @gritrt_abort(i32) #0
@@ -100,5 +100,5 @@ attributes #0 = { noreturn }
 
 !gt.attest = !{!0}
 
-!0 = !{!"be3fec7f31f2e022c28b3a0972f363bbf7a7e0c162e8f2e1f9b461c9cee4b535"}
+!0 = !{!"10260aaf6a614d7d22be0d27c4e82471af004aab380367fd0e9c88facdfbf2cd"}
 !1 = !{!"E0503"}
