@@ -271,3 +271,81 @@ fn cmp_bytes_is_lexicographic_on_bytes() {
         assert_eq!(value, want.to_string(), "{backend}\n{body}\n{text}");
     }
 }
+
+/// Nhiên liệu KHÔNG bao giờ cạn trên đầu vào hợp lệ (điều kiện của Giang, 2026-10-14): 10⁶ phần tử sinh bằng LCG NGAY TRONG Grit
+/// (tránh nguồn 10 MB), chạy trên exe; thoát 0 (không abort `fuel_exhausted`) và khớp sắp xếp ổn định của Rust. Hai vòng nhiên liệu của
+/// `msort` (`pass`: n + 1 vòng, `sort`: 64 vòng) có dư rất lớn: ~20 lượt, mỗi lượt `pass` dùng ≤ n/2 vòng.
+#[test]
+fn one_million_elements_never_exhaust_fuel() {
+    const N: u64 = 1_000_000;
+    const RANGE: u64 = 5000;
+    let src = format!(
+        "▢ K {{ k: u64, i: u64 }}
+⊐ Copy for K {{ }}
+⊐ Ord for K {{
+  ƒ cmp(&self, o: &K) → Ordering ! ∅ {{
+    ⎇ self.k < o.k {{ Ordering::Less }} ⇝ {{ ⎇ self.k > o.k {{ Ordering::Greater }} ⇝ {{ Ordering::Equal }} }}
+  }}
+}}
+ƒ main() → u64 ! {{mem}} {{
+  μar1 ≔ Arena::new();
+  μar2 ≔ Arena::new();
+  μx ≔ Vec::new(&!ar1);
+  μy ≔ Vec::new(&!ar2);
+  μseed ≔ 99u64;
+  μi ≔ 0u64;
+  ⟳ i < {N}u64 ↓ {N}u64 - i {{
+    seed ← seed *% 6364136223846793005u64 +% 1442695040888963407u64;
+    x.push(K {{ k: (seed / 8589934592u64) % {RANGE}u64, i: i }});
+    y.push(K {{ k: 0u64, i: 0u64 }});
+    i ← i + 1u64;
+  }}
+  msort::sort(x.as_mut_slice(), y.as_mut_slice());
+  s ≔ x.as_slice();
+  μh ≔ 0u64;
+  μj ≔ 0usize;
+  ⟳ j < s.len() ↓ s.len() - j {{ h ← h *% 1000003u64 +% s[j].k *% 131u64 +% s[j].i; j ← j + 1usize; }}
+  h
+}}
+"
+    );
+    let d = scratch("fuel1m");
+    std::fs::write(d.join("msort.gt"), MSORT).expect("ghi");
+    std::fs::write(d.join("main.gt"), &src).expect("ghi");
+    let t = std::time::Instant::now();
+    let o = gritc()
+        .args(["run", "--json", "--backend=llvm"])
+        .arg(&d)
+        .output()
+        .expect("chạy gritc");
+    let dt = t.elapsed();
+    let text = String::from_utf8_lossy(&o.stdout).into_owned();
+    let line = text
+        .lines()
+        .rev()
+        .find(|l| l.starts_with('{'))
+        .unwrap_or("");
+    let v: serde_json::Value = serde_json::from_str(line)
+        .unwrap_or_else(|e| panic!("JSON ({e}): {text}\n{}", String::from_utf8_lossy(&o.stderr)));
+    assert!(
+        !v["run"]["aborted"].as_bool().unwrap_or(true),
+        "abort ({}): nhiên liệu/biên cạn trên đầu vào hợp lệ là BUG: {text}",
+        v["run"]["abort_kind"]
+    );
+    let mut seed = 99u64;
+    let keys: Vec<u64> = (0..N)
+        .map(|_| {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed / 8_589_934_592) % RANGE
+        })
+        .collect();
+    assert_eq!(
+        v["run"]["value"].as_str().unwrap_or(""),
+        expected(&keys).to_string(),
+        "{text}"
+    );
+    println!("10^6 phần tử (gồm biên dịch): {:.1} s", dt.as_secs_f64());
+    let _ = std::fs::remove_dir_all(&d);
+}
