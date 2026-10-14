@@ -51,3 +51,7 @@ Viết cho Giang đọc và quyết định (2026-10-14). **Chưa được duy�
 | 554 | chặt | tương đương có lập luận | như trên |
 **Không có đột biến nào ở trạng thái "chưa giải quyết = false negative tiềm ẩn" theo nghĩa nguy hiểm** — NHƯNG điều này dựa vào lập luận đơn điệu ở đầu tài liệu (đọc mã, chưa chứng minh hình thức; tôi chưa quét hết mọi luật ĐỎ để chắc không có luật phủ định) và vào việc oracle không phân biệt được bản gốc với bản đột biến. Nếu Giang không chấp nhận lập luận, ba đột biến này quay lại thành "false negative tiềm ẩn" của M6 và điều kiện #9 chưa đạt.
 **Điểm mở khác (từ ADR-027):** quy tắc bất biến cho `Mutex`/`Atomic` chưa chứng minh được là cần bằng kiểm tắt bản sửa (chỉ `Cell` thể hiện); phải thêm tấn công riêng khi 8.D cho phép tham chiếu trong `Arg`/luồng có phạm vi.
+
+---
+## Kiểm lại bằng bộ test HIỆN TẠI (2026-10-15; `tools/mut.py`, 1 worker, `cargo test -p gt-borrowck`)
+Chạy lại đúng các dòng của bốn đột biến (số dòng hiện tại 265/372/565/602): **238 (dòng 265, `false → true`): KILLED; 361 (372), 554 (565), 591 (602): SURVIVED** — khớp bảng ở trên và ADR-027 §0. Hai đột biến LỎNG hơn "xoá câu lệnh `relate`" ở dòng 372 và 602 (bỏ hẳn ràng buộc) đều KILLED, chứng tỏ bộ test nhạy với hướng nguy hiểm ở chính các điểm này. Kết quả thô: `target/tmp/mut_regions4.txt` (không commit). **Chưa kiểm:** chưa chạy so sánh phán quyết từng chương trình giữa bản gốc và ba bản đột biến để xác nhận tập từ chối của chúng là siêu tập (đo cũ trên 6 000 chương trình chỉ cho thấy "giống hệt").
