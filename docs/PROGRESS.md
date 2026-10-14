@@ -655,3 +655,7 @@ Nguyên tắc: không sửa mã sản phẩm để làm test xanh; mỗi thay đ
 | + | MỚI `gt-types/tests/literals.rs::float_restrictions_are_e0319` | ca E0319 + ca hợp lệ | khoá hành vi mới | — |
 
 Mẫu nào chỉ bị đổi vì checker từ chối mà chưa rõ lý do ngôn ngữ: chỉ #1 (và #2, #3, #5, #6 cùng gốc `f32`) ⇒ đã đưa Q79.
+
+## ADR-036 bước (i)+(ii) — hồ sơ release và Guard-post (2026-10-14)
+- (i) `gritc build|run --profile=dev|release`; release = `mem2reg,sroa,early-cse` sau Guard-pre, `verify`, Guard-post; backend O0, CPU generic, không FMA. Commit 36dce54, a0083fb, f13a91f.
+- (ii) Guard-post (`check_post`) + băm IR trước/sau + 7 lỗi chèn `GRITC_FAULT=post:{drop-abort,fma,fast-math,fp-attr,nsw,unreachable,untagged-spawn}` đều bị E1101; 4 test đơn vị mới ở gt-guard (26 test), 4 test tiến trình (`release_guard`); đột biến 34/34 bị bắt. KẾT QUẢ BẤT NGỜ: `instcombine` bị Guard-post từ chối 6/6 công cụ dogfood (thêm `nuw/nneg`, xoá abort của kiểm tra gập được) ⇒ loại khỏi danh sách (Q81 chờ Giang). 6/6 công cụ dựng được ở release với danh sách còn lại.
