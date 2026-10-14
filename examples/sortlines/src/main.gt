@@ -64,13 +64,26 @@
     y.push(Line { b: &b[0..0] });
   } ⇝ { }
   msort::sort(x.as_mut_slice(), y.as_mut_slice());
+  // dựng TOÀN BỘ đầu ra vào một Vec<u8> (Arena thứ ba) rồi ghi MỘT lần (Q75: không đệm trong gt-rt, tool tự gom đầu ra);
+  // tổng = số byte tệp + 1 nếu dòng cuối thiếu ký tự xuống dòng (mỗi dòng ra len + 1 byte)
+  extra ≔ ⎇ b.len() > 0usize { ⎇ b[b.len() - 1] == 10u8 { 0usize } ⇝ { 1usize } } ⇝ { 0usize };
+  total ≔ b.len() + extra;
+  μa3 ≔ alloc.arena();
+  μo ≔ Vec::new(&!a3);
+  o.reserve(total);
   s ≔ x.as_slice();
   μk ≔ 0usize;
   ⟳ k < s.len() ↓ s.len() - k {
-    out.write_bytes(s[k].b);
-    out.write_str("\n");
+    line ≔ s[k].b;
+    μj ≔ 0usize;
+    ⟳ j < line.len() ↓ line.len() - j {
+      o.push(line[j]);
+      j ← j + 1;
+    }
+    o.push(10u8);
     k ← k + 1;
   }
+  out.write_bytes(o.as_slice());
 }
 
 ƒ main() ! {io, div, mem} {

@@ -240,9 +240,12 @@ pub extern "C" fn gritrt_ewrite_u64(n: u64) {
 /// Như `gritrt_write_str` nhưng ra stderr.
 ///
 /// # Safety
-/// `p` trỏ tới `n` byte đọc được.
+/// `p` trỏ tới `n` byte đọc được (`n = 0`: `p` có thể null).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gritrt_ewrite_str(p: *const u8, n: u64) {
+    if n == 0 {
+        return; // lát rỗng của `Vec` có thể mang con trỏ null: không dựng `&[u8]` từ null (UB)
+    }
     let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
     let mut o = std::io::stderr().lock();
     if o.write_all(bytes).and_then(|()| o.flush()).is_err() {
@@ -251,9 +254,12 @@ pub unsafe extern "C" fn gritrt_ewrite_str(p: *const u8, n: u64) {
 }
 
 /// # Safety
-/// `p` trỏ tới `n` byte đọc được.
+/// `p` trỏ tới `n` byte đọc được (`n = 0`: `p` có thể null).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gritrt_write_str(p: *const u8, n: u64) {
+    if n == 0 {
+        return; // lát rỗng của `Vec` có thể mang con trỏ null: không dựng `&[u8]` từ null (UB)
+    }
     let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
     let mut o = std::io::stdout().lock();
     if o.write_all(bytes).and_then(|()| o.flush()).is_err() {

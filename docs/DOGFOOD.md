@@ -94,12 +94,13 @@ Mỗi dòng = một khoảng trống/bug gặp khi viết công cụ thật. C�
 ### Kết quả đo thật (7 test `crates/rig/tests/dogfood_sortlines.rs` ĐẠT, so với bản tham chiếu Rust `sort_by` theo byte, khớp TỪNG BYTE)
 - **Đúng:** 15 ca nhỏ (rỗng, chỉ `\n`, một dòng có/không `\n` cuối, dòng rỗng xen kẽ, CRLF thuần và lẫn, không xuống dòng cuối, UTF-8 + 😀, byte cao 0xff/0x80/0x7f, NUL, trùng lặp, tiền tố, `\r` đơn); một dòng dài 1 MiB (3 ca, gồm hai dòng chung tiền tố 1 MiB); 1 MiB và 32 MiB văn bản ngẫu nhiên (có NUL, 0xff, CR, 0xc3); 10⁶ dòng ngắn; 4 MiB toàn dòng rỗng (4 194 304 dòng) + 1000 dòng rỗng; đường lỗi (thiếu tệp ⇒ mã 2 + `sortlines: <tệp>: no such file` ở stderr, stdout rỗng; thiếu đối số ⇒ `usage: sortlines <file>`, mã 2); công thức Arena (xem ADR-034 phụ lục).
 - **Tính ổn định KHÔNG quan sát được** khi so toàn dòng (hai dòng bằng nhau về byte không phân biệt được) nên sortlines KHÔNG tuyên bố đã kiểm ổn định. Tính ổn định của `sort` đã kiểm riêng ở `gt-driver/tests/llvm_sort.rs` bằng hash theo chỉ số gốc (4 bố cục rộng 24/32 byte × 50 000 phần tử, 60 mảng ngẫu nhiên, 10⁶ phần tử, độ nhạy đã thử).
-- **Hiệu năng so với Rust `sort_by` (đo, -O0, mọi check giữ; KHÔNG phải cổng; ống pipe, một lần chạy mỗi ca, máy dev):**
+- **Hiệu năng so với Rust `sort_by` (đo, -O0, mọi check giữ; KHÔNG phải cổng; ống pipe, một lần chạy mỗi ca, máy dev) — SAU khi tool gom đầu ra vào một `Vec<u8>` rồi ghi MỘT lần (Q75, 2026-10-14):**
 
 | ca | sortlines.gt | Rust sort_by | tỉ lệ thời gian | đỉnh working set (sortlines) / ước tính Rust |
 |---|---|---|---|---|
-| 1 MiB văn bản | 0,31 s | 0,043 s | ×7,2 | 7 / 3 MiB |
-| 32 MiB văn bản | 7,24 s | 2,03 s | ×3,6 | 86 / 89 MiB |
-| 10⁶ dòng ngắn (4,5 MB) | 3,63 s | 0,54 s | ×6,8 | 39 / 24 MiB |
-| 4 MiB toàn dòng rỗng | 7,20 s | 0,27 s | ×27 | 136 / 72 MiB |
+| 1 MiB văn bản | 0,09 s | 0,040 s | ×2,4 | 7 / 3 MiB |
+| 32 MiB văn bản | 2,43 s | 2,02 s | ×1,2 | 118 / 89 MiB |
+| 10⁶ dòng ngắn (4,5 MB) | 0,75 s | 0,53 s | ×1,4 | 42 / 24 MiB |
+| 4 MiB toàn dòng rỗng | 0,99 s | 0,26 s | ×3,8 | 139 / 72 MiB |
+- **Bản đo TRƯỚC đó đã bị thay:** khi in từng dòng bằng hai lời gọi `write_*` (mỗi lời gọi flush stdout) tool chậm ×3,6–×27 (32 MiB: 7,24 s; 10⁶ dòng: 3,63 s; 4 MiB rỗng: 7,20 s) — thời gian chủ yếu là syscall ghi, không phải sắp xếp. Gom đầu ra một lần giảm 3–10×. Bộ nhớ đỉnh tăng bằng một Arena thứ ba (kích thước tệp: 86 → 118 MiB ở 32 MiB). Ra TỆP (PowerShell `Start-Process -RedirectStandardOutput`) trước đây 129,5 s cho 10⁶ dòng: CHƯA đo lại sau thay đổi.
 - Rust: thời gian đo TRONG tiến trình thử (không gồm khởi động); bộ nhớ Rust là ƯỚC TÍNH (tệp·2 + 16·dòng), không đo; sortlines.gt thời gian gồm khởi động tiến trình + đọc/ghi. Chưa đo lặp lại nhiều lần nên bỏ qua phương sai.

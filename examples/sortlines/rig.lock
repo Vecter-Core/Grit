@@ -6,4 +6,4 @@ name = "sortlines"
 version = "0.1.0"
 source = "root"
 deps = []
-hash = "sha256:43475ae5550a519464d888d73072927fb7e82e7e891c89955d2441f71437800c"
+hash = "sha256:ca0bfee8034b6b54a3e75227a547718245606328fb7b686d700b642ffccd5d6b"
