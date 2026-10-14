@@ -1,0 +1,8 @@
+// expect: pass
+// note: mẫu bọc-và-chuyển-tiếp: self.i.a() trong ⊐ <T: A> A for W<T> (W<S>::a → S::a, không chu trình instance)
+⊏ A { ƒ a(&self) → i32 ! ∅; }
+▢ S { }
+▢ W<T> { i: T }
+⊐ A for S { ƒ a(&self) → i32 ! ∅ { 1 } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i32 ! ∅ { self.i.a() +% 10 } }
+ƒ main() → i32 ! ∅ { w ≔ W { i: S { } }; w.a() }

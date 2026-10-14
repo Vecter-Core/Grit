@@ -25,6 +25,9 @@ const MSORT: &str = include_str!("../../../examples/sortlines/src/msort.gt");
 /// loại cho kiểu phần tử của sortlines (ADR-034 cập nhật): `GT_GTV_SET=elem`
 const KINDS_ELEM: [&str; 2] = ["vec_line_sort", "vec_big_sort"];
 
+/// loại kiểm PHÁN QUYẾT M8 (GT_GTV_SET=term): đồ thị dừng qua impl generic/hai trait, kỳ vọng từ bảng impl của bộ sinh
+const KINDS_TERM: [&str; 1] = ["term_graph"];
+
 const KINDS: [&str; 7] = [
     "generic_unbounded",
     "bound_call",
@@ -705,6 +708,213 @@ fn gen_big_sort(rng: &mut Rng) -> (String, Want) {
     (src, Ok(r.to_string()))
 }
 
+// ------------------------------------------------------------------------------------------------ đồ thị dừng (M8) theo bảng impl của bộ sinh
+
+/// Giá trị kiểu: lá `Xj` hoặc `W<…>` mang một số `k`.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum TVal {
+    Leaf(usize),
+    W(Box<TVal>, i64),
+}
+
+/// kiểu (bỏ `k`) — nút của đồ thị
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum TTy {
+    Leaf(usize),
+    W(Box<TTy>),
+}
+
+fn tty(v: &TVal) -> TTy {
+    match v {
+        TVal::Leaf(j) => TTy::Leaf(*j),
+        TVal::W(i, _) => TTy::W(Box::new(tty(i))),
+    }
+}
+
+fn tval_src(v: &TVal) -> String {
+    match v {
+        TVal::Leaf(j) => format!("X{j} {{ }}"),
+        TVal::W(i, k) => format!("W {{ i: {}, k: {k}i64 }}", tval_src(i)),
+    }
+}
+
+#[derive(Clone, Debug)]
+enum WImpl {
+    /// `self.i.<cùng trait>() *% 5 +% self.k`
+    Fwd,
+    /// `self.i.<trait kia>() *% 5 +% self.k`
+    Cross,
+    /// `self.k *% c`
+    Konst(i64),
+}
+
+struct TermModel {
+    nleaf: usize,
+    /// `leaf[tr][j]`: (hằng, các lời gọi (trait, giá trị))
+    leaf: [Vec<(i64, Vec<(usize, TVal)>)>; 2],
+    w: [WImpl; 2],
+}
+
+const TNAME: [&str; 2] = ["a", "b"];
+
+impl TermModel {
+    /// các nút kế tiếp của (trait, kiểu) theo BẢNG IMPL CỦA BỘ SINH (không gọi `select_impl`)
+    fn succ(&self, tr: usize, t: &TTy) -> Vec<(usize, TTy)> {
+        match t {
+            TTy::Leaf(j) => self.leaf[tr][*j]
+                .1
+                .iter()
+                .map(|(tr2, v)| (*tr2, tty(v)))
+                .collect(),
+            TTy::W(inner) => match &self.w[tr] {
+                WImpl::Fwd => vec![(tr, (**inner).clone())],
+                WImpl::Cross => vec![(1 - tr, (**inner).clone())],
+                WImpl::Konst(_) => Vec::new(),
+            },
+        }
+    }
+
+    /// có chu trình trong đồ thị đạt được từ mọi gốc (impl của lá — M8 duyệt MỌI hàm không generic) không?
+    fn has_cycle(&self) -> bool {
+        use std::collections::BTreeMap;
+        let mut color: BTreeMap<(usize, TTy), u8> = BTreeMap::new();
+        fn dfs(m: &TermModel, n: (usize, TTy), color: &mut BTreeMap<(usize, TTy), u8>) -> bool {
+            match color.get(&n) {
+                Some(1) => return true,
+                Some(_) => return false,
+                None => {}
+            }
+            color.insert(n.clone(), 1);
+            for s in m.succ(n.0, &n.1) {
+                if dfs(m, s, color) {
+                    return true;
+                }
+            }
+            color.insert(n, 2);
+            false
+        }
+        for tr in 0..2 {
+            for j in 0..self.nleaf {
+                if dfs(self, (tr, TTy::Leaf(j)), &mut color) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// giá trị (CHỈ gọi khi đồ thị không có chu trình)
+    fn eval(&self, tr: usize, v: &TVal) -> i64 {
+        match v {
+            TVal::Leaf(j) => {
+                let (k0, calls) = &self.leaf[tr][*j];
+                let mut r = *k0;
+                for (tr2, v2) in calls {
+                    r = r.wrapping_mul(3).wrapping_add(self.eval(*tr2, v2));
+                }
+                r
+            }
+            TVal::W(inner, k) => match &self.w[tr] {
+                WImpl::Fwd => self.eval(tr, inner).wrapping_mul(5).wrapping_add(*k),
+                WImpl::Cross => self.eval(1 - tr, inner).wrapping_mul(5).wrapping_add(*k),
+                WImpl::Konst(c) => k.wrapping_mul(*c),
+            },
+        }
+    }
+}
+
+fn gen_tval(rng: &mut Rng, nleaf: usize, depth: u64) -> TVal {
+    if depth == 0 || rng.chance(45) {
+        TVal::Leaf(rng.below(nleaf as u64) as usize)
+    } else {
+        TVal::W(
+            Box::new(gen_tval(rng, nleaf, depth - 1)),
+            rng.below(50) as i64,
+        )
+    }
+}
+
+/// chương trình dừng/không dừng nhiều tầng qua impl generic và hai trait; trả (nguồn, mô hình, các lời gọi ở main)
+fn gen_term(rng: &mut Rng) -> (String, TermModel, Vec<(usize, TVal)>) {
+    let nleaf = 1 + rng.below(3) as usize;
+    let mk_leaf = |rng: &mut Rng| -> Vec<(i64, Vec<(usize, TVal)>)> {
+        (0..nleaf)
+            .map(|_| {
+                let k0 = rng.below(100) as i64;
+                let ncalls = rng.below(3) as usize;
+                let calls = (0..ncalls)
+                    .map(|_| (rng.below(2) as usize, gen_tval(rng, nleaf, 3)))
+                    .collect();
+                (k0, calls)
+            })
+            .collect()
+    };
+    let leaf = [mk_leaf(rng), mk_leaf(rng)];
+    let mkw = |rng: &mut Rng| match rng.below(10) {
+        0..=4 => WImpl::Fwd,
+        5..=7 => WImpl::Cross,
+        _ => WImpl::Konst(rng.below(9) as i64 + 1),
+    };
+    let w = [mkw(rng), mkw(rng)];
+    let model = TermModel { nleaf, leaf, w };
+    let mut src = String::from(
+        "⊏ A { ƒ a(&self) → i64 ! ∅; }\n⊏ B { ƒ b(&self) → i64 ! ∅; }\n▢ W<T> { i: T, k: i64 }\n",
+    );
+    for j in 0..nleaf {
+        src.push_str(&format!("▢ X{j} {{ }}\n"));
+    }
+    let trait_name = ["A", "B"];
+    for tr in 0..2 {
+        for j in 0..nleaf {
+            let (k0, calls) = &model.leaf[tr][j];
+            let mut body = format!("μr ≔ {k0}i64; ");
+            for (n, (tr2, v)) in calls.iter().enumerate() {
+                body.push_str(&format!(
+                    "t{n} ≔ {}; r ← r *% 3i64 +% t{n}.{}(); ",
+                    tval_src(v),
+                    TNAME[*tr2]
+                ));
+            }
+            body.push('r');
+            src.push_str(&format!(
+                "⊐ {} for X{j} {{ ƒ {}(&self) → i64 ! ∅ {{ {body} }} }}\n",
+                trait_name[tr], TNAME[tr]
+            ));
+        }
+        let m = TNAME[tr];
+        let other = TNAME[1 - tr];
+        src.push_str(&match &model.w[tr] {
+            WImpl::Fwd => format!(
+                "⊐ <T: {}> {} for W<T> {{ ƒ {m}(&self) → i64 ! ∅ {{ self.i.{m}() *% 5i64 +% self.k }} }}\n",
+                trait_name[tr], trait_name[tr]
+            ),
+            WImpl::Cross => format!(
+                "⊐ <T: {}> {} for W<T> {{ ƒ {m}(&self) → i64 ! ∅ {{ self.i.{other}() *% 5i64 +% self.k }} }}\n",
+                trait_name[1 - tr],
+                trait_name[tr]
+            ),
+            WImpl::Konst(c) => format!(
+                "⊐ <T> {} for W<T> {{ ƒ {m}(&self) → i64 ! ∅ {{ self.k *% {c}i64 }} }}\n",
+                trait_name[tr]
+            ),
+        });
+    }
+    let ncalls = 1 + rng.below(3) as usize;
+    let mains: Vec<(usize, TVal)> = (0..ncalls)
+        .map(|_| (rng.below(2) as usize, gen_tval(rng, nleaf, 3)))
+        .collect();
+    src.push_str("ƒ main() → i64 ! ∅ {\n  μh ≔ 0i64;\n");
+    for (n, (tr, v)) in mains.iter().enumerate() {
+        src.push_str(&format!(
+            "  m{n} ≔ {};\n  h ← h *% 31i64 +% m{n}.{}();\n",
+            tval_src(v),
+            TNAME[*tr]
+        ));
+    }
+    src.push_str("  h\n}\n");
+    (src, model, mains)
+}
+
 // ------------------------------------------------------------------------------------------------ chạy
 
 #[derive(Default)]
@@ -744,8 +954,106 @@ fn run_exe_env(
     (o.status.code(), err, val)
 }
 
+/// một chương trình `term_graph`: phán quyết M8 phải khớp mô hình (có chu trình ⇒ ĐỎ chỉ E0703; không ⇒ XANH và giá trị khớp ở hai backend)
+fn run_term(seed: u64, t: &mut Tally, dir: &std::path::Path, rng: &mut Rng) {
+    let (source, model, mains) = gen_term(rng);
+    let cyclic = model.has_cycle();
+    let kind: &'static str = if cyclic {
+        "term_cyclic"
+    } else {
+        "term_acyclic"
+    };
+    *t.programs.entry(kind).or_default() += 1;
+    let mut res = match check(
+        &[SourceInput {
+            name: "main.gt".into(),
+            text: source.clone(),
+        }],
+        &Options::default(),
+    ) {
+        Ok(r) => r,
+        Err(err) => {
+            t.mismatch += 1;
+            t.detail.push(format!(
+                "#{kind}/{seed}: đầu vào không hợp lệ: {err}\n{source}"
+            ));
+            return;
+        }
+    };
+    let errs: Vec<String> = res
+        .report
+        .diagnostics
+        .iter()
+        .filter(|d| d.level == gt_diag::Level::Error)
+        .map(|d| d.code.as_str().to_string())
+        .collect();
+    if cyclic {
+        // kỳ vọng: ĐỎ, mọi lỗi đều E0703 (không được lọt qua cổng)
+        if res.verdict.allows_output() || errs.is_empty() || errs.iter().any(|c| c != "E0703") {
+            t.mismatch += 1;
+            t.detail.push(format!(
+                "#{kind}/{seed}: mô hình CÓ chu trình nhưng M8 cho phán quyết {:?} lỗi {errs:?}\n{source}",
+                res.verdict.allows_output()
+            ));
+        } else {
+            *t.compared.entry(kind).or_default() += 1;
+        }
+        return;
+    }
+    if !res.verdict.allows_output() {
+        // từ chối oan đồ thị không chu trình: bất đồng (M8 quá chặt) — trừ khi lỗi không phải của M8 (bỏ khỏi so sánh, báo)
+        if errs.iter().all(|c| c == "E0703") {
+            t.mismatch += 1;
+            t.detail.push(format!(
+                "#{kind}/{seed}: mô hình KHÔNG có chu trình nhưng M8 từ chối {errs:?}\n{source}"
+            ));
+        } else {
+            *t.dropped.entry(format!("{kind}: ĐỎ {errs:?}")).or_default() += 1;
+        }
+        return;
+    }
+    let mut want = 0i64;
+    for (tr, v) in &mains {
+        want = want.wrapping_mul(31).wrapping_add(model.eval(*tr, v));
+    }
+    let exe = dir.join(format!("t{seed}.exe"));
+    {
+        let art = res.open_gate().expect("cổng mở");
+        let att = attestation(&res, &gt_driver::pipeline::mir_dump(art));
+        if let Err(err) = build_exe(art, &exe, true, &att) {
+            *t.dropped
+                .entry(format!("{kind}: chưa hạ được"))
+                .or_default() += 1;
+            if matches!(err, gt_driver::native::NativeError::Guard(_)) {
+                t.mismatch += 1;
+                t.detail
+                    .push(format!("#{kind}/{seed}: Guard từ chối: {err}\n{source}"));
+            }
+            return;
+        }
+    }
+    let (code, err, val) = run_exe_env(&exe, &[]);
+    let _ = std::fs::remove_file(&exe);
+    let llvm_ok = code == Some(0) && val.as_deref() == Some(want.to_string().as_str());
+    let r = run_main(res.take_gated().expect("sản phẩm"));
+    let interp_ok = matches!(&r.end, RunEnd::Normal)
+        && norm_interp(&r.value).as_deref() == Some(want.to_string().as_str());
+    if llvm_ok && interp_ok {
+        *t.compared.entry(kind).or_default() += 1;
+    } else {
+        t.mismatch += 1;
+        t.detail.push(format!(
+            "#{kind}/{seed}: kỳ vọng {want} / llvm (mã {code:?}, {val:?}, {err:?}) khớp={llvm_ok} / thông dịch khớp={interp_ok}\n{source}"
+        ));
+    }
+}
+
 fn run_one(kind: &'static str, seed: u64, t: &mut Tally, dir: &std::path::Path) {
     let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0x67AB | 1);
+    if kind == "term_graph" {
+        run_term(seed, t, dir, &mut rng);
+        return;
+    }
     *t.programs.entry(kind).or_default() += 1;
     let (source, want) = match kind {
         "vec_ops" => gen_vec_ops(&mut rng),
@@ -851,24 +1159,34 @@ fn run_batch(start: u64, count: u64) -> Tally {
     if std::env::var("GT_GTV_FIRST").is_ok_and(|v| v == "1") {
         gt_types::set_select_impl_first_for_test(true);
     }
+    if std::env::var("GT_GTV_DROP").is_ok_and(|v| v == "1") {
+        gt_term::set_drop_trait_edges_for_test(true);
+    }
     let mut t = Tally::default();
     for s in start..start + count {
         let set: &[&'static str] = if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "elem") {
             &KINDS_ELEM
+        } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "term") {
+            &KINDS_TERM
         } else {
             &KINDS
         };
         run_one(set[(s % set.len() as u64) as usize], s, &mut t, &dir);
     }
     gt_types::set_select_impl_first_for_test(false);
+    gt_term::set_drop_trait_edges_for_test(false);
     let _ = std::fs::remove_dir_all(&dir);
     t
 }
 
 fn summary(t: &Tally) -> String {
     format!(
-        "{{\"programs\":{:?},\"compared\":{:?},\"dropped\":{:?},\"mismatch\":{}}}",
-        t.programs, t.compared, t.dropped, t.mismatch
+        "{{\"programs\":{:?},\"compared\":{:?},\"dropped\":{:?},\"mismatch\":{},\"term_fallbacks\":{}}}",
+        t.programs,
+        t.compared,
+        t.dropped,
+        t.mismatch,
+        gt_term::conservative_fallbacks()
     )
 }
 
@@ -877,7 +1195,15 @@ fn summary(t: &Tally) -> String {
 fn batch() {
     let (start, count) = (env_u64("GT_GTV_START", 1), env_u64("GT_GTV_COUNT", 25));
     let t = run_batch(start, count);
-    let tag = if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "elem") {
+    let tag = if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "term") {
+        if std::env::var("GT_GTV_FIRST").is_ok_and(|v| v == "1") {
+            "generic-trait-vec-term-SENSITIVITY-select-first"
+        } else if std::env::var("GT_GTV_DROP").is_ok_and(|v| v == "1") {
+            "generic-trait-vec-term-SENSITIVITY-drop-trait-edges"
+        } else {
+            "generic-trait-vec-term"
+        }
+    } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "elem") {
         "generic-trait-vec-elem"
     } else if std::env::var("GT_GTV_FIRST").is_ok_and(|v| v == "1") {
         "generic-trait-vec-SENSITIVITY-select-first"
@@ -900,10 +1226,12 @@ fn batch() {
             writeln!(f, "  DETAIL {d}").expect("ghi");
         }
     }
-    if std::env::var("GT_GTV_FIRST").is_ok_and(|v| v == "1") {
+    if std::env::var("GT_GTV_FIRST").is_ok_and(|v| v == "1")
+        || std::env::var("GT_GTV_DROP").is_ok_and(|v| v == "1")
+    {
         assert!(
             t.mismatch > 0,
-            "độ nhạy: select_impl chọn impl đầu mà lô vẫn XANH ⇒ bộ sinh mù"
+            "độ nhạy: đã phá bản sửa mà lô vẫn XANH ⇒ bộ sinh mù"
         );
     } else {
         assert_eq!(t.mismatch, 0, "bất đồng: {:#?}", t.detail);
@@ -921,5 +1249,31 @@ fn tiny_fixed_batch() {
         compared >= 10,
         "quá ít chương trình so sánh được: {}",
         summary(&t)
+    );
+}
+
+/// lô nhỏ cố định cho PHÁN QUYẾT M8 theo đồ thị instance (cổng đầy đủ + đột biến gt-term): 30 chương trình `term_graph`, cả có và không có
+/// chu trình, khớp mô hình của bộ sinh; đồ thị instance luôn dựng được (không lùi về bảo thủ).
+#[test]
+fn tiny_term_graph_batch() {
+    let dir = std::env::temp_dir().join(format!("gt-gtv-term-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("tạo");
+    let before = gt_term::conservative_fallbacks();
+    let mut t = Tally::default();
+    for s in 1..=30u64 {
+        run_one("term_graph", s, &mut t, &dir);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(t.mismatch, 0, "bất đồng: {:#?}", t.detail);
+    let cyc = t.compared.get("term_cyclic").copied().unwrap_or(0);
+    let acy = t.compared.get("term_acyclic").copied().unwrap_or(0);
+    assert!(
+        cyc >= 5 && acy >= 5,
+        "thiếu ca: có chu trình {cyc}, không {acy}"
+    );
+    assert_eq!(
+        gt_term::conservative_fallbacks(),
+        before,
+        "đồ thị instance không dựng được (lùi về bảo thủ)"
     );
 }

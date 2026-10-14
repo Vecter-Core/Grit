@@ -1,5 +1,5 @@
-// expect: fail E0703
-// note: TỪ CHỐI OAN ghi nhận (ADR-033): chương trình dừng nhưng M8 coi `fwd → mọi impl → W::a → fwd` là vòng; chưa có cách né ngoài hiệu ứng div
+// expect: pass
+// note: forwarder qua hàm generic tự do fwd<T: A> trong impl generic: đồ thị instance W<S>::a → fwd<S> → S::a KHÔNG có chu trình (ADR-033 phụ lục)
 ⊏ A { ƒ a(&self) → i32 ! ∅; }
 ▢ S { }
 ▢ W<T> { i: T }

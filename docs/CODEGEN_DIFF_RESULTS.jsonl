@@ -30,3 +30,400 @@
 {"suite":"generic-trait-vec-elem","start":26,"count":25,"result":{"programs":{"vec_big_sort": 12, "vec_line_sort": 13},"compared":{"vec_big_sort": 12, "vec_line_sort": 13},"dropped":{},"mismatch":0}}
 {"suite":"generic-trait-vec-elem","start":51,"count":25,"result":{"programs":{"vec_big_sort": 13, "vec_line_sort": 12},"compared":{"vec_big_sort": 13, "vec_line_sort": 12},"dropped":{},"mismatch":0}}
 {"suite":"generic-trait-vec-elem","start":76,"count":25,"result":{"programs":{"vec_big_sort": 12, "vec_line_sort": 13},"compared":{"vec_big_sort": 12, "vec_line_sort": 12},"dropped":{"vec_line_sort: ĐỎ E0301": 1},"mismatch":0}}
+{"suite":"generic-trait-vec-term","start":1,"count":25,"result":{"programs":{"term_acyclic": 11, "term_cyclic": 14},"compared":{"term_acyclic": 11, "term_cyclic": 14},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-term","start":26,"count":25,"result":{"programs":{"term_acyclic": 11, "term_cyclic": 14},"compared":{"term_acyclic": 11, "term_cyclic": 14},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-term","start":51,"count":25,"result":{"programs":{"term_acyclic": 12, "term_cyclic": 13},"compared":{"term_acyclic": 12, "term_cyclic": 13},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-term","start":76,"count":25,"result":{"programs":{"term_acyclic": 6, "term_cyclic": 19},"compared":{"term_acyclic": 6, "term_cyclic": 19},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-term","start":101,"count":25,"result":{"programs":{"term_acyclic": 9, "term_cyclic": 16},"compared":{"term_acyclic": 9, "term_cyclic": 16},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-term","start":126,"count":25,"result":{"programs":{"term_acyclic": 6, "term_cyclic": 19},"compared":{"term_acyclic": 6, "term_cyclic": 19},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-term","start":151,"count":25,"result":{"programs":{"term_acyclic": 6, "term_cyclic": 19},"compared":{"term_acyclic": 6, "term_cyclic": 19},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-term-SENSITIVITY-select-first","start":1,"count":40,"result":{"programs":{"term_acyclic": 16, "term_cyclic": 24},"compared":{"term_acyclic": 7, "term_cyclic": 24},"dropped":{},"mismatch":9,"term_fallbacks":0}}
+  DETAIL #term_acyclic/2: kỳ vọng 119395 / llvm (mã Some(0), Some("14305"), "") khớp=false / thông dịch khớp=false
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+▢ X2 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 80i64; r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 3i64; r } }
+⊐ A for X2 { ƒ a(&self) → i64 ! ∅ { μr ≔ 74i64; t0 ≔ X1 { }; r ← r *% 3i64 +% t0.b(); t1 ≔ X1 { }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 26i64; t0 ≔ W { i: W { i: W { i: X0 { }, k: 1i64 }, k: 8i64 }, k: 5i64 }; r ← r *% 3i64 +% t0.a(); t1 ≔ W { i: W { i: X0 { }, k: 18i64 }, k: 1i64 }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 23i64; r } }
+⊐ B for X2 { ƒ b(&self) → i64 ! ∅ { μr ≔ 84i64; t0 ≔ W { i: W { i: W { i: X0 { }, k: 4i64 }, k: 21i64 }, k: 43i64 }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ <T: A> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: X2 { }, k: 37i64 };
+  h ← h *% 31i64 +% m0.a();
+  m1 ≔ X2 { };
+  h ← h *% 31i64 +% m1.a();
+  h
+}
+
+  DETAIL #term_acyclic/5: kỳ vọng 9694 / llvm (mã Some(0), Some("1909"), "") khớp=false / thông dịch khớp=false
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 71i64; t0 ≔ W { i: X0 { }, k: 41i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 47i64; t0 ≔ W { i: X0 { }, k: 3i64 }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ <T> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.k *% 4i64 } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: W { i: X0 { }, k: 49i64 }, k: 24i64 };
+  h ← h *% 31i64 +% m0.a();
+  h
+}
+
+  DETAIL #term_acyclic/6: kỳ vọng 7692 / llvm (mã Some(0), Some("332"), "") khớp=false / thông dịch khớp=false
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+▢ X2 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 61i64; r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 7i64; t0 ≔ X1 { }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ A for X2 { ƒ a(&self) → i64 ! ∅ { μr ≔ 74i64; t0 ≔ W { i: W { i: X0 { }, k: 4i64 }, k: 34i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 1i64; r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 77i64; r } }
+⊐ B for X2 { ƒ b(&self) → i64 ! ∅ { μr ≔ 91i64; t0 ≔ X1 { }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ <T: B> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: W { i: X2 { }, k: 28i64 }, k: 27i64 };
+  h ← h *% 31i64 +% m0.a();
+  h
+}
+
+  DETAIL #term_acyclic/9: kỳ vọng 137 / llvm (mã Some(0), Some("222"), "") khớp=false / thông dịch khớp=false
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 44i64; r } }
+⊐ <T> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.k *% 3i64 } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 42i64; r } }
+⊐ <T: A> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: W { i: W { i: X0 { }, k: 6i64 }, k: 9i64 }, k: 2i64 };
+  h ← h *% 31i64 +% m0.b();
+  h
+}
+
+  DETAIL #term_acyclic/16: kỳ vọng 3043 / llvm (mã Some(0), Some("3053"), "") khớp=false / thông dịch khớp=false
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 15i64; r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 70i64; t0 ≔ X0 { }; r ← r *% 3i64 +% t0.a(); t1 ≔ X1 { }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ <T: B> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 52i64; r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 50i64; r } }
+⊐ <T> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.k *% 9i64 } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: W { i: W { i: X0 { }, k: 32i64 }, k: 44i64 }, k: 10i64 };
+  h ← h *% 31i64 +% m0.b();
+  m1 ≔ W { i: X1 { }, k: 3i64 };
+  h ← h *% 31i64 +% m1.a();
+  h
+}
+
+  DETAIL #term_acyclic/24: kỳ vọng 1640 / llvm (mã Some(-1073741571), None, "") khớp=false / thông dịch khớp=false
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 20i64; t0 ≔ X0 { }; r ← r *% 3i64 +% t0.b(); t1 ≔ X1 { }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 97i64; r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 90i64; t0 ≔ W { i: X1 { }, k: 14i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 38i64; r } }
+⊐ <T: B> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ X0 { };
+  h ← h *% 31i64 +% m0.a();
+  h
+}
+
+  DETAIL #term_acyclic/27: kỳ vọng 57950 / llvm (mã Some(0), Some("9195"), "") khớp=false / thông dịch khớp=false
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 40i64; r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 58i64; r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 67i64; r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 29i64; t0 ≔ W { i: W { i: X1 { }, k: 28i64 }, k: 2i64 }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ <T: B> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ X1 { };
+  h ← h *% 31i64 +% m0.b();
+  m1 ≔ W { i: W { i: W { i: X0 { }, k: 34i64 }, k: 3i64 }, k: 36i64 };
+  h ← h *% 31i64 +% m1.a();
+  h
+}
+
+  DETAIL #term_acyclic/29: kỳ vọng 1529 / llvm (mã Some(0), Some("1489"), "") khớp=false / thông dịch khớp=false
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 64i64; r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 51i64; r } }
+⊐ <T: B> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 81i64; t0 ≔ X1 { }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 78i64; r } }
+⊐ <T: A> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: W { i: X1 { }, k: 47i64 }, k: 19i64 };
+  h ← h *% 31i64 +% m0.a();
+  h
+}
+
+  DETAIL #term_acyclic/32: kỳ vọng 186735049 / llvm (mã Some(-1073741571), None, "") khớp=false / thông dịch khớp=false
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+▢ X2 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 47i64; t0 ≔ W { i: W { i: W { i: X1 { }, k: 19i64 }, k: 40i64 }, k: 38i64 }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 70i64; r } }
+⊐ A for X2 { ƒ a(&self) → i64 ! ∅ { μr ≔ 45i64; t0 ≔ W { i: X0 { }, k: 7i64 }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 56i64; r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 97i64; t0 ≔ X0 { }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ B for X2 { ƒ b(&self) → i64 ! ∅ { μr ≔ 4i64; t0 ≔ W { i: X2 { }, k: 33i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ <T: A> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ X1 { };
+  h ← h *% 31i64 +% m0.a();
+  m1 ≔ W { i: W { i: W { i: X2 { }, k: 49i64 }, k: 11i64 }, k: 9i64 };
+  h ← h *% 31i64 +% m1.b();
+  m2 ≔ X1 { };
+  h ← h *% 31i64 +% m2.a();
+  h
+}
+
+{"suite":"generic-trait-vec-term-SENSITIVITY-drop-trait-edges","start":1,"count":40,"result":{"programs":{"term_acyclic": 16, "term_cyclic": 24},"compared":{"term_acyclic": 16, "term_cyclic": 15},"dropped":{},"mismatch":9,"term_fallbacks":0}}
+  DETAIL #term_cyclic/7: mô hình CÓ chu trình nhưng M8 cho phán quyết true lỗi []
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 42i64; t0 ≔ W { i: X1 { }, k: 0i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 77i64; t0 ≔ X0 { }; r ← r *% 3i64 +% t0.a(); t1 ≔ X1 { }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 32i64; t0 ≔ W { i: X1 { }, k: 24i64 }; r ← r *% 3i64 +% t0.b(); t1 ≔ W { i: W { i: W { i: X1 { }, k: 45i64 }, k: 47i64 }, k: 12i64 }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 52i64; t0 ≔ W { i: X1 { }, k: 0i64 }; r ← r *% 3i64 +% t0.b(); t1 ≔ W { i: W { i: X0 { }, k: 38i64 }, k: 28i64 }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ <T: A> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ X0 { };
+  h ← h *% 31i64 +% m0.a();
+  m1 ≔ W { i: W { i: W { i: X1 { }, k: 34i64 }, k: 0i64 }, k: 22i64 };
+  h ← h *% 31i64 +% m1.a();
+  m2 ≔ X0 { };
+  h ← h *% 31i64 +% m2.a();
+  h
+}
+
+  DETAIL #term_cyclic/8: mô hình CÓ chu trình nhưng M8 cho phán quyết true lỗi []
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 73i64; t0 ≔ W { i: W { i: X0 { }, k: 2i64 }, k: 16i64 }; r ← r *% 3i64 +% t0.b(); t1 ≔ W { i: X0 { }, k: 21i64 }; r ← r *% 3i64 +% t1.a(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 55i64; t0 ≔ W { i: W { i: W { i: X0 { }, k: 16i64 }, k: 40i64 }, k: 39i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ <T: B> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: W { i: W { i: X0 { }, k: 11i64 }, k: 11i64 }, k: 4i64 };
+  h ← h *% 31i64 +% m0.b();
+  m1 ≔ X0 { };
+  h ← h *% 31i64 +% m1.a();
+  h
+}
+
+  DETAIL #term_cyclic/22: mô hình CÓ chu trình nhưng M8 cho phán quyết true lỗi []
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 82i64; r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 95i64; t0 ≔ W { i: W { i: X0 { }, k: 21i64 }, k: 31i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ <T: B> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 85i64; t0 ≔ X1 { }; r ← r *% 3i64 +% t0.b(); t1 ≔ W { i: W { i: W { i: X0 { }, k: 38i64 }, k: 36i64 }, k: 8i64 }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 80i64; r } }
+⊐ <T: B> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: X0 { }, k: 19i64 };
+  h ← h *% 31i64 +% m0.a();
+  h
+}
+
+  DETAIL #term_cyclic/25: mô hình CÓ chu trình nhưng M8 cho phán quyết true lỗi []
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+▢ X2 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 60i64; t0 ≔ X0 { }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 98i64; t0 ≔ X0 { }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ A for X2 { ƒ a(&self) → i64 ! ∅ { μr ≔ 47i64; t0 ≔ W { i: W { i: X0 { }, k: 20i64 }, k: 17i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 50i64; r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 54i64; t0 ≔ X2 { }; r ← r *% 3i64 +% t0.a(); t1 ≔ W { i: W { i: W { i: X1 { }, k: 44i64 }, k: 17i64 }, k: 10i64 }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ B for X2 { ƒ b(&self) → i64 ! ∅ { μr ≔ 86i64; t0 ≔ X0 { }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ <T: B> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ X2 { };
+  h ← h *% 31i64 +% m0.a();
+  m1 ≔ W { i: X0 { }, k: 9i64 };
+  h ← h *% 31i64 +% m1.b();
+  h
+}
+
+  DETAIL #term_cyclic/30: mô hình CÓ chu trình nhưng M8 cho phán quyết true lỗi []
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 26i64; r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 76i64; t0 ≔ X0 { }; r ← r *% 3i64 +% t0.b(); t1 ≔ W { i: X1 { }, k: 4i64 }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 57i64; t0 ≔ W { i: X1 { }, k: 37i64 }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 75i64; r } }
+⊐ <T: B> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ X0 { };
+  h ← h *% 31i64 +% m0.b();
+  m1 ≔ W { i: X1 { }, k: 9i64 };
+  h ← h *% 31i64 +% m1.b();
+  m2 ≔ W { i: X0 { }, k: 11i64 };
+  h ← h *% 31i64 +% m2.b();
+  h
+}
+
+  DETAIL #term_cyclic/31: mô hình CÓ chu trình nhưng M8 cho phán quyết true lỗi []
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+▢ X2 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 28i64; t0 ≔ W { i: X2 { }, k: 34i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 27i64; t0 ≔ W { i: W { i: W { i: X2 { }, k: 16i64 }, k: 39i64 }, k: 0i64 }; r ← r *% 3i64 +% t0.a(); t1 ≔ X2 { }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ A for X2 { ƒ a(&self) → i64 ! ∅ { μr ≔ 83i64; r } }
+⊐ <T> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.k *% 7i64 } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 69i64; r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 66i64; t0 ≔ W { i: W { i: X1 { }, k: 36i64 }, k: 34i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ B for X2 { ƒ b(&self) → i64 ! ∅ { μr ≔ 16i64; r } }
+⊐ <T: B> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: X0 { }, k: 12i64 };
+  h ← h *% 31i64 +% m0.a();
+  m1 ≔ X2 { };
+  h ← h *% 31i64 +% m1.a();
+  m2 ≔ W { i: X0 { }, k: 38i64 };
+  h ← h *% 31i64 +% m2.b();
+  h
+}
+
+  DETAIL #term_cyclic/33: mô hình CÓ chu trình nhưng M8 cho phán quyết true lỗi []
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+▢ X2 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 68i64; t0 ≔ X2 { }; r ← r *% 3i64 +% t0.a(); t1 ≔ W { i: W { i: W { i: X0 { }, k: 16i64 }, k: 49i64 }, k: 3i64 }; r ← r *% 3i64 +% t1.a(); r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 32i64; t0 ≔ W { i: W { i: W { i: X0 { }, k: 36i64 }, k: 12i64 }, k: 11i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ A for X2 { ƒ a(&self) → i64 ! ∅ { μr ≔ 4i64; t0 ≔ X0 { }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 31i64; r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 52i64; r } }
+⊐ B for X2 { ƒ b(&self) → i64 ! ∅ { μr ≔ 62i64; r } }
+⊐ <T: A> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: X2 { }, k: 31i64 };
+  h ← h *% 31i64 +% m0.a();
+  m1 ≔ X1 { };
+  h ← h *% 31i64 +% m1.b();
+  m2 ≔ W { i: X1 { }, k: 25i64 };
+  h ← h *% 31i64 +% m2.b();
+  h
+}
+
+  DETAIL #term_cyclic/37: mô hình CÓ chu trình nhưng M8 cho phán quyết true lỗi []
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 24i64; t0 ≔ W { i: X1 { }, k: 43i64 }; r ← r *% 3i64 +% t0.b(); t1 ≔ W { i: W { i: W { i: X0 { }, k: 20i64 }, k: 28i64 }, k: 27i64 }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 67i64; t0 ≔ W { i: X0 { }, k: 30i64 }; r ← r *% 3i64 +% t0.b(); t1 ≔ W { i: X1 { }, k: 38i64 }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 26i64; t0 ≔ W { i: X0 { }, k: 3i64 }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 39i64; t0 ≔ X1 { }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ <T: B> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.i.b() *% 5i64 +% self.k } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ W { i: X0 { }, k: 24i64 };
+  h ← h *% 31i64 +% m0.a();
+  h
+}
+
+  DETAIL #term_cyclic/39: mô hình CÓ chu trình nhưng M8 cho phán quyết true lỗi []
+⊏ A { ƒ a(&self) → i64 ! ∅; }
+⊏ B { ƒ b(&self) → i64 ! ∅; }
+▢ W<T> { i: T, k: i64 }
+▢ X0 { }
+▢ X1 { }
+▢ X2 { }
+⊐ A for X0 { ƒ a(&self) → i64 ! ∅ { μr ≔ 2i64; t0 ≔ X2 { }; r ← r *% 3i64 +% t0.b(); t1 ≔ W { i: W { i: X1 { }, k: 26i64 }, k: 0i64 }; r ← r *% 3i64 +% t1.b(); r } }
+⊐ A for X1 { ƒ a(&self) → i64 ! ∅ { μr ≔ 2i64; t0 ≔ W { i: W { i: X0 { }, k: 23i64 }, k: 4i64 }; r ← r *% 3i64 +% t0.b(); t1 ≔ X0 { }; r ← r *% 3i64 +% t1.a(); r } }
+⊐ A for X2 { ƒ a(&self) → i64 ! ∅ { μr ≔ 84i64; t0 ≔ W { i: X1 { }, k: 31i64 }; r ← r *% 3i64 +% t0.b(); t1 ≔ W { i: X0 { }, k: 10i64 }; r ← r *% 3i64 +% t1.a(); r } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i64 ! ∅ { self.i.a() *% 5i64 +% self.k } }
+⊐ B for X0 { ƒ b(&self) → i64 ! ∅ { μr ≔ 42i64; t0 ≔ X2 { }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ B for X1 { ƒ b(&self) → i64 ! ∅ { μr ≔ 77i64; t0 ≔ W { i: W { i: W { i: X1 { }, k: 35i64 }, k: 12i64 }, k: 42i64 }; r ← r *% 3i64 +% t0.b(); r } }
+⊐ B for X2 { ƒ b(&self) → i64 ! ∅ { μr ≔ 22i64; t0 ≔ W { i: W { i: X2 { }, k: 41i64 }, k: 37i64 }; r ← r *% 3i64 +% t0.a(); r } }
+⊐ <T> B for W<T> { ƒ b(&self) → i64 ! ∅ { self.k *% 6i64 } }
+ƒ main() → i64 ! ∅ {
+  μh ≔ 0i64;
+  m0 ≔ X0 { };
+  h ← h *% 31i64 +% m0.b();
+  m1 ≔ X1 { };
+  h ← h *% 31i64 +% m1.a();
+  m2 ≔ X1 { };
+  h ← h *% 31i64 +% m2.b();
+  h
+}
+

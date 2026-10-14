@@ -1,0 +1,11 @@
+// expect: pass
+// note: hai trait gọi lẫn nhau trên instance khác nhau nhưng hữu hạn: W<S>::a → S::b, W<S>::b → S::a
+⊏ A { ƒ a(&self) → i32 ! ∅; }
+⊏ B { ƒ b(&self) → i32 ! ∅; }
+▢ S { }
+▢ W<T> { i: T }
+⊐ A for S { ƒ a(&self) → i32 ! ∅ { 1 } }
+⊐ B for S { ƒ b(&self) → i32 ! ∅ { 2 } }
+⊐ <T: B> A for W<T> { ƒ a(&self) → i32 ! ∅ { self.i.b() } }
+⊐ <T: A> B for W<T> { ƒ b(&self) → i32 ! ∅ { self.i.a() } }
+ƒ main() → i32 ! ∅ { w ≔ W { i: S { } }; w.a() +% w.b() }

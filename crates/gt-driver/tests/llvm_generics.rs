@@ -188,20 +188,48 @@ fn building_twice_gives_identical_binaries_and_ir() {
     assert_eq!(a, b, "exe khác nhau giữa hai lần build");
 }
 
-/// Ghi nhận khoảng trống của ADR-032: gọi qua trait TRONG thân impl generic bị M8 từ chối (E0703) vì cạnh `Wrap<T>::area → T::area`
-/// có thể trỏ lại chính nó theo cú pháp. Test này khoá hành vi hiện tại để thay đổi bị phát hiện (xem KNOWN_LIMITATIONS).
+/// ADR-033 phụ lục (đồ thị gọi theo INSTANCE): gọi qua trait TRONG thân impl generic KHÔNG còn bị M8 từ chối khi đồ thị instance không có chu
+/// trình; chạy đúng ở cả hai backend. Số tính tay: W³ bọc S: 1 + 10·3 = 31; hai trait xen kẽ: W<S>::a = S::b = 2, W<S>::b = S::a = 1 ⇒ 3.
 #[test]
-fn known_limit_trait_call_inside_generic_impl_is_rejected_by_m8() {
+fn trait_call_inside_generic_impl_is_accepted_when_the_instance_graph_is_acyclic() {
+    both(
+        "⊏ A { ƒ a(&self) → i32 ! ∅; }
+▢ S { }
+▢ W<T> { i: T }
+⊐ A for S { ƒ a(&self) → i32 ! ∅ { 1 } }
+⊐ <T: A> A for W<T> { ƒ a(&self) → i32 ! ∅ { self.i.a() +% 10 } }
+ƒ main() → i32 ! ∅ { w ≔ W { i: W { i: W { i: S { } } } }; w.a() }
+",
+        "31",
+    );
+    both(
+        "⊏ A { ƒ a(&self) → i32 ! ∅; }
+⊏ B { ƒ b(&self) → i32 ! ∅; }
+▢ S { }
+▢ W<T> { i: T }
+⊐ A for S { ƒ a(&self) → i32 ! ∅ { 1 } }
+⊐ B for S { ƒ b(&self) → i32 ! ∅ { 2 } }
+⊐ <T: B> A for W<T> { ƒ a(&self) → i32 ! ∅ { self.i.b() } }
+⊐ <T: A> B for W<T> { ƒ b(&self) → i32 ! ∅ { self.i.a() } }
+ƒ main() → i32 ! ∅ { w ≔ W { i: S { } }; w.a() +% w.b() }
+",
+        "3",
+    );
+}
+
+/// Vòng THẬT qua impl generic (`X::a → W<X>::a → X::a`) vẫn PHẢI bị từ chối (E0703): chặn bản sửa bỏ cạnh ngây thơ.
+#[test]
+fn a_real_cycle_through_a_generic_impl_is_still_rejected_by_m8() {
     let d = scratch("m8");
     let f = d.join("prog.gt");
     std::fs::write(
         &f,
         "⊏ A { ƒ a(&self) → i32 ! ∅; }
-▢ S { }
+▢ X { }
 ▢ W<T> { i: T }
-⊐ A for S { ƒ a(&self) → i32 ! ∅ { 1 } }
+⊐ A for X { ƒ a(&self) → i32 ! ∅ { w ≔ W { i: X { } }; w.a() } }
 ⊐ <T: A> A for W<T> { ƒ a(&self) → i32 ! ∅ { self.i.a() } }
-ƒ main() → i32 ! ∅ { w ≔ W { i: S { } }; w.a() }
+ƒ main() → i32 ! ∅ { x ≔ X { }; x.a() }
 ",
     )
     .expect("ghi");

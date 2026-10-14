@@ -236,6 +236,354 @@ fn sccs(n: usize, adj: &[Vec<usize>]) -> Vec<usize> {
     comp
 }
 
+/// Đồ thị gọi ở mức NÚT HÀM sau khi gộp instance: `recursive[i]` nút `i` có instance nằm trong chu trình; `comp[i]` số hiệu thành phần
+/// (các nút cùng một SCC đệ quy chung số hiệu); `bad_indirect[i]` có cạnh gián tiếp (giá trị hàm/phương thức trait) nằm trong SCC của nó.
+struct NodeGraph {
+    comp: Vec<usize>,
+    recursive: Vec<bool>,
+    bad_indirect: Vec<bool>,
+}
+
+type Inst = (NodeId, Vec<gt_types::Ty>);
+
+/// số lần phải lùi về đồ thị theo nút bảo thủ từ đầu tiến trình (đo đạc cho test: bộ sinh `term_graph` đòi 0)
+static CONSERVATIVE_FALLBACKS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+#[must_use]
+pub fn conservative_fallbacks() -> usize {
+    CONSERVATIVE_FALLBACKS.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+static DROP_TRAIT_EDGES: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Chốt kiểm thử độ nhạy (ADR-033 phụ lục): bỏ MỌI cạnh phương thức trait của đồ thị instance (toàn tiến trình: M8 chạy ở luồng khác luồng
+/// gọi; FAIL-OPEN cố ý, để chứng minh bộ sinh `term_graph` tự bắt được). KHÔNG dùng ngoài test.
+pub fn set_drop_trait_edges_for_test(on: bool) {
+    DROP_TRAIT_EDGES.store(on, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Chốt phòng thủ: quá số nút này ⇒ không dựng đồ thị instance (lùi về bảo thủ).
+const MAX_GRAPH_NODES: usize = 2 * gt_types::MAX_PROGRAM_INSTANCES;
+
+static GRAPH_LIMIT_OVERRIDE: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+static FORCE_CONSERVATIVE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Chốt kiểm thử: đặt cận số nút của đồ thị instance (0 = mặc định). KHÔNG dùng ngoài test.
+pub fn set_graph_limit_for_test(n: usize) {
+    GRAPH_LIMIT_OVERRIDE.store(n, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Chốt kiểm thử: buộc lùi về đồ thị theo nút bảo thủ (để kiểm đường dự phòng). KHÔNG dùng ngoài test.
+pub fn set_force_conservative_for_test(on: bool) {
+    FORCE_CONSERVATIVE.store(on, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn graph_limit() -> usize {
+    match GRAPH_LIMIT_OVERRIDE.load(std::sync::atomic::Ordering::SeqCst) {
+        0 => MAX_GRAPH_NODES,
+        n => n,
+    }
+}
+
+/// Đồ thị gọi theo INSTANCE. `None` ⇒ không dựng được trọn vẹn (kiểu chưa cụ thể, không tìm được impl, quá lớn): người gọi dùng đồ thị
+/// bảo thủ. KHÔNG BAO GIỜ bỏ cạnh vì thiếu thông tin.
+fn instance_graph(
+    t: &TypesOutput,
+    bodies: &[&Body],
+    by_node: &BTreeMap<NodeId, usize>,
+    escaped: &BTreeSet<NodeId>,
+) -> Option<NodeGraph> {
+    use gt_types::Ty;
+    if FORCE_CONSERVATIVE.load(std::sync::atomic::Ordering::SeqCst) {
+        return None;
+    }
+    let mut idx: BTreeMap<Inst, usize> = BTreeMap::new();
+    let mut list: Vec<Inst> = Vec::new();
+    let add = |i: Inst, idx: &mut BTreeMap<Inst, usize>, list: &mut Vec<Inst>| -> Option<usize> {
+        if let Some(&k) = idx.get(&i) {
+            return Some(k);
+        }
+        if list.len() >= graph_limit() {
+            return None;
+        }
+        let k = list.len();
+        idx.insert(i.clone(), k);
+        list.push(i);
+        Some(k)
+    };
+    for b in bodies {
+        if t.db.fn_params(b.node).is_empty() {
+            add((b.node, Vec::new()), &mut idx, &mut list)?;
+        }
+    }
+    for i in &t.instances {
+        if by_node.contains_key(&i.node) {
+            add((i.node, i.args.clone()), &mut idx, &mut list)?;
+        }
+    }
+    // cạnh: (đích, gián tiếp?); `value_call[k]`: instance k có lời gọi giá trị hàm
+    let mut edges: Vec<Vec<(usize, bool)>> = Vec::new();
+    let mut value_call: Vec<bool> = Vec::new();
+    let mut done = 0usize;
+    while done < list.len() {
+        let k = done;
+        done += 1;
+        let (node, args) = list[k].clone();
+        while edges.len() <= k {
+            edges.push(Vec::new());
+            value_call.push(false);
+        }
+        let Some(&bi) = by_node.get(&node) else {
+            continue;
+        };
+        let body = bodies[bi];
+        let params = t.db.fn_params(node);
+        let sub = |ty: &Ty| -> Ty {
+            ty.subst(&|p| {
+                params
+                    .iter()
+                    .position(|q| *q == p)
+                    .and_then(|i| args.get(i).cloned())
+            })
+        };
+        for bb in &body.blocks {
+            // hàm dùng như giá trị: chỉ PHÁT HIỆN instance (không có cạnh)
+            let mut ops: Vec<&gt_mir::Operand> = Vec::new();
+            for st in &bb.statements {
+                if let gt_mir::StatementKind::Assign(_, rv) = &st.kind {
+                    match rv {
+                        gt_mir::Rvalue::Use(o) | gt_mir::Rvalue::Cast(o, _) => ops.push(o),
+                        gt_mir::Rvalue::Aggregate(_, v) => ops.extend(v.iter()),
+                        _ => {}
+                    }
+                }
+            }
+            let Some(term) = bb.terminator.as_ref() else {
+                for o in ops {
+                    discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;
+                }
+                continue;
+            };
+            let TerminatorKind::Call {
+                callee,
+                args: cargs,
+                ..
+            } = &term.kind
+            else {
+                for o in ops {
+                    discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;
+                }
+                continue;
+            };
+            ops.extend(cargs.iter());
+            for o in ops {
+                discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;
+            }
+            match callee {
+                Callee::Fn { node: n2, generics } => {
+                    if by_node.contains_key(n2) {
+                        let a2: Vec<Ty> = generics.iter().map(&sub).collect();
+                        let j = add((*n2, a2), &mut idx, &mut list)?;
+                        edges[k].push((j, false));
+                    }
+                }
+                Callee::TraitMethod {
+                    trait_def,
+                    member,
+                    self_ty,
+                    generics,
+                } => {
+                    let st = sub(self_ty);
+                    if st.has_param() || st.has_infer() {
+                        return None;
+                    }
+                    let ga: Vec<Ty> = generics.iter().map(&sub).collect();
+                    let (n2, a2) = t.db.resolve_trait_method(*trait_def, *member, &st, &ga)?;
+                    if by_node.contains_key(&n2) {
+                        let j = add((n2, a2), &mut idx, &mut list)?;
+                        if !DROP_TRAIT_EDGES.load(std::sync::atomic::Ordering::SeqCst) {
+                            edges[k].push((j, true));
+                        }
+                    }
+                }
+                Callee::Value(_) => value_call[k] = true,
+            }
+        }
+    }
+    let n = list.len();
+    while edges.len() < n {
+        edges.push(Vec::new());
+        value_call.push(false);
+    }
+    // lời gọi giá trị hàm ⇒ cạnh gián tiếp tới mọi instance của hàm bị thoát
+    for k in 0..n {
+        if value_call[k] {
+            for (j, (nj, _)) in list.iter().enumerate() {
+                if escaped.contains(nj) {
+                    edges[k].push((j, true));
+                }
+            }
+        }
+    }
+    let adj: Vec<Vec<usize>> = edges
+        .iter()
+        .map(|e| {
+            let mut v: Vec<usize> = e.iter().map(|(j, _)| *j).collect();
+            v.sort_unstable();
+            v.dedup();
+            v
+        })
+        .collect();
+    let comp = sccs(n, &adj);
+    let mut size: BTreeMap<usize, usize> = BTreeMap::new();
+    for c in &comp {
+        *size.entry(*c).or_default() += 1;
+    }
+    let inst_rec: Vec<bool> = (0..n)
+        .map(|k| size[&comp[k]] > 1 || adj[k].contains(&k))
+        .collect();
+    // gộp theo nút
+    let nb = bodies.len();
+    let mut parent: Vec<usize> = (0..nb).collect();
+    fn find(p: &mut [usize], x: usize) -> usize {
+        let mut r = x;
+        while p[r] != r {
+            r = p[r];
+        }
+        let mut y = x;
+        while p[y] != r {
+            let nx = p[y];
+            p[y] = r;
+            y = nx;
+        }
+        r
+    }
+    let mut recursive = vec![false; nb];
+    let mut bad = vec![false; nb];
+    let mut first_of_comp: BTreeMap<usize, usize> = BTreeMap::new();
+    for k in 0..n {
+        let Some(&bi) = by_node.get(&list[k].0) else {
+            continue;
+        };
+        if !inst_rec[k] {
+            continue;
+        }
+        recursive[bi] = true;
+        if edges[k].iter().any(|(j, ind)| *ind && comp[*j] == comp[k]) {
+            bad[bi] = true;
+        }
+        match first_of_comp.get(&comp[k]) {
+            Some(&f) => {
+                let (ra, rb) = (find(&mut parent, f), find(&mut parent, bi));
+                if ra != rb {
+                    parent[rb] = ra;
+                }
+            }
+            None => {
+                first_of_comp.insert(comp[k], bi);
+            }
+        }
+    }
+    let comps: Vec<usize> = (0..nb).map(|i| find(&mut parent, i)).collect();
+    Some(NodeGraph {
+        comp: comps,
+        recursive,
+        bad_indirect: bad,
+    })
+}
+
+/// nếu `o` là hàm dùng như giá trị thì phát hiện instance của nó (đối số đã thế)
+fn discover(
+    o: &gt_mir::Operand,
+    sub: &dyn Fn(&gt_types::Ty) -> gt_types::Ty,
+    by_node: &BTreeMap<NodeId, usize>,
+    add: &mut dyn FnMut(Inst) -> Option<usize>,
+) -> Option<()> {
+    if let gt_mir::Operand::Const(gt_mir::Const::FnItem { node, generics, .. }) = o
+        && by_node.contains_key(node)
+    {
+        add((*node, generics.iter().map(sub).collect()))?;
+    }
+    Some(())
+}
+
+/// Đồ thị theo NÚT bảo thủ (hành vi cũ): mọi `TraitMethod` nối tới mọi thành viên của mọi impl của trait; mọi lời gọi giá trị nối tới
+/// mọi hàm bị thoát.
+fn conservative_graph(
+    t: &TypesOutput,
+    bodies: &[&Body],
+    by_node: &BTreeMap<NodeId, usize>,
+    escaped: &BTreeSet<NodeId>,
+) -> NodeGraph {
+    let trait_impl_members = |trait_def: gt_resolve::DefId| -> Vec<NodeId> {
+        t.db.impls
+            .iter()
+            .filter(|i| {
+                i.trait_ref
+                    .as_ref()
+                    .is_some_and(|tr| tr.trait_def == trait_def)
+            })
+            .flat_map(|i| i.members.iter().map(|mm| mm.node))
+            .collect()
+    };
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); bodies.len()];
+    let mut indirect: Vec<Vec<usize>> = vec![Vec::new(); bodies.len()];
+    for (i, b) in bodies.iter().enumerate() {
+        for bb in &b.blocks {
+            let Some(TerminatorKind::Call { callee, .. }) = bb.terminator.as_ref().map(|t| &t.kind)
+            else {
+                continue;
+            };
+            match callee {
+                Callee::Fn { node, .. } => {
+                    if let Some(&j) = by_node.get(node) {
+                        adj[i].push(j);
+                    }
+                }
+                Callee::Value(_) => {
+                    for n in escaped {
+                        if let Some(&j) = by_node.get(n) {
+                            adj[i].push(j);
+                            indirect[i].push(j);
+                        }
+                    }
+                }
+                Callee::TraitMethod { trait_def, .. } => {
+                    for n in trait_impl_members(*trait_def) {
+                        if let Some(&j) = by_node.get(&n) {
+                            adj[i].push(j);
+                            indirect[i].push(j);
+                        }
+                    }
+                }
+            }
+        }
+        adj[i].sort_unstable();
+        adj[i].dedup();
+        indirect[i].sort_unstable();
+        indirect[i].dedup();
+    }
+    let comp = sccs(bodies.len(), &adj);
+    let mut size: BTreeMap<usize, usize> = BTreeMap::new();
+    for c in &comp {
+        *size.entry(*c).or_default() += 1;
+    }
+    let recursive: Vec<bool> = (0..bodies.len())
+        .map(|i| size[&comp[i]] > 1 || adj[i].contains(&i))
+        .collect();
+    let bad: Vec<bool> = (0..bodies.len())
+        .map(|i| indirect[i].iter().any(|j| comp[*j] == comp[i]))
+        .collect();
+    NodeGraph {
+        comp,
+        recursive,
+        bad_indirect: bad,
+    }
+}
+
 /// Có đường đi từ đầu vòng quay lại chính nó không (cạnh lùi). Không có ⇒ vòng lặp lặp tối đa một lần.
 fn has_back_edge(b: &Body, head: gt_mir::BasicBlock) -> bool {
     let mut seen = vec![false; b.blocks.len()];
@@ -350,65 +698,16 @@ pub fn check_termination(
         }
         s
     };
-    let trait_impl_members = |trait_def: gt_resolve::DefId| -> Vec<NodeId> {
-        t.db.impls
-            .iter()
-            .filter(|i| {
-                i.trait_ref
-                    .as_ref()
-                    .is_some_and(|tr| tr.trait_def == trait_def)
-            })
-            .flat_map(|i| i.members.iter().map(|mm| mm.node))
-            .collect()
-    };
-    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); bodies.len()];
-    let mut indirect: Vec<Vec<usize>> = vec![Vec::new(); bodies.len()];
+    // Đồ thị gọi theo INSTANCE (ADR-033 phụ lục); không dựng được ⇒ lùi về đồ thị theo nút bảo thủ (mọi `TraitMethod` nối tới mọi impl).
+    let graph = instance_graph(t, &bodies, &by_node, &escaped).unwrap_or_else(|| {
+        CONSERVATIVE_FALLBACKS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        conservative_graph(t, &bodies, &by_node, &escaped)
+    });
     for (i, b) in bodies.iter().enumerate() {
-        for bb in &b.blocks {
-            let Some(TerminatorKind::Call { callee, .. }) = bb.terminator.as_ref().map(|t| &t.kind)
-            else {
-                continue;
-            };
-            match callee {
-                Callee::Fn { node, .. } => {
-                    if let Some(&j) = by_node.get(node) {
-                        adj[i].push(j);
-                    }
-                }
-                Callee::Value(_) => {
-                    for n in &escaped {
-                        if let Some(&j) = by_node.get(n) {
-                            adj[i].push(j);
-                            indirect[i].push(j);
-                        }
-                    }
-                }
-                Callee::TraitMethod { trait_def, .. } => {
-                    for n in trait_impl_members(*trait_def) {
-                        if let Some(&j) = by_node.get(&n) {
-                            adj[i].push(j);
-                            indirect[i].push(j);
-                        }
-                    }
-                }
-            }
-        }
-        adj[i].sort_unstable();
-        adj[i].dedup();
-        indirect[i].sort_unstable();
-        indirect[i].dedup();
-    }
-    let comp = sccs(bodies.len(), &adj);
-    let mut size: BTreeMap<usize, usize> = BTreeMap::new();
-    for c in &comp {
-        *size.entry(*c).or_default() += 1;
-    }
-    for (i, b) in bodies.iter().enumerate() {
-        let recursive = size[&comp[i]] > 1 || adj[i].contains(&i);
-        if !recursive {
+        if !graph.recursive[i] {
             continue;
         }
-        info.scc.insert(b.node, comp[i]);
+        info.scc.insert(b.node, graph.comp[i]);
         if has_div(b) {
             continue;
         }
@@ -423,7 +722,7 @@ pub fn check_termination(
                     b.key
                 ),
             ));
-        } else if indirect[i].iter().any(|j| comp[*j] == comp[i]) {
+        } else if graph.bad_indirect[i] {
             bag.push(mk(
                 t,
                 "E0703",
