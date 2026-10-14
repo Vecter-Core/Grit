@@ -14,7 +14,7 @@ esac
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$ROOT/docs/FUZZ_LOG.jsonl"
 ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
-busy=$(tasklist 2>/dev/null | grep -i -E "^(cargo|rustc|link|gritc|cl|clang|rig)[^ ]*\.exe|-[0-9a-f]{16}\.exe" | head -3)
+busy=$(tasklist 2>/dev/null | grep -i -E "^(cargo|rustc|link|gritc|cl|clang|rig)\.exe|^[a-z_0-9]+-[0-9a-f]{16}\.exe" | head -3)
 if [ -n "$busy" ]; then
   echo "{\"ts\":\"$(ts)\",\"target\":\"$T\",\"status\":\"skipped_busy\",\"seconds\":0,\"runs\":0}" >> "$LOG"
   echo "máy bận, bỏ qua: $busy"

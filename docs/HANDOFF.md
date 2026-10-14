@@ -2,11 +2,12 @@
 
 > Cập nhật SAU MỖI bước nhỏ (mục 2 "Trạng thái" và mục 3 "Việc tiếp theo"). Nếu bị ngắt giữa chừng, mọi thứ ở đây + `git log` là đủ để tiếp tục.
 
-## TRẠNG THÁI MỚI NHẤT (2026-10-14, sau ADR-036 bước iv)
-- Đã có: sáu công cụ dogfood bằng Grit (wc, json, sha256, sortlines, wordfreq, stats), `f64` tối thiểu (E0319), `Vec/Text/Arena`, hồ sơ `release` (`--profile=release`: `mem2reg,sroa,early-cse` + Guard-post, backend O0), dev≡release trên 1820 chương trình (0 bất đồng hành vi), cổng đầy đủ xanh (836 đạt/0 đỏ/156 bộ, commit b6dcc03).
-- Chờ Giang: Q79 (f32), Q80 (`%` số thực), Q81 (instcombine/chứng minh ghi lại), Q82 (backend O2: ×1,3–3,4 theo min nhưng đưa tối ưu máy vào TCB), ADR-035/036 phần còn lại, cột 'người duyệt' của docs/TCB_INTRINSICS.md (luôn 'CHỜ GIANG').
-- FB-3 (E0311 oan, `&X<'a>` trong impl): FAIL-CLOSED, ưu tiên thấp, không chặn; né bằng `&Self`.
-- Việc tiếp theo theo lệnh Giang: mục 3 (báo cáo 'dùng được thật': công cụ, khoảng trống, bảng điều kiện chuyển pha GRIT_PLAN §7, danh sách TCB) rồi DỪNG chờ duyệt; KHÔNG viết M12/M13.
+## TRẠNG THÁI MỚI NHẤT (2026-10-15, sau lệnh Giang 2026-10-14 mục 1–6)
+- Có: 6 công cụ dogfood; `f64`; Vec/Text/Arena; `--profile=dev|release|release-o2` (mặc định dev; release* có bằng chứng THỰC NGHIỆM dev≡release: 1820 + 1794 chương trình 0 bất đồng, bẫy abort/float, độ nhạy, tái lập; ADR-036 §9); `--checks=proven` THỬ NGHIỆM (N0606, bị từ chối cùng release*); Obligation IR đóng băng (ADR-039, `ir_freeze.rs`); cổng đầy đủ xanh lần cuối 2026-10-14 (836 đạt/0 đỏ/156 bộ) — SAU đó đã đổi thêm code (release-o2, N0606, IR, ExhaustiveProver, test mới): CẦN CHẠY LẠI cổng đầy đủ một lần.
+- Đã duyệt: Q79 (f32 dành riêng Phase 2), Q80 (cấm % số thực), Q81 (không instcombine), Q82 (có điều kiện, đã chạy xong điều kiện).
+- CHỜ GIANG: `docs/MUTANT_ARGUMENTS.md` (361/591/554, điều kiện #9); ADR-038 (Q83 Arena chia sẻ, Q84 gói Rig `std`, Q85 ký hiệu `?`, Q86 thứ tự) — CHƯA code gì cho ADR-038; cột 'người duyệt' của TCB (42 dòng, luôn CHỜ GIANG); READINESS #6 (Giang xem KNOWN_LIMITATIONS/PROGRESS); điều kiện #2 fuzz: tích luỹ lexer/parser (xem `python tools/fuzz_total.py`; cần ≈ 45 giờ máy rảnh; chạy từng phiên 10 phút bằng `tools/fuzz_session.sh <lex|parse>`, cần PATH có thư mục ASan DLL của MSVC).
+- FB-3 (E0311 oan, né `&Self`) và FB-6 (`Option::unwrap` E0902) là fail-closed, ưu tiên thấp. 69 đột biến nguy hiểm của M7 vẫn mở (KNOWN_LIMITATIONS).
+- KHÔNG làm M12/M13. Việc kế tiếp chỉ sau khi Giang duyệt ADR-038.
 
 ## 0. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ lập trình mới (`.gt`) **thiết kế cho AI viết code**; ký hiệu toán học/logic ngắn gọn (có bí danh ASCII). Chủ dự án: **Giang** (trả lời bằng TIẾNG VIỆT).
