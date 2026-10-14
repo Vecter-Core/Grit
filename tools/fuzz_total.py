@@ -37,6 +37,7 @@ def totals(path=LOG):
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")
     t = totals()
     if "--json" in sys.argv:
         print(json.dumps(t, sort_keys=True))

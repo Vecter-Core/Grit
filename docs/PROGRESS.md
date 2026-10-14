@@ -680,3 +680,6 @@ Cách so sánh: `GT_PROFILE=release` chạy lại cả bộ đối chiếu ở h
 - **Mục 3 (ADR-039):** đóng băng Obligation IR + bài tập giấy 3 nghĩa vụ (a: lượng từ trên khoảng, b: hợp lệ con trỏ Vec::push, c: quan hệ hai độ dài): (c) biểu diễn được sẵn và cả hai bộ giải chứng minh; (a),(b) cần mở rộng ⇒ đã THÊM `Term::Uf`, `Prop::{Forall,Exists,Pred}`, `Binder`, khoá JSON `goal_ast`/`hyps_ast`. Test `ir_freeze.rs` 7/7; gt-oblig 134 đạt/0 đỏ; đột biến 6/6 bị bắt. **Tìm thấy và sửa một lỗi soundness tiềm ẩn của `ExhaustiveProver`** (trả `Refuted` khi không đánh giá được). Bộ giải SMT vẫn là thiết kế trên giấy.
 - **Mục 4:** `docs/MUTANT_ARGUMENTS.md` (238 đã giết; 361/591/554 tương đương có lập luận đơn điệu, CHỜ GIANG; không tự coi là đã duyệt).
 - **Mục 6 (ADR-038):** dự thảo thư viện/ngôn ngữ (Arena a–d, HashMap, Option/Result + `?` đề xuất, intrinsic I/O, API), đề xuất Arena chia sẻ (ii); CHƯA có mã. Chờ Giang (Q83–Q86).
+
+### Cổng đầy đủ xanh sau lệnh 2026-10-14 (2026-10-15)
+`tools/gate.sh`: fmt OK, clippy `-D warnings` EXIT=0, audit EXIT=0, **TEST_PASSED=848 FAILED=0 SUITES=158**, check_expectations + unittest xanh, **GATE_RESULT=GREEN** (trước: 836/156). Thêm 12 test: `release_policy` (5), `ir_freeze` (7). Fuzz tích luỹ sau phiên đầu bằng `fuzz_session.sh`: lexer 1,17 giờ, parser 2,00 giờ (trên 24 giờ mỗi loại).
