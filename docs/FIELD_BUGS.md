@@ -56,3 +56,8 @@ Viết `examples/json` (330 dòng) và so sánh với tham chiếu Rust + serde_
 - **Phân loại:** ÂM TÍNH GIẢ của checker M4 (trái quyết định thiết kế). An toàn bộ nhớ không bị ảnh hưởng: cast mất thông tin vẫn bị `CastLossy` bắt lúc chạy (lớp phòng thủ thứ hai).
 - **Vì sao lọt qua M4/M7:** KHÔNG có mẫu nào (fail hay pass) dùng `as` từ số thực sang nguyên; `cast` ở M4 coi mọi cặp số là hợp lệ; M5/M7 chỉ sinh/chứng minh `CastLossy`, nên không bao giờ sai ngầm nhưng cũng không phản ánh quyết định cấm. Không có test cho từng ô của bảng ép kiểu.
 - **Sửa + hồi quy:** E0319 ở `check/expr.rs::cast`; test `float_restrictions_are_e0319` và 4 mẫu `tests/fail/E0319_*`.
+
+## FB-6 — `Option::unwrap` không dùng được trên `Option` chưa chứng minh `is_some` (E0902) (2026-10-14, gặp khi kiểm "dùng được thật")
+- **Triệu chứng:** `ƒ f(o: Option<u64>) → u64 ! ∅ { o.unwrap() }` ⇒ ĐỎ `E0902` ("đối số không sao chép được nên không gọi được hợp đồng lúc chạy"); `⎇ o.is_some() { o.unwrap() }` ⇒ xanh.
+- **Phân loại:** FAIL-CLOSED (từ chối chương trình có hợp đồng không kiểm được lúc chạy), hạn chế thư viện/thiết kế: hợp đồng `⊳ self.is_some()` của `unwrap(self)` cần đối số `Copy` để chạy lúc chạy, mà `Option<T>` không `Copy`. Không phải bug an toàn.
+- **Né:** `⌥` tường minh hoặc bọc trong `⎇ o.is_some()`. Ưu tiên thấp; ghi để người viết công cụ biết (READINESS.md mục b.5).
