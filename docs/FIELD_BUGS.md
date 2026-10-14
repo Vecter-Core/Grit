@@ -42,3 +42,11 @@ Viết `examples/json` (330 dòng) và so sánh với tham chiếu Rust + serde_
 - **Nguyên nhân gốc:** `region.rs::slots` đánh dấu vị trí region "đến từ `Self`" CHỈ cho `TypeKind::SelfType`; trường hợp người dùng viết lại chính kiểu của impl (`Line<'a>`) không được nhận là `Self`, nên số vị trí region của tham số ở impl (2: `&` và `'a`) khác của trait (`&Self`: 1 vị trí không-Self + 1 vị trí Self bị lọc) ⇒ `regions_compatible` trả `false`.
 - **Sửa:** CHƯA làm. Cần nhận ra "đường dẫn trùng kiểu của impl với đúng các lifetime của impl" là `Self` (cần DefId đã giải ở `slots`, hiện chỉ có AST) — là thay đổi trong kiểm tra chữ ký trait/impl liên quan soundness; để thiết kế riêng. Né: viết `&Self`. Test hồi quy sẽ viết cùng bản sửa; hiện ghi nhận ở `docs/KNOWN_LIMITATIONS.md`.
 - **Ảnh hưởng điều kiện cứng:** không (không chạm mutability bên trong, `--checks=all`, cổng ĐỎ/ICE).
+
+## FB-4 — `u8 as char` không hạ được ở codegen (2026-10-14, gặp khi dựng `examples/wordfreq`)
+- **Triệu chứng:** `rig build` ⇒ `backend llvm chưa hỗ trợ: ép kiểu Int(U8) → Char` (thoát 3, không exe); `gritc check`/thông dịch XANH và chạy đúng. Khoảng cách giữa hai backend (fail-closed, không sai ngầm).
+- **Tái hiện tối thiểu:** `ƒ main() → u32 ! ∅ { c ≔ 200u8 as char; c as u32 }` (backend llvm).
+- **Phân loại:** (b) codegen thiếu (không phải sai tích cực/âm tính của checker); fail-closed.
+- **Nguyên nhân gốc:** `Cg::cast` chỉ nhận cặp (số nguyên/bool/char → số nguyên); đích `Char` chưa được xử lý dù M4 cho phép `u8 as char` (mọi u8 là giá trị vô hướng hợp lệ) và thông dịch đã có.
+- **Sửa + test hồi quy:** `Cg::cast` nới không dấu u8 → i32 (và `cast_fits` luôn đúng cho cặp này). Test `gt-driver/tests/llvm_text.rs::{u8_as_char_lowers_and_encodes_latin1_scalars, u8_char_round_trip}` (hai backend, số tính tay 6195 và 200): ĐỎ khi bỏ bản sửa (đã thử), XANH khi có.
+- **Ảnh hưởng điều kiện cứng:** không.

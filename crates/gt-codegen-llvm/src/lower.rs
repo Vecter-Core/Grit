@@ -1528,6 +1528,15 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             let fat = llvm(self.builder.build_insert_value(fat, len, 1, "u1"))?;
             return Ok(fat.as_basic_value_enum());
         }
+        // `u8 as char`: mọi u8 là một giá trị vô hướng hợp lệ (U+0000…U+00FF) ⇒ nới không dấu lên 32 bit
+        if matches!((from, to), (Ty::Int(IntTy::U8), Ty::Char)) {
+            return Ok(llvm(self.builder.build_int_z_extend(
+                v.into_int_value(),
+                self.ctx.i32_type(),
+                "u8char",
+            ))?
+            .into());
+        }
         let (Some((fb, fs)), Ty::Int(ti)) = (Self::int_bits_signed(from), to) else {
             return unsupported(format!("ép kiểu {from:?} → {to:?}"));
         };
@@ -1555,6 +1564,9 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         from: &Ty,
         to: &Ty,
     ) -> R<BasicValueEnum<'ctx>> {
+        if matches!((from, to), (Ty::Int(IntTy::U8), Ty::Char)) {
+            return Ok(self.ctx.bool_type().const_int(1, false).into()); // luôn đủ chỗ
+        }
         let (Some((fb, fs)), Ty::Int(ti)) = (Self::int_bits_signed(from), to) else {
             return unsupported(format!("kiểm ép kiểu {from:?} → {to:?}"));
         };
