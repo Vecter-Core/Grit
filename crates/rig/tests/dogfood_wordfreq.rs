@@ -219,7 +219,7 @@ fn random_words(seed: &mut u64, bytes: usize, vocab: u64) -> Vec<u8> {
             x /= 7;
             x += id;
         }
-        v.push([b' ', b'\n', b',', b'.'][(lcg(seed) % 4) as usize]);
+        v.push(b" \n,."[(lcg(seed) % 4) as usize]);
     }
     v
 }
