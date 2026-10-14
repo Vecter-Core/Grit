@@ -45,3 +45,16 @@
 Đọc theo **min** (trung vị bị nhiễu, xem dưới): fib ×1,27; wc ×2,17; json ×1,28; **sha256 ×3,36**; sortlines ×2,70; stats: cả 7 lần chạy của release trong script đều ≈ 1,06 s (hiệu ứng quét tệp ảnh hưởng TOÀN BỘ lần chạy của exe này, nên cột này vô nghĩa); đo lại riêng (3 vòng × 5 lần, cùng tệp 10^6 số): dev 0,15–0,18 s, release 0,06–0,08 s ⇒ ≈ ×2,3. Các dòng `wc`, `stats`, `json`, `fib`, `sha256` có lần chạy ≈ 1,0–1,1 s (với `stats`: cả 7 lần): đó là hiệu ứng quét tệp của Windows Defender lên exe mới (đã ghi ở mục đầu tệp này), KHÔNG phải tốc độ chương trình — vì vậy dùng **min** làm số đại diện và đừng tin trung vị/σ ở các dòng đó. (Lần đo đầu của cấu hình A cũng dính hiệu ứng này: fib release 1,11 s đều đặn 7 lần; đo lại và đo tay cho 0,096 s.)
 Bằng chứng an toàn của thí nghiệm B (mẫu nhỏ): `release_traps` (14 loại abort + số thực từng bit IEEE gồm bẫy FMA) 4/4, `release_guard` 4/4, `tiny_*` 3/3 + 4/4, 60 chương trình f64 và 30 chương trình abort-index đều 0 bất đồng. CHƯA chạy 1820 chương trình ở cấu hình B.
 **Vì sao KHÔNG tự bật:** backend O2 đưa TỐI ƯU MÁY (DAG-combine, cấp phát thanh ghi greedy, gộp nhánh) vào TCB ở tầng SAU Guard-post — Guard-post chỉ nhìn IR nên không thấy tầng này; chỉ còn bằng chứng hành vi dev≡release. ADR-036 chỉ duyệt danh sách pass IR. Đã ghi Q82 chờ Giang.
+
+
+### C. CẤU HÌNH ỨNG VIÊN ĐÃ CÓ BẰNG CHỨNG: `--profile=release-o2` (đo sạch 2026-10-15, 9 lần xen kẽ, không dính hiệu ứng quét tệp)
+Cùng đầu vào như mục A/B; `BENCH_PROFILE=release-o2 python tools/bench_profile.py 9`.
+| bench | dựng dev / release (gritc debug) | dev: trung vị (min–max) ± σ | release: trung vị (min–max) ± σ | tăng tốc (trung vị) | tăng tốc (min) | đầu ra giống nhau |
+|---|---|---|---|---|---|---|
+| fib(35) | 0.18 / 0.18 s | 0.082 s (0.079–0.091) ± 0.003 | 0.063 s (0.059–0.069) ± 0.003 | ×1.31 | ×1.33 | có |
+| wc | 0.23 / 0.25 s | 0.283 s (0.267–0.298) ± 0.008 | 0.127 s (0.122–0.144) ± 0.007 | ×2.22 | ×2.18 | có |
+| json | 1.09 / 1.13 s | 0.055 s (0.051–0.059) ± 0.003 | 0.039 s (0.035–0.049) ± 0.004 | ×1.40 | ×1.48 | có |
+| sha256 | 0.52 / 0.53 s | 1.404 s (1.375–1.588) ± 0.061 | 0.421 s (0.405–0.487) ± 0.024 | ×3.33 | ×3.39 | có |
+| sortlines | 0.50 / 0.52 s | 0.269 s (0.249–0.302) ± 0.017 | 0.111 s (0.101–0.136) ± 0.010 | ×2.41 | ×2.47 | có |
+| stats | 0.40 / 0.42 s | 0.153 s (0.147–0.163) ± 0.004 | 0.066 s (0.063–0.092) ± 0.009 | ×2.31 | ×2.33 | có |
+Đầu ra (stdout + mã thoát) giống nhau ở mọi bench. Số này thay thế các ô nhiễu của mục B (stats ×2,3 là đo riêng cũ; nay đo trong cùng script). Bằng chứng an toàn: ADR-036 §9.

@@ -1239,3 +1239,12 @@ Quy ước: `ℤ` toán học, `v1…` là `Var`.
 
 ### 6. Việc cài đặt đi kèm (cùng commit với đóng băng)
 Mở rộng `ir.rs` + cập nhật mọi `match` (mới ⇒ `Unknown`/không biểu diễn được), `to_json` thêm `goal_ast`/`hyps_ast`, test `crates/gt-oblig/tests/ir_freeze.rs`: (i) ba nghĩa vụ bài tập dựng bằng IR và tuần tự hoá; (ii) tái lập hai lần; (iii) văn bản cũ là tiền tố của văn bản mới; (iv) hai bộ giải trả `Unknown` cho nút mới (và `Proved` đúng cho ca (c)); (v) bộ giải tiêu `Budget` tất định.
+
+#### ADR-036 §9 — bằng chứng cho `release-o2` (Q82) — 2026-10-15
+Điều kiện Giang (mục 1 lệnh 2026-10-14) đã chạy ở ĐÚNG cấu hình `--profile=release-o2` (danh sách trắng `mem2reg,sroa,early-cse` + Guard-post + `TargetMachine` O2, CPU generic, không FMA):
+- **1794 chương trình khác nhau, 0 bất đồng hành vi** (14 lô, rc=0 cả 14 lần đầu; 3988 s ≈ 66 phút): gtv mặc định 500, term 100, elem 150, text 150, f64 150, bit-ops 414, abort-targeted index/divrem/pre 60 mỗi loại (2440 lượt), bits-3way 150; seed mới (≥ 130000), kết quả ở `docs/RELEASE_O2_DIFF_RESULTS.jsonl`. Bộ mặc định của gt-driver ở O2: 108 test đạt, 0 đỏ.
+- **Bẫy abort + float ở O2** (`release_traps`: 14 loại abort, 24 bộ ba FMA/đổi thứ tự, hằng gập, NaN/±0/∞/dưới chuẩn): 4/4 đạt; `release_guard` (7 lỗi chèn `post:*`, báo cáo check còn lại giống dev, hai băm IR): 4/4 đạt.
+- **Độ nhạy đỏ ở O2:** `GRITC_FAULT=post:{drop-abort,fma,fast-math,nsw}` làm `tiny_fixed_batch` đỏ; thêm `instcombine` vào danh sách pass làm nó đỏ; không lỗi chèn ⇒ xanh (kiểm chứng).
+- **Tái lập (`release_policy::builds_are_reproducible_for_every_profile`):** SHA-256 exe giống nhau qua hai lần build cùng chỗ, thư mục khác, và sau khi xoá sạch thư mục dựng, cho dev/release/release-o2 × (chương trình đơn, dự án nhiều tệp `examples/sortlines`).
+- **Hiệu năng (BENCHMARK.md mục C, 9 lần xen kẽ, đầu ra giống nhau):** release-o2 so với dev (trung vị): fib ×1,31; wc ×2,22; json ×1,40; sha256 ×3,33; sortlines ×2,41; stats ×2,31.
+**Quyết định ghi nhận (theo điều kiện của Giang "đạt thì gọi release là hỗ trợ"):** `release` và `release-o2` được ghi trong help và tài liệu là **hỗ trợ — có bằng chứng THỰC NGHIỆM dev≡release, KHÔNG phải chứng minh**; **mặc định vẫn là `dev`**; `--checks=proven` bị từ chối cùng chúng. **Chưa kiểm:** GT_FULL8 ở release/release-o2; chương trình ngoài bộ sinh và 6 công cụ; hệ điều hành ngoài Windows; backend O2 đưa tối ưu MÁY vào TCB (ngoài tầm nhìn Guard-post — chỉ còn bằng chứng hành vi). Muốn đổi `release` thành O2 mặc định hay gỡ `release` (O0 backend) là quyết định riêng của Giang.
