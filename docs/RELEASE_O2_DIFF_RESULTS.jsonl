@@ -1,0 +1,28 @@
+{"suite":"generic-trait-vec","start":130000,"count":100,"result":{"programs":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 15, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 15},"compared":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 15, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 15},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-130000","profile":"release-o2","rc":0,"secs":139}
+{"suite":"generic-trait-vec","start":130100,"count":100,"result":{"programs":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 15, "vec_index_oob": 15, "vec_ops": 14},"compared":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 15, "vec_index_oob": 15, "vec_ops": 14},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-130100","profile":"release-o2","rc":0,"secs":119}
+{"suite":"generic-trait-vec","start":130200,"count":100,"result":{"programs":{"bound_call": 15, "generic_unbounded": 15, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 14},"compared":{"bound_call": 15, "generic_unbounded": 15, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 14},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-130200","profile":"release-o2","rc":0,"secs":121}
+{"suite":"generic-trait-vec","start":130300,"count":100,"result":{"programs":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 15, "multi_trait": 15, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 14},"compared":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 15, "multi_trait": 15, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 14},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-130300","profile":"release-o2","rc":0,"secs":119}
+{"suite":"generic-trait-vec","start":130400,"count":100,"result":{"programs":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 14, "vec_index_oob": 15, "vec_ops": 15},"compared":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 14, "vec_index_oob": 15, "vec_ops": 15},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-130400","profile":"release-o2","rc":0,"secs":120}
+{"suite":"generic-trait-vec-term","start":131000,"count":100,"result":{"programs":{"term_acyclic": 29, "term_cyclic": 71},"compared":{"term_acyclic": 29, "term_cyclic": 71},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-term","profile":"release-o2","rc":0,"secs":35}
+{"suite":"generic-trait-vec-elem","start":132000,"count":150,"result":{"programs":{"vec_big_sort": 75, "vec_line_sort": 75},"compared":{"vec_big_sort": 75, "vec_line_sort": 70},"dropped":{"vec_line_sort: ĐỎ E0301": 5},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-elem","profile":"release-o2","rc":0,"secs":215}
+{"suite":"generic-trait-vec-text","start":133000,"count":150,"result":{"programs":{"text_build": 50, "text_slice": 50, "text_utf8": 50},"compared":{"text_build": 50, "text_slice": 50, "text_utf8": 50},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-text","profile":"release-o2","rc":0,"secs":183}
+{"suite":"generic-trait-vec-f64","start":134000,"count":150,"result":{"programs":{"f64_arith": 50, "f64_cmp": 50, "f64_conv": 50},"compared":{"f64_arith": 50, "f64_cmp": 50, "f64_conv": 50},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-f64","profile":"release-o2","rc":0,"secs":180}
+{"start":135000,"green_wanted":150,"next_seed":135414,"result":{"programs":414,"runs":864,"equal":599,"mismatch":0,"normal":396,"aborts":{"cast_lossy": 32, "div_by_zero": 9, "index_out_of_bounds": 18, "invariant": 23, "overflow": 86, "overflow_neg": 1, "postcondition": 21, "precondition": 12, "slice_range": 1},"interp_limit":1,"llvm_timeout":0,"unsupported":0,"red_or_ice":264,"red_programs":264,"skipped":{"ĐỎ E0404": 96, "ĐỎ E0601": 56, "ĐỎ E0602": 5, "ĐỎ E0603": 26, "ĐỎ E0604": 49, "ĐỎ E0702": 4, "ĐỎ E0901": 28}}}
+{"batch":"diff-bit","profile":"release-o2","rc":0,"secs":962}
+{"suite":"abort-targeted","kind":"index","start":136000,"count":60,"result":{"programs":60,"red_programs":0,"runs":360,"equal":360,"mismatch":0,"normal":136,"aborts":{"index_out_of_bounds": 224},"unsupported":0,"timeout":0,"interp_limit":0,"skipped":{}}}
+{"batch":"abort-index","profile":"release-o2","rc":0,"secs":420}
+{"suite":"abort-targeted","kind":"divrem","start":136100,"count":60,"result":{"programs":60,"red_programs":0,"runs":325,"equal":325,"mismatch":0,"normal":264,"aborts":{"div_by_zero": 31, "overflow": 1, "rem_by_zero": 29},"unsupported":0,"timeout":0,"interp_limit":0,"skipped":{}}}
+{"batch":"abort-divrem","profile":"release-o2","rc":0,"secs":376}
+{"suite":"abort-targeted","kind":"pre","start":136200,"count":60,"result":{"programs":60,"red_programs":0,"runs":360,"equal":360,"mismatch":0,"normal":201,"aborts":{"precondition": 159},"unsupported":0,"timeout":0,"interp_limit":0,"skipped":{}}}
+{"batch":"abort-pre","profile":"release-o2","rc":0,"secs":406}
+{"suite":"bits-3way","start":137000,"count":150,"result":{"programs":150,"red_programs":23,"runs":531,"equal_3way":508,"mismatch":0,"normal":238,"aborts":{"overflow": 223, "precondition": 47},"skipped":{"ĐỎ E0601": 8, "ĐỎ E0901": 15}}}
+{"batch":"bits","profile":"release-o2","rc":0,"secs":593}

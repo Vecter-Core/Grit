@@ -33,18 +33,18 @@ fn out_text(o: &Output) -> String {
     )
 }
 
-/// (1) help ghi rõ THỬ NGHIỆM cho cả hai
+/// (1) help: `--checks=proven` ghi rõ THỬ NGHIỆM; `release*` ghi "bằng chứng thực nghiệm" (đã đạt điều kiện Q82, ADR-036 §9) và mặc định vẫn là dev
 #[test]
-fn help_marks_release_and_proven_as_experimental() {
+fn help_marks_proven_experimental_and_release_as_evidence_backed() {
     let o = gritc().arg("--help").output().expect("chạy");
     let t = out_text(&o);
     assert!(
-        t.contains("release và release-o2 là THỬ NGHIỆM"),
-        "help thiếu nhãn thử nghiệm cho release: {t}"
-    );
-    assert!(
         t.contains("proven là THỬ NGHIỆM"),
         "help thiếu nhãn thử nghiệm cho --checks=proven: {t}"
+    );
+    assert!(
+        t.contains("mặc định: dev; release và release-o2 đã có bằng chứng thực nghiệm dev≡release, KHÔNG phải chứng minh"),
+        "help thiếu mô tả release (mặc định dev + bằng chứng thực nghiệm): {t}"
     );
 }
 

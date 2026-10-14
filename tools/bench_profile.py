@@ -48,7 +48,11 @@ def gen_inputs(tmp):
     return p
 
 
+PROF2 = os.environ.get("BENCH_PROFILE", "release")  # hồ sơ gắn nhãn cột "release" (release hoặc release-o2)
+
+
 def build(src, out, profile):
+    profile = PROF2 if profile == "release" else profile
     t = time.perf_counter()
     r = subprocess.run([GRITC, "build", src, f"--profile={profile}", "-o", out], env=ENV, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0 or not os.path.exists(out):
