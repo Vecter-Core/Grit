@@ -18,7 +18,11 @@ fn run(src: &str, backend: &str) -> (i32, String) {
         .output()
         .expect("chạy gritc");
     let text = String::from_utf8_lossy(&o.stdout).into_owned();
-    let line = text.lines().rev().find(|l| l.starts_with('{')).unwrap_or("");
+    let line = text
+        .lines()
+        .rev()
+        .find(|l| l.starts_with('{'))
+        .unwrap_or("");
     let v: serde_json::Value = serde_json::from_str(line)
         .unwrap_or_else(|e| panic!("JSON ({e}): {text}\n{}", String::from_utf8_lossy(&o.stderr)));
     let raw = v["run"]["value"].as_str().unwrap_or("").to_string();
