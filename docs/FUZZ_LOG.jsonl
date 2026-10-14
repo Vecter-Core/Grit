@@ -1,3 +1,4 @@
 {"ts":"2026-10 (ngày không rõ)","target":"lex","status":"historical","sessions":6,"seconds":3600,"runs":4080000,"note":"M1: 6 phiên x 10 phút, 606-784 nghìn lượt mỗi phiên (PROGRESS.md dòng 64); số lượt tổng làm tròn '~4,08 triệu'"}
 {"ts":"2026-10 (ngày không rõ)","target":"parse","status":"historical","sessions":6,"seconds":3600,"runs":276703,"note":"M3: 6 phiên x 10 phút, một phần chạy song song với đột biến gt-fmt (PROGRESS.md dòng 113)"}
 {"ts":"2026-10 (ngày không rõ)","target":"parse","status":"historical","sessions":6,"seconds":3600,"runs":877830,"note":"M3 sau Q16c: 6 phiên x 10 phút, máy rảnh (PROGRESS.md dòng 131)"}
+{"ts":"2026-10-14T17:59:58Z","target":"lex","status":"ok","seconds":600,"runs":1430063,"exit":0}
