@@ -205,9 +205,16 @@ fn build_llvm(cli: &Cli, mut res: CheckResult, path: &str) -> i32 {
         format!("{stem}.exe")
     });
     let att = crate::pipeline::attestation(&res, &crate::pipeline::mir_dump(art));
-    if let Err(e) = crate::native::build_exe_profile(art, Path::new(&out), false, &att, cli.profile)
-    {
-        return native_failure(&mut res, cli, &e);
+    match crate::native::build_exe_profile(art, Path::new(&out), false, &att, cli.profile) {
+        Err(e) => return native_failure(&mut res, cli, &e),
+        Ok(info) => {
+            if let Some(post) = &info.ir_post_sha256 {
+                eprintln!(
+                    "gritc: hồ sơ release; băm IR trước tối ưu {} và sau tối ưu {post}",
+                    info.ir_pre_sha256
+                );
+            }
+        }
     }
     res.backend = "llvm";
     emit(&res, cli, Phase::Check, None, Some(&att));
@@ -236,7 +243,7 @@ fn run_llvm(
     let exe = dir.join("prog.exe");
     let att = crate::pipeline::attestation(res, &crate::pipeline::mir_dump(art));
     let r = match crate::native::build_exe_profile(art, &exe, true, &att, cli.profile) {
-        Ok(()) => Ok(crate::native::run_exe(&exe)),
+        Ok(_) => Ok(crate::native::run_exe(&exe)),
         Err(e) => Err(native_failure(res, cli, &e)),
     };
     let _ = std::fs::remove_dir_all(&dir);

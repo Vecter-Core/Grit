@@ -166,9 +166,118 @@ fn required_class(inst: &InstructionValue<'_>) -> Option<&'static str> {
         .and_then(|(_, class)| *class)
 }
 
-const UB_FLAGS: [&str; 11] = [
+const UB_FLAGS: [&str; 14] = [
     "nsw", "nuw", "exact", "nnan", "ninf", "nsz", "fast", "disjoint", "nneg", "samesign", "afn",
+    "arcp", "contract", "reassoc",
 ];
+
+/// Thuộc tính HÀM dạng chuỗi bật số học thực không an toàn (ADR-036 §6b): cấm ở mọi hồ sơ.
+const UNSAFE_FP_ATTRS: [&str; 6] = [
+    "unsafe-fp-math",
+    "no-nans-fp-math",
+    "no-infs-fp-math",
+    "no-signed-zeros-fp-math",
+    "approx-func-fp-math",
+    "less-precise-fpmad",
+];
+
+/// Hàm intrinsic hợp nhất nhân-cộng (FMA đổi kết quả bit so với IEEE từng phép): cấm.
+fn fused_intrinsic(name: &str) -> bool {
+    name.starts_with("llvm.fmuladd") || name.starts_with("llvm.fma")
+}
+
+/// Số lời gọi `gritrt_abort` theo (hàm, loại abort = hằng số đối số 0; `?` nếu không phải hằng).
+pub type AbortProfile = std::collections::BTreeMap<(String, String), usize>;
+
+/// Sự kiện của IR TRƯỚC tối ưu mà Guard-post cần (ADR-036 §6a).
+#[derive(Clone, Debug, Default)]
+pub struct PreFacts {
+    pub aborts: AbortProfile,
+}
+
+fn abort_kind_of(inst: &InstructionValue<'_>) -> String {
+    inst.get_operand(0)
+        .and_then(|o| match o {
+            gt_llvm::inkwell::values::Operand::Value(v) => Some(v),
+            gt_llvm::inkwell::values::Operand::Block(_) => None,
+        })
+        .and_then(|v| match v {
+            gt_llvm::inkwell::values::BasicValueEnum::IntValue(i) => i.get_zero_extended_constant(),
+            _ => None,
+        })
+        .map_or_else(|| "?".to_string(), |k| k.to_string())
+}
+
+/// Đếm lời gọi `gritrt_abort` theo (hàm, loại).
+#[must_use]
+pub fn abort_profile(m: &Module<'_>) -> AbortProfile {
+    let mut p = AbortProfile::new();
+    for f in m.get_functions() {
+        let fname = f.get_name().to_string_lossy().into_owned();
+        for bb in f.get_basic_blocks() {
+            let mut cur = bb.get_first_instruction();
+            while let Some(inst) = cur {
+                if callee_name(&inst).as_deref() == Some("gritrt_abort") {
+                    *p.entry((fname.clone(), abort_kind_of(&inst))).or_insert(0) += 1;
+                }
+                cur = inst.get_next_instruction();
+            }
+        }
+    }
+    p
+}
+
+/// Chụp sự kiện của IR trước tối ưu.
+#[must_use]
+pub fn pre_facts(m: &Module<'_>) -> PreFacts {
+    PreFacts {
+        aborts: abort_profile(m),
+    }
+}
+
+/// GUARD-POST (ADR-036 §6a): kiểm IR SAU tối ưu. Gồm TOÀN BỘ luật của [`check_module`] (verifier, attestation, instance, nghĩa vụ,
+/// bảng runtime, `unreachable` chỉ đúng mẫu abort ⇒ không có `unreachable` MỚI, không cờ UB/fast-math/contract/reassoc, không assume) CỘNG:
+/// (R1) với mỗi (hàm, loại abort) số lời gọi `gritrt_abort` KHÔNG giảm so với IR trước tối ưu — giảm = dấu hiệu bộ tối ưu đã xoá một kiểm tra;
+/// (R2) không `llvm.fma`/`llvm.fmuladd`; (R3) không thuộc tính hàm `unsafe-fp-math`… (xem `UNSAFE_FP_ATTRS`).
+#[must_use]
+pub fn check_post(m: &Module<'_>, input: &GuardInput<'_>, pre: &PreFacts) -> Vec<String> {
+    let mut v = check_module(m, input);
+    let post = abort_profile(m);
+    for ((f, k), n) in &pre.aborts {
+        let now = post.get(&(f.clone(), k.clone())).copied().unwrap_or(0);
+        if now < *n {
+            v.push(format!(
+                "{f}: số lời gọi gritrt_abort loại {k} giảm {n} → {now} sau tối ưu (bộ tối ưu đã xoá một kiểm tra)"
+            ));
+        }
+    }
+    for f in m.get_functions() {
+        let fname = f.get_name().to_string_lossy().into_owned();
+        for a in f.attributes(AttributeLoc::Function) {
+            if a.is_string() {
+                let key = a.get_string_kind_id().to_string_lossy().into_owned();
+                if UNSAFE_FP_ATTRS.contains(&key.as_str()) {
+                    v.push(format!(
+                        "{fname}: thuộc tính hàm số thực không an toàn `{key}`"
+                    ));
+                }
+            }
+        }
+        for bb in f.get_basic_blocks() {
+            let mut cur = bb.get_first_instruction();
+            while let Some(inst) = cur {
+                if callee_name(&inst).is_some_and(|c| fused_intrinsic(&c)) {
+                    v.push(format!(
+                        "{fname}: hợp nhất nhân-cộng (FMA) bị cấm: {}",
+                        inst.print_to_string().to_string().trim()
+                    ));
+                }
+                cur = inst.get_next_instruction();
+            }
+        }
+    }
+    v
+}
 
 /// Kiểm một module. Trả danh sách vi phạm (rỗng = chấp nhận).
 #[must_use]

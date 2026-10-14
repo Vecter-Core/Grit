@@ -88,6 +88,38 @@ pub enum Inject {
     ExternalCall,
     /// định nghĩa thêm một hàm KHÔNG thuộc bảng instance (hàm lạ, vô hại về hành vi)
     RogueInstance,
+    // ---- lỗi chèn SAU tối ưu (chỉ có tác dụng ở hồ sơ release; ADR-036 §6a): Guard-post phải từ chối ----
+    /// xoá một lời gọi `gritrt_abort` (như thể bộ tối ưu xoá một kiểm tra)
+    PostDropAbort,
+    /// thêm lời gọi `llvm.fma.f64`
+    PostFma,
+    /// thêm `fadd` có cờ `contract` + `reassoc`
+    PostFastMath,
+    /// gắn thuộc tính hàm `unsafe-fp-math=true`
+    PostFpAttr,
+    /// thêm phép cộng có cờ `nsw`
+    PostNsw,
+    /// thêm `unreachable` trần
+    PostUnreachable,
+    /// thêm lời gọi `gritrt_spawn` KHÔNG mang `!gt.obl`
+    PostUntaggedSpawn,
+}
+
+impl Inject {
+    /// lỗi chèn sau tối ưu?
+    #[must_use]
+    pub fn is_post(self) -> bool {
+        matches!(
+            self,
+            Inject::PostDropAbort
+                | Inject::PostFma
+                | Inject::PostFastMath
+                | Inject::PostFpAttr
+                | Inject::PostNsw
+                | Inject::PostUnreachable
+                | Inject::PostUntaggedSpawn
+        )
+    }
 }
 
 /// Kết quả: IR dạng chữ và object COFF.
@@ -226,6 +258,7 @@ pub fn compile(
     keys: &BTreeMap<NodeId, String>,
     opts: &Options,
     guard: &dyn for<'c> Fn(&Module<'c>) -> Vec<String>,
+    guard_post: &dyn for<'c> Fn(&Module<'c>) -> Vec<String>,
 ) -> R<Compiled> {
     Target::initialize_x86(&InitializationConfig::default());
     let triple = TargetMachine::get_default_triple();
@@ -344,6 +377,14 @@ pub fn compile(
         if let Err(e) = cg.module.verify() {
             return internal(format!("IR sau tối ưu không hợp lệ: {e}"));
         }
+        if let Some(k) = opts.inject.filter(|k| k.is_post()) {
+            inject_post(&cg, k)?;
+        }
+        // GUARD-POST: kiểm IR SAU tối ưu (ADR-036 §6a); mọi vi phạm ⇒ từ chối, không sinh exe
+        let post = guard_post(&cg.module);
+        if !post.is_empty() {
+            return Err(CodegenError::Guard(post));
+        }
     }
     let ir = cg.module.print_to_string().to_string();
     let buf = llvm(tm.write_to_memory_buffer(&cg.module, FileType::Object))?;
@@ -351,6 +392,117 @@ pub fn compile(
         ir,
         object: buf.as_slice().to_vec(),
     })
+}
+
+/// Chèn lỗi SAU tối ưu để kiểm Guard-post (`GRITC_FAULT=post:…`): chỉ làm IR XẤU hơn.
+fn inject_post(cg: &Cg<'_, '_>, k: Inject) -> R<()> {
+    let ctx = cg.ctx;
+    let new_fn = |name: &str| {
+        let f = cg
+            .module
+            .add_function(name, ctx.void_type().fn_type(&[], false), None);
+        let bb = ctx.append_basic_block(f, "bb0");
+        cg.builder.position_at_end(bb);
+        f
+    };
+    match k {
+        Inject::PostDropAbort => {
+            for f in cg.module.get_functions() {
+                for bb in f.get_basic_blocks() {
+                    let mut cur = bb.get_first_instruction();
+                    while let Some(i) = cur {
+                        if i.get_opcode() == inkwell::values::InstructionOpcode::Call
+                            && inkwell::values::CallSiteValue::try_from(i)
+                                .ok()
+                                .and_then(|c| c.get_called_fn_value())
+                                .is_some_and(|c| c.get_name().to_bytes() == b"gritrt_abort")
+                        {
+                            i.erase_from_basic_block();
+                            return Ok(());
+                        }
+                        cur = i.get_next_instruction();
+                    }
+                }
+            }
+            return internal("PostDropAbort: không có lời gọi gritrt_abort để xoá");
+        }
+        Inject::PostFma => {
+            let f64t = ctx.f64_type();
+            let Some(intr) = Intrinsic::find("llvm.fma") else {
+                return internal("không thấy llvm.fma");
+            };
+            let Some(d) = intr.get_declaration(&cg.module, &[f64t.into()]) else {
+                return internal("không khai báo được llvm.fma");
+            };
+            new_fn("gt.fault");
+            let z = f64t.const_float(1.0);
+            llvm(
+                cg.builder
+                    .build_call(d, &[z.into(), z.into(), z.into()], ""),
+            )?;
+            llvm(cg.builder.build_return(None))?;
+        }
+        Inject::PostFastMath => {
+            let f64t = ctx.f64_type();
+            let ft = f64t.fn_type(&[f64t.into(), f64t.into()], false);
+            let func = cg.module.add_function("gt.fault", ft, None);
+            let bb = ctx.append_basic_block(func, "bb0");
+            cg.builder.position_at_end(bb);
+            let (Some(a), Some(b)) = (func.get_nth_param(0), func.get_nth_param(1)) else {
+                return internal("PostFastMath: thiếu tham số");
+            };
+            let r = llvm(cg.builder.build_float_add(
+                a.into_float_value(),
+                b.into_float_value(),
+                "",
+            ))?;
+            if let Some(i) = r.as_instruction() {
+                let _ = i.set_fast_math_flags(
+                    inkwell::values::FastMathFlags::AllowContract
+                        | inkwell::values::FastMathFlags::AllowReassoc,
+                );
+            }
+            llvm(cg.builder.build_return(Some(&r)))?;
+        }
+        Inject::PostFpAttr => {
+            let f = new_fn("gt.fault");
+            f.add_attribute(
+                AttributeLoc::Function,
+                ctx.create_string_attribute("unsafe-fp-math", "true"),
+            );
+            llvm(cg.builder.build_return(None))?;
+        }
+        Inject::PostNsw => {
+            let ft = ctx
+                .i32_type()
+                .fn_type(&[ctx.i32_type().into(), ctx.i32_type().into()], false);
+            let func = cg.module.add_function("gt.fault", ft, None);
+            let bb = ctx.append_basic_block(func, "bb0");
+            cg.builder.position_at_end(bb);
+            let (Some(a), Some(b)) = (func.get_nth_param(0), func.get_nth_param(1)) else {
+                return internal("PostNsw: thiếu tham số");
+            };
+            let r = llvm(
+                cg.builder
+                    .build_int_nsw_add(a.into_int_value(), b.into_int_value(), ""),
+            )?;
+            llvm(cg.builder.build_return(Some(&r)))?;
+        }
+        Inject::PostUnreachable => {
+            new_fn("gt.fault");
+            llvm(cg.builder.build_unreachable())?;
+        }
+        Inject::PostUntaggedSpawn => {
+            let sp =
+                cg.module
+                    .add_function("gritrt_spawn", ctx.void_type().fn_type(&[], false), None);
+            new_fn("gt.fault");
+            llvm(cg.builder.build_call(sp, &[], ""))?;
+            llvm(cg.builder.build_return(None))?;
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 fn noreturn(ctx: &Context) -> Attribute {

@@ -88,7 +88,20 @@ fn linker() -> Result<Command, NativeError> {
 
 /// `GRITC_FAULT=ir:unreachable|ir:strip-obl|ir:attest`: chèn lỗi vào IR để KIỂM IR Guard (chỉ làm gritc từ chối thêm).
 fn inject_from_env() -> Option<Inject> {
-    match std::env::var("GRITC_FAULT").ok()?.strip_prefix("ir:")? {
+    let v = std::env::var("GRITC_FAULT").ok()?;
+    if let Some(k) = v.strip_prefix("post:") {
+        return match k {
+            "drop-abort" => Some(Inject::PostDropAbort),
+            "fma" => Some(Inject::PostFma),
+            "fast-math" => Some(Inject::PostFastMath),
+            "fp-attr" => Some(Inject::PostFpAttr),
+            "nsw" => Some(Inject::PostNsw),
+            "unreachable" => Some(Inject::PostUnreachable),
+            "untagged-spawn" => Some(Inject::PostUntaggedSpawn),
+            _ => None,
+        };
+    }
+    match v.strip_prefix("ir:")? {
         "unreachable" => Some(Inject::StrayUnreachable),
         "strip-obl" => Some(Inject::StripObligation),
         "attest" => Some(Inject::BadAttestation),
@@ -107,7 +120,14 @@ pub fn build_exe(
     report_result: bool,
     attestation: &str,
 ) -> Result<(), NativeError> {
-    build_exe_profile(art, out, report_result, attestation, Opt::Dev)
+    build_exe_profile(art, out, report_result, attestation, Opt::Dev).map(|_| ())
+}
+
+/// Băm SHA-256 của IR trước và sau tối ưu (ADR-036 §6a: attestation phủ cả hai). Hồ sơ `dev`: không có IR sau tối ưu.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BuildInfo {
+    pub ir_pre_sha256: String,
+    pub ir_post_sha256: Option<String>,
 }
 
 /// Như `build_exe` nhưng chọn hồ sơ (`dev` = -O0; `release` = danh sách trắng pass, ADR-036).
@@ -117,11 +137,20 @@ pub fn build_exe_profile(
     report_result: bool,
     attestation: &str,
     opt: Opt,
-) -> Result<(), NativeError> {
+) -> Result<BuildInfo, NativeError> {
     check_llvm_dll()?;
     let rt = rt_lib()?;
     crate::runner::apply_types_fault_from_env();
     let allowed = gt_codegen_llvm::expected_instances(&art.types, &art.obl.bodies);
+    // sự kiện của IR TRƯỚC tối ưu (do Guard-pre chụp) cho Guard-post, và băm hai IR
+    let facts: std::cell::RefCell<gt_guard::PreFacts> =
+        std::cell::RefCell::new(gt_guard::PreFacts::default());
+    let hashes: std::cell::RefCell<(String, Option<String>)> =
+        std::cell::RefCell::new((String::new(), None));
+    let input = gt_guard::GuardInput {
+        attestation,
+        instances: &allowed,
+    };
     let compiled = gt_codegen_llvm::compile(
         &art.types,
         &art.obl.bodies,
@@ -133,13 +162,16 @@ pub fn build_exe_profile(
             opt,
         },
         &|m| {
-            gt_guard::check_module(
-                m,
-                &gt_guard::GuardInput {
-                    attestation,
-                    instances: &allowed,
-                },
-            )
+            *facts.borrow_mut() = gt_guard::pre_facts(m);
+            hashes.borrow_mut().0 =
+                crate::sha256::sha256_hex(m.print_to_string().to_string().as_bytes());
+            gt_guard::check_module(m, &input)
+        },
+        &|m| {
+            hashes.borrow_mut().1 = Some(crate::sha256::sha256_hex(
+                m.print_to_string().to_string().as_bytes(),
+            ));
+            gt_guard::check_post(m, &input, &facts.borrow())
         },
     )
     .map_err(|e| match e {
@@ -174,7 +206,13 @@ pub fn build_exe_profile(
     let r = cmd.output();
     let _ = std::fs::remove_file(&obj);
     match r {
-        Ok(o) if o.status.success() && out.is_file() => Ok(()),
+        Ok(o) if o.status.success() && out.is_file() => {
+            let (pre, post) = hashes.into_inner();
+            Ok(BuildInfo {
+                ir_pre_sha256: pre,
+                ir_post_sha256: post,
+            })
+        }
         Ok(o) => {
             let _ = std::fs::remove_file(out);
             Err(NativeError::Link(format!(

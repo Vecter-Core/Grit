@@ -573,3 +573,201 @@ fn symbol_charset_is_strict() {
     finish_ok(&w, f);
     assert_eq!(w.check(), Vec::<String>::new());
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// GUARD-POST (ADR-036 §6a): `check_post` = mọi luật của `check_module` + không giảm số `gritrt_abort` theo (hàm, loại) + không FMA/thuộc tính FP.
+// ---------------------------------------------------------------------------------------------------------------------------------
+use gt_guard::{PreFacts, check_post, pre_facts};
+
+fn trap_kind<'a>(w: &W<'a>, f: FunctionValue<'a>, name: &str, kind: u64) {
+    let t = w.ctx.append_basic_block(f, name);
+    w.b.position_at_end(t);
+    w.b.build_call(
+        w.abort,
+        &[w.ctx.i32_type().const_int(kind, false).into()],
+        "",
+    )
+    .expect("call");
+    w.b.build_unreachable().expect("unreachable");
+}
+
+/// gắn `!gt.instances` đúng theo các hàm đã tạo
+fn add_instances(w: &W<'_>) {
+    let names = w.names.borrow().clone();
+    let entries: Vec<_> = names
+        .iter()
+        .map(|n| w.ctx.metadata_string(&format!("{n}={n}")).into())
+        .collect();
+    w.m.add_global_metadata(INSTANCES_KEY, &w.ctx.metadata_node(&entries))
+        .expect("metadata");
+}
+
+/// hàm `f` có các khối trap theo (tên, loại) rồi ret ở entry; đã gắn `!gt.instances`
+fn module_with_traps<'a>(ctx: &'a Context, traps: &[(&str, u64)]) -> W<'a> {
+    let w = world(ctx, true, Some(ATT));
+    let f = w.func("f");
+    for (n, k) in traps {
+        trap_kind(&w, f, n, *k);
+    }
+    let e = f.get_first_basic_block().expect("entry");
+    w.b.position_at_end(e);
+    w.b.build_return(None).expect("ret");
+    add_instances(&w);
+    w
+}
+
+fn post(w: &W<'_>, pre: &PreFacts) -> Vec<String> {
+    let names = w.names.borrow().clone();
+    check_post(
+        &w.m,
+        &GuardInput {
+            attestation: ATT,
+            instances: &names,
+        },
+        pre,
+    )
+}
+
+/// đặt con trỏ dựng trước lệnh `ret` của entry của `f`
+fn before_ret(w: &W<'_>, name: &str) {
+    let f = w.m.get_function(name).expect("hàm");
+    let ret = f
+        .get_first_basic_block()
+        .expect("entry")
+        .get_terminator()
+        .expect("ret");
+    w.b.position_before(&ret);
+}
+
+#[test]
+fn post_accepts_equal_or_more_aborts_per_function_and_kind() {
+    let c0 = Context::create();
+    let before = module_with_traps(&c0, &[("trap.0", 1), ("trap.1", 2)]);
+    let pre = pre_facts(&before.m);
+    assert_eq!(post(&before, &pre), Vec::<String>::new());
+    let c1 = Context::create();
+    let more = module_with_traps(&c1, &[("trap.0", 1), ("trap.1", 2), ("trap.2", 2)]);
+    assert_eq!(
+        post(&more, &pre),
+        Vec::<String>::new(),
+        "thêm abort không phải vi phạm"
+    );
+}
+
+#[test]
+fn post_rejects_fewer_aborts_of_a_kind_even_if_another_kind_compensates() {
+    let c0 = Context::create();
+    let before = module_with_traps(&c0, &[("trap.0", 1), ("trap.1", 2)]);
+    let pre = pre_facts(&before.m);
+    // mất một abort loại 2
+    let c1 = Context::create();
+    let fewer = module_with_traps(&c1, &[("trap.0", 1)]);
+    let v = post(&fewer, &pre);
+    assert!(has(&v, "loại 2 giảm 1 → 0"), "{v:?}");
+    // bù bằng một abort loại khác: số tổng không đổi nhưng VẪN bị từ chối (đếm theo loại)
+    let c2 = Context::create();
+    let swapped = module_with_traps(&c2, &[("trap.0", 1), ("trap.1", 3)]);
+    let v = post(&swapped, &pre);
+    assert!(has(&v, "loại 2 giảm 1 → 0"), "{v:?}");
+    // chuyển abort sang hàm khác: bị từ chối (đếm theo hàm)
+    let c3 = Context::create();
+    let w = world(&c3, true, Some(ATT));
+    let f = w.func("f");
+    let g = w.func("g");
+    trap_kind(&w, g, "trap.0", 1);
+    trap_kind(&w, g, "trap.1", 2);
+    for fv in [f, g] {
+        w.b.position_at_end(fv.get_first_basic_block().expect("entry"));
+        w.b.build_return(None).expect("ret");
+    }
+    add_instances(&w);
+    let v = post(&w, &pre);
+    assert!(
+        has(&v, "f: số lời gọi gritrt_abort loại 1 giảm 1 → 0"),
+        "{v:?}"
+    );
+}
+
+#[test]
+fn post_rejects_fma_fp_attributes_and_contract_flags() {
+    for intr in ["llvm.fma.f64", "llvm.fmuladd.f64"] {
+        let c = Context::create();
+        let w = module_with_traps(&c, &[("trap.0", 1)]);
+        let pre = pre_facts(&w.m);
+        assert_eq!(post(&w, &pre), Vec::<String>::new());
+        let f64t = c.f64_type();
+        let ty = f64t.fn_type(&[f64t.into(), f64t.into(), f64t.into()], false);
+        let d = w.m.add_function(intr, ty, None);
+        before_ret(&w, "f");
+        let z = f64t.const_float(1.0);
+        w.b.build_call(d, &[z.into(), z.into(), z.into()], "")
+            .expect("call");
+        let v = post(&w, &pre);
+        assert!(has(&v, "hợp nhất nhân-cộng"), "{intr}: {v:?}");
+    }
+    // từng thuộc tính hàm FP không an toàn
+    for key in [
+        "unsafe-fp-math",
+        "no-nans-fp-math",
+        "no-infs-fp-math",
+        "no-signed-zeros-fp-math",
+        "approx-func-fp-math",
+        "less-precise-fpmad",
+    ] {
+        let c = Context::create();
+        let w = module_with_traps(&c, &[("trap.0", 1)]);
+        let pre = pre_facts(&w.m);
+        w.m.get_function("f").expect("f").add_attribute(
+            AttributeLoc::Function,
+            c.create_string_attribute(key, "true"),
+        );
+        let v = post(&w, &pre);
+        assert!(has(&v, &format!("`{key}`")), "{key}: {v:?}");
+    }
+    // thuộc tính chuỗi vô hại (ví dụ target-cpu) KHÔNG bị từ chối
+    let c = Context::create();
+    let w = module_with_traps(&c, &[("trap.0", 1)]);
+    let pre = pre_facts(&w.m);
+    w.m.get_function("f").expect("f").add_attribute(
+        AttributeLoc::Function,
+        c.create_string_attribute("target-cpu", "generic"),
+    );
+    assert_eq!(post(&w, &pre), Vec::<String>::new());
+}
+
+#[test]
+fn post_rejects_each_fast_math_flag_on_float_ops() {
+    use gt_llvm::inkwell::values::FastMathFlags;
+    for (flag, tok) in [
+        (FastMathFlags::AllowContract, "contract"),
+        (FastMathFlags::AllowReassoc, "reassoc"),
+        (FastMathFlags::AllowReciprocal, "arcp"),
+        (FastMathFlags::NoNaNs, "nnan"),
+        (FastMathFlags::NoInfs, "ninf"),
+        (FastMathFlags::NoSignedZeros, "nsz"),
+        (FastMathFlags::ApproxFunc, "afn"),
+    ] {
+        let c = Context::create();
+        let w = module_with_traps(&c, &[("trap.0", 1)]);
+        let pre = pre_facts(&w.m);
+        let f64t = c.f64_type();
+        before_ret(&w, "f");
+        let p = w.b.build_alloca(f64t, "p").expect("p");
+        let l = w.b.build_load(f64t, p, "l").expect("l").into_float_value();
+        let r = w.b.build_float_add(l, l, "r").expect("fadd");
+        assert_eq!(
+            post(&w, &pre),
+            Vec::<String>::new(),
+            "{tok}: fadd thường phải được chấp nhận"
+        );
+        r.as_instruction()
+            .expect("inst")
+            .set_fast_math_flags(flag)
+            .expect("flags");
+        let v = post(&w, &pre);
+        assert!(
+            has(&v, &format!("cờ sinh poison/UB `{tok}`")),
+            "{tok}: {v:?}"
+        );
+    }
+}
