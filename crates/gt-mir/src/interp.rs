@@ -399,6 +399,8 @@ impl<'a> Interp<'a> {
                             local = l2;
                             path = p2;
                         }
+                        // `&str` là `V::Str` (giá trị, không có vị trí riêng): `*s` giữ nguyên chỗ chứa `s`
+                        V::Str(_) => {}
                         other => return Err(Flow::Bug(format!("deref {other:?}"))),
                     }
                 }
@@ -490,6 +492,151 @@ impl<'a> Interp<'a> {
 
     /// Lang item đồng thời/mutability bên trong (`Cell`, `Mutex`, `Atomic`): CÔNG CỤ TEST, NGOÀI TCB, thực thi TUẦN TỰ. Ngữ nghĩa này KHÔNG
     /// phải bằng chứng cho ngữ nghĩa codegen (M10 phải dùng atomics/khoá LLVM thật; ADR-027 §1). `Ok(None)`: không phải intrinsic loại này.
+    /// `&str` của thông dịch là `V::Str`: `len`, `slice` (kiểm `from ≤ to ≤ len` và BIÊN KÝ TỰ; sai ⇒ abort `slice_range`)
+    fn str_op(&self, m: &str, vals: &[V]) -> Result<V, Flow> {
+        let mut owned: Vec<V> = Vec::new();
+        for v in vals {
+            owned.push(match v {
+                V::Ref(fr, l, p) => match self.get(*fr, *l, p)? {
+                    s @ V::Str(_) => s,
+                    other => other,
+                },
+                other => other.clone(),
+            });
+        }
+        let vals = owned.as_slice();
+        match (m, vals) {
+            ("len", [V::Str(s)]) => Ok(V::Int(s.len() as i128, IntTy::Usize)),
+            ("slice", [V::Str(s), V::Int(f, _), V::Int(t, _)]) => {
+                let (f, t) = (*f as usize, *t as usize);
+                if f <= t && t <= s.len() && s.is_char_boundary(f) && s.is_char_boundary(t) {
+                    Ok(V::Str(s[f..t].to_string()))
+                } else {
+                    Err(Flow::Abort("slice_range".to_string()))
+                }
+            }
+            _ => Err(Flow::Bug(format!("str::{m}: đối số không đúng dạng"))),
+        }
+    }
+
+    /// byte của một mảng `V::Array` giá trị u8
+    fn bytes_of(v: &V) -> Result<Vec<u8>, Flow> {
+        let V::Array(a) = v else {
+            return Err(Flow::Bug("kỳ vọng mảng byte".to_string()));
+        };
+        a.iter()
+            .map(|x| match x {
+                V::Int(b, _) => Ok(*b as u8),
+                _ => Err(Flow::Bug("phần tử không phải byte".to_string())),
+            })
+            .collect()
+    }
+
+    /// `Text<'a>` (ADR-035) trên thông dịch: `Adt(0, [Vec])`, `Vec = Adt(0, [arena, Array(byte), len, cap])`; bất biến UTF-8 giữ bằng cách chỉ
+    /// thêm `String`/`char`/byte đã kiểm bằng `std::str::from_utf8` (nguồn độc lập với bộ sinh).
+    fn text_op(&mut self, m: &str, vals: &[V]) -> Result<V, Flow> {
+        let bug = |t: &str| Flow::Bug(format!("Text::{m}: {t}"));
+        let mk = |arena: &V| {
+            V::Adt(
+                0,
+                vec![V::Adt(
+                    0,
+                    vec![
+                        arena.clone(),
+                        V::Array(Vec::new()),
+                        V::Int(0, IntTy::Usize),
+                        V::Int(0, IntTy::Usize),
+                    ],
+                )],
+            )
+        };
+        match (m, vals) {
+            ("new", [arena]) => Ok(mk(arena)),
+            ("from_utf8", [arena, V::Ref(fr, l, path)]) => {
+                let bytes = Self::bytes_of(&self.get(*fr, *l, path)?)?;
+                if std::str::from_utf8(&bytes).is_err() {
+                    return Ok(V::Adt(0, Vec::new()));
+                }
+                let mut t = mk(arena);
+                let V::Adt(_, f) = &mut t else {
+                    return Err(bug("dựng Text"));
+                };
+                let V::Adt(_, vf) = &mut f[0] else {
+                    return Err(bug("dựng Vec"));
+                };
+                vf[1] = V::Array(
+                    bytes
+                        .iter()
+                        .map(|b| V::Int(i128::from(*b), IntTy::U8))
+                        .collect(),
+                );
+                vf[2] = V::Int(bytes.len() as i128, IntTy::Usize);
+                vf[3] = V::Int(bytes.len() as i128, IntTy::Usize);
+                Ok(V::Adt(1, vec![t]))
+            }
+            ("len", [V::Ref(fr, l, path)]) => {
+                let mut p = path.clone();
+                p.extend([Step::Field(0), Step::Field(2)]);
+                self.get(*fr, *l, &p)
+            }
+            ("as_bytes", [V::Ref(fr, l, path)]) => {
+                let mut p = path.clone();
+                p.extend([Step::Field(0), Step::Field(1)]);
+                Ok(V::Ref(*fr, *l, p))
+            }
+            ("as_str", [V::Ref(fr, l, path)]) => {
+                let mut p = path.clone();
+                p.extend([Step::Field(0), Step::Field(1)]);
+                let bytes = Self::bytes_of(&self.get(*fr, *l, &p)?)?;
+                String::from_utf8(bytes)
+                    .map(V::Str)
+                    .map_err(|_| bug("bất biến UTF-8 bị phá"))
+            }
+            ("push_str" | "push_char" | "push_utf8", [V::Ref(fr, l, path), x]) => {
+                let add: Vec<u8> = match (m, x) {
+                    ("push_str", V::Str(s)) => s.as_bytes().to_vec(),
+                    ("push_char", V::Char(c)) => {
+                        let ch = char::from_u32(*c).ok_or_else(|| bug("char không hợp lệ"))?;
+                        ch.to_string().into_bytes()
+                    }
+                    ("push_utf8", V::Ref(fr2, l2, p2)) => {
+                        let b = Self::bytes_of(&self.get(*fr2, *l2, p2)?)?;
+                        if std::str::from_utf8(&b).is_err() {
+                            return Ok(V::Bool(false));
+                        }
+                        b
+                    }
+                    _ => return Err(bug("đối số không đúng dạng")),
+                };
+                let mut items = path.clone();
+                items.extend([Step::Field(0), Step::Field(1)]);
+                let V::Array(mut a) = self.get(*fr, *l, &items)? else {
+                    return Err(bug("trường byte không phải mảng"));
+                };
+                a.extend(add.iter().map(|b| V::Int(i128::from(*b), IntTy::U8)));
+                let n = a.len() as i128;
+                self.set_at(*fr, *l, &items, V::Array(a))?;
+                let mut lp = path.clone();
+                lp.extend([Step::Field(0), Step::Field(2)]);
+                self.set_at(*fr, *l, &lp, V::Int(n, IntTy::Usize))?;
+                let mut cp = path.clone();
+                cp.extend([Step::Field(0), Step::Field(3)]);
+                let V::Int(cap, t) = self.get(*fr, *l, &cp)? else {
+                    return Err(bug("cap không phải số nguyên"));
+                };
+                if n > cap {
+                    self.set_at(*fr, *l, &cp, V::Int(n, t))?;
+                }
+                Ok(if m == "push_utf8" {
+                    V::Bool(true)
+                } else {
+                    V::Unit
+                })
+            }
+            _ => Err(bug("đối số không đúng dạng")),
+        }
+    }
+
     /// `Vec<'a, T>` (ADR-032 phụ lục A) trên thông dịch: giá trị `Adt(0, [arena, Array(phần tử), len, cap])`; `Array` luôn có đúng `len`
     /// phần tử. Không mô phỏng hết Arena/tràn kích thước (thông dịch không có bố cục): các abort đó chỉ kiểm trên exe.
     fn vec_op(&mut self, m: &str, vals: &[V]) -> Result<V, Flow> {
@@ -595,6 +742,12 @@ impl<'a> Interp<'a> {
         let m = key.rsplit("::").next().unwrap_or("");
         if key.starts_with("$prelude::Vec<") {
             return self.vec_op(m, vals).map(Some);
+        }
+        if key.starts_with("$prelude::Text::") {
+            return self.text_op(m, vals).map(Some);
+        }
+        if key == "$prelude::str::len" || key == "$prelude::str::slice" {
+            return self.str_op(m, vals).map(Some);
         }
         if key == "$prelude::Arena::new" || key == "$prelude::Arena::reset" {
             // Arena của thông dịch: tay cầm 0, không giới hạn bộ nhớ; `reset` không làm gì (M6 đã bảo đảm không còn tham chiếu vào nội dung)

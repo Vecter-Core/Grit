@@ -1,0 +1,11 @@
+// expect: pass
+// note: dựng xong rồi lấy khung nhìn (đóng băng) rồi đọc: hợp lệ
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μt ≔ Text::new(&!ar);
+  t.push_str("héllo ");
+  t.push_char('😀');
+  s ≔ t.as_str();
+  b ≔ t.as_bytes();
+  (s.len() as u64) +% (b.len() as u64)
+}

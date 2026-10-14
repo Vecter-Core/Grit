@@ -33,6 +33,26 @@ pub struct ChecksReport {
     pub would_delete: Vec<CheckItem>,
 }
 
+/// Loại abort BÊN TRONG một intrinsic của prelude (không phải `Assert` của MIR) để liệt kê vào báo cáo: hết Arena (`Vec`, `Text`,
+/// `Arena::alloc`) hoặc cắt `str` không ở biên ký tự (`str::slice`, abort `slice_range`).
+fn intrinsic_abort_kind(key: &str) -> Option<&'static str> {
+    let arena = (key.starts_with("$prelude::Vec<")
+        && (key.ends_with("::push") || key.ends_with("::reserve")))
+        || key == "$prelude::Arena::alloc"
+        || matches!(
+            key,
+            "$prelude::Text::new"
+                | "$prelude::Text::push_str"
+                | "$prelude::Text::push_char"
+                | "$prelude::Text::push_utf8"
+                | "$prelude::Text::from_utf8"
+        );
+    if arena && key != "$prelude::Text::new" {
+        return Some("arena_exhausted");
+    }
+    (key == "$prelude::str::slice").then_some("str_slice")
+}
+
 /// Dựng báo cáo check từ kết quả M7 (tất định: theo thân rồi theo thứ tự nghĩa vụ). `keys`: tên đầy đủ theo NodeId, để nhận ra các lời
 /// gọi intrinsic của prelude có thể abort `arena_exhausted` lúc chạy (`Vec::push`, `Arena::alloc`; ADR-032 phụ lục A, 3c).
 #[must_use]
@@ -82,16 +102,12 @@ pub fn checks_report(
                     callee: gt_mir::Callee::Fn { node, .. },
                     ..
                 } = &t.kind
-                && keys.get(node).is_some_and(|k| {
-                    (k.starts_with("$prelude::Vec<")
-                        && (k.ends_with("::push") || k.ends_with("::reserve")))
-                        || k == "$prelude::Arena::alloc"
-                })
+                && let Some(kind) = keys.get(node).and_then(|k| intrinsic_abort_kind(k))
             {
                 r.kept.push(CheckItem {
                     id: format!("{}#arena{n}", b.key),
                     func: b.key.clone(),
-                    kind: "arena_exhausted",
+                    kind,
                     span: (t.source.span.start, t.source.span.end),
                     status: "intrinsic_runtime",
                     solver: None,

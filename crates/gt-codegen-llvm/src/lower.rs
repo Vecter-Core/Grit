@@ -148,6 +148,14 @@ enum Intr {
     VecNew,
     VecPush,
     VecReserve,
+    TextNew,
+    TextPushStr,
+    TextPushChar,
+    TextPushUtf8,
+    TextFromUtf8,
+    TextLen,
+    TextView,
+    StrSlice,
     VecLen,
     VecAsSlice,
     VecAsMutSlice,
@@ -1672,6 +1680,24 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         if key.starts_with("$prelude::root_") {
             return Some(Intr::RootCap);
         }
+        if let Some(m) = key.strip_prefix("$prelude::Text::") {
+            return match m {
+                "new" => Some(Intr::TextNew),
+                "push_str" => Some(Intr::TextPushStr),
+                "push_char" => Some(Intr::TextPushChar),
+                "push_utf8" => Some(Intr::TextPushUtf8),
+                "from_utf8" => Some(Intr::TextFromUtf8),
+                "len" => Some(Intr::TextLen),
+                "as_str" | "as_bytes" => Some(Intr::TextView),
+                _ => None,
+            };
+        }
+        if key == "$prelude::str::len" {
+            return Some(Intr::SliceLen);
+        }
+        if key == "$prelude::str::slice" {
+            return Some(Intr::StrSlice);
+        }
         if key.starts_with("$prelude::Vec<") {
             return match m {
                 "new" => Some(Intr::VecNew),
@@ -1977,6 +2003,100 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 self.tag_obl(c.try_as_basic_value().instruction(), "E0405")?;
                 Ok(Some(self.unit_type().const_zero()))
             }
+            Intr::TextNew => {
+                // Text { bytes: Vec { arena, null, 0, 0 } }
+                let tt = self.lower_ty(dest_ty)?.into_struct_type();
+                let vt = self.vec_struct(&[Ty::Int(IntTy::U8)])?;
+                let vecv = vt.get_undef();
+                let vecv = llvm(self.builder.build_insert_value(vecv, vals[0], 0, "v.arena"))?;
+                let null = self.ptr_type().const_null();
+                let vecv = llvm(self.builder.build_insert_value(vecv, null, 1, "v.ptr"))?;
+                let z = self.i64t().const_zero();
+                let vecv = llvm(self.builder.build_insert_value(vecv, z, 2, "v.len"))?;
+                let vecv = llvm(self.builder.build_insert_value(vecv, z, 3, "v.cap"))?;
+                let t = tt.get_undef();
+                let t = llvm(self.builder.build_insert_value(t, vecv, 0, "text"))?;
+                Ok(Some(t.as_basic_value_enum()))
+            }
+            Intr::TextPushStr => {
+                let (p, n) = self.split_fat(vals[1])?;
+                self.vec_extend(fx, vals[0].into_pointer_value(), p, n)?;
+                Ok(Some(self.unit_type().const_zero()))
+            }
+            Intr::TextPushChar => {
+                self.text_push_char(fx, vals[0].into_pointer_value(), vals[1].into_int_value())?;
+                Ok(Some(self.unit_type().const_zero()))
+            }
+            Intr::TextPushUtf8 => {
+                let (p, n) = self.split_fat(vals[1])?;
+                let valid = self.utf8_valid(p, n)?;
+                let yes = self.ctx.append_basic_block(fx.f, "utf8.yes");
+                let done = self.ctx.append_basic_block(fx.f, "utf8.done");
+                llvm(self.builder.build_conditional_branch(valid, yes, done))?;
+                self.builder.position_at_end(yes);
+                self.vec_extend(fx, vals[0].into_pointer_value(), p, n)?;
+                llvm(self.builder.build_unconditional_branch(done))?;
+                self.builder.position_at_end(done);
+                Ok(Some(valid.as_basic_value_enum()))
+            }
+            Intr::TextFromUtf8 => {
+                let (p, n) = self.split_fat(vals[1])?;
+                let valid = self.utf8_valid(p, n)?;
+                let Ty::Adt(od, targs) = dest_ty else {
+                    return internal("Text::from_utf8 không trả Option");
+                };
+                let et = self.lower_ty(dest_ty)?.into_struct_type();
+                let tmp = self.entry_alloca(fx, et.into(), "from_utf8.res")?;
+                let somb = self.ctx.append_basic_block(fx.f, "utf8.some");
+                let nonb = self.ctx.append_basic_block(fx.f, "utf8.none");
+                let end = self.ctx.append_basic_block(fx.f, "utf8.end");
+                llvm(self.builder.build_conditional_branch(valid, somb, nonb))?;
+                // Some(Text { Vec { arena, null, 0, 0 } + nội dung })
+                self.builder.position_at_end(somb);
+                let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
+                llvm(
+                    self.builder
+                        .build_store(tag, self.i64t().const_int(1, false)),
+                )?;
+                let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
+                let v1 = self.variant_struct(*od, targs, 1)?;
+                let tp = llvm(self.builder.build_struct_gep(v1, pay, 0, "text"))?;
+                let vt = self.vec_struct(&[Ty::Int(IntTy::U8)])?;
+                let ap = llvm(self.builder.build_struct_gep(vt, tp, 0, "arena.p"))?;
+                llvm(self.builder.build_store(ap, vals[0]))?;
+                let pp = llvm(self.builder.build_struct_gep(vt, tp, 1, "ptr.p"))?;
+                llvm(self.builder.build_store(pp, self.ptr_type().const_null()))?;
+                let lp = llvm(self.builder.build_struct_gep(vt, tp, 2, "len.p"))?;
+                llvm(self.builder.build_store(lp, self.i64t().const_zero()))?;
+                let cp = llvm(self.builder.build_struct_gep(vt, tp, 3, "cap.p"))?;
+                llvm(self.builder.build_store(cp, self.i64t().const_zero()))?;
+                self.vec_extend(fx, tp, p, n)?;
+                llvm(self.builder.build_unconditional_branch(end))?;
+                // None
+                self.builder.position_at_end(nonb);
+                let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
+                llvm(self.builder.build_store(tag, self.i64t().const_zero()))?;
+                llvm(self.builder.build_unconditional_branch(end))?;
+                self.builder.position_at_end(end);
+                Ok(Some(llvm(self.builder.build_load(et, tmp, "from_utf8.v"))?))
+            }
+            Intr::TextLen => {
+                let vt = self.vec_struct(&[Ty::Int(IntTy::U8)])?;
+                let base = vals[0].into_pointer_value();
+                let lp = llvm(self.builder.build_struct_gep(vt, base, 2, "len.p"))?;
+                Ok(Some(llvm(self.builder.build_load(self.i64t(), lp, "len"))?))
+            }
+            Intr::TextView => {
+                let vt = self.vec_struct(&[Ty::Int(IntTy::U8)])?;
+                let base = vals[0].into_pointer_value();
+                let pp = llvm(self.builder.build_struct_gep(vt, base, 1, "ptr.p"))?;
+                let p =
+                    llvm(self.builder.build_load(self.ptr_type(), pp, "ptr"))?.into_pointer_value();
+                let lp = llvm(self.builder.build_struct_gep(vt, base, 2, "len.p"))?;
+                let n = llvm(self.builder.build_load(self.i64t(), lp, "len"))?.into_int_value();
+                self.fat_value(p, n)
+            }
+            Intr::StrSlice => self.str_slice(fx, vals),
             Intr::VecNew => {
                 // Vec { arena: &!Arena, ptr: null, len: 0, cap: 0 } — không cấp phát cho tới `push` đầu tiên
                 let vt = self.lower_ty(dest_ty)?.into_struct_type();
@@ -2537,6 +2657,233 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         llvm(self.builder.build_store(ptr_p, np))?;
         llvm(self.builder.build_store(cap_p, ncap))?;
         Ok(())
+    }
+
+    /// alloca ở khối ĐẦU của hàm (không phình ngăn xếp khi nằm trong vòng lặp)
+    fn entry_alloca(
+        &self,
+        fx: &Fx<'ctx, '_>,
+        ty: BasicTypeEnum<'ctx>,
+        name: &str,
+    ) -> R<PointerValue<'ctx>> {
+        let here = self.builder.get_insert_block();
+        let Some(entry) = fx.f.get_first_basic_block() else {
+            return internal("hàm không có khối đầu");
+        };
+        match entry.get_first_instruction() {
+            Some(i) => self.builder.position_before(&i),
+            None => self.builder.position_at_end(entry),
+        }
+        let a = llvm(self.builder.build_alloca(ty, name))?;
+        if let Some(h) = here {
+            self.builder.position_at_end(h);
+        }
+        Ok(a)
+    }
+
+    /// `gritrt_utf8_valid(p, n) != 0` (kiểm RFC 3629 bằng `std::str::from_utf8` ở runtime)
+    fn utf8_valid(&mut self, p: PointerValue<'ctx>, n: IntValue<'ctx>) -> R<IntValue<'ctx>> {
+        let i32t = self.ctx.i32_type();
+        let ft = i32t.fn_type(&[self.ptr_type().into(), self.i64t().into()], false);
+        let f = self.rt_fn("gritrt_utf8_valid", ft);
+        let c = llvm(self.builder.build_call(f, &[p.into(), n.into()], "u8v"))?;
+        let Some(r) = c.try_as_basic_value().basic() else {
+            return internal("gritrt_utf8_valid không trả giá trị");
+        };
+        llvm(self.builder.build_int_compare(
+            IntPredicate::NE,
+            r.into_int_value(),
+            i32t.const_zero(),
+            "valid",
+        ))
+    }
+
+    /// Thêm `n` byte từ `src` vào cuối `Vec<u8>` ở `base`: `len + n` tràn ⇒ abort `overflow`; cần chỗ thì cấp khối mới (≥ gấp đôi, ≥ 16).
+    fn vec_extend(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        base: PointerValue<'ctx>,
+        src: PointerValue<'ctx>,
+        n: IntValue<'ctx>,
+    ) -> R<()> {
+        let vt = self.vec_struct(&[Ty::Int(IntTy::U8)])?;
+        let i64t = self.i64t();
+        let len_p = llvm(self.builder.build_struct_gep(vt, base, 2, "len.p"))?;
+        let cap_p = llvm(self.builder.build_struct_gep(vt, base, 3, "cap.p"))?;
+        let ptr_p = llvm(self.builder.build_struct_gep(vt, base, 1, "ptr.p"))?;
+        let len = llvm(self.builder.build_load(i64t, len_p, "len"))?.into_int_value();
+        let cap = llvm(self.builder.build_load(i64t, cap_p, "cap"))?.into_int_value();
+        let sum = self
+            .call_intrinsic("llvm.uadd.with.overflow", len, n)?
+            .into_struct_value();
+        let sum_v = llvm(self.builder.build_extract_value(sum, 0, "sum"))?.into_int_value();
+        let sum_o = llvm(self.builder.build_extract_value(sum, 1, "sum.o"))?.into_int_value();
+        let ok = llvm(self.builder.build_not(sum_o, "sum.ok"))?;
+        self.guard(fx, ok, abort_kind::OVERFLOW)?;
+        let need = llvm(
+            self.builder
+                .build_int_compare(IntPredicate::UGT, sum_v, cap, "need"),
+        )?;
+        let grow = self.ctx.append_basic_block(fx.f, "ext.grow");
+        let copy = self.ctx.append_basic_block(fx.f, "ext.copy");
+        llvm(self.builder.build_conditional_branch(need, grow, copy))?;
+        self.builder.position_at_end(grow);
+        let dbl = self
+            .call_intrinsic("llvm.umul.with.overflow", cap, i64t.const_int(2, false))?
+            .into_struct_value();
+        let dbl_v = llvm(self.builder.build_extract_value(dbl, 0, "dbl"))?.into_int_value();
+        let dbl_o = llvm(self.builder.build_extract_value(dbl, 1, "dbl.o"))?.into_int_value();
+        let ok = llvm(self.builder.build_not(dbl_o, "dbl.ok"))?;
+        self.guard(fx, ok, abort_kind::OVERFLOW)?;
+        let lt = llvm(
+            self.builder
+                .build_int_compare(IntPredicate::ULT, dbl_v, sum_v, "lt"),
+        )?;
+        let m1 = llvm(self.builder.build_select(lt, sum_v, dbl_v, "m1"))?.into_int_value();
+        let sixteen = i64t.const_int(16, false);
+        let lt16 = llvm(
+            self.builder
+                .build_int_compare(IntPredicate::ULT, m1, sixteen, "lt16"),
+        )?;
+        let ncap = llvm(self.builder.build_select(lt16, sixteen, m1, "ncap"))?.into_int_value();
+        self.vec_grow_to(fx, vt, base, ncap, 1, 1)?;
+        llvm(self.builder.build_unconditional_branch(copy))?;
+        self.builder.position_at_end(copy);
+        let cur =
+            llvm(self.builder.build_load(self.ptr_type(), ptr_p, "cur"))?.into_pointer_value();
+        let i8t: BasicTypeEnum<'ctx> = self.ctx.i8_type().into();
+        let dst = self.gep(i8t, cur, &[len])?;
+        llvm(self.builder.build_memcpy(dst, 1, src, 1, n))?;
+        llvm(self.builder.build_store(len_p, sum_v))?;
+        Ok(())
+    }
+
+    /// `Text::push_char`: mã hoá UTF-8 (1–4 byte) vào bộ đệm 4 byte rồi `vec_extend`. `char` của Grit luôn là giá trị vô hướng hợp lệ (literal
+    /// hoặc `u8 as char`).
+    fn text_push_char(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        base: PointerValue<'ctx>,
+        c: IntValue<'ctx>,
+    ) -> R<()> {
+        let i32t = self.ctx.i32_type();
+        let i8t = self.ctx.i8_type();
+        let k = |v: u64| i32t.const_int(v, false);
+        let b = &self.builder;
+        let lt = |v: u64, n: &str| llvm(b.build_int_compare(IntPredicate::ULT, c, k(v), n));
+        let (l1, l2, l3) = (lt(0x80, "l1")?, lt(0x800, "l2")?, lt(0x1_0000, "l3")?);
+        let sel = |cnd: IntValue<'ctx>, a: IntValue<'ctx>, d: IntValue<'ctx>, n: &str| {
+            llvm(b.build_select(cnd, a, d, n)).map(BasicValueEnum::into_int_value)
+        };
+        let n4 = sel(l3, k(3), k(4), "n4")?;
+        let n3 = sel(l2, k(2), n4, "n3")?;
+        let nn = sel(l1, k(1), n3, "n")?;
+        let shr = |x: IntValue<'ctx>, s: u64, n: &str| llvm(b.build_right_shift(x, k(s), false, n));
+        let and = |x: IntValue<'ctx>, m: u64, n: &str| llvm(b.build_and(x, k(m), n));
+        let or = |x: IntValue<'ctx>, m: u64, n: &str| llvm(b.build_or(x, k(m), n));
+        // byte đầu
+        let h2 = or(shr(c, 6, "s6")?, 0xC0, "h2")?;
+        let h3 = or(shr(c, 12, "s12")?, 0xE0, "h3")?;
+        let h4 = or(shr(c, 18, "s18")?, 0xF0, "h4")?;
+        let b0 = {
+            let t = sel(l2, h2, sel(l3, h3, h4, "t34")?, "t234")?;
+            sel(l1, c, t, "b0")?
+        };
+        // các byte nối: 0x80 | 6 bit
+        let cont = |x: IntValue<'ctx>, s: u64, n: &str| -> R<IntValue<'ctx>> {
+            let sh = if s == 0 { x } else { shr(x, s, "cs")? };
+            or(and(sh, 0x3F, "cm")?, 0x80, n)
+        };
+        let (c0, c6, c12) = (cont(c, 0, "c0")?, cont(c, 6, "c6")?, cont(c, 12, "c12")?);
+        let eq = |v: u64, n: &str| llvm(b.build_int_compare(IntPredicate::EQ, nn, k(v), n));
+        let (e2, e3) = (eq(2, "e2")?, eq(3, "e3")?);
+        // b1: n=2 → c0; n=3 → c6; n=4 → c12
+        let b1 = sel(e2, c0, sel(e3, c6, c12, "b1b")?, "b1")?;
+        // b2: n=3 → c0; n=4 → c6
+        let b2 = sel(e3, c0, c6, "b2")?;
+        let b3 = c0;
+        let buf_ty = i8t.array_type(4);
+        let buf = self.entry_alloca(fx, buf_ty.into(), "u8buf")?;
+        let tr = |x: IntValue<'ctx>, n: &str| llvm(self.builder.build_int_truncate(x, i8t, n));
+        for (i, v) in [b0, b1, b2, b3].into_iter().enumerate() {
+            let slot = self.gep(i8t.into(), buf, &[self.i64t().const_int(i as u64, false)])?;
+            let t = tr(v, "tb")?;
+            llvm(self.builder.build_store(slot, t))?;
+        }
+        let n64 = llvm(self.builder.build_int_z_extend(nn, self.i64t(), "n64"))?;
+        self.vec_extend(fx, base, buf, n64)
+    }
+
+    /// `str::slice(from, to)`: `from ≤ to ≤ len` và cả hai đầu ở BIÊN KÝ TỰ (byte đó không phải byte nối `10xxxxxx`); sai ⇒ abort `slice_range`.
+    fn str_slice(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        vals: &[BasicValueEnum<'ctx>],
+    ) -> R<Option<BasicValueEnum<'ctx>>> {
+        let [fat, from, to] = vals else {
+            return internal("str::slice: sai số đối số");
+        };
+        let (p, n) = self.split_fat(*fat)?;
+        let (from, to) = (from.into_int_value(), to.into_int_value());
+        let c1 = llvm(
+            self.builder
+                .build_int_compare(IntPredicate::ULE, from, to, "f<=t"),
+        )?;
+        self.guard(fx, c1, abort_kind::SLICE_RANGE)?;
+        let c2 = llvm(
+            self.builder
+                .build_int_compare(IntPredicate::ULE, to, n, "t<=n"),
+        )?;
+        self.guard(fx, c2, abort_kind::SLICE_RANGE)?;
+        for idx in [from, to] {
+            let at_end = llvm(
+                self.builder
+                    .build_int_compare(IntPredicate::EQ, idx, n, "at_end"),
+            )?;
+            let before = self
+                .builder
+                .get_insert_block()
+                .ok_or_else(|| CodegenError::Internal("không có khối hiện tại".to_string()))?;
+            let chk = self.ctx.append_basic_block(fx.f, "bound.chk");
+            let join = self.ctx.append_basic_block(fx.f, "bound.join");
+            llvm(self.builder.build_conditional_branch(at_end, join, chk))?;
+            self.builder.position_at_end(chk);
+            let i8t: BasicTypeEnum<'ctx> = self.ctx.i8_type().into();
+            let bp = self.gep(i8t, p, &[idx])?;
+            let byte =
+                llvm(self.builder.build_load(self.ctx.i8_type(), bp, "byte"))?.into_int_value();
+            let masked = llvm(self.builder.build_and(
+                byte,
+                self.ctx.i8_type().const_int(0xC0, false),
+                "m",
+            ))?;
+            let ok2 = llvm(self.builder.build_int_compare(
+                IntPredicate::NE,
+                masked,
+                self.ctx.i8_type().const_int(0x80, false),
+                "isbound",
+            ))?;
+            let chk_end = self
+                .builder
+                .get_insert_block()
+                .ok_or_else(|| CodegenError::Internal("không có khối hiện tại".to_string()))?;
+            llvm(self.builder.build_unconditional_branch(join))?;
+            self.builder.position_at_end(join);
+            let phi = llvm(self.builder.build_phi(self.ctx.bool_type(), "ok"))?;
+            phi.add_incoming(&[
+                (&self.ctx.bool_type().const_int(1, false), before),
+                (&ok2, chk_end),
+            ]);
+            self.guard(
+                fx,
+                phi.as_basic_value().into_int_value(),
+                abort_kind::SLICE_RANGE,
+            )?;
+        }
+        let i8t: BasicTypeEnum<'ctx> = self.ctx.i8_type().into();
+        let np = self.gep(i8t, p, &[from])?;
+        let nl = llvm(self.builder.build_int_sub(to, from, "slen"))?;
+        self.fat_value(np, nl)
     }
 
     /// `Vec::reserve(&!self, n)`: bảo đảm `cap ≥ n` bằng MỘT lần cấp khối (không gấp đôi); `n ≤ cap` thì không làm gì.

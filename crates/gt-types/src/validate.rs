@@ -204,7 +204,10 @@ impl Env<'_> {
         let Some(adt) = self.db.adts.get(d).cloned() else {
             return;
         };
-        if matches!(adt.lang, Some(Lang::Secret | Lang::Cap | Lang::Vec)) {
+        if matches!(
+            adt.lang,
+            Some(Lang::Secret | Lang::Cap | Lang::Vec | Lang::Text)
+        ) {
             let name = self.defs()[d.index()].path.clone();
             self.err(
                 "E0313",

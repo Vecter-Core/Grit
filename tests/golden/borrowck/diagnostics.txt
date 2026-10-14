@@ -50,6 +50,7 @@ E0402_reborrow_twice_through_ref | E0402 | `&!*r` | [khoản mượn bắt đầ
 E0402_same_call_two_unique | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
 E0402_same_field_twice | E0402 | `&!w.n` | [khoản mượn bắt đầu ở đây @ `&!w.n`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
 E0402_struct_holding_unique_then_borrow | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
+E0402_text_two_on_one_arena | E0402 | `&!ar` | [khoản mượn bắt đầu ở đây @ `&!ar`] | hai khoản mượn duy nhất `&!` chồng nhau trên `ar`: khoản mượn trước còn được dùng về sau
 E0402_three_unique_borrows | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
 E0402_three_unique_borrows | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
 E0402_three_unique_borrows | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
@@ -84,6 +85,9 @@ E0403_shared_held_over_loop_unique_inside | E0403 | `&!x` | [khoản mượn b�
 E0403_shared_live_then_unique | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_struct_field_read_while_unique | E0403 | `w.n` | [khoản mượn bắt đầu ở đây @ `&!w`] | dùng/mượn chung `w` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_struct_holding_shared_then_unique | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_text_bytes_alive_across_push_char | E0403 | `t.push_char('é')` | [khoản mượn bắt đầu ở đây @ `t.as_bytes()`] | mượn duy nhất `&!` `t` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_text_view_alive_across_push_str | E0403 | `t.push_str("def")` | [khoản mượn bắt đầu ở đây @ `t.as_str()`] | mượn duy nhất `&!` `t` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_text_view_alive_across_push_utf8 | E0403 | `t.push_utf8(&b[..])` | [khoản mượn bắt đầu ở đây @ `t.as_str()`] | mượn duy nhất `&!` `t` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_tuple_read_while_unique | E0403 | `t.0` | [khoản mượn bắt đầu ở đây @ `&!t`] | dùng/mượn chung `t` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_unique_live_then_shared | E0403 | `&x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_unique_vs_shared | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau

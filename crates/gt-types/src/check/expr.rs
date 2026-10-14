@@ -626,8 +626,10 @@ impl<'e, 'a> Checker<'e, 'a> {
             );
             return Ty::Err;
         };
-        let forged = matches!(adt.lang, Some(Lang::Secret | Lang::Cap | Lang::Vec))
-            && !self.env.is_prelude(e.id.file());
+        let forged = matches!(
+            adt.lang,
+            Some(Lang::Secret | Lang::Cap | Lang::Vec | Lang::Text)
+        ) && !self.env.is_prelude(e.id.file());
         if forged {
             let name = self.env.defs()[d.index()].path.clone();
             self.err(

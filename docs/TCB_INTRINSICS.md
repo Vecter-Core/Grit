@@ -50,6 +50,20 @@ Kiểu `Vec<'a, T> { arena: &!'a Arena, ptr: *μ T, len: usize, cap: usize }` (l
 | `Vec::as_slice(&self) → &[T]` / `as_mut_slice(&!self) → &![T]` | `∅` | không | lát `{ptr, len}` | không (truy cập phần tử qua lát mang `Assert` biên của M5/M7) | lát đúng `len`, không phơi bày vùng chưa khởi tạo; sống không quá khoản mượn `self` | CHỜ GIANG |
 Hàm runtime dùng: `gritrt_arena_alloc` (đã có trong bảng `RUNTIME` của IR Guard, lớp E0405). `GRITRT_ARENA_LIMIT=<byte>`: tổng dung lượng chunk tối đa của MỘT arena; chỉ làm cấp phát thất bại SỚM hơn (fail-closed); mặc định không giới hạn.
 
+## B4. `Text<'a>` và `str::slice` (thêm 2026-10-14, ADR-035 phụ lục) — lớp nghĩa vụ IR Guard: **E0405** (cấp phát Arena)
+`Text<'a> { bytes: Vec<'a, u8> }` (lang `text`, trường private; literal và `⊐ Copy for` bị E0313). **Bất biến UTF-8:** nội dung LUÔN là UTF-8 hợp lệ (RFC 3629); chỉ các đường dưới đây thêm byte: `push_str` (`&str` hợp lệ vì chỉ literal/`as_str`/`slice` tạo `&str`), `push_char` (`char` của Grit luôn là giá trị vô hướng hợp lệ: literal hoặc `u8 as char`), `push_utf8`/`from_utf8` (KIỂM bằng `gritrt_utf8_valid` = `std::str::from_utf8` của Rust; không hợp lệ ⇒ `false`/`None`, KHÔNG thêm byte nào). Không có `from_utf8_unchecked`. **Đóng băng:** khung nhìn `as_str`/`as_bytes` lấy bằng `&self`; dựng thêm cần `&!self` nên M6 chặn tĩnh khung nhìn còn sống (E0403); một Arena một Text (E0402).
+| intrinsic | hiệu ứng | capability | hạ thành | abort | bất biến | người duyệt |
+|---|---|---|---|---|---|---|
+| `Text::new(a: &!'a Arena) → Text<'a>` | `mem` | không | dựng `Text{Vec{a, null, 0, 0}}`; KHÔNG cấp phát | không | rỗng ⇒ hợp lệ | CHỜ GIANG |
+| `Text::push_str(&!self, s: &str)` | `mem` | không | `vec_extend`: `len+n` (kiểm tràn), nếu cần cấp khối mới (≥ gấp đôi, ≥ 16 byte; `gritrt_arena_alloc`) + `llvm.memcpy` | `len+n` hoặc `2·cap` tràn ⇒ `overflow`; hết Arena ⇒ `arena_exhausted` | thêm đúng các byte của `s` ⇒ vẫn UTF-8 | CHỜ GIANG |
+| `Text::push_char(&!self, c: char)` | `mem` | không | mã hoá 1–4 byte vào bộ đệm 4 byte (alloca ở khối đầu) rồi `vec_extend` | như trên | mã hoá chuẩn của một giá trị vô hướng ⇒ UTF-8 | CHỜ GIANG |
+| `Text::push_utf8(&!self, b: &[u8]) → bool` | `mem` | không | `gritrt_utf8_valid(ptr,len)`; hợp lệ ⇒ `vec_extend` và trả `true`, ngược lại trả `false` và KHÔNG đổi Text | như `push_str` | chỉ thêm khi `b` hợp lệ | CHỜ GIANG |
+| `Text::from_utf8(a: &!'a Arena, b: &[u8]) → Option<Text<'a>>` | `mem` | không | như `new` + `push_utf8`; `Some(Text)` hoặc `None` | như `push_str` | `Some` ⇒ nội dung hợp lệ | CHỜ GIANG |
+| `Text::len(&self)`, `as_bytes(&self) → &[u8]`, `as_str(&self) → &str` | `∅` | không | tải trường; `as_*` ⇒ con trỏ béo `{ptr,len}` | không | khung nhìn đúng `len`, sống không quá khoản mượn `self` | CHỜ GIANG |
+| `str::len(&self) → usize` | `∅` | không | `len` của con trỏ béo | không | — | CHỜ GIANG |
+| `str::slice(&self, from: usize, to: usize) → &str` | `∅` | không | kiểm `from ≤ to ≤ len` và cả hai đầu ở BIÊN KÝ TỰ (byte tại chỉ số — nếu chỉ số < len — không phải byte nối `10xxxxxx`), rồi con trỏ béo mới | sai ⇒ abort `slice_range` (13) | kết quả là `&str` hợp lệ (cắt ở biên ký tự của chuỗi hợp lệ) | CHỜ GIANG |
+Hàm runtime mới: `gritrt_utf8_valid(p, n) → i32` (bảng `RUNTIME` của IR Guard, không phải lớp nhạy cảm). `unsafe` của nó: `from_raw_parts(p, n)` chỉ khi `n > 0` (`n = 0` ⇒ trả 1, `p` có thể null).
+
 ## C. Runtime `gt-rt` (staticlib, `panic = "abort"`): hàm xuất ra cho mã sinh
 `gritrt_start`, `gritrt_abort(kind)` (mã thoát **70**, kind = tên `AssertKind` hoặc `io_error`/`arg_out_of_range`/`abort`), `gritrt_report_int` (chỉ khi `GRITRT_RESULT_FILE`), `gritrt_alloc`, `gritrt_spawn`, `gritrt_mutex_lock/unlock`, `gritrt_arg_count`, `gritrt_arg_ptr/len`, `gritrt_exit`, `gritrt_ewrite_u64/str`, `gritrt_fs_read`, `gritrt_fs_open`, `gritrt_arena_new/alloc/reset`, `gritrt_file_len/ptr`, `gritrt_write_u64/str`. Danh sách đóng của IR Guard (`gt_guard::RUNTIME`).
 Ranh giới `unsafe` của gt-rt: ADR-031.

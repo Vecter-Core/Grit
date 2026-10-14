@@ -1,0 +1,10 @@
+// expect: pass
+// note: khung nhìn hết sống trước khi dựng thêm ⇒ hợp lệ (NLL)
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μt ≔ Text::new(&!ar);
+  t.push_str("abc");
+  n ≔ t.as_str().len();
+  t.push_str("def");
+  (n as u64) +% (t.len() as u64)
+}

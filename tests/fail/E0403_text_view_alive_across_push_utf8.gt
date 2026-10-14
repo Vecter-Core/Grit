@@ -1,0 +1,11 @@
+// expect: fail E0403
+// note: Text: khung nhìn còn sống qua push_utf8 (dựng thêm bằng byte đã kiểm) bị từ chối
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μt ≔ Text::new(&!ar);
+  t.push_str("abc");
+  v ≔ t.as_str();
+  b ≔ [104u8, 105u8];
+  ok ≔ t.push_utf8(&b[..]);
+  ⎇ ok { v.len() as u64 } ⇝ { 0u64 }
+}

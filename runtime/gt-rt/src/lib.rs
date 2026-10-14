@@ -253,6 +253,20 @@ pub unsafe extern "C" fn gritrt_ewrite_str(p: *const u8, n: u64) {
     }
 }
 
+/// Kiểm `n` byte có phải UTF-8 hợp lệ (RFC 3629: không overlong, không surrogate, ≤ U+10FFFF) bằng `std::str::from_utf8` — nguồn kiểm
+/// ĐỘC LẬP với bộ sinh. Trả 1 nếu hợp lệ, 0 nếu không.
+///
+/// # Safety
+/// `p` trỏ tới `n` byte đọc được (`n = 0`: `p` có thể null).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_utf8_valid(p: *const u8, n: u64) -> i32 {
+    if n == 0 {
+        return 1;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    i32::from(std::str::from_utf8(bytes).is_ok())
+}
+
 /// # Safety
 /// `p` trỏ tới `n` byte đọc được (`n = 0`: `p` có thể null).
 #[unsafe(no_mangle)]

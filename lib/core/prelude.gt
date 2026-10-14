@@ -134,6 +134,26 @@
   ƒ as_slice(&self) → &[T] ! ∅ { }
   ƒ as_mut_slice(&!self) → &![T] ! ∅ { }
 }
+// Text<'a> (ADR-035, Q72, TCB): bộ đệm UTF-8 trên MỘT Arena, DỰNG rồi ĐÓNG BĂNG. Bất biến UTF-8 chỉ do các intrinsic dưới đây bảo đảm
+// (đường tạo hợp lệ: `new` rỗng, `push_str` (&str hợp lệ), `push_char` (char hợp lệ), `push_utf8`/`from_utf8` (KIỂM RFC 3629 bằng runtime)).
+// Khung nhìn `&str`/`&[u8]` lấy bằng `&self` nên dựng thêm (`&!self`) làm chúng vô hiệu (M6 chặn tĩnh). Trường private; literal bị E0313.
+#lang(text)
+▢ Text<'a> { bytes: Vec<'a, u8> }
+⊐ <'a> Text<'a> {
+  ƒ new(a: &!'a Arena) → Text<'a> ! {mem} { }
+  ƒ push_str(&!self, s: &str) ! {mem} { }
+  ƒ push_char(&!self, c: char) ! {mem} { }
+  ƒ push_utf8(&!self, b: &[u8]) → bool ! {mem} { }
+  ƒ from_utf8(a: &!'a Arena, b: &[u8]) → Option<Text<'a>> ! {mem} { }
+  ƒ len(&self) → usize ! ∅ { }
+  ƒ as_str(&self) → &str ! ∅ { }
+  ƒ as_bytes(&self) → &[u8] ! ∅ { }
+}
+// cắt `&str` TẠI BIÊN KÝ TỰ: `from ≤ to ≤ len` và hai đầu không nằm giữa một ký tự nhiều byte; sai ⇒ abort `slice_range`
+⊐ str {
+  ƒ len(&self) → usize ! ∅ { }
+  ƒ slice(&self, from: usize, to: usize) → &str ! ∅ { }
+}
 ▦ core {
   ◈ ƒ abort(msg: &str) → ! ! {div} { }
   ◈ ƒ exit(code: u32) → ! ! {div} { }

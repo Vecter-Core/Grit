@@ -1,0 +1,4 @@
+// expect: fail E0313
+// note: Text giữ &! duy nhất và bất biến UTF-8 của TCB: không bao giờ Copy
+⊐ <'a> Copy for Text<'a> { }
+ƒ main() ! ∅ { }

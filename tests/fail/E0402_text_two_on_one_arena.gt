@@ -1,0 +1,10 @@
+// expect: fail E0402
+// note: Text giữ &!Arena độc quyền (qua Vec): hai Text cùng sống trên một Arena bị từ chối
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μa ≔ Text::new(&!ar);
+  μb ≔ Text::new(&!ar);
+  a.push_str("x");
+  b.push_str("y");
+  a.len() as u64
+}

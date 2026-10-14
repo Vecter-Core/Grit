@@ -25,6 +25,9 @@ const MSORT: &str = include_str!("../../../examples/sortlines/src/msort.gt");
 /// loại cho kiểu phần tử của sortlines (ADR-034 cập nhật): `GT_GTV_SET=elem`
 const KINDS_ELEM: [&str; 2] = ["vec_line_sort", "vec_big_sort"];
 
+/// loại cho `Text` (ADR-035): `GT_GTV_SET=text`
+const KINDS_TEXT: [&str; 3] = ["text_build", "text_utf8", "text_slice"];
+
 /// loại kiểm PHÁN QUYẾT M8 (GT_GTV_SET=term): đồ thị dừng qua impl generic/hai trait, kỳ vọng từ bảng impl của bộ sinh
 const KINDS_TERM: [&str; 1] = ["term_graph"];
 
@@ -918,6 +921,218 @@ fn gen_term(rng: &mut Rng) -> (String, TermModel, Vec<(usize, TVal)>) {
     (src, model, mains)
 }
 
+// ------------------------------------------------------------------------------------------------ Text (ADR-035)
+
+/// mảnh chuỗi (không chứa `"` `\` hay ký tự điều khiển): ASCII, Latin-1, Hy Lạp, CJK, emoji — phủ 1–4 byte UTF-8
+const TEXT_PIECES: [&str; 12] = [
+    "",
+    "a",
+    "hello",
+    "Zed 09",
+    "héllo",
+    "ü",
+    "αβγ",
+    "日本語",
+    "€",
+    "😀",
+    "a😀b",
+    "naïve café",
+];
+
+/// ký tự mẫu cho `push_char` (hợp lệ trong literal `'c'` của Grit): phủ 1/2/3/4 byte
+const TEXT_CHARS: [char; 12] = [
+    'a',
+    'Z',
+    '0',
+    ' ',
+    'é',
+    'ÿ',
+    'ω',
+    '€',
+    '日',
+    '😀',
+    '\u{10FFFF}',
+    '\u{FFFD}',
+];
+
+fn hash_bytes(b: &[u8]) -> u64 {
+    let mut h = 0u64;
+    for x in b {
+        h = h
+            .wrapping_mul(257)
+            .wrapping_add(u64::from(*x))
+            .wrapping_add(1);
+    }
+    h
+}
+
+const TEXT_HASH_FN: &str = "ƒ bh(b: &[u8]) → u64 ! ∅ { μh ≔ 0u64; μj ≔ 0usize; ⟳ j < b.len() ↓ b.len() - j { h ← h *% 257u64 +% (b[j] as u64) +% 1u64; j ← j + 1usize; } h }\n";
+
+fn char_lit(c: char) -> String {
+    format!("'{c}'")
+}
+
+fn gen_text_build(rng: &mut Rng) -> (String, Want) {
+    let nops = 1 + rng.below(12) as usize;
+    let mut expect = String::new();
+    let mut body = String::new();
+    for _ in 0..nops {
+        if rng.chance(50) {
+            let p = TEXT_PIECES[rng.below(TEXT_PIECES.len() as u64) as usize];
+            body.push_str(&format!("  t.push_str(\"{p}\");\n"));
+            expect.push_str(p);
+        } else {
+            let c = TEXT_CHARS[rng.below(TEXT_CHARS.len() as u64) as usize];
+            body.push_str(&format!("  t.push_char({});\n", char_lit(c)));
+            expect.push(c);
+        }
+    }
+    let src = format!(
+        "{TEXT_HASH_FN}ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μt ≔ Text::new(&!ar);\n{body}  s ≔ t.as_str();\n  (s.len() as u64) *% 1000003u64 +% (t.len() as u64) *% 101u64 +% bh(t.as_bytes())\n}}\n"
+    );
+    let h = (expect.len() as u64)
+        .wrapping_mul(1_000_003)
+        .wrapping_add((expect.len() as u64).wrapping_mul(101))
+        .wrapping_add(hash_bytes(expect.as_bytes()));
+    (src, Ok(h.to_string()))
+}
+
+/// byte ngẫu nhiên: nửa số ca là chuỗi hợp lệ bị làm hỏng (cắt giữa ký tự, chèn 0xC0/0xC1/0xF5/0xED 0xA0.., byte nối lẻ loi), nửa là byte thô
+fn gen_utf8_bytes(rng: &mut Rng) -> Vec<u8> {
+    let mut v: Vec<u8> = Vec::new();
+    for _ in 0..(1 + rng.below(4)) {
+        v.extend_from_slice(TEXT_PIECES[rng.below(TEXT_PIECES.len() as u64) as usize].as_bytes());
+    }
+    match rng.below(8) {
+        0 | 1 => {} // giữ hợp lệ
+        2 => {
+            let k = rng.below(v.len() as u64 + 1) as usize;
+            v.truncate(k); // có thể cắt giữa ký tự
+        }
+        3 => {
+            let at = rng.below(v.len() as u64 + 1) as usize;
+            v.insert(
+                at,
+                [0xC0, 0xC1, 0xF5, 0xFF, 0x80, 0xBF][rng.below(6) as usize],
+            );
+        }
+        4 => {
+            let at = rng.below(v.len() as u64 + 1) as usize;
+            for (i, b) in [0xED, 0xA0, 0x80].iter().enumerate() {
+                v.insert(at + i, *b); // surrogate U+D800 mã hoá UTF-8 (không hợp lệ)
+            }
+        }
+        5 => {
+            let at = rng.below(v.len() as u64 + 1) as usize;
+            for (i, b) in [0xF4, 0x90, 0x80, 0x80].iter().enumerate() {
+                v.insert(at + i, *b); // > U+10FFFF
+            }
+        }
+        6 => {
+            let at = rng.below(v.len() as u64 + 1) as usize;
+            for (i, b) in [0xE0, 0x80, 0x80].iter().enumerate() {
+                v.insert(at + i, *b); // overlong
+            }
+        }
+        _ => {
+            v = (0..rng.below(8)).map(|_| rng.next() as u8).collect();
+        }
+    }
+    v
+}
+
+fn gen_text_utf8(rng: &mut Rng) -> (String, Want) {
+    let bytes = gen_utf8_bytes(rng);
+    let lit = arr_lit(&bytes);
+    let r = if bytes.is_empty() { "0..0" } else { ".." };
+    // from_utf8 → Option<Text>; push_utf8 trên Text có sẵn "x" rồi thêm cùng dãy
+    let src = format!(
+        "{TEXT_HASH_FN}ƒ main() → u64 ! {{mem}} {{
+  b ≔ {lit};
+  μar1 ≔ Arena::new();
+  μar2 ≔ Arena::new();
+  a ≔ ⌥ Text::from_utf8(&!ar1, &b[{r}]) {{ Some(t) ↦ bh(t.as_bytes()) +% (t.len() as u64) *% 7u64 +% 1u64, None ↦ 0u64 }};
+  μt ≔ Text::new(&!ar2);
+  t.push_str(\"x\");
+  ok ≔ t.push_utf8(&b[{r}]);
+  c ≔ ⎇ ok {{ 1u64 }} ⇝ {{ 0u64 }};
+  a *% 1000003u64 +% c *% 100000007u64 +% bh(t.as_bytes()) +% (t.len() as u64)
+}}
+"
+    );
+    let valid = std::str::from_utf8(&bytes).is_ok();
+    let a = if valid {
+        hash_bytes(&bytes)
+            .wrapping_add((bytes.len() as u64).wrapping_mul(7))
+            .wrapping_add(1)
+    } else {
+        0
+    };
+    let mut after = b"x".to_vec();
+    if valid {
+        after.extend_from_slice(&bytes);
+    }
+    let v = a
+        .wrapping_mul(1_000_003)
+        .wrapping_add(u64::from(valid).wrapping_mul(100_000_007))
+        .wrapping_add(hash_bytes(&after))
+        .wrapping_add(after.len() as u64);
+    (src, Ok(v.to_string()))
+}
+
+fn gen_text_slice(rng: &mut Rng) -> (String, Want) {
+    let mut s = String::new();
+    for _ in 0..(1 + rng.below(4)) {
+        s.push_str(TEXT_PIECES[rng.below(TEXT_PIECES.len() as u64) as usize]);
+    }
+    // chỉ số: nửa số ca ở biên hợp lệ, phần còn lại ngẫu nhiên (có thể giữa ký tự hoặc ngoài biên)
+    let n = s.len() as u64;
+    let pick = |rng: &mut Rng| -> u64 {
+        if rng.chance(50) {
+            let bounds: Vec<u64> = (0..=s.len())
+                .filter(|i| s.is_char_boundary(*i))
+                .map(|i| i as u64)
+                .collect();
+            bounds[rng.below(bounds.len() as u64) as usize]
+        } else {
+            rng.below(n + 3)
+        }
+    };
+    let (a, b) = (pick(rng), pick(rng));
+    let (from, to) = if rng.chance(70) && a > b {
+        (b, a)
+    } else {
+        (a, b)
+    };
+    let src = format!(
+        "{TEXT_HASH_FN}ƒ main() → u64 ! {{mem}} {{
+  μar1 ≔ Arena::new();
+  μar2 ≔ Arena::new();
+  μt ≔ Text::new(&!ar1);
+  t.push_str(\"{s}\");
+  v ≔ t.as_str();
+  w ≔ v.slice({from}usize, {to}usize);
+  μu ≔ Text::new(&!ar2);
+  u.push_str(w);
+  (w.len() as u64) *% 1000003u64 +% bh(u.as_bytes())
+}}
+"
+    );
+    let ok = from <= to
+        && to <= n
+        && s.is_char_boundary(from as usize)
+        && s.is_char_boundary(to as usize);
+    if ok {
+        let sub = &s.as_bytes()[from as usize..to as usize];
+        let h = (sub.len() as u64)
+            .wrapping_mul(1_000_003)
+            .wrapping_add(hash_bytes(sub));
+        (src, Ok(h.to_string()))
+    } else {
+        (src, Err("slice_range"))
+    }
+}
+
 // ------------------------------------------------------------------------------------------------ chạy
 
 #[derive(Default)]
@@ -1064,6 +1279,9 @@ fn run_one(kind: &'static str, seed: u64, t: &mut Tally, dir: &std::path::Path) 
         "vec_arena_exhausted" => gen_vec_exhaust(&mut rng),
         "vec_line_sort" => gen_line_sort(&mut rng),
         "vec_big_sort" => gen_big_sort(&mut rng),
+        "text_build" => gen_text_build(&mut rng),
+        "text_utf8" => gen_text_utf8(&mut rng),
+        "text_slice" => gen_text_slice(&mut rng),
         k => gen_generic(k, &mut rng),
     };
     let mut inputs = vec![SourceInput {
@@ -1171,6 +1389,8 @@ fn run_batch(start: u64, count: u64) -> Tally {
             &KINDS_ELEM
         } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "term") {
             &KINDS_TERM
+        } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "text") {
+            &KINDS_TEXT
         } else {
             &KINDS
         };
@@ -1206,6 +1426,8 @@ fn batch() {
         } else {
             "generic-trait-vec-term"
         }
+    } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "text") {
+        "generic-trait-vec-text"
     } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "elem") {
         "generic-trait-vec-elem"
     } else if std::env::var("GT_GTV_FIRST").is_ok_and(|v| v == "1") {

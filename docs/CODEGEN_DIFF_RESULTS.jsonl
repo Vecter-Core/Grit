@@ -427,3 +427,7 @@
   h
 }
 
+{"suite":"generic-trait-vec-text","start":1,"count":25,"result":{"programs":{"text_build": 8, "text_slice": 8, "text_utf8": 9},"compared":{"text_build": 8, "text_slice": 8, "text_utf8": 9},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-text","start":26,"count":25,"result":{"programs":{"text_build": 8, "text_slice": 9, "text_utf8": 8},"compared":{"text_build": 8, "text_slice": 9, "text_utf8": 8},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-text","start":51,"count":25,"result":{"programs":{"text_build": 9, "text_slice": 8, "text_utf8": 8},"compared":{"text_build": 9, "text_slice": 8, "text_utf8": 8},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"suite":"generic-trait-vec-text","start":76,"count":25,"result":{"programs":{"text_build": 8, "text_slice": 8, "text_utf8": 9},"compared":{"text_build": 8, "text_slice": 8, "text_utf8": 9},"dropped":{},"mismatch":0,"term_fallbacks":0}}
