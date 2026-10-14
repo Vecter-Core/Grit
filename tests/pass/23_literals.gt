@@ -1,5 +1,5 @@
 // expect: pass
-// note: mọi dạng literal của grammar §Lexical; -128i8 hợp lệ vì dấu - được gấp vào literal trước khi kiểm phạm vi
+// note: mọi dạng literal của grammar §Lexical (f32 bị E0319 từ 2026-10-14 nên dùng 1f64); -128i8 hợp lệ vì dấu - được gấp vào literal trước khi kiểm phạm vi
 ƒ lits() → i64 ! ∅ {
   a ≔ 1_000_000i64;
   b ≔ 0xFFu8;
@@ -8,7 +8,7 @@
   e ≔ -128i8;
   f ≔ 2.5e-3f64;
   g ≔ 1e3;
-  h ≔ 1f32;
+  h ≔ 1f64;
   i ≔ 'x';
   j ≔ "tab\there";
   k ≔ 1..2;

@@ -34,7 +34,7 @@ if has audit; then
 fi
 if has test; then
   echo "== test"
-  CMD="${GATE_TEST_CMD:-cargo test --workspace -- --test-threads=2}"
+  CMD="${GATE_TEST_CMD:-cargo test --workspace --no-fail-fast -- --test-threads=2}"
   mkdir -p /d/Grit/target/tmp
   OUT=/d/Grit/target/tmp/gate_test.txt
   bash -c "$CMD" > "$OUT" 2>&1; c=$?
