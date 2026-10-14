@@ -43,9 +43,7 @@ fn suffixed_literals_have_exactly_that_type() {
         ("x ≔ 0o17u8;", "u8"),
         ("x ≔ 0b1010_0101u8;", "u8"),
         ("x ≔ 1_000_000i64;", "i64"),
-        ("x ≔ 1f32;", "f32"),
         ("x ≔ 1f64;", "f64"),
-        ("x ≔ 2.5f32;", "f32"),
         ("x ≔ 2.5e-3f64;", "f64"),
     ] {
         assert_eq!(local_ty(body, "x"), want, "{body}");
@@ -114,7 +112,7 @@ fn no_implicit_numeric_conversion_between_different_types_d1() {
         "a ≔ 1i32; b: i64 ≔ a;",
         "a ≔ 1u8; b: u16 ≔ a;",
         "a ≔ 1i64; b: i32 ≔ a;",
-        "a ≔ 1.5f32; b: f64 ≔ a;",
+        "a ≔ 1.5f64; b: f32 ≔ a;",
         "a ≔ 1i32; b: f64 ≔ a;",
         "b: f64 ≔ 1;",
         "b: i32 ≔ 1.0;",
@@ -124,7 +122,7 @@ fn no_implicit_numeric_conversion_between_different_types_d1() {
         err(&format!("ƒ f() ! ∅ {{ {bad} }}"), "E0302", 1);
     }
     // cùng kiểu, hoặc ép tường minh: được
-    ok("ƒ f() ! ∅ { a ≔ 1i32; b: i64 ≔ a as i64; c ≔ a as f64; d ≔ 2.5f64 as i32; }");
+    ok("ƒ f() ! ∅ { a ≔ 1i32; b: i64 ≔ a as i64; c ≔ a as f64; d ≔ 2.5f64 as f64; }");
 }
 
 #[test]
@@ -175,7 +173,7 @@ fn array_lengths_are_compile_time_constants() {
 #[test]
 fn casts_follow_the_allowed_table() {
     ok(
-        "ƒ f() ! ∅ { a ≔ 1i32 as u8; b ≔ 1u8 as char; c ≔ 'a' as u32; d ≔ true as i32; e ≔ 1.5 as i32; g ≔ 3 as f32; }",
+        "ƒ f() ! ∅ { a ≔ 1i32 as u8; b ≔ 1u8 as char; c ≔ 'a' as u32; d ≔ true as i32; e ≔ 3 as f64; g ≔ 2.5f64 as f64; }",
     );
     for bad in [
         "x ≔ \"s\" as i32;",
@@ -186,4 +184,24 @@ fn casts_follow_the_allowed_table() {
     ] {
         err(&format!("ƒ f() ! ∅ {{ {bad} }}"), "E0301", 1);
     }
+}
+
+/// E0319 (ADR-035 §B): `as` từ số thực sang nguyên/char/bool, `f32` (literal và `as f32`), `%` trên số thực
+#[test]
+fn float_restrictions_are_e0319() {
+    for bad in [
+        "x ≔ 1.5f32;",
+        "x ≔ 1f32;",
+        "x ≔ 1.5f64 as f32;",
+        "x ≔ 3 as f32;",
+        "x ≔ 1.5f64 as i32;",
+        "x ≔ 1.5f64 as u8;",
+        "x ≔ 1.5f64 as bool;",
+        "x ≔ 1.5f64 as char;",
+        "x ≔ 7.0f64 % 2.0f64;",
+    ] {
+        err(&format!("ƒ f() ! ∅ {{ {bad} }}"), "E0319", 1);
+    }
+    // số nguyên → f64 và f64 → f64 hợp lệ
+    ok("ƒ f() ! ∅ { a ≔ 1i32 as f64; b ≔ 2u8 as f64; c ≔ 1.5f64 as f64; d ≔ 7i64 as f64; }");
 }

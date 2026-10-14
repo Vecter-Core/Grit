@@ -458,7 +458,8 @@ fn threads_ir_uses_real_atomics_with_requested_orderings() {
 fn unsupported_construct_is_refused_without_exe() {
     let dir = scratch("unsup");
     let f = dir.join("prog.gt");
-    std::fs::write(&f, "ƒ main() → f64 ! ∅ { 1.5 }\n").expect("ghi");
+    // mảng cỡ > u32 không hạ được (số thực f64 đã được hỗ trợ từ 2026-10-14)
+    std::fs::write(&f, "ƒ main() → u8 ! ∅ { a ≔ [0u8; 5000000000]; a[0] }\n").expect("ghi");
     let exe = dir.join("u.exe");
     let o = gritc()
         .args(["build", "--backend=llvm", "-o"])

@@ -15,7 +15,7 @@ fn d4_float_equality_is_rejected_in_every_form() {
         "ƒ f(a: f64) → bool ! ∅ { 1.0 == a }",
         "ƒ f() → bool ! ∅ { 1.0 == 2.0 }",
         "ƒ f(a: f64) → bool ! ∅ { a == 1.5f64 }",
-        "ƒ f(a: f32) → bool ! ∅ { a ≠ 0f32 }",
+        "ƒ f(a: f32) → bool ! ∅ { a ≠ a }",
     ] {
         err(bad, "E0303", 1);
     }
