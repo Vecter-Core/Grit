@@ -1,0 +1,38 @@
+{"suite":"generic-trait-vec","start":30000,"count":100,"result":{"programs":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 15, "vec_index_oob": 15, "vec_ops": 14},"compared":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 15, "vec_index_oob": 15, "vec_ops": 14},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-30000","profile":"release","rc":0,"secs":139}
+{"suite":"generic-trait-vec","start":30100,"count":100,"result":{"programs":{"bound_call": 15, "generic_unbounded": 15, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 14},"compared":{"bound_call": 15, "generic_unbounded": 15, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 14},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-30100","profile":"release","rc":0,"secs":117}
+{"suite":"generic-trait-vec","start":30200,"count":100,"result":{"programs":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 15, "multi_trait": 15, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 14},"compared":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 15, "multi_trait": 15, "vec_arena_exhausted": 14, "vec_index_oob": 14, "vec_ops": 14},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-30200","profile":"release","rc":0,"secs":124}
+{"suite":"generic-trait-vec","start":30300,"count":100,"result":{"programs":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 14, "vec_index_oob": 15, "vec_ops": 15},"compared":{"bound_call": 14, "generic_unbounded": 14, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 14, "vec_index_oob": 15, "vec_ops": 15},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-30300","profile":"release","rc":0,"secs":125}
+{"suite":"generic-trait-vec","start":30400,"count":100,"result":{"programs":{"bound_call": 14, "generic_unbounded": 15, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 15, "vec_index_oob": 14, "vec_ops": 14},"compared":{"bound_call": 14, "generic_unbounded": 15, "impl_generic": 14, "multi_trait": 14, "vec_arena_exhausted": 15, "vec_index_oob": 14, "vec_ops": 14},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-30400","profile":"release","rc":0,"secs":125}
+{"suite":"generic-trait-vec-term","start":31000,"count":100,"result":{"programs":{"term_acyclic": 35, "term_cyclic": 65},"compared":{"term_acyclic": 35, "term_cyclic": 65},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-term","profile":"release","rc":0,"secs":45}
+{"suite":"generic-trait-vec-elem","start":32000,"count":150,"result":{"programs":{"vec_big_sort": 75, "vec_line_sort": 75},"compared":{"vec_big_sort": 75, "vec_line_sort": 71},"dropped":{"vec_line_sort: ĐỎ E0301": 4},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-elem","profile":"release","rc":0,"secs":257}
+{"suite":"generic-trait-vec-text","start":33000,"count":150,"result":{"programs":{"text_build": 50, "text_slice": 50, "text_utf8": 50},"compared":{"text_build": 50, "text_slice": 50, "text_utf8": 50},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-text","profile":"release","rc":0,"secs":183}
+{"suite":"generic-trait-vec-f64","start":34000,"count":150,"result":{"programs":{"f64_arith": 50, "f64_cmp": 50, "f64_conv": 50},"compared":{"f64_arith": 50, "f64_cmp": 50, "f64_conv": 50},"dropped":{},"mismatch":0,"term_fallbacks":0}}
+{"batch":"gtv-f64","profile":"release","rc":0,"secs":180}
+{"start":35000,"green_wanted":150,"next_seed":35440,"result":{"programs":440,"runs":890,"equal":596,"mismatch":0,"normal":406,"aborts":{"cast_lossy": 57, "index_out_of_bounds": 6, "invariant": 14, "overflow": 80, "postcondition": 29, "precondition": 4},"interp_limit":4,"llvm_timeout":0,"unsupported":0,"red_or_ice":290,"red_programs":290,"skipped":{"ĐỎ E0404": 112, "ĐỎ E0601": 55, "ĐỎ E0602": 4, "ĐỎ E0603": 22, "ĐỎ E0604": 68, "ĐỎ E0702": 7, "ĐỎ E0901": 22}}}
+{"batch":"diff-bit","profile":"release","rc":0,"secs":1062}
+{"suite":"abort-targeted","kind":"index","start":36000,"count":60,"result":{"programs":60,"red_programs":0,"runs":360,"equal":360,"mismatch":0,"normal":135,"aborts":{"index_out_of_bounds": 225},"unsupported":0,"timeout":0,"interp_limit":0,"skipped":{}}}
+{"batch":"abort-index","profile":"release","rc":0,"secs":418}
+{"suite":"abort-targeted","kind":"divrem","start":36100,"count":60,"result":{"programs":60,"red_programs":0,"runs":324,"equal":322,"mismatch":2,"normal":259,"aborts":{"div_by_zero": 35, "overflow": 2, "rem_by_zero": 26},"unsupported":0,"timeout":0,"interp_limit":0,"skipped":{}}}
+  DETAIL #divrem36110 [0, 127]: thông dịch Normal/Some("Int(0, I8)") ≠ llvm Internal("không chạy được D:\\Grit\\target\\tmp\\gt-abort-18740\\a36110.exe: Access is denied. (os error 5)")/None
+ƒ entry(a: i8, b: i8) → i8 ! ∅ { a / (b +% 1i8) }
+ƒ main() → i8 ! ∅ { entry(0i8, 127i8) }
+
+  DETAIL #divrem36110 [127, -1]: llvm lỗi liên kết thất bại (exit code: 1104): LINK : fatal error LNK1104: cannot open file 'D:\Grit\target\tmp\gt-abort-18740\a36110.exe'
+
+ƒ entry(a: i8, b: i8) → i8 ! ∅ { a / (b +% 1i8) }
+ƒ main() → i8 ! ∅ { entry(127i8, -1i8) }
+
+{"batch":"abort-divrem","profile":"release","rc":101,"secs":372}
+{"suite":"abort-targeted","kind":"pre","start":36200,"count":60,"result":{"programs":60,"red_programs":0,"runs":360,"equal":360,"mismatch":0,"normal":211,"aborts":{"precondition": 149},"unsupported":0,"timeout":0,"interp_limit":0,"skipped":{}}}
+{"batch":"abort-pre","profile":"release","rc":0,"secs":411}
+{"suite":"bits-3way","start":37000,"count":150,"result":{"programs":150,"red_programs":18,"runs":546,"equal_3way":528,"mismatch":0,"normal":273,"aborts":{"overflow": 188, "precondition": 67},"skipped":{"ĐỎ E0601": 8, "ĐỎ E0901": 10}}}
+{"batch":"bits","profile":"release","rc":0,"secs":617}
+{"suite":"abort-targeted","kind":"divrem","start":36110,"count":1,"result":{"programs":1,"red_programs":0,"runs":6,"equal":6,"mismatch":0,"normal":5,"aborts":{"div_by_zero": 1},"unsupported":0,"timeout":0,"interp_limit":0,"skipped":{}}}
