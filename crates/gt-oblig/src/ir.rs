@@ -8,7 +8,9 @@ use std::fmt::Write;
 pub type VarId = u32;
 
 /// Biểu thức số nguyên TOÁN HỌC (không modular): quấn vòng/ép kiểu được biểu diễn bằng khoảng kiểu tường minh trong `goal`.
+/// `#[non_exhaustive]` (ADR-039): thêm biến thể KHÔNG phải thay đổi phá vỡ; bộ giải không hiểu một nút phải trả `Unknown`.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Term {
     Int(I256),
     Var(VarId),
@@ -16,9 +18,22 @@ pub enum Term {
     Sub(Box<Term>, Box<Term>),
     Mul(Box<Term>, Box<Term>),
     Neg(Box<Term>),
+    /// Ứng dụng hàm KHÔNG diễn giải (ADR-039 §4): `size_of`, `ptr_add`, `select`… Phase 1 không sinh nút này; mọi bộ giải hiện có ⇒ `Unknown`.
+    Uf(String, Vec<Term>),
 }
 
+/// Biến buộc của lượng từ có biên: `var` chạy trên `lo ≤ var < hi` (hoặc `≤ hi` khi `hi_inclusive`). `var` là biến MỚI (không trùng `VarDecl`).
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Binder {
+    pub var: VarId,
+    pub lo: Term,
+    pub hi: Term,
+    pub hi_inclusive: bool,
+}
+
+/// `#[non_exhaustive]` (ADR-039). Các nút `Forall/Exists/Pred` Phase 1 không sinh; mọi bộ giải hiện có ⇒ `Unknown` (fail-closed).
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Prop {
     True,
     False,
@@ -31,6 +46,12 @@ pub enum Prop {
     Not(Box<Prop>),
     /// Nguyên tử logic không diễn giải (vd `is_some(o)`): tên nằm ở `Obligation::atoms`.
     Atom(VarId),
+    /// Lượng từ CÓ BIÊN (ADR-039 §4): `∀ var ∈ [lo, hi): body`.
+    Forall(Box<Binder>, Box<Prop>),
+    /// `∃ var ∈ [lo, hi): body`.
+    Exists(Box<Binder>, Box<Prop>),
+    /// Ứng dụng vị từ KHÔNG diễn giải (vd `valid_write(ptr, off, n)`).
+    Pred(String, Vec<Term>),
 }
 
 impl Term {
@@ -68,12 +89,20 @@ impl Term {
                 b.vars(out);
             }
             Term::Neg(a) => a.vars(out),
+            Term::Uf(_, args) => args.iter().for_each(|t| t.vars(out)),
         }
     }
 
     #[must_use]
     pub fn to_text(&self) -> String {
         match self {
+            Term::Uf(f, args) => format!(
+                "{f}({})",
+                args.iter()
+                    .map(Term::to_text)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
             Term::Int(v) => v.to_decimal(),
             Term::Var(v) => format!("v{v}"),
             Term::Add(a, b) => format!("({} + {})", a.to_text(), b.to_text()),
@@ -95,6 +124,12 @@ impl Prop {
             Prop::And(v) | Prop::Or(v) => v.iter().for_each(|p| p.vars(out, atoms)),
             Prop::Not(p) => p.vars(out, atoms),
             Prop::Atom(a) => atoms.push(*a),
+            Prop::Forall(b, p) | Prop::Exists(b, p) => {
+                b.lo.vars(out);
+                b.hi.vars(out);
+                p.vars(out, atoms);
+            }
+            Prop::Pred(_, args) => args.iter().for_each(|t| t.vars(out)),
         }
     }
 
@@ -144,6 +179,123 @@ impl Prop {
             ),
             Prop::Not(p) => format!("!{}", p.to_text()),
             Prop::Atom(a) => format!("a{a}"),
+            Prop::Forall(b, p) => {
+                format!("forall v{} in {}: {}", b.var, b.range_text(), p.to_text())
+            }
+            Prop::Exists(b, p) => {
+                format!("exists v{} in {}: {}", b.var, b.range_text(), p.to_text())
+            }
+            Prop::Pred(n, args) => format!(
+                "{n}({})",
+                args.iter()
+                    .map(Term::to_text)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        }
+    }
+
+    /// Dạng cây CÓ CẤU TRÚC, tất định, để tuần tự hoá JSON (khoá `goal_ast`/`hyps_ast`; ĐÓNG BĂNG theo ADR-039 §2).
+    #[must_use]
+    pub fn to_ast_json(&self) -> String {
+        let l = |ps: &[Prop]| {
+            ps.iter()
+                .map(Prop::to_ast_json)
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let bin = |op: &str, a: &Term, b: &Term| {
+            format!(
+                "{{\"op\":\"{op}\",\"l\":{},\"r\":{}}}",
+                a.to_ast_json(),
+                b.to_ast_json()
+            )
+        };
+        match self {
+            Prop::True => "{\"op\":\"true\"}".into(),
+            Prop::False => "{\"op\":\"false\"}".into(),
+            Prop::Le(a, b) => bin("le", a, b),
+            Prop::Lt(a, b) => bin("lt", a, b),
+            Prop::Eq(a, b) => bin("eq", a, b),
+            Prop::Ne(a, b) => bin("ne", a, b),
+            Prop::And(v) => format!("{{\"op\":\"and\",\"args\":[{}]}}", l(v)),
+            Prop::Or(v) => format!("{{\"op\":\"or\",\"args\":[{}]}}", l(v)),
+            Prop::Not(p) => format!("{{\"op\":\"not\",\"arg\":{}}}", p.to_ast_json()),
+            Prop::Atom(a) => format!("{{\"op\":\"atom\",\"id\":{a}}}"),
+            Prop::Forall(b, p) => format!(
+                "{{\"op\":\"forall\",{},\"body\":{}}}",
+                b.to_ast_fields(),
+                p.to_ast_json()
+            ),
+            Prop::Exists(b, p) => format!(
+                "{{\"op\":\"exists\",{},\"body\":{}}}",
+                b.to_ast_fields(),
+                p.to_ast_json()
+            ),
+            Prop::Pred(n, args) => format!(
+                "{{\"op\":\"pred\",\"name\":{},\"args\":[{}]}}",
+                esc(n),
+                args.iter()
+                    .map(Term::to_ast_json)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+        }
+    }
+}
+
+impl Binder {
+    fn range_text(&self) -> String {
+        format!(
+            "[{}, {}{}",
+            self.lo.to_text(),
+            self.hi.to_text(),
+            if self.hi_inclusive { "]" } else { ")" }
+        )
+    }
+
+    fn to_ast_fields(&self) -> String {
+        format!(
+            "\"var\":{},\"lo\":{},\"hi\":{},\"hi_incl\":{}",
+            self.var,
+            self.lo.to_ast_json(),
+            self.hi.to_ast_json(),
+            self.hi_inclusive
+        )
+    }
+}
+
+impl Term {
+    /// Dạng cây có cấu trúc, tất định (xem `Prop::to_ast_json`).
+    #[must_use]
+    pub fn to_ast_json(&self) -> String {
+        match self {
+            Term::Int(v) => format!("{{\"op\":\"int\",\"v\":\"{}\"}}", v.to_decimal()),
+            Term::Var(v) => format!("{{\"op\":\"var\",\"id\":{v}}}"),
+            Term::Add(a, b) => format!(
+                "{{\"op\":\"add\",\"l\":{},\"r\":{}}}",
+                a.to_ast_json(),
+                b.to_ast_json()
+            ),
+            Term::Sub(a, b) => format!(
+                "{{\"op\":\"sub\",\"l\":{},\"r\":{}}}",
+                a.to_ast_json(),
+                b.to_ast_json()
+            ),
+            Term::Mul(a, b) => format!(
+                "{{\"op\":\"mul\",\"l\":{},\"r\":{}}}",
+                a.to_ast_json(),
+                b.to_ast_json()
+            ),
+            Term::Neg(a) => format!("{{\"op\":\"neg\",\"arg\":{}}}", a.to_ast_json()),
+            Term::Uf(f, args) => format!(
+                "{{\"op\":\"uf\",\"name\":{},\"args\":[{}]}}",
+                esc(f),
+                args.iter()
+                    .map(Term::to_ast_json)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
         }
     }
 }
@@ -336,8 +488,9 @@ impl Obligation {
                 format!("{{\"checkable\":false,\"why\":{}}}", esc(why))
             }
         };
+        let hyps_ast: Vec<String> = self.hyps.iter().map(Prop::to_ast_json).collect();
         format!(
-            "{{\"id\":{},\"kind\":{},\"body\":{},\"block\":{},\"stmt\":{},\"span\":[{},{}],\"vars\":[{}],\"atoms\":[{}],\"goal\":{},\"hyps\":[{}],\"runtime\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"body\":{},\"block\":{},\"stmt\":{},\"span\":[{},{}],\"vars\":[{}],\"atoms\":[{}],\"goal\":{},\"hyps\":[{}],\"runtime\":{},\"goal_ast\":{},\"hyps_ast\":[{}]}}",
             esc(&self.id),
             esc(self.kind.name()),
             esc(&self.body),
@@ -349,7 +502,9 @@ impl Obligation {
             atoms.join(","),
             esc(&self.goal.to_text()),
             hyps.join(","),
-            runtime
+            runtime,
+            self.goal.to_ast_json(),
+            hyps_ast.join(",")
         )
     }
 }

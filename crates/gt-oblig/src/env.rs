@@ -40,7 +40,7 @@ pub fn lin(t: &Term) -> Option<Lin> {
                 go(b, -sign, out)
             }
             Term::Neg(a) => go(a, -sign, out),
-            Term::Mul(..) => None,
+            Term::Mul(..) | Term::Uf(..) => None,
         }
     }
     let mut l = Lin {
@@ -208,6 +208,8 @@ impl Env {
             Term::Sub(a, b) => self.eval_term(a).sub(self.eval_term(b)),
             Term::Mul(a, b) => self.eval_term(a).mul(self.eval_term(b)),
             Term::Neg(a) => self.eval_term(a).neg(),
+            // hàm không diễn giải: không biết gì về giá trị ⇒ khoảng tuỳ ý (sound)
+            Term::Uf(..) => Interval::top(),
         }
     }
 
@@ -395,6 +397,8 @@ impl Env {
                 r
             }
             Prop::Not(q) => not(self.eval_prop(q)),
+            // nút của Phase 2: không đánh giá được ⇒ Maybe (không bao giờ Yes)
+            Prop::Forall(..) | Prop::Exists(..) | Prop::Pred(..) => Tri::Maybe,
             Prop::Atom(a) => match self.atoms.get(a) {
                 Some(true) => Tri::Yes,
                 Some(false) => Tri::No,
@@ -630,6 +634,8 @@ impl Env {
                 self.assume_le(b, a, false);
             }
             (Prop::Ne(a, b), true) | (Prop::Eq(a, b), false) => self.assume_ne(a, b),
+            // nút của Phase 2: giả thiết không học được gì (mất chính xác, vẫn sound)
+            (Prop::Forall(..) | Prop::Exists(..) | Prop::Pred(..), _) => {}
             (Prop::Atom(a), pos) => {
                 if self.atoms.get(a).is_some_and(|old| *old != pos) {
                     self.dead = true;

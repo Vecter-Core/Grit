@@ -98,6 +98,8 @@ fn eval_term(t: &Term, vals: &std::collections::BTreeMap<VarId, I256>) -> Option
         Term::Sub(a, b) => eval_term(a, vals)?.checked_sub(eval_term(b, vals)?)?,
         Term::Mul(a, b) => eval_term(a, vals)?.checked_mul(eval_term(b, vals)?)?,
         Term::Neg(a) => eval_term(a, vals)?.negate(),
+        // không diễn giải ⇒ không đánh giá được ⇒ bộ giải trả Unknown (fail-closed)
+        Term::Uf(..) => return None,
     })
 }
 
@@ -131,6 +133,7 @@ fn eval_prop(
         }
         Prop::Not(q) => !eval_prop(q, vals, atoms)?,
         Prop::Atom(a) => *atoms.get(a)?,
+        Prop::Forall(..) | Prop::Exists(..) | Prop::Pred(..) => return None,
     })
 }
 
@@ -172,6 +175,7 @@ impl Prover for ExhaustiveProver {
             return Verdict::Unknown;
         }
         let (mut sat, mut viol) = (0u64, 0u64);
+        let mut unevaluable = false;
         let mut witness: Option<Vec<(VarId, I256)>> = None;
         // bộ đếm hỗn hợp: biến nguyên từ min..=max, nguyên tử {0,1}
         let los: Vec<i128> = decls
@@ -195,20 +199,33 @@ impl Prover for ExhaustiveProver {
                 .copied()
                 .zip(acur.iter().copied())
                 .collect();
-            let hyps_ok = ob
-                .hyps
-                .iter()
-                .all(|h| eval_prop(h, &vals, &atoms) == Some(true));
+            // đánh giá được hay không: `None` = nút/phép không đánh giá được (nút lạ của Phase 2, tràn I256) ⇒ KHÔNG được coi là sai hay đúng
+            let mut hyps_ok = true;
+            for h in &ob.hyps {
+                match eval_prop(h, &vals, &atoms) {
+                    Some(true) => {}
+                    Some(false) => {
+                        hyps_ok = false;
+                        break;
+                    }
+                    None => {
+                        unevaluable = true;
+                        hyps_ok = false;
+                        break;
+                    }
+                }
+            }
             if hyps_ok {
                 sat += 1;
                 match eval_prop(&ob.goal, &vals, &atoms) {
                     Some(true) => {}
-                    _ => {
+                    Some(false) => {
                         viol += 1;
                         if witness.is_none() {
                             witness = Some(vals.iter().map(|(k, v)| (*k, *v)).collect());
                         }
                     }
+                    None => unevaluable = true,
                 }
             }
             // tăng bộ đếm
@@ -239,6 +256,10 @@ impl Prover for ExhaustiveProver {
                     break;
                 }
             }
+        }
+        if unevaluable {
+            // fail-closed (ADR-039): có điểm không đánh giá được ⇒ KHÔNG kết luận gì
+            return Verdict::Unknown;
         }
         if sat == 0 {
             Verdict::Proved(Cert("giả thiết không thoả (vét cạn)".into()))

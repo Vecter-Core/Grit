@@ -1041,6 +1041,8 @@ impl<'a> Ctx<'a> {
             Term::Sub(a, b) => Term::sub(Self::subst_term(a, ints)?, Self::subst_term(b, ints)?),
             Term::Mul(a, b) => Term::mul(Self::subst_term(a, ints)?, Self::subst_term(b, ints)?),
             Term::Neg(a) => Term::Neg(Box::new(Self::subst_term(a, ints)?)),
+            // nút của Phase 2 (ADR-039): Phase 1 không sinh; không biểu diễn được ⇒ bỏ (fail-closed)
+            Term::Uf(..) => return None,
         })
     }
 
@@ -1082,6 +1084,7 @@ impl<'a> Ctx<'a> {
                 }
                 None => return None,
             },
+            Prop::Forall(..) | Prop::Exists(..) | Prop::Pred(..) => return None,
         })
     }
 
@@ -2129,6 +2132,7 @@ fn canon_term(t: &Term, argc: u32) -> Option<Term> {
         Term::Sub(a, b) => Term::sub(canon_term(a, argc)?, canon_term(b, argc)?),
         Term::Mul(a, b) => Term::mul(canon_term(a, argc)?, canon_term(b, argc)?),
         Term::Neg(a) => Term::Neg(Box::new(canon_term(a, argc)?)),
+        Term::Uf(..) => return None,
     })
 }
 
@@ -2163,6 +2167,7 @@ fn canon_prop(
                 Prop::Atom(id)
             }
         }
+        Prop::Forall(..) | Prop::Exists(..) | Prop::Pred(..) => return None,
     })
 }
 
