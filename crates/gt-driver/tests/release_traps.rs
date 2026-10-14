@@ -245,6 +245,7 @@ fn constant_folded_floats_are_ieee_exact_in_release() {
 
 /// NaN, ±0, ±∞, số dưới chuẩn: so sánh có thứ tự, `is_nan`, bit của ±0, nhân dưới chuẩn
 #[test]
+#[allow(clippy::neg_multiply)] // cố ý: kiểm `0.0 * -1.0` cho bit của −0
 fn nan_signed_zero_infinity_subnormal_behave_per_ieee_in_release() {
     let nan = "core::f64_from_bits(9221120237041090560u64)"; // 0x7FF8000000000000
     // (biểu thức u64, kỳ vọng)
