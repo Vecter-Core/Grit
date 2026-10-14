@@ -144,6 +144,16 @@ fn wrapping_and_saturating() {
     );
 }
 
+/// literal số thực có dấu `_` và hậu tố `f64`: `1_000.5` phải thành 1000,5 (đột biến thay `_` bằng khoảng trắng ⇒ parse lỗi ⇒ ICE)
+#[test]
+fn float_literal_with_underscores_and_suffix() {
+    check_value(
+        "ƒ main() → u64 ! ∅ { ⌥ (1_000.5f64).to_i64() { Some(v) ↦ v as u64, None ↦ 7u64 } }
+",
+        "1000",
+    );
+}
+
 #[test]
 fn casts() {
     check_value(

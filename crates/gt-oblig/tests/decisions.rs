@@ -173,6 +173,24 @@ fn negation_casts_and_comparisons_feed_later_obligations() {
             "cast_lossy:d",
         ),
         ("ƒ f(a: i32) → u8 ! ∅ { a as u8 }", "cast_lossy:g"),
+        // i64 → f64 chính xác khi |x| ≤ 2^53 (biên đúng 2^53 và 2^53 + 1; ADR-035 §B)
+        (
+            "ƒ f(a: i64) → f64 ! ∅ { ⎇ a >= -9007199254740992 { ⎇ a <= 9007199254740992 { a as f64 } ⇝ { 0.0 } } ⇝ { 0.0 } }",
+            "cast_lossy:x",
+        ),
+        (
+            "ƒ f(a: i64) → f64 ! ∅ { ⎇ a >= -9007199254740992 { ⎇ a <= 9007199254740993 { a as f64 } ⇝ { 0.0 } } ⇝ { 0.0 } }",
+            "cast_lossy:g",
+        ),
+        (
+            "ƒ f(a: i64) → f64 ! ∅ { ⎇ a >= -9007199254740993 { ⎇ a <= 9007199254740992 { a as f64 } ⇝ { 0.0 } } ⇝ { 0.0 } }",
+            "cast_lossy:g",
+        ),
+        (
+            "ƒ f(a: i64) → f64 ! ∅ { ⎇ a > 9007199254740993 { a as f64 } ⇝ { 0.0 } }",
+            "cast_lossy:d",
+        ),
+        ("ƒ f(a: i64) → f64 ! ∅ { a as f64 }", "cast_lossy:g"),
         // so sánh lưu vào biến bool rồi rẽ nhánh
         (
             "ƒ f(x: u8) → u8 ! ∅ { c ≔ x < 10; ⎇ c { x + 246 } ⇝ { 0 } }",

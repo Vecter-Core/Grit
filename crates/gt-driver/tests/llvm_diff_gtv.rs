@@ -1734,6 +1734,23 @@ fn tiny_fixed_batch() {
     );
 }
 
+/// lô nhỏ cố định cho f64 (cổng đầy đủ + đột biến hằng số thực/ép kiểu): 3 loại × 6 chương trình, khớp mô hình độc lập của bộ sinh
+#[test]
+fn tiny_f64_batch() {
+    let dir = std::env::temp_dir().join(format!("gt-gtv-f64-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("tạo");
+    let mut t = Tally::default();
+    for s in 1..=6u64 {
+        for k in KINDS_F64 {
+            run_one(k, s, &mut t, &dir);
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(t.mismatch, 0, "bất đồng: {:#?}", t.detail);
+    let compared: u64 = t.compared.values().sum();
+    assert!(compared >= 12, "quá ít chương trình f64: {}", summary(&t));
+}
+
 /// lô nhỏ cố định cho PHÁN QUYẾT M8 theo đồ thị instance (cổng đầy đủ + đột biến gt-term): 30 chương trình `term_graph`, cả có và không có
 /// chu trình, khớp mô hình của bộ sinh; đồ thị instance luôn dựng được (không lùi về bảo thủ).
 #[test]

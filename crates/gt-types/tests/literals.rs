@@ -202,6 +202,10 @@ fn float_restrictions_are_e0319() {
     ] {
         err(&format!("ƒ f() ! ∅ {{ {bad} }}"), "E0319", 1);
     }
+    // `as` TỪ f32 (kiểu lấy từ chữ ký, không có literal f32) cũng bị E0319: đột biến "chỉ kiểm vế đích" phải đỏ
+    err("ƒ f(x: f32) → f64 ! ∅ { x as f64 }", "E0319", 1);
+    // số thập lục phân kết thúc bằng `f32`/`f64` là SỐ NGUYÊN (chữ số f, 3, 2...), không phải hậu tố: không được báo E0319
+    ok("ƒ f() ! ∅ { a ≔ 0x1f32; b ≔ 0x1f64; }");
     // số nguyên → f64 và f64 → f64 hợp lệ
     ok("ƒ f() ! ∅ { a ≔ 1i32 as f64; b ≔ 2u8 as f64; c ≔ 1.5f64 as f64; d ≔ 7i64 as f64; }");
 }
