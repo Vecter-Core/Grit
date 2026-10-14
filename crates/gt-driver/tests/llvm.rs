@@ -46,8 +46,18 @@ fn run(src: &str, backend: &str) -> Out {
     let dir = scratch(backend);
     let f = dir.join("prog.gt");
     std::fs::write(&f, src).expect("ghi nguồn");
+    // "llvm-release" = backend llvm với `--profile=release` (ADR-036)
+    let (be, prof) = match backend {
+        "llvm-release" => ("llvm", "release"),
+        b => (b, "dev"),
+    };
     let o = gritc()
-        .args(["run", "--json", &format!("--backend={backend}")])
+        .args([
+            "run",
+            "--json",
+            &format!("--backend={be}"),
+            &format!("--profile={prof}"),
+        ])
         .arg(&f)
         .output()
         .expect("chạy gritc");
@@ -64,10 +74,7 @@ fn run(src: &str, backend: &str) -> Out {
         )
     });
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(
-        v["backend"], backend,
-        "đầu ra phải nêu đúng backend: {text}"
-    );
+    assert_eq!(v["backend"], be, "đầu ra phải nêu đúng backend: {text}");
     let run = &v["run"];
     Out {
         exit: o.status.code().unwrap_or(-1),
@@ -152,6 +159,37 @@ fn float_literal_with_underscores_and_suffix() {
 ",
         "1000",
     );
+}
+
+/// hồ sơ release (ADR-036 bước (i)): cùng giá trị, cùng loại abort, cùng mã thoát với dev trên vài chương trình đại diện
+#[test]
+fn release_profile_agrees_with_dev_on_values_and_aborts() {
+    for src in [
+        "ƒ main() → u64 ! ∅ { μs ≔ 0u64; μi ≔ 0u64; ⟳ i < 100u64 ↓ 100u64 - i { s ← s + i; i ← i + 1; } s }
+",
+        "ƒ f(n: u64) → u64 ! ∅ { ⎇ n < 2u64 { n } ⇝ { f(n - 1u64) + f(n - 2u64) } }
+ƒ main() → u64 ! ∅ { f(15u64) }
+",
+        "ƒ main() → u64 ! ∅ { a ≔ 0.1f64; b ≔ 0.2f64; ⌥ ((a + b) * 1000000000000000000.0f64).to_i64() { Some(v) ↦ v as u64, None ↦ 7u64 } }
+",
+        "ƒ f(x: i32) → u8 ! ∅ { x as u8 }
+ƒ main() → u8 ! ∅ { f(300) }
+",
+        "ƒ f(a: u8, b: u8) → u8 ! ∅ { a + b }
+ƒ main() → u8 ! ∅ { f(200u8, 100u8) }
+",
+        "ƒ f(a: [u8; 3], i: usize) → u8 ! ∅ { a[i] }
+ƒ main() → u8 ! ∅ { f([1u8, 2u8, 3u8], 5usize) }
+",
+        "ƒ f(a: i32, b: i32) → i32 ! ∅ { a / b }
+ƒ main() → i32 ! ∅ { f(7, 0) }
+",
+    ] {
+        let d = run(src, "llvm");
+        let r = run(src, "llvm-release");
+        assert_eq!(d, r, "dev ≠ release
+{src}");
+    }
 }
 
 #[test]

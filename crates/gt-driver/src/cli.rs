@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 include!(concat!(env!("OUT_DIR"), "/explain_table.rs"));
 
-const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
+const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release (mặc định: dev)] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release (mặc định: dev)] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
 
 #[derive(Debug)]
 struct Cli {
@@ -22,6 +22,7 @@ struct Cli {
     out: Option<String>,
     fmt_check: bool,
     backend: Backend,
+    profile: gt_codegen_llvm::Opt,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -56,6 +57,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
         out: None,
         fmt_check: false,
         backend: default_backend(),
+        profile: gt_codegen_llvm::Opt::Dev,
     };
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -66,6 +68,8 @@ fn parse(args: &[String]) -> Result<Cli, String> {
             "--checks=proven" => cli.checks = Checks::Proven,
             "--backend=interpreter" => cli.backend = Backend::Interpreter,
             "--backend=llvm" => cli.backend = Backend::Llvm,
+            "--profile=dev" => cli.profile = gt_codegen_llvm::Opt::Dev,
+            "--profile=release" => cli.profile = gt_codegen_llvm::Opt::Release,
             "-o" => {
                 cli.out = Some(
                     it.next()
@@ -76,6 +80,11 @@ fn parse(args: &[String]) -> Result<Cli, String> {
             s if s.starts_with("--backend=") => {
                 return Err(format!(
                     "`{s}`: chỉ nhận --backend=llvm hoặc --backend=interpreter"
+                ));
+            }
+            s if s.starts_with("--profile=") => {
+                return Err(format!(
+                    "`{s}`: chỉ nhận --profile=dev hoặc --profile=release"
                 ));
             }
             s if s.starts_with("--checks=") => {
@@ -196,7 +205,8 @@ fn build_llvm(cli: &Cli, mut res: CheckResult, path: &str) -> i32 {
         format!("{stem}.exe")
     });
     let att = crate::pipeline::attestation(&res, &crate::pipeline::mir_dump(art));
-    if let Err(e) = crate::native::build_exe(art, Path::new(&out), false, &att) {
+    if let Err(e) = crate::native::build_exe_profile(art, Path::new(&out), false, &att, cli.profile)
+    {
         return native_failure(&mut res, cli, &e);
     }
     res.backend = "llvm";
@@ -225,7 +235,7 @@ fn run_llvm(
     }
     let exe = dir.join("prog.exe");
     let att = crate::pipeline::attestation(res, &crate::pipeline::mir_dump(art));
-    let r = match crate::native::build_exe(art, &exe, true, &att) {
+    let r = match crate::native::build_exe_profile(art, &exe, true, &att, cli.profile) {
         Ok(()) => Ok(crate::native::run_exe(&exe)),
         Err(e) => Err(native_failure(res, cli, &e)),
     };

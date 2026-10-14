@@ -3,7 +3,7 @@
 use crate::pipeline::Artifacts;
 use crate::runner::RunReport;
 use crate::verdict::RunEnd;
-use gt_codegen_llvm::{CodegenError, Inject, Options};
+use gt_codegen_llvm::{CodegenError, Inject, Opt, Options};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -107,6 +107,17 @@ pub fn build_exe(
     report_result: bool,
     attestation: &str,
 ) -> Result<(), NativeError> {
+    build_exe_profile(art, out, report_result, attestation, Opt::Dev)
+}
+
+/// Như `build_exe` nhưng chọn hồ sơ (`dev` = -O0; `release` = danh sách trắng pass, ADR-036).
+pub fn build_exe_profile(
+    art: &Artifacts,
+    out: &Path,
+    report_result: bool,
+    attestation: &str,
+    opt: Opt,
+) -> Result<(), NativeError> {
     check_llvm_dll()?;
     let rt = rt_lib()?;
     crate::runner::apply_types_fault_from_env();
@@ -119,6 +130,7 @@ pub fn build_exe(
             report_result,
             attestation: attestation.to_string(),
             inject: inject_from_env(),
+            opt,
         },
         &|m| {
             gt_guard::check_module(

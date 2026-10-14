@@ -21,6 +21,7 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::intrinsics::Intrinsic;
 use inkwell::module::Module;
+use inkwell::passes::PassBuilderOptions;
 use inkwell::targets::{
     CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetData, TargetMachine,
 };
@@ -56,7 +57,21 @@ pub struct Options {
     pub attestation: String,
     /// CHÈN LỖI để kiểm IR Guard (`GRITC_FAULT=ir:…`): chỉ làm IR XẤU hơn ⇒ Guard phải từ chối; không bao giờ làm đầu ra tốt hơn.
     pub inject: Option<Inject>,
+    /// hồ sơ: `Dev` (-O0, IR Guard kiểm đúng hình dạng) hoặc `Release` (danh sách trắng pass, ADR-036)
+    pub opt: Opt,
 }
+
+/// Hồ sơ biên dịch (ADR-036).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Opt {
+    #[default]
+    Dev,
+    Release,
+}
+
+/// (`no-verify-fixpoint`: LLVM 20 mặc định ABORT tiến trình nếu instcombine chưa hội tụ sau 1 lượt — chỉ là kiểm tra nội bộ của LLVM; kết quả vẫn được Guard-post và `verify` kiểm.)
+/// Danh sách TRẮNG pass tối ưu của hồ sơ `release` (ADR-036 §6): mỗi pass có lý do trong ADR; KHÔNG `default<O2>`, KHÔNG inline.
+pub const RELEASE_PASSES: &str = "mem2reg,sroa,early-cse,instcombine<no-verify-fixpoint>";
 
 /// Lỗi cố ý chèn vào IR (chỉ để kiểm cổng).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -321,6 +336,14 @@ pub fn compile(
     let violations = guard(&cg.module);
     if !violations.is_empty() {
         return Err(CodegenError::Guard(violations));
+    }
+    if opts.opt == Opt::Release {
+        cg.module
+            .run_passes(RELEASE_PASSES, &tm, PassBuilderOptions::create())
+            .map_err(|e| CodegenError::Internal(format!("bộ tối ưu: {e}")))?;
+        if let Err(e) = cg.module.verify() {
+            return internal(format!("IR sau tối ưu không hợp lệ: {e}"));
+        }
     }
     let ir = cg.module.print_to_string().to_string();
     let buf = llvm(tm.write_to_memory_buffer(&cg.module, FileType::Object))?;
