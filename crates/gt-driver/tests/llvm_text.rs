@@ -2,6 +2,15 @@
 //! (`backend llvm chưa hỗ trợ: ép kiểu Int(U8) → Char`) dù thông dịch chạy được. Mọi `u8` là một giá trị vô hướng hợp lệ ⇒ nới không dấu.
 #![cfg(feature = "llvm")]
 use std::path::PathBuf;
+
+/// hồ sơ do bộ chạy chọn (`GT_PROFILE=release` ⇒ chạy lại cả bộ ở hồ sơ release, ADR-036 Q77); mặc định dev
+fn profile_arg() -> String {
+    format!(
+        "--profile={}",
+        std::env::var("GT_PROFILE").unwrap_or_else(|_| "dev".to_string())
+    )
+}
+
 use std::process::Command;
 
 fn run(src: &str, backend: &str) -> (i32, String) {
@@ -14,6 +23,7 @@ fn run(src: &str, backend: &str) -> (i32, String) {
     std::fs::write(&f, src).expect("ghi");
     let o = Command::new(env!("CARGO_BIN_EXE_gritc"))
         .args(["run", "--json", &format!("--backend={backend}")])
+        .arg(profile_arg())
         .arg(&f)
         .output()
         .expect("chạy gritc");

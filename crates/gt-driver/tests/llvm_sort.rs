@@ -3,6 +3,15 @@
 //! Cần `LLVM-C.dll` trên PATH.
 #![cfg(feature = "llvm")]
 use std::path::PathBuf;
+
+/// hồ sơ do bộ chạy chọn (`GT_PROFILE=release` ⇒ chạy lại cả bộ ở hồ sơ release, ADR-036 Q77); mặc định dev
+fn profile_arg() -> String {
+    format!(
+        "--profile={}",
+        std::env::var("GT_PROFILE").unwrap_or_else(|_| "dev".to_string())
+    )
+}
+
 use std::process::Command;
 
 const MSORT: &str = include_str!("../../../examples/sortlines/src/msort.gt");
@@ -90,6 +99,7 @@ fn run(keys: &[u64], backend: &str) -> Out {
     std::fs::write(d.join("main.gt"), main_src(keys)).expect("ghi");
     let o = gritc()
         .args(["run", "--json", &format!("--backend={backend}")])
+        .arg(profile_arg())
         .arg(&d)
         .output()
         .expect("chạy gritc");
@@ -251,6 +261,7 @@ fn cmp_bytes_is_lexicographic_on_bytes() {
         std::fs::write(d.join("main.gt"), &body).expect("ghi");
         let o = gritc()
             .args(["run", "--json", &format!("--backend={backend}")])
+            .arg(profile_arg())
             .arg(&d)
             .output()
             .expect("chạy");
@@ -315,6 +326,7 @@ fn one_million_elements_never_exhaust_fuel() {
     let t = std::time::Instant::now();
     let o = gritc()
         .args(["run", "--json", "--backend=llvm"])
+        .arg(profile_arg())
         .arg(&d)
         .output()
         .expect("chạy gritc");
@@ -486,6 +498,7 @@ fn wide_elements_24_and_32_bytes_match_stable_sort_at_scale() {
         std::fs::write(d.join("main.gt"), &src).expect("ghi");
         let o = gritc()
             .args(["run", "--json", "--backend=llvm"])
+            .arg(profile_arg())
             .arg(&d)
             .output()
             .expect("chạy gritc");

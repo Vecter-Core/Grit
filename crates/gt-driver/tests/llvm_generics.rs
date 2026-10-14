@@ -2,6 +2,15 @@
 //! Cần `LLVM-C.dll` trên PATH (t.sh / gate.sh đặt sẵn).
 #![cfg(feature = "llvm")]
 use std::path::PathBuf;
+
+/// hồ sơ do bộ chạy chọn (`GT_PROFILE=release` ⇒ chạy lại cả bộ ở hồ sơ release, ADR-036 Q77); mặc định dev
+fn profile_arg() -> String {
+    format!(
+        "--profile={}",
+        std::env::var("GT_PROFILE").unwrap_or_else(|_| "dev".to_string())
+    )
+}
+
 use std::process::Command;
 
 fn gritc() -> Command {
@@ -24,6 +33,7 @@ fn run(src: &str, backend: &str) -> (i32, String) {
     std::fs::write(&f, src).expect("ghi");
     let o = gritc()
         .args(["run", "--json", &format!("--backend={backend}")])
+        .arg(profile_arg())
         .arg(&f)
         .output()
         .expect("chạy gritc");
@@ -103,7 +113,7 @@ fn dump_ir(src: &str) -> (String, PathBuf) {
     let ir = d.join("p.ll");
     let o = gritc()
         .env("GRITC_DUMP_IR", &ir)
-        .args(["build", "--backend=llvm", "-o"])
+        .args(["build", "--backend=llvm", &profile_arg(), "-o"])
         .arg(&exe)
         .arg(&f)
         .output()
@@ -246,9 +256,10 @@ fn build_with_fault(src: &str, fault: &str, backend_run: bool) -> (Option<i32>, 
     let mut c = gritc();
     c.env("GRITC_FAULT", fault);
     if backend_run {
-        c.args(["run", "--backend=interpreter"]);
+        c.args(["run", "--backend=interpreter"]).arg(profile_arg());
     } else {
-        c.args(["build", "--backend=llvm", "-o"]).arg(&exe);
+        c.args(["build", "--backend=llvm", &profile_arg(), "-o"])
+            .arg(&exe);
     }
     let o = c.arg(&f).output().expect("chạy");
     (

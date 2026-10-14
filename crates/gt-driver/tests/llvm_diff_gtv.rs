@@ -1,6 +1,7 @@
 //! So sánh codegen ≡ thông dịch ≡ MÔ HÌNH ĐỘC LẬP cho generic, trait và `Vec` (ADR-034, lệnh 2026-10-14 bước (iv)).
 //! Điểm mù cần xử lý: thông dịch và codegen CÙNG dùng `TypeDb::select_impl`, nên chọn sai impl thì cả hai sai giống nhau. Vì vậy giá trị
 //! kỳ vọng ở đây tính bằng MÔ HÌNH RUST CỦA BỘ SINH (bảng impl của bộ sinh, bộ đánh giá hàm generic theo cấu trúc chương trình sinh ra);
+
 //! không gọi `select_impl`/gt-types/gt-mir. Ba nguồn: mô hình, thông dịch, exe LLVM.
 //! Loại chương trình (ngưỡng ≥ 30 mỗi loại đã so sánh được): generic_unbounded, bound_call, impl_generic, multi_trait, vec_ops,
 //! vec_index_oob (ba nguồn), vec_arena_exhausted (exe-only, `GRITRT_ARENA_LIMIT`).
@@ -10,7 +11,7 @@
 #[path = "../../gt-mir/tests/support/progen.rs"]
 mod progen;
 
-use gt_driver::native::build_exe;
+use gt_driver::native::build_exe_profile;
 use gt_driver::pipeline::attestation;
 use gt_driver::runner::run_main;
 use gt_driver::{Options, RunEnd, check};
@@ -1488,7 +1489,7 @@ fn run_term(seed: u64, t: &mut Tally, dir: &std::path::Path, rng: &mut Rng) {
     {
         let art = res.open_gate().expect("cổng mở");
         let att = attestation(&res, &gt_driver::pipeline::mir_dump(art));
-        if let Err(err) = build_exe(art, &exe, true, &att) {
+        if let Err(err) = build_exe_profile(art, &exe, true, &att, test_profile()) {
             *t.dropped
                 .entry(format!("{kind}: chưa hạ được"))
                 .or_default() += 1;
@@ -1575,7 +1576,7 @@ fn run_one(kind: &'static str, seed: u64, t: &mut Tally, dir: &std::path::Path) 
     {
         let art = res.open_gate().expect("cổng mở");
         let att = attestation(&res, &gt_driver::pipeline::mir_dump(art));
-        if let Err(err) = build_exe(art, &exe, true, &att) {
+        if let Err(err) = build_exe_profile(art, &exe, true, &att, test_profile()) {
             // chưa hạ được (thoát 3) hoặc Guard từ chối: bỏ khỏi so sánh, báo tỉ lệ
             *t.dropped
                 .entry(format!("{kind}: chưa hạ được"))
@@ -1775,4 +1776,13 @@ fn tiny_term_graph_batch() {
         before,
         "đồ thị instance không dựng được (lùi về bảo thủ)"
     );
+}
+
+/// hồ sơ do bộ chạy chọn (`GT_PROFILE=release` ⇒ chạy lại cả bộ ở hồ sơ release, ADR-036 Q77); mặc định dev
+fn test_profile() -> gt_codegen_llvm::Opt {
+    if std::env::var("GT_PROFILE").is_ok_and(|v| v == "release") {
+        gt_codegen_llvm::Opt::Release
+    } else {
+        gt_codegen_llvm::Opt::Dev
+    }
 }

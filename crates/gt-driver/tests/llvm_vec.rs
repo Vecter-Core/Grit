@@ -2,6 +2,15 @@
 //! kiểm trên exe (thông dịch không mô phỏng bộ nhớ). Cần `LLVM-C.dll` trên PATH.
 #![cfg(feature = "llvm")]
 use std::path::PathBuf;
+
+/// hồ sơ do bộ chạy chọn (`GT_PROFILE=release` ⇒ chạy lại cả bộ ở hồ sơ release, ADR-036 Q77); mặc định dev
+fn profile_arg() -> String {
+    format!(
+        "--profile={}",
+        std::env::var("GT_PROFILE").unwrap_or_else(|_| "dev".to_string())
+    )
+}
+
 use std::process::Command;
 
 fn gritc() -> Command {
@@ -31,6 +40,7 @@ fn run_env(src: &str, backend: &str, env: &[(&str, &str)]) -> Out {
     std::fs::write(&f, src).expect("ghi");
     let mut c = gritc();
     c.args(["run", "--json", &format!("--backend={backend}")])
+        .arg(profile_arg())
         .arg(&f);
     for (k, v) in env {
         c.env(k, v);

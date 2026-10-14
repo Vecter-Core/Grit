@@ -7,10 +7,20 @@
 #![cfg(feature = "llvm")]
 #[path = "../../gt-oblig/tests/support/obgen.rs"]
 mod obgen;
+
+/// hồ sơ do bộ chạy chọn (`GT_PROFILE=release` ⇒ chạy lại cả bộ ở hồ sơ release, ADR-036 Q77); mặc định dev
+fn test_profile() -> gt_codegen_llvm::Opt {
+    if std::env::var("GT_PROFILE").is_ok_and(|v| v == "release") {
+        gt_codegen_llvm::Opt::Release
+    } else {
+        gt_codegen_llvm::Opt::Dev
+    }
+}
+
 #[path = "../../gt-mir/tests/support/progen.rs"]
 mod progen;
 
-use gt_driver::native::{build_exe, run_exe_timeout};
+use gt_driver::native::{build_exe_profile, run_exe_timeout};
 use gt_driver::pipeline::attestation;
 use gt_driver::runner::run_main;
 use gt_driver::{Options, RunEnd, check};
@@ -157,8 +167,8 @@ fn one(seed: u64, t: &mut Tally, dir: &std::path::Path) -> bool {
         let att = {
             let art = res.open_gate().expect("cổng mở");
             let att = attestation(&res, &gt_driver::pipeline::mir_dump(art));
-            match build_exe(art, &exe, true, &att) {
-                Ok(()) => {}
+            match build_exe_profile(art, &exe, true, &att, test_profile()) {
+                Ok(_) => {}
                 Err(e) => {
                     if e.exit_code() == 3 {
                         t.unsupported += 1;
