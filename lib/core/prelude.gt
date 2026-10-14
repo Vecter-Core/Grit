@@ -150,6 +150,14 @@
   ƒ as_bytes(&self) → &[u8] ! ∅ { }
 }
 // cắt `&str` TẠI BIÊN KÝ TỰ: `from ≤ to ≤ len` và hai đầu không nằm giữa một ký tự nhiều byte; sai ⇒ abort `slice_range`
+// f64 (ADR-035 §B, TCB): số học IEEE-754 thuần (không fast-math); `==`/`≠` cấm (D4); `as` sang số nguyên cấm (E0319): chỉ `to_i64` trả `Option`.
+// M7 coi giá trị f64 là BÍ ẨN. `sqrt` làm tròn đúng (IEEE), NaN cho số âm; `to_bits`/`from_bits` là bitcast; `is_nan` thay cho `x != x`.
+⊐ f64 {
+  ƒ sqrt(self) → f64 ! ∅ { }
+  ƒ to_i64(self) → Option<i64> ! ∅ { }
+  ƒ to_bits(self) → u64 ! ∅ { }
+  ƒ is_nan(self) → bool ! ∅ { }
+}
 ⊐ str {
   ƒ len(&self) → usize ! ∅ { }
   ƒ slice(&self, from: usize, to: usize) → &str ! ∅ { }
@@ -157,6 +165,8 @@
 ▦ core {
   ◈ ƒ abort(msg: &str) → ! ! {div} { }
   ◈ ƒ exit(code: u32) → ! ! {div} { }
+  // bitcast u64 → f64 (mẫu bit IEEE-754; mọi mẫu hợp lệ, kể cả NaN/±∞/dưới chuẩn)
+  ◈ ƒ f64_from_bits(b: u64) → f64 ! ∅ { }
   // nhiên liệu của vòng lặp: gọi SAU vòng lặp `⟳ fuel > 0 … ↓ fuel`; `fuel == 0` (cạn) ⇒ abort `fuel_exhausted` (check lúc chạy, M7 có thể xoá, ghi chú N0905)
   ◈ ƒ fuel_left(n: u64) ! ∅ { }
   // KHÔNG ◈: hàm riêng của module, chỉ để test E0203 (quy tắc nhìn thấy) của gt-resolve dùng chính prelude thật

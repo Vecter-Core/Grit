@@ -1,0 +1,7 @@
+// expect: pass
+// note: to_i64 trả Option, sqrt, to_bits, is_nan
+ƒ main() → u64 ! ∅ {
+  w ≔ 2.0f64.sqrt();
+  r ≔ ⌥ (w * 1000.0f64).to_i64() { Some(v) ↦ v as u64, None ↦ 0u64 };
+  ⎇ w.is_nan() { 0u64 } ⇝ { r +% w.to_bits() % 7u64 }
+}

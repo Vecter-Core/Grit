@@ -1,0 +1,3 @@
+// expect: fail E0319
+// note: `as` từ số thực sang số nguyên bị cấm: dùng f64::to_i64 (Option)
+ƒ main() → i64 ! ∅ { x ≔ 1.5f64; x as i64 }

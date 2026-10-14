@@ -820,6 +820,13 @@ impl<'a> Ctx<'a> {
             },
             Rvalue::CastFits(op, to) => match (self.term_of(st, op), ity(to)) {
                 (Some(t), Some(ty)) => Val::Bool(Self::range_prop(ty, &t)),
+                // số nguyên → f64 chính xác ⇔ |x| ≤ 2^53 (D1, ADR-035 Q73)
+                (Some(t), None) if matches!(to, GTy::Float(gt_types::FloatTy::F64)) => {
+                    Val::Bool(Prop::And(vec![
+                        Prop::Le(Term::int(-(1i128 << 53)), t.clone()),
+                        Prop::Le(t, Term::int(1i128 << 53)),
+                    ]))
+                }
                 _ => Val::Unknown,
             },
             Rvalue::CheckedBinaryOp(op, a, b) => {

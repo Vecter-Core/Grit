@@ -64,6 +64,18 @@ Hàm runtime dùng: `gritrt_arena_alloc` (đã có trong bảng `RUNTIME` của 
 | `str::slice(&self, from: usize, to: usize) → &str` | `∅` | không | kiểm `from ≤ to ≤ len` và cả hai đầu ở BIÊN KÝ TỰ (byte tại chỉ số — nếu chỉ số < len — không phải byte nối `10xxxxxx`), rồi con trỏ béo mới | sai ⇒ abort `slice_range` (13) | kết quả là `&str` hợp lệ (cắt ở biên ký tự của chuỗi hợp lệ) | CHỜ GIANG |
 Hàm runtime mới: `gritrt_utf8_valid(p, n) → i32` (bảng `RUNTIME` của IR Guard, không phải lớp nhạy cảm). `unsafe` của nó: `from_raw_parts(p, n)` chỉ khi `n > 0` (`n = 0` ⇒ trả 1, `p` có thể null).
 
+## B5. `f64` (thêm 2026-10-14, ADR-035 §B) — không có lời gọi runtime, không lớp nghĩa vụ IR Guard
+Kiểu `f64` (LLVM `double`); `f32` bị E0319. **Số học IEEE-754 thuần** (`fadd fsub fmul fdiv fneg`, so sánh có thứ tự `fcmp olt/ole/ogt/oge`, KHÔNG cờ fast-math/nnan/ninf — IR Guard đã cấm các cờ này): không có `Assert` tràn hay chia 0 cho số thực (kết quả ±∞/NaN theo IEEE). `==`/`≠` cấm (D4, E0303); `%` và `as` số thực → số nguyên/char/bool cấm (E0319). Literal: Rust `str::parse::<f64>` (làm tròn đúng) ⇒ `const_float`. M7 coi giá trị f64 là BÍ ẨN (không lý thuyết số thực).
+| intrinsic | hiệu ứng | capability | hạ thành | abort | bất biến | người duyệt |
+|---|---|---|---|---|---|---|
+| `x as f64` từ số nguyên ≤ 32 bit | `∅` | không | `sitofp`/`uitofp` | không (chính xác) | giá trị đúng | CHỜ GIANG |
+| `x as f64` từ `i64/u64/isize/usize` | `∅` | không | `CastFits` (|x| ≤ 2^53) rồi `sitofp`/`uitofp` | |x| > 2^53 ⇒ abort `cast_lossy` (D1; M7 chứng minh được khi biết miền) | chỉ chuyển đổi khi chính xác | CHỜ GIANG |
+| `f64::sqrt(self) → f64` | `∅` | không | `llvm.sqrt.f64` (làm tròn đúng IEEE; NaN cho số âm) | không | — | CHỜ GIANG |
+| `f64::to_i64(self) → Option<i64>` | `∅` | không | `Some(fptosi x)` nếu `−2^63 ≤ x < 2^63` (so sánh có thứ tự ⇒ NaN/±∞ ra ngoài), ngược lại `None`; `fptosi` chỉ chạy trong miền (không poison) | không | phần thập phân cắt về 0 | CHỜ GIANG |
+| `f64::to_bits(self) → u64`, `core::f64_from_bits(b: u64) → f64` | `∅` | không | `bitcast` | không | mọi mẫu bit hợp lệ (NaN/±∞/dưới chuẩn) | CHỜ GIANG |
+| `f64::is_nan(self) → bool` | `∅` | không | `fcmp uno x, x` | không | thay cho `x != x` | CHỜ GIANG |
+NaN: dấu/payload của NaN KHÔNG được đặc tả; mọi so sánh bit phải chuẩn hoá NaN trước (test dùng 0x7FF8000000000000).
+
 ## C. Runtime `gt-rt` (staticlib, `panic = "abort"`): hàm xuất ra cho mã sinh
 `gritrt_start`, `gritrt_abort(kind)` (mã thoát **70**, kind = tên `AssertKind` hoặc `io_error`/`arg_out_of_range`/`abort`), `gritrt_report_int` (chỉ khi `GRITRT_RESULT_FILE`), `gritrt_alloc`, `gritrt_spawn`, `gritrt_mutex_lock/unlock`, `gritrt_arg_count`, `gritrt_arg_ptr/len`, `gritrt_exit`, `gritrt_ewrite_u64/str`, `gritrt_fs_read`, `gritrt_fs_open`, `gritrt_arena_new/alloc/reset`, `gritrt_file_len/ptr`, `gritrt_write_u64/str`. Danh sách đóng của IR Guard (`gt_guard::RUNTIME`).
 Ranh giới `unsafe` của gt-rt: ADR-031.

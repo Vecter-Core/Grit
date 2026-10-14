@@ -1,0 +1,3 @@
+// expect: fail E0319
+// note: `as` từ số thực sang bool bị cấm
+ƒ main() → bool ! ∅ { x ≔ 1.5f64; x as bool }

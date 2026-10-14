@@ -1,0 +1,9 @@
+# rig.lock — tạo bởi `rig lock`; KHÔNG sửa tay. Băm nội dung từng gói; lệch ⇒ rig từ chối build.
+version = 1
+
+[[package]]
+name = "stats"
+version = "0.1.0"
+source = "root"
+deps = []
+hash = "sha256:39ef390b089a7964f4a18282cb79fa817c05959132ac6727fdccf417797bf3e4"

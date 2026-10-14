@@ -1,0 +1,3 @@
+// expect: fail E0319
+// note: f32 chưa hỗ trợ ở Phase 1
+ƒ main() ! ∅ { x ≔ 1.5f32; }

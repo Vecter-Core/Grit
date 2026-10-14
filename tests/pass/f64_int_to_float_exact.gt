@@ -1,0 +1,3 @@
+// expect: pass
+// note: số nguyên ≤ 32 bit → f64 chính xác (không nghĩa vụ); i64 hằng nhỏ được M7 chứng minh |x| ≤ 2^53
+ƒ main() → f64 ! ∅ { a ≔ 7i32; b ≔ 200u8; c ≔ 123456i64; (a as f64) + (b as f64) + (c as f64) }

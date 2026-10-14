@@ -156,6 +156,11 @@ enum Intr {
     TextLen,
     TextView,
     StrSlice,
+    F64Sqrt,
+    F64ToI64,
+    F64ToBits,
+    F64FromBits,
+    F64IsNan,
     VecLen,
     VecAsSlice,
     VecAsMutSlice,
@@ -505,7 +510,8 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     }
                 }
             }
-            Ty::Float(_) => return unsupported("số thực"),
+            Ty::Float(gt_types::FloatTy::F64) => self.ctx.f64_type().into(),
+            Ty::Float(_) => return unsupported("f32"),
             Ty::Str | Ty::Slice(_) => return unsupported("kiểu không kích thước đứng riêng"),
             Ty::Param(_) | Ty::Infer(_) => return unsupported("tham số kiểu chưa được thế"),
             Ty::Err => return internal("Ty::Err sau cổng"),
@@ -1138,7 +1144,18 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     _ => return internal("Const::Item không phải const/static"),
                 }
             }
-            Const::Float { .. } => return unsupported("literal số thực"),
+            Const::Float { text, ty } => {
+                if !matches!(ty, gt_types::FloatTy::F64) {
+                    return unsupported("f32");
+                }
+                // `str::parse::<f64>` của Rust làm tròn ĐÚNG về gần nhất; `const_float` nhận đúng giá trị f64 đó (không cần `unsafe`)
+                let t = text.replace('_', "");
+                let t = t.trim_end_matches("f64");
+                let Ok(x) = t.parse::<f64>() else {
+                    return internal(format!("literal số thực lạ `{text}`"));
+                };
+                (self.ctx.f64_type().const_float(x).into(), Ty::Float(*ty))
+            }
         })
     }
 
@@ -1323,6 +1340,9 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             }
             Rvalue::UnaryOp(op, o) => {
                 let (v, ty) = self.operand(fx, o)?;
+                if let (UnOp::Neg, Ty::Float(_), BasicValueEnum::FloatValue(fv)) = (op, &ty, v) {
+                    return Ok(llvm(self.builder.build_float_neg(fv, "fneg"))?.into());
+                }
                 let iv = v.into_int_value();
                 match (op, &ty) {
                     (UnOp::Not, Ty::Bool) => Ok(llvm(self.builder.build_not(iv, "not"))?.into()),
@@ -1370,6 +1390,28 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         y: BasicValueEnum<'ctx>,
         ty: &Ty,
     ) -> R<BasicValueEnum<'ctx>> {
+        if let (BasicValueEnum::FloatValue(a), BasicValueEnum::FloatValue(b)) = (x, y) {
+            // IEEE-754 thuần: KHÔNG cờ fast-math (IR Guard cấm), không có Assert tràn/chia 0 cho số thực
+            let r: BasicValueEnum<'ctx> = match op {
+                BinOp::Add => llvm(self.builder.build_float_add(a, b, "fadd"))?.into(),
+                BinOp::Sub => llvm(self.builder.build_float_sub(a, b, "fsub"))?.into(),
+                BinOp::Mul => llvm(self.builder.build_float_mul(a, b, "fmul"))?.into(),
+                BinOp::Div => llvm(self.builder.build_float_div(a, b, "fdiv"))?.into(),
+                BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge | BinOp::Eq | BinOp::Ne => {
+                    let pred = match op {
+                        BinOp::Lt => inkwell::FloatPredicate::OLT,
+                        BinOp::Le => inkwell::FloatPredicate::OLE,
+                        BinOp::Gt => inkwell::FloatPredicate::OGT,
+                        BinOp::Ge => inkwell::FloatPredicate::OGE,
+                        BinOp::Eq => inkwell::FloatPredicate::OEQ,
+                        _ => inkwell::FloatPredicate::UNE,
+                    };
+                    llvm(self.builder.build_float_compare(pred, a, b, "fcmp"))?.into()
+                }
+                other => return unsupported(format!("phép {other:?} trên số thực")),
+            };
+            return Ok(r);
+        }
         let (BasicValueEnum::IntValue(a), BasicValueEnum::IntValue(b)) = (x, y) else {
             return unsupported(format!("phép hai ngôi {op:?} trên {ty:?}"));
         };
@@ -1528,6 +1570,19 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             let fat = llvm(self.builder.build_insert_value(fat, len, 1, "u1"))?;
             return Ok(fat.as_basic_value_enum());
         }
+        // số nguyên → f64: `sitofp`/`uitofp` (chính xác khi |x| ≤ 2^53; ngoài miền MIR đã có Assert CastLossy trước đó)
+        if let (Ty::Int(fi), Ty::Float(gt_types::FloatTy::F64)) = (from, to) {
+            let iv = v.into_int_value();
+            let f64t = self.ctx.f64_type();
+            return Ok(if fi.signed() {
+                llvm(self.builder.build_signed_int_to_float(iv, f64t, "sitofp"))?.into()
+            } else {
+                llvm(self.builder.build_unsigned_int_to_float(iv, f64t, "uitofp"))?.into()
+            });
+        }
+        if let (Ty::Float(gt_types::FloatTy::F64), Ty::Float(gt_types::FloatTy::F64)) = (from, to) {
+            return Ok(v);
+        }
         // `u8 as char`: mọi u8 là một giá trị vô hướng hợp lệ (U+0000…U+00FF) ⇒ nới không dấu lên 32 bit
         if matches!((from, to), (Ty::Int(IntTy::U8), Ty::Char)) {
             return Ok(llvm(self.builder.build_int_z_extend(
@@ -1566,6 +1621,37 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
     ) -> R<BasicValueEnum<'ctx>> {
         if matches!((from, to), (Ty::Int(IntTy::U8), Ty::Char)) {
             return Ok(self.ctx.bool_type().const_int(1, false).into()); // luôn đủ chỗ
+        }
+        // số nguyên → f64 CHÍNH XÁC ⇔ |x| ≤ 2^53 (D1): i64/u64/isize/usize cần kiểm; ≤ 32 bit luôn đúng
+        if let (Ty::Int(fi), Ty::Float(gt_types::FloatTy::F64)) = (from, to) {
+            let iv = v.into_int_value();
+            if fi.bits() <= 32 {
+                return Ok(self.ctx.bool_type().const_int(1, false).into());
+            }
+            let i64t = self.i64t();
+            let lim = 1u64 << 53;
+            let ok = if fi.signed() {
+                // (x + 2^53) <= 2^54 theo so sánh KHÔNG dấu
+                let shifted = llvm(self.builder.build_int_add(
+                    iv,
+                    i64t.const_int(lim, false),
+                    "sh",
+                ))?;
+                llvm(self.builder.build_int_compare(
+                    IntPredicate::ULE,
+                    shifted,
+                    i64t.const_int(lim * 2, false),
+                    "fits",
+                ))?
+            } else {
+                llvm(self.builder.build_int_compare(
+                    IntPredicate::ULE,
+                    iv,
+                    i64t.const_int(lim, false),
+                    "fits",
+                ))?
+            };
+            return Ok(ok.into());
         }
         let (Some((fb, fs)), Ty::Int(ti)) = (Self::int_bits_signed(from), to) else {
             return unsupported(format!("kiểm ép kiểu {from:?} → {to:?}"));
@@ -1701,6 +1787,18 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 "from_utf8" => Some(Intr::TextFromUtf8),
                 "len" => Some(Intr::TextLen),
                 "as_str" | "as_bytes" => Some(Intr::TextView),
+                _ => None,
+            };
+        }
+        if key.ends_with("core::f64_from_bits") {
+            return Some(Intr::F64FromBits);
+        }
+        if let Some(m) = key.strip_prefix("$prelude::f64::") {
+            return match m {
+                "sqrt" => Some(Intr::F64Sqrt),
+                "to_i64" => Some(Intr::F64ToI64),
+                "to_bits" => Some(Intr::F64ToBits),
+                "is_nan" => Some(Intr::F64IsNan),
                 _ => None,
             };
         }
@@ -2014,6 +2112,89 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 let c = llvm(self.builder.build_call(f, &[h.into()], ""))?;
                 self.tag_obl(c.try_as_basic_value().instruction(), "E0405")?;
                 Ok(Some(self.unit_type().const_zero()))
+            }
+            Intr::F64Sqrt => {
+                let f64t = self.ctx.f64_type();
+                let Some(intr) = Intrinsic::find("llvm.sqrt") else {
+                    return internal("không có intrinsic llvm.sqrt");
+                };
+                let Some(decl) = intr.get_declaration(&self.module, &[f64t.into()]) else {
+                    return internal("không khai báo được llvm.sqrt");
+                };
+                let c = llvm(self.builder.build_call(decl, &[vals[0].into()], "sqrt"))?;
+                Ok(c.try_as_basic_value().basic())
+            }
+            Intr::F64ToBits => Ok(Some(llvm(self.builder.build_bit_cast(
+                vals[0],
+                self.i64t(),
+                "bits",
+            ))?)),
+            Intr::F64FromBits => Ok(Some(llvm(self.builder.build_bit_cast(
+                vals[0],
+                self.ctx.f64_type(),
+                "fromb",
+            ))?)),
+            Intr::F64IsNan => {
+                let x = vals[0].into_float_value();
+                Ok(Some(
+                    llvm(self.builder.build_float_compare(
+                        inkwell::FloatPredicate::UNO,
+                        x,
+                        x,
+                        "isnan",
+                    ))?
+                    .as_basic_value_enum(),
+                ))
+            }
+            Intr::F64ToI64 => {
+                // Some(trunc x) nếu -2^63 ≤ x < 2^63 (so sánh CÓ THỨ TỰ ⇒ NaN và ±∞ ra ngoài); ngược lại None. fptosi chỉ chạy trong miền (không poison).
+                let Ty::Adt(od, targs) = dest_ty else {
+                    return internal("f64::to_i64 không trả Option");
+                };
+                let x = vals[0].into_float_value();
+                let f64t = self.ctx.f64_type();
+                let lo = f64t.const_float(-9_223_372_036_854_775_808.0);
+                let hi = f64t.const_float(9_223_372_036_854_775_808.0);
+                let ge = llvm(self.builder.build_float_compare(
+                    inkwell::FloatPredicate::OGE,
+                    x,
+                    lo,
+                    "ge",
+                ))?;
+                let lt = llvm(self.builder.build_float_compare(
+                    inkwell::FloatPredicate::OLT,
+                    x,
+                    hi,
+                    "lt",
+                ))?;
+                let inr = llvm(self.builder.build_and(ge, lt, "inr"))?;
+                let et = self.lower_ty(dest_ty)?.into_struct_type();
+                let tmp = self.entry_alloca(fx, et.into(), "to_i64.res")?;
+                let somb = self.ctx.append_basic_block(fx.f, "toi.some");
+                let nonb = self.ctx.append_basic_block(fx.f, "toi.none");
+                let end = self.ctx.append_basic_block(fx.f, "toi.end");
+                llvm(self.builder.build_conditional_branch(inr, somb, nonb))?;
+                self.builder.position_at_end(somb);
+                let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
+                llvm(
+                    self.builder
+                        .build_store(tag, self.i64t().const_int(1, false)),
+                )?;
+                let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
+                let v1 = self.variant_struct(*od, targs, 1)?;
+                let f0 = llvm(self.builder.build_struct_gep(v1, pay, 0, "val"))?;
+                let iv = llvm(
+                    self.builder
+                        .build_float_to_signed_int(x, self.i64t(), "fptosi"),
+                )?;
+                llvm(self.builder.build_store(f0, iv))?;
+                llvm(self.builder.build_unconditional_branch(end))?;
+                self.builder.position_at_end(nonb);
+                let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
+                llvm(self.builder.build_store(tag, self.i64t().const_zero()))?;
+                llvm(self.builder.build_unconditional_branch(end))?;
+                self.builder.position_at_end(end);
+                Ok(Some(llvm(self.builder.build_load(et, tmp, "to_i64.v"))?))
             }
             Intr::TextNew => {
                 // Text { bytes: Vec { arena, null, 0, 0 } }

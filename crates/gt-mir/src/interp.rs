@@ -10,6 +10,8 @@ pub enum V {
     Int(i128, IntTy),
     Bool(bool),
     Char(u32),
+    /// số thực f64 (IEEE-754)
+    Float(f64),
     Str(String),
     Unit,
     Tuple(Vec<V>),
@@ -532,6 +534,26 @@ impl<'a> Interp<'a> {
             .collect()
     }
 
+    /// `f64::{sqrt, to_i64, to_bits, from_bits, is_nan}` (ADR-035 §B): `to_i64` ⇒ `None` nếu NaN, ±∞ hoặc ngoài miền i64; phần thập phân cắt về 0.
+    fn f64_op(m: &str, vals: &[V]) -> Result<V, Flow> {
+        match (m, vals) {
+            ("sqrt", [V::Float(x)]) => Ok(V::Float(x.sqrt())),
+            ("is_nan", [V::Float(x)]) => Ok(V::Bool(x.is_nan())),
+            ("to_bits", [V::Float(x)]) => Ok(V::Int(i128::from(x.to_bits()), IntTy::U64)),
+            ("to_i64", [V::Float(x)]) => Ok(
+                if x.is_finite()
+                    && *x >= -9_223_372_036_854_775_808.0
+                    && *x < 9_223_372_036_854_775_808.0
+                {
+                    V::Adt(1, vec![V::Int(i128::from(x.trunc() as i64), IntTy::I64)])
+                } else {
+                    V::Adt(0, Vec::new())
+                },
+            ),
+            _ => Err(Flow::Bug(format!("f64::{m}: đối số không đúng dạng"))),
+        }
+    }
+
     /// `Text<'a>` (ADR-035) trên thông dịch: `Adt(0, [Vec])`, `Vec = Adt(0, [arena, Array(byte), len, cap])`; bất biến UTF-8 giữ bằng cách chỉ
     /// thêm `String`/`char`/byte đã kiểm bằng `std::str::from_utf8` (nguồn độc lập với bộ sinh).
     fn text_op(&mut self, m: &str, vals: &[V]) -> Result<V, Flow> {
@@ -743,6 +765,14 @@ impl<'a> Interp<'a> {
         if key.starts_with("$prelude::Vec<") {
             return self.vec_op(m, vals).map(Some);
         }
+        if key.ends_with("core::f64_from_bits")
+            && let [V::Int(b, _)] = vals
+        {
+            return Ok(Some(V::Float(f64::from_bits(*b as u64))));
+        }
+        if let Some(name) = key.strip_prefix("$prelude::f64::") {
+            return Self::f64_op(name, vals).map(Some);
+        }
         if key.starts_with("$prelude::Text::") {
             return self.text_op(m, vals).map(Some);
         }
@@ -852,7 +882,15 @@ impl<'a> Interp<'a> {
                 Const::Str(s) => V::Str(s.clone()),
                 Const::Unit => V::Unit,
                 Const::FnItem { node, .. } => V::Fn(*node),
-                Const::Float { .. } | Const::Item { .. } => {
+                Const::Float { text, .. } => {
+                    let t = text.replace('_', "");
+                    let t = t.trim_end_matches("f64");
+                    match t.parse::<f64>() {
+                        Ok(x) => V::Float(x),
+                        Err(_) => return Err(Flow::Bug(format!("literal số thực lạ `{text}`"))),
+                    }
+                }
+                Const::Item { .. } => {
                     return Err(Flow::Bug("hằng ngoài phạm vi thông dịch".to_string()));
                 }
             }),
@@ -889,6 +927,7 @@ impl<'a> Interp<'a> {
             Rvalue::UnaryOp(op, o) => match (op, self.operand(o)?) {
                 (UnOp::Not, V::Bool(b)) => V::Bool(!b),
                 (UnOp::Neg, V::Int(i, t)) => V::Int(wrap(-i, t), t),
+                (UnOp::Neg, V::Float(x)) => V::Float(-x),
                 (_, o) => return Err(Flow::Bug(format!("unop trên {o:?}"))),
             },
             Rvalue::BinaryOp(op, a, b) => binop(*op, self.operand(a)?, self.operand(b)?)?,
@@ -968,6 +1007,19 @@ fn binop(op: BinOp, a: V, b: V) -> Result<V, Flow> {
             BinOp::Ge => V::Bool(x >= y),
             BinOp::BitAnd => return Err(Flow::Bug("BitAnd trên số".to_string())),
         },
+        (V::Float(x), V::Float(y)) => match op {
+            BinOp::Add => V::Float(x + y),
+            BinOp::Sub => V::Float(x - y),
+            BinOp::Mul => V::Float(x * y),
+            BinOp::Div => V::Float(x / y),
+            BinOp::Lt => V::Bool(x < y),
+            BinOp::Le => V::Bool(x <= y),
+            BinOp::Gt => V::Bool(x > y),
+            BinOp::Ge => V::Bool(x >= y),
+            BinOp::Eq => V::Bool(x == y),
+            BinOp::Ne => V::Bool(x != y),
+            _ => return Err(Flow::Bug(format!("phép {op:?} trên số thực"))),
+        },
         (V::Bool(x), V::Bool(y)) => match op {
             BinOp::Eq => V::Bool(x == y),
             BinOp::Ne => V::Bool(x != y),
@@ -985,6 +1037,14 @@ fn binop(op: BinOp, a: V, b: V) -> Result<V, Flow> {
 /// `strict`: chỉ thành công nếu không mất thông tin (CastFits).
 fn cast(v: V, t: &Ty, strict: bool) -> Result<V, Flow> {
     match (v, t) {
+        // số nguyên → f64: chính xác khi |x| ≤ 2^53; `strict` (CastFits) chỉ đúng trong miền đó
+        (V::Int(x, _), Ty::Float(gt_types::FloatTy::F64)) => {
+            if strict && x.unsigned_abs() > (1u128 << 53) {
+                return Err(Flow::Bug("mất thông tin".to_string()));
+            }
+            Ok(V::Float(x as f64))
+        }
+        (V::Float(x), Ty::Float(gt_types::FloatTy::F64)) => Ok(V::Float(x)),
         (V::Int(x, _), Ty::Int(to)) => {
             if strict && !in_range(x, *to) {
                 return Err(Flow::Bug("mất thông tin".to_string()));

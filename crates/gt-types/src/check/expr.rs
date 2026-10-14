@@ -145,6 +145,12 @@ impl<'e, 'a> Checker<'e, 'a> {
             LitKind::Str(_) => Ty::Ref(false, Box::new(Ty::Str)),
             LitKind::Float(s) => {
                 if s.ends_with("f32") {
+                    self.err(
+                        "E0319",
+                        l.id,
+                        l.span,
+                        "`f32` chưa hỗ trợ ở Phase 1 (ADR-035 §B): dùng `f64`".to_string(),
+                    );
                     Ty::Float(FloatTy::F32)
                 } else if s.ends_with("f64") {
                     Ty::Float(FloatTy::F64)
@@ -155,6 +161,12 @@ impl<'e, 'a> Checker<'e, 'a> {
             LitKind::Int(s) => {
                 let is_dec = !(s.starts_with("0x") || s.starts_with("0o") || s.starts_with("0b"));
                 if is_dec && s.ends_with("f32") {
+                    self.err(
+                        "E0319",
+                        l.id,
+                        l.span,
+                        "`f32` chưa hỗ trợ ở Phase 1 (ADR-035 §B): dùng `f64`".to_string(),
+                    );
                     return Ty::Float(FloatTy::F32);
                 }
                 if is_dec && s.ends_with("f64") {
@@ -321,6 +333,14 @@ impl<'e, 'a> Checker<'e, 'a> {
                 self.same_operand(&lt, &rt, rhs);
                 let intonly = !matches!(op, Add | Sub | Mul | Div | Rem);
                 let r = self.infer.shallow(&lt);
+                if matches!(op, Rem) && self.is_float(&lt) {
+                    self.err(
+                        "E0319",
+                        e.id,
+                        e.span,
+                        "`%` trên số thực chưa hỗ trợ ở Phase 1 (cần `fmod` ngoài bảng runtime của IR Guard; ADR-035 §B)".to_string(),
+                    );
+                }
                 if r != Ty::Err {
                     let ok = if intonly {
                         self.is_int(&lt)
@@ -381,6 +401,24 @@ impl<'e, 'a> Checker<'e, 'a> {
         let target = self.env.lower_ty(ty, &cx);
         let from = self.expr(inner, None);
         let (f, t) = (self.infer.shallow(&from), self.infer.shallow(&target));
+        if matches!(f, Ty::Float(_)) && matches!(t, Ty::Int(_) | Ty::Char | Ty::Bool) {
+            self.err(
+                "E0319",
+                e.id,
+                e.span,
+                "`as` từ số thực sang số nguyên/ký tự/bool bị cấm (ADR-035 Q70): dùng `f64::to_i64` (trả `Option`: NaN, ±∞, ngoài miền ⇒ `None`)".to_string(),
+            );
+            return target;
+        }
+        if matches!(t, Ty::Float(FloatTy::F32)) || matches!(f, Ty::Float(FloatTy::F32)) {
+            self.err(
+                "E0319",
+                e.id,
+                e.span,
+                "`f32` chưa hỗ trợ ở Phase 1 (ADR-035 §B): dùng `f64`".to_string(),
+            );
+            return target;
+        }
         let ok = match (&f, &t) {
             (Ty::Err, _) | (_, Ty::Err) => true,
             _ if self.is_numeric(&f) && matches!(t, Ty::Int(_) | Ty::Float(_)) => true,

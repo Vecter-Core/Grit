@@ -119,3 +119,18 @@ Mỗi dòng = một khoảng trống/bug gặp khi viết công cụ thật. C�
 ### Kết quả đo thật (5 test `crates/rig/tests/dogfood_wordfreq.rs` ĐẠT; so với tham chiếu Rust HashMap + sắp xếp, khớp TỪNG BYTE)
 - **Đúng:** 14 ca nhỏ (rỗng, chỉ dấu phân cách, một từ, hoà theo byte, hoa/thường, dấu gạch dưới/dấu câu, CRLF, từ UTF-8 (é, 日本語, 😀), dính ASCII-UTF-8, NUL là dấu phân cách, chữ số, 12 và đúng 10 từ phân biệt); 9 ca UTF-8 SAI (0xFF, byte nối lẻ, cắt giữa 2/4 byte, overlong `C0 AF` và `E0 80 80`, surrogate `ED A0 80`, > U+10FFFF, Latin-1 `é`) ⇒ lỗi có kiểm soát mã 2, stdout rỗng, KHÔNG abort; thiếu tệp/thiếu đối số; 1 MiB và 32 MiB văn bản ngẫu nhiên (nhiều từ, tần suất lệch); hai từ 1 MiB; 10⁶ lần `a` (đếm 1 000 000); 200 000 từ phân biệt.
 - **Hiệu năng (đo, -O0, mọi check giữ, ống pipe, một lần chạy mỗi ca):** 1 MiB (300 từ) 0,21 s (×4,2 so Rust), đỉnh 12 MiB; 32 MiB (5000 từ) 7,23 s (×4,8), đỉnh 234 MiB; 4 MiB (200 000 từ) 0,76 s (×4,0), đỉnh 33 MiB. Rust: thời gian đo trong tiến trình thử (HashMap + sắp xếp); bộ nhớ Rust không đo. Phương sai chưa đo.
+
+## Công cụ 6: stats (`examples/stats`, Grit ~140 dòng, dự án Rig, dùng `f64`) — 2026-10-14
+### Khoảng trống THEO THỨ TỰ CHẶN
+| # | khoảng trống | chặn? | xử lý |
+|---|---|---|---|
+| S1 | `f64` không hạ được ở codegen (`lower_ty`, hằng, phép tính, `as`) và không chạy ở thông dịch (`hằng ngoài phạm vi`) | CÓ | bước (iii): cài đủ (ADR-035 phụ lục) |
+| S2 | M4 chấp nhận `x as i64` từ số thực (xanh, chỉ ghi chú cast_lossy) trái quyết định Q70 | CÓ (trái đặc tả) | E0319 |
+| S3 | không có hằng NaN/±∞ | nhẹ | `core::f64_from_bits` |
+| S4 | không có `sqrt`, `round`, chuyển f64 → số nguyên | CÓ (cần cho độ lệch chuẩn) | `sqrt`, `to_i64 → Option` (làm tròn nửa lên = `to_i64(x + 0,5)`) |
+| S5 | `f64::from_bits` dạng đường dẫn kiểu nguyên thuỷ không phân giải (`f64` không là tên) | nhẹ | hàm `core::f64_from_bits` |
+| S6 | không có `write_f64` | nhẹ (theo lệnh) | in số nguyên đã làm tròn |
+| S7 | không có `%`, `abs`, `min`, `max`, `floor` cho f64 | nhẹ | `%` bị E0319; còn lại chưa cần |
+### Kết quả đo thật (3 test `crates/rig/tests/dogfood_stats.rs` ĐẠT; Rust tính giá trị kỳ vọng bằng CÙNG công thức và thứ tự f64; khớp TỪNG BYTE)
+- **Đúng:** 14 ca nhỏ (rỗng, trắng, `0`, hằng ⇒ stddev 0, CRLF/tab, số 0 đầu, làm tròn nửa lên, 2^53 và sát 2^53, trải rộng); 11 ca token sai/quá lớn (chữ, `-5`, `1.5`, `0x10`, `+3`, chữ số Ả Rập, dấu phẩy, NUL, 2^53 + 1, 26 chữ số, sai sau token tốt) ⇒ lỗi có kiểm soát mã 2, stdout rỗng; thiếu tệp/đối số; 200 tệp ngẫu nhiên (số gần 2^53); 10^6 số; 32 MiB (≈ 1,9 triệu số).
+- **Hiệu năng (-O0, mọi check giữ; ống pipe; một lần chạy):** 10^6 số (≈ 6,9 MB) 0,17 s (×1,3 so Rust), đỉnh 13 MiB; 32 MiB 0,69 s (×1,1), đỉnh 51 MiB. Rust: thời gian trong tiến trình thử (gồm phân tích); bộ nhớ Rust không đo; phương sai chưa đo.

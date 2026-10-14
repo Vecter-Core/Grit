@@ -1,0 +1,7 @@
+// expect: pass
+// note: số học IEEE và so sánh thứ tự trên f64 (== / != cấm theo D4)
+ƒ main() → u64 ! ∅ {
+  x ≔ 1.5f64;
+  y ≔ x * 2.0f64 + 0.25f64 - 1.0f64 / 8.0f64;
+  ⎇ y > 3.0f64 ∧ y <= 3.125f64 { 1u64 } ⇝ { 0u64 }
+}

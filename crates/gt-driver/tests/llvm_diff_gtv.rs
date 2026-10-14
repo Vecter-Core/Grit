@@ -28,6 +28,9 @@ const KINDS_ELEM: [&str; 2] = ["vec_line_sort", "vec_big_sort"];
 /// loại cho `Text` (ADR-035): `GT_GTV_SET=text`
 const KINDS_TEXT: [&str; 3] = ["text_build", "text_utf8", "text_slice"];
 
+/// loại cho `f64` (ADR-035 §B): `GT_GTV_SET=f64`
+const KINDS_F64: [&str; 3] = ["f64_arith", "f64_cmp", "f64_conv"];
+
 /// loại kiểm PHÁN QUYẾT M8 (GT_GTV_SET=term): đồ thị dừng qua impl generic/hai trait, kỳ vọng từ bảng impl của bộ sinh
 const KINDS_TERM: [&str; 1] = ["term_graph"];
 
@@ -1133,6 +1136,253 @@ fn gen_text_slice(rng: &mut Rng) -> (String, Want) {
     }
 }
 
+// ------------------------------------------------------------------------------------------------ f64 (ADR-035 §B)
+
+/// Giá trị mẫu của bộ sinh: số thập phân (Rust `parse::<f64>` và LLVM cùng làm tròn đúng) hoặc mẫu bit đặc biệt (NaN, ±∞, ±0, dưới chuẩn, lớn nhất)
+#[derive(Clone, Copy, Debug)]
+enum FLeaf {
+    Dec(&'static str),
+    Bits(u64),
+}
+
+const F_DEC: [&str; 14] = [
+    "0.0",
+    "1.0",
+    "0.5",
+    "0.1",
+    "0.2",
+    "0.3",
+    "2.5",
+    "3.0",
+    "10.0",
+    "100.0",
+    "1234.5678",
+    "0.000001",
+    "123456789.0",
+    "9007199254740993.0",
+];
+
+const F_BITS: [u64; 10] = [
+    0x7FF8_0000_0000_0000, // NaN
+    0x7FF0_0000_0000_0000, // +inf
+    0xFFF0_0000_0000_0000, // -inf
+    0x8000_0000_0000_0000, // -0
+    0x0000_0000_0000_0001, // dưới chuẩn nhỏ nhất
+    0x000F_FFFF_FFFF_FFFF, // dưới chuẩn lớn nhất
+    0x0010_0000_0000_0000, // chuẩn nhỏ nhất
+    0x7FEF_FFFF_FFFF_FFFF, // lớn nhất
+    0xBFF0_0000_0000_0000, // -1
+    0x4340_0000_0000_0000, // 2^53
+];
+
+fn fleaf_val(l: FLeaf) -> f64 {
+    match l {
+        FLeaf::Dec(t) => t.parse::<f64>().expect("thập phân hợp lệ"),
+        FLeaf::Bits(b) => f64::from_bits(b),
+    }
+}
+
+fn fleaf_src(l: FLeaf) -> String {
+    match l {
+        FLeaf::Dec(t) => format!("{t}f64"),
+        FLeaf::Bits(b) => format!("core::f64_from_bits({b}u64)"),
+    }
+}
+
+fn gen_fleaf(rng: &mut Rng) -> FLeaf {
+    if rng.chance(55) {
+        FLeaf::Dec(F_DEC[rng.below(F_DEC.len() as u64) as usize])
+    } else {
+        FLeaf::Bits(F_BITS[rng.below(F_BITS.len() as u64) as usize])
+    }
+}
+
+#[derive(Clone, Debug)]
+enum FE {
+    Leaf(FLeaf),
+    Neg(Box<FE>),
+    Sqrt(Box<FE>),
+    Bin(char, Box<FE>, Box<FE>),
+}
+
+fn gen_fe(rng: &mut Rng, depth: u64) -> FE {
+    if depth == 0 || rng.chance(25) {
+        return FE::Leaf(gen_fleaf(rng));
+    }
+    match rng.below(7) {
+        0 => FE::Neg(Box::new(gen_fe(rng, depth - 1))),
+        1 => FE::Sqrt(Box::new(gen_fe(rng, depth - 1))),
+        k => FE::Bin(
+            ['+', '-', '*', '/'][(k as usize - 2) % 4],
+            Box::new(gen_fe(rng, depth - 1)),
+            Box::new(gen_fe(rng, depth - 1)),
+        ),
+    }
+}
+
+fn fe_val(e: &FE) -> f64 {
+    match e {
+        FE::Leaf(l) => fleaf_val(*l),
+        FE::Neg(x) => -fe_val(x),
+        FE::Sqrt(x) => fe_val(x).sqrt(),
+        FE::Bin(op, a, b) => {
+            let (x, y) = (fe_val(a), fe_val(b));
+            match op {
+                '+' => x + y,
+                '-' => x - y,
+                '*' => x * y,
+                _ => x / y,
+            }
+        }
+    }
+}
+
+fn fe_src(e: &FE) -> String {
+    match e {
+        FE::Leaf(l) => fleaf_src(*l),
+        FE::Neg(x) => format!("(-{})", fe_src(x)),
+        FE::Sqrt(x) => format!("{}.sqrt()", fe_src(x)),
+        FE::Bin(op, a, b) => format!("({} {op} {})", fe_src(a), fe_src(b)),
+    }
+}
+
+/// NaN chuẩn hoá (dấu/payload của NaN không được đặc tả): mọi NaN → 0x7FF8000000000000
+fn canon(x: f64) -> u64 {
+    if x.is_nan() {
+        0x7FF8_0000_0000_0000
+    } else {
+        x.to_bits()
+    }
+}
+
+const F_CANON: &str =
+    "ƒ cb(x: f64) → u64 ! ∅ { ⎇ x.is_nan() { 9221120237041090560u64 } ⇝ { x.to_bits() } }\n";
+
+fn gen_f64_arith(rng: &mut Rng) -> (String, Want) {
+    let n = 1 + rng.below(4) as usize;
+    let mut body = String::from("  μh ≔ 0u64;\n");
+    let mut h = 0u64;
+    for _ in 0..n {
+        let e = gen_fe(rng, 4);
+        body.push_str(&format!("  h ← h *% 1000003u64 +% cb({});\n", fe_src(&e)));
+        h = h.wrapping_mul(1_000_003).wrapping_add(canon(fe_val(&e)));
+    }
+    (
+        format!("{F_CANON}ƒ main() → u64 ! ∅ {{\n{body}  h\n}}\n"),
+        Ok(h.to_string()),
+    )
+}
+
+fn gen_f64_cmp(rng: &mut Rng) -> (String, Want) {
+    let n = 2 + rng.below(6) as usize;
+    let mut body = String::from("  μh ≔ 0u64;\n");
+    let mut h = 0u64;
+    for _ in 0..n {
+        let (a, b) = (gen_fleaf(rng), gen_fleaf(rng));
+        let (x, y) = (fleaf_val(a), fleaf_val(b));
+        let (op, r) = match rng.below(4) {
+            0 => ("<", x < y),
+            1 => ("<=", x <= y),
+            2 => (">", x > y),
+            _ => (">=", x >= y),
+        };
+        body.push_str(&format!(
+            "  h ← h *% 3u64 +% (⎇ {} {op} {} {{ 1u64 }} ⇝ {{ 0u64 }});\n",
+            fleaf_src(a),
+            fleaf_src(b)
+        ));
+        h = h.wrapping_mul(3).wrapping_add(u64::from(r));
+        // `is_nan` thay cho `x != x`
+        body.push_str(&format!(
+            "  h ← h *% 3u64 +% (⎇ {}.is_nan() {{ 1u64 }} ⇝ {{ 0u64 }});\n",
+            fleaf_src(a)
+        ));
+        h = h.wrapping_mul(3).wrapping_add(u64::from(x.is_nan()));
+    }
+    (
+        format!("ƒ main() → u64 ! ∅ {{\n{body}  h\n}}\n"),
+        Ok(h.to_string()),
+    )
+}
+
+/// Chuyển đổi: `to_i64` (Option), `i64/u64 as f64` (chính xác ≤ 2^53, ngoài miền ⇒ abort `cast_lossy`), `to_bits`/`from_bits`
+fn gen_f64_conv(rng: &mut Rng) -> (String, Want) {
+    match rng.below(3) {
+        0 => {
+            // to_i64 trên giá trị tuỳ ý (NaN, ±∞, ±2^63, phần thập phân)
+            let n = 1 + rng.below(4) as usize;
+            let mut body = String::from("  μh ≔ 0u64;\n");
+            let mut h = 0u64;
+            for _ in 0..n {
+                let e = gen_fe(rng, 2);
+                let v = fe_val(&e);
+                // Some(t): t ≥ 0 ⇒ t + 1; t < 0 ⇒ 7 + [t < −1000] (tránh `as u64` của số âm ⇒ cast_lossy); None ⇒ 0
+                let contrib: u64 = if v.is_finite()
+                    && (-9_223_372_036_854_775_808.0..9_223_372_036_854_775_808.0).contains(&v)
+                {
+                    let t = v.trunc() as i64;
+                    if t >= 0 {
+                        (t as u64).wrapping_add(1)
+                    } else {
+                        7 + u64::from(t < -1000)
+                    }
+                } else {
+                    0
+                };
+                body.push_str(&format!(
+                    "  h ← h *% 1000003u64 +% (⌥ {}.to_i64() {{ Some(v) ↦ (⎇ v < 0i64 {{ 7u64 +% (⎇ v < -1000i64 {{ 1u64 }} ⇝ {{ 0u64 }}) }} ⇝ {{ (v as u64) +% 1u64 }}), None ↦ 0u64 }});\n",
+                    fe_src(&e)
+                ));
+                h = h.wrapping_mul(1_000_003).wrapping_add(contrib);
+            }
+            (
+                format!("ƒ main() → u64 ! ∅ {{\n{body}  h\n}}\n"),
+                Ok(h.to_string()),
+            )
+        }
+        1 => {
+            // số nguyên → f64: trong miền ⇒ giá trị đúng; ngoài ±2^53 ⇒ abort cast_lossy (giá trị đi qua hàm để M7 không biết)
+            let big = rng.chance(50);
+            let mag: i64 = if big {
+                (1i64 << 53) + 1 + rng.below(1000) as i64
+            } else {
+                rng.below(1 << 40) as i64
+            };
+            let n = if rng.chance(50) { mag } else { -mag };
+            let use_u = rng.chance(30) && n >= 0;
+            let src = if use_u {
+                format!(
+                    "ƒ idv(x: u64) → u64 ! ∅ {{ x }}\nƒ main() → u64 ! ∅ {{ x ≔ idv({n}u64) as f64; x.to_bits() }}\n"
+                )
+            } else {
+                format!(
+                    "ƒ idv(x: i64) → i64 ! ∅ {{ x }}\nƒ main() → u64 ! ∅ {{ x ≔ idv({n}i64) as f64; x.to_bits() }}\n"
+                )
+            };
+            if mag.unsigned_abs() > (1u64 << 53) {
+                (src, Err("cast_lossy"))
+            } else {
+                (src, Ok((n as f64).to_bits().to_string()))
+            }
+        }
+        _ => {
+            // bitcast khứ hồi và sqrt trên mẫu bit tuỳ ý
+            let b = rng.next();
+            let x = f64::from_bits(b);
+            let src = format!(
+                "{F_CANON}ƒ main() → u64 ! ∅ {{ x ≔ core::f64_from_bits({b}u64); cb(x) *% 1000003u64 +% cb(x.sqrt()) }}\n"
+            );
+            (
+                src,
+                Ok(canon(x)
+                    .wrapping_mul(1_000_003)
+                    .wrapping_add(canon(x.sqrt()))
+                    .to_string()),
+            )
+        }
+    }
+}
+
 // ------------------------------------------------------------------------------------------------ chạy
 
 #[derive(Default)]
@@ -1279,6 +1529,9 @@ fn run_one(kind: &'static str, seed: u64, t: &mut Tally, dir: &std::path::Path) 
         "vec_arena_exhausted" => gen_vec_exhaust(&mut rng),
         "vec_line_sort" => gen_line_sort(&mut rng),
         "vec_big_sort" => gen_big_sort(&mut rng),
+        "f64_arith" => gen_f64_arith(&mut rng),
+        "f64_cmp" => gen_f64_cmp(&mut rng),
+        "f64_conv" => gen_f64_conv(&mut rng),
         "text_build" => gen_text_build(&mut rng),
         "text_utf8" => gen_text_utf8(&mut rng),
         "text_slice" => gen_text_slice(&mut rng),
@@ -1391,6 +1644,8 @@ fn run_batch(start: u64, count: u64) -> Tally {
             &KINDS_TERM
         } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "text") {
             &KINDS_TEXT
+        } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "f64") {
+            &KINDS_F64
         } else {
             &KINDS
         };
@@ -1426,6 +1681,8 @@ fn batch() {
         } else {
             "generic-trait-vec-term"
         }
+    } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "f64") {
+        "generic-trait-vec-f64"
     } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "text") {
         "generic-trait-vec-text"
     } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "elem") {

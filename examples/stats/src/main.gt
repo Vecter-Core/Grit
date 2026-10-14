@@ -1,0 +1,136 @@
+// stats: trung bình và độ lệch chuẩn (tổng thể) của một dãy số nguyên không âm đọc từ tệp (công cụ thứ sáu, dogfood `f64`). Dùng: stats <đường-dẫn>
+// Quy ước (README.md; bản tham chiếu Rust trong test dùng y hệt): tệp là các số thập phân không âm cách nhau bởi khoảng trắng ASCII (` `, `\t`, `\n`, `\r`);
+// mỗi số ≤ 2^53 (đổi sang f64 CHÍNH XÁC). Token sai (ký tự lạ, rỗng) hoặc quá lớn ⇒ lỗi CÓ KIỂM SOÁT (stderr, mã 2), không abort.
+// Tính theo thứ tự cố định bằng f64 IEEE-754: tổng = Σ xᵢ (cộng lần lượt), trung bình m = tổng / n, phương sai v = Σ (xᵢ − m)² / n (lần lượt), độ lệch √v.
+// In ba dòng `count <n>`, `mean <m làm tròn>`, `stddev <s làm tròn>`; làm tròn = ⌊x + 0,5⌋ bằng `to_i64` (không cần write_f64). n = 0 ⇒ mean và stddev = 0.
+// Bộ nhớ: một Vec<u64> (đếm trước số token, `reserve` một lần) + một Text đầu ra.
+
+ƒ is_space(c: u8) → bool ! ∅ { c == 32u8 ∨ c == 9u8 ∨ c == 10u8 ∨ c == 13u8 }
+
+// số token = số điểm bắt đầu token
+ƒ count_tokens(b: &[u8]) → usize ! ∅ {
+  μn ≔ 0usize;
+  μi ≔ 0usize;
+  μprev ≔ true;
+  ⟳ i < b.len() ↓ b.len() - i {
+    cur ≔ ¬is_space(b[i]);
+    ⎇ cur ∧ prev { n ← n + 1; } ⇝ { }
+    prev ← ¬cur;
+    i ← i + 1;
+  }
+  n
+}
+
+ƒ fail(err: &Cap<ErrOut>, path: &str, why: &str) → ! ! {io, div} {
+  err.write_str("stats: ");
+  err.write_str(path);
+  err.write_str(": ");
+  err.write_str(why);
+  err.write_str("\n");
+  core::exit(2u32)
+}
+
+ƒ usage(err: &Cap<ErrOut>) → ! ! {io, div} {
+  err.write_str("usage: stats <file>\n");
+  core::exit(2u32)
+}
+
+// ghi `n` thập phân vào Text bằng `push_char`
+ƒ push_u64<'a>(t: &!Text<'a>, n: u64) ! {mem} {
+  μdigits ≔ [0u8; 20];
+  μk ≔ 0usize;
+  μv ≔ n;
+  ⟳ k < 20usize ∧ (v > 0u64 ∨ k == 0usize) ↓ 20usize - k {
+    digits[k] ← ((v % 10u64) as u8) +% 48u8;
+    v ← v / 10u64;
+    k ← k + 1;
+  }
+  μj ≔ k;
+  ⟳ j > 0usize ↓ j {
+    j ← j - 1;
+    t.push_char(digits[j] as char);
+  }
+}
+
+// làm tròn nửa lên một số thực không âm bằng `to_i64`; ngoài miền (không xảy ra với dữ liệu hợp lệ) ⇒ 0
+ƒ round_u64(x: f64) → u64 ! ∅ {
+  ⌥ (x + 0.5f64).to_i64() {
+    Some(v) ↦ ⎇ v < 0i64 { 0u64 } ⇝ { v as u64 },
+    None ↦ 0u64,
+  }
+}
+
+ƒ run(b: &[u8], alloc: &Cap<Alloc>, out: &Cap<Out>, err: &Cap<ErrOut>, path: &str) ! {io, div, mem} {
+  nt ≔ count_tokens(b);
+  μa1 ≔ alloc.arena();
+  μxs ≔ Vec::new(&!a1);
+  xs.reserve(nt);
+  // phân tích token: chỉ chữ số thập phân; mỗi giá trị ≤ 2^53
+  μi ≔ 0usize;
+  μv ≔ 0u64;
+  μin_tok ≔ false;
+  ⟳ i < b.len() ↓ b.len() - i {
+    c ≔ b[i];
+    ⎇ is_space(c) {
+      ⎇ in_tok { xs.push(v); v ← 0u64; in_tok ← false; } ⇝ { }
+    } ⇝ {
+      ⎇ c >= 48u8 ∧ c <= 57u8 {
+        v ← v * 10u64 + ((c - 48u8) as u64);
+        ⎇ v > 9007199254740992u64 { fail(err, path, "value too large (> 2^53)") } ⇝ { }
+        in_tok ← true;
+      } ⇝ { fail(err, path, "invalid token (only decimal digits and ASCII whitespace allowed)") }
+    }
+    i ← i + 1;
+  }
+  ⎇ in_tok { xs.push(v); } ⇝ { }
+  s ≔ xs.as_slice();
+  n ≔ s.len();
+  μmean ≔ 0.0f64;
+  μsd ≔ 0.0f64;
+  ⎇ n > 0usize {
+    μsum ≔ 0.0f64;
+    μk ≔ 0usize;
+    ⟳ k < s.len() ↓ s.len() - k {
+      sum ← sum + (s[k] as f64);
+      k ← k + 1;
+    }
+    nf ≔ n as f64;
+    mean ← sum / nf;
+    μacc ≔ 0.0f64;
+    μj ≔ 0usize;
+    ⟳ j < s.len() ↓ s.len() - j {
+      d ≔ (s[j] as f64) - mean;
+      acc ← acc + d * d;
+      j ← j + 1;
+    }
+    sd ← (acc / nf).sqrt();
+  } ⇝ { }
+  μa2 ≔ alloc.arena();
+  μo ≔ Text::new(&!a2);
+  o.push_str("count ");
+  push_u64(&!o, n as u64);
+  o.push_str("\nmean ");
+  push_u64(&!o, round_u64(mean));
+  o.push_str("\nstddev ");
+  push_u64(&!o, round_u64(sd));
+  o.push_str("\n");
+  out.write_bytes(o.as_bytes());
+}
+
+ƒ main() ! {io, div, mem} {
+  env ≔ root_env();
+  fs ≔ root_fs();
+  out ≔ root_out();
+  err ≔ root_err();
+  alloc ≔ root_alloc();
+  ⎇ env.arg_count() < 2usize { usage(&err) } ⇝ {
+    path ≔ env.arg(1usize);
+    ⌥ fs.open(path) {
+      Ok(f) ↦ { run(f.bytes(), &alloc, &out, &err, path); },
+      Err(IoError::NotFound) ↦ fail(&err, path, "no such file"),
+      Err(IoError::Denied) ↦ fail(&err, path, "permission denied"),
+      Err(IoError::Invalid) ↦ fail(&err, path, "invalid path"),
+      Err(IoError::Other) ↦ fail(&err, path, "i/o error"),
+    }
+  }
+}
