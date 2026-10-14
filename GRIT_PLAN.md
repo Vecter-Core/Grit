@@ -399,7 +399,7 @@ Closure, `dyn`/trait object, macro, async, GAT/specialization, inline asm, FFI n
 Chỉ chuyển khi đạt **tất cả**:
 
 1. Toàn bộ test xanh; corpus borrowck/đa luồng/biên không còn false negative đã biết.
-2. Fuzz lexer/parser/typechecker mỗi cái ≥24 giờ tích luỹ, không panic/treo.
+2. **(Sửa bởi ADR-037, Giang 2026-10-14)** Fuzz **lexer và parser** mỗi cái ≥24 giờ TÍCH LUỸ (không cần liên tục, giữ corpus; cơ chế `tools/fuzz_session.sh` + `docs/FUZZ_LOG.jsonl`; tổng bằng `tools/fuzz_total.py`), không panic/treo. **Type checker: KHÔNG fuzz byte** (parser chặn trước); thay bằng bộ sinh có cấu trúc + oracle độc lập + đột biến (số chương trình và độ phủ theo loại ghi ở ADR-037). Đây là NỚI điều kiện so với bản gốc "lexer/parser/typechecker mỗi cái ≥24 giờ".
 3. 3 chương trình thật (M12) chạy đúng; benchmark nền được ghi nhận.
 4. Mọi mã lỗi có tài liệu + test đủ (mục 0.5).
 5. Output tái lập 100% (build hai lần so băm).
