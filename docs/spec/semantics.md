@@ -5,6 +5,7 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 
 ## 1. Kiểu
 - **Kiểu nguyên thuỷ (danh sách chính thức):** `i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 isize usize f32 f64 bool char str`.
+  **`f32` là DÀNH RIÊNG (Phase 2)**: Phase 1 chỉ hỗ trợ `f64`; mọi dùng `f32` (kiểu, literal `1f32`, `as f32`) bị E0319 (Giang duyệt Q79, 2026-10-14). `%` trên số thực cũng bị E0319 (Q80).
   (Giang yêu cầu ghi ở "§3"; §3 là biến & luồng nên danh sách nằm ở §1 — nội dung đúng như yêu cầu.)
   `isize/usize` rộng bằng con trỏ của mục tiêu (Phase 1: x86-64 ⇒ 64 bit). `char` = một Unicode scalar value (không phải surrogate).
   `str` không biết kích thước, chỉ dùng sau `&`/`&!` (`&str`). Unit là `()`.

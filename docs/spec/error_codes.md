@@ -69,6 +69,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | N0601 | Check tràn hạ thành runtime | M7 | pass/02_sum_loop |
 | N0602 | Check biên mảng hạ thành runtime | M7 | — |
 | N0603 | Check chia/% (mẫu số ≠ 0, `MIN / -1`) hạ thành runtime | M7 | — |
+| N0606 | `--checks=proven` là chế độ THỬ NGHIỆM (xoá check đã chứng minh); in mỗi lần chạy | gritc | gt-driver/tests/release_policy.rs |
 | N0604 | Check ép kiểu mất thông tin hạ thành runtime | M7 | — |
 | N0605 | Phân tích bị giảm độ chính xác: vượt `ZONE_MAX_VARS` biến cho miền quan hệ, hoặc hết ngân sách bước (D20) | M7 | — |
 | N0901 | Tiền điều kiện hạ thành runtime | M7 | — |

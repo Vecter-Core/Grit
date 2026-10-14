@@ -10,10 +10,10 @@ mod obgen;
 
 /// hồ sơ do bộ chạy chọn (`GT_PROFILE=release` ⇒ chạy lại cả bộ ở hồ sơ release, ADR-036 Q77); mặc định dev
 fn test_profile() -> gt_codegen_llvm::Opt {
-    if std::env::var("GT_PROFILE").is_ok_and(|v| v == "release") {
-        gt_codegen_llvm::Opt::Release
-    } else {
-        gt_codegen_llvm::Opt::Dev
+    match std::env::var("GT_PROFILE").as_deref() {
+        Ok("release") => gt_codegen_llvm::Opt::Release,
+        Ok("release-o2") => gt_codegen_llvm::Opt::ReleaseO2,
+        _ => gt_codegen_llvm::Opt::Dev,
     }
 }
 

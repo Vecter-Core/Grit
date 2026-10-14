@@ -3,6 +3,11 @@
 //! (loại abort cố định; số thực do Rust tính theo IEEE từng phép, KHÔNG hợp nhất).
 use std::process::Command;
 
+/// hồ sơ release dưới kiểm: `GT_PROFILE` (`release` hoặc `release-o2`; mặc định `release`)
+fn rel() -> String {
+    std::env::var("GT_PROFILE").unwrap_or_else(|_| "release".to_string())
+}
+
 fn run(src: &str, profile: &str, env: &[(&str, &str)]) -> (i32, bool, String, String) {
     static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let n = N.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -148,7 +153,7 @@ fn abort_cases() -> Vec<Case> {
 fn every_reachable_abort_kind_is_the_same_in_dev_and_release() {
     for (kind, src, env) in abort_cases() {
         let d = run(src, "dev", &env);
-        let r = run(src, "release", &env);
+        let r = run(src, &rel(), &env);
         assert_eq!(
             (d.0, d.1, d.2.as_str()),
             (70, true, kind),
@@ -205,7 +210,7 @@ fn float_traps_match_ieee_per_operation_in_release() {
             .to_bits()
             .wrapping_add(left.to_bits().wrapping_mul(3))
             .wrapping_add(right.to_bits().wrapping_mul(5));
-        for p in ["dev", "release"] {
+        for p in ["dev", rel().as_str()] {
             let got = run(&src, p, &[]);
             assert_eq!(
                 (got.0, got.3.as_str()),
@@ -232,7 +237,7 @@ fn constant_folded_floats_are_ieee_exact_in_release() {
     ];
     for (e, want) in cases {
         let src = format!("ƒ main() → u64 ! ∅ {{ ({e}).to_bits() }}\n");
-        for p in ["dev", "release"] {
+        for p in ["dev", rel().as_str()] {
             let got = run(&src, p, &[]);
             assert_eq!(
                 (got.0, got.3.as_str()),
@@ -290,7 +295,7 @@ fn nan_signed_zero_infinity_subnormal_behave_per_ieee_in_release() {
     ];
     for (e, want) in progs {
         let src = format!("ƒ main() → u64 ! ∅ {{ {e} }}\n");
-        for p in ["dev", "release"] {
+        for p in ["dev", rel().as_str()] {
             let got = run(&src, p, &[]);
             assert_eq!(
                 (got.0, got.3.as_str()),

@@ -290,6 +290,13 @@ fn run_passes(
         .iter()
         .map(|i| (i.name.clone(), i.text.clone()))
         .collect();
+    if opts.checks == Checks::Proven {
+        // chế độ THỬ NGHIỆM xoá check đã chứng minh: nhắc MỖI lần chạy (lệnh Giang 2026-10-14, mục 5)
+        run.bag.push(gritc_diag(
+            "N0606",
+            "`--checks=proven` là chế độ THỬ NGHIỆM: xoá các check đã chứng minh (mặc định an toàn là `--checks=all`; còn 69 đột biến nguy hiểm của bộ giải chưa giải quyết — KNOWN_LIMITATIONS)".to_string(),
+        ));
+    }
     if with_selftest {
         if let Some(Err(why)) = run.stage("selftest", selftest) {
             // pass chạy xong nhưng kết luận HỎNG: đánh dấu Failed + ICE

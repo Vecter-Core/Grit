@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 include!(concat!(env!("OUT_DIR"), "/explain_table.rs"));
 
-const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release (mặc định: dev)] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release (mặc định: dev)] [--json] [--deny-yellow] [--checks=all|proven]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
+const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release|release-o2 (mặc định: dev; release và release-o2 là THỬ NGHIỆM)] [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release|release-o2 (mặc định: dev; release và release-o2 là THỬ NGHIỆM)] [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
 
 #[derive(Debug)]
 struct Cli {
@@ -70,6 +70,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
             "--backend=llvm" => cli.backend = Backend::Llvm,
             "--profile=dev" => cli.profile = gt_codegen_llvm::Opt::Dev,
             "--profile=release" => cli.profile = gt_codegen_llvm::Opt::Release,
+            "--profile=release-o2" => cli.profile = gt_codegen_llvm::Opt::ReleaseO2,
             "-o" => {
                 cli.out = Some(
                     it.next()
@@ -84,7 +85,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
             }
             s if s.starts_with("--profile=") => {
                 return Err(format!(
-                    "`{s}`: chỉ nhận --profile=dev hoặc --profile=release"
+                    "`{s}`: chỉ nhận --profile=dev, --profile=release hoặc --profile=release-o2"
                 ));
             }
             s if s.starts_with("--checks=") => {
@@ -98,6 +99,13 @@ fn parse(args: &[String]) -> Result<Cli, String> {
                 cli.path = Some(s.to_string());
             }
         }
+    }
+    // chế độ XOÁ check (`--checks=proven`) là THỬ NGHIỆM và KHÔNG được dùng bởi hồ sơ release (lệnh Giang 2026-10-14, mục 5)
+    if cli.checks == Checks::Proven && cli.profile.is_release() {
+        return Err(
+            "`--checks=proven` (thử nghiệm: xoá check đã chứng minh) không được dùng cùng `--profile=release*`: hồ sơ release luôn giữ mọi check"
+                .to_string(),
+        );
     }
     Ok(cli)
 }

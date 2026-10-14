@@ -66,7 +66,18 @@ pub struct Options {
 pub enum Opt {
     #[default]
     Dev,
+    /// THỬ NGHIỆM: danh sách trắng pass IR + Guard-post; backend O0
     Release,
+    /// THỬ NGHIỆM (ứng viên, ADR-036 Q82): như `Release` nhưng `TargetMachine` ở `OptimizationLevel::Default` (tối ưu máy)
+    ReleaseO2,
+}
+
+impl Opt {
+    /// hồ sơ chạy bộ tối ưu IR + Guard-post?
+    #[must_use]
+    pub fn is_release(self) -> bool {
+        matches!(self, Opt::Release | Opt::ReleaseO2)
+    }
 }
 
 /// (`instcombine` đã THỬ và BỊ LOẠI: thêm cờ `nuw/nneg` và xoá abort của kiểm tra gập được — Guard-post từ chối cả 6 công cụ dogfood; ADR-036 §7.)
@@ -267,7 +278,11 @@ pub fn compile(
         &triple,
         "generic",
         "",
-        OptimizationLevel::None,
+        if opts.opt == Opt::ReleaseO2 {
+            OptimizationLevel::Default
+        } else {
+            OptimizationLevel::None
+        },
         RelocMode::Default,
         CodeModel::Default,
     ) else {
@@ -370,7 +385,7 @@ pub fn compile(
     if !violations.is_empty() {
         return Err(CodegenError::Guard(violations));
     }
-    if opts.opt == Opt::Release {
+    if opts.opt.is_release() {
         cg.module
             .run_passes(RELEASE_PASSES, &tm, PassBuilderOptions::create())
             .map_err(|e| CodegenError::Internal(format!("bộ tối ưu: {e}")))?;

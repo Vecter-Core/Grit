@@ -2,6 +2,11 @@
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
+/// hồ sơ release dưới kiểm: `GT_PROFILE` (`release` hoặc `release-o2`; mặc định `release`)
+fn rel() -> String {
+    std::env::var("GT_PROFILE").unwrap_or_else(|_| "release".to_string())
+}
+
 const PROG: &str = "ƒ f(n: u64) → u64 ! ∅ { μs ≔ 0u64; μi ≔ 0u64; ⟳ i < n ↓ n - i { s ← s + i; i ← i + 1; } s }\nƒ main() → u64 ! ∅ { f(100u64) }\n";
 
 fn gritc() -> Command {
@@ -46,7 +51,7 @@ fn guard_post_rejects_every_injected_fault() {
         ("post:unreachable", "không đúng mẫu abort"),
         ("post:untagged-spawn", "thiếu metadata !gt.obl"),
     ] {
-        let (o, exe, dir) = build("release", Some(fault), false);
+        let (o, exe, dir) = build(&rel(), Some(fault), false);
         let err = String::from_utf8_lossy(&o.stderr).into_owned();
         assert_eq!(o.status.code(), Some(1), "{fault}: {err}");
         assert!(
@@ -59,7 +64,7 @@ fn guard_post_rejects_every_injected_fault() {
             "{fault}: không để lại object"
         );
         // cùng chương trình, KHÔNG lỗi chèn ⇒ dựng được (lỗi trên thật sự do lỗi chèn)
-        let (ok, exe2, _) = build("release", None, false);
+        let (ok, exe2, _) = build(&rel(), None, false);
         assert_eq!(
             ok.status.code(),
             Some(0),
@@ -79,7 +84,7 @@ fn guard_pre_still_runs_before_the_optimizer_in_release() {
         ("ir:attest", "attestation lệch"),
         ("ir:instance", "không thuộc bảng instance"),
     ] {
-        let (o, exe, _) = build("release", Some(fault), false);
+        let (o, exe, _) = build(&rel(), Some(fault), false);
         let err = String::from_utf8_lossy(&o.stderr).into_owned();
         assert_eq!(o.status.code(), Some(1), "{fault}: {err}");
         assert!(
@@ -94,7 +99,7 @@ fn guard_pre_still_runs_before_the_optimizer_in_release() {
 #[test]
 fn release_does_not_change_the_remaining_checks_report() {
     let (d, _, _) = build("dev", None, true);
-    let (r, _, _) = build("release", None, true);
+    let (r, _, _) = build(&rel(), None, true);
     assert_eq!(d.status.code(), Some(0));
     assert_eq!(r.status.code(), Some(0));
     let (ds, rs) = (
@@ -111,7 +116,7 @@ fn release_does_not_change_the_remaining_checks_report() {
 /// băm IR trước/sau tối ưu: release in hai băm SHA-256 KHÁC nhau; dev không có băm sau
 #[test]
 fn release_reports_two_ir_hashes_dev_none() {
-    let (r, _, _) = build("release", None, false);
+    let (r, _, _) = build(&rel(), None, false);
     let err = String::from_utf8_lossy(&r.stderr).into_owned();
     let line = err
         .lines()
