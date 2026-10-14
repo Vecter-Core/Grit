@@ -748,10 +748,13 @@ enum WImpl {
     Konst(i64),
 }
 
+/// impl của một lá cho một trait: (hằng, các lời gọi (trait, giá trị))
+type LeafImpl = (i64, Vec<(usize, TVal)>);
+
 struct TermModel {
     nleaf: usize,
     /// `leaf[tr][j]`: (hằng, các lời gọi (trait, giá trị))
-    leaf: [Vec<(i64, Vec<(usize, TVal)>)>; 2],
+    leaf: [Vec<LeafImpl>; 2],
     w: [WImpl; 2],
 }
 
@@ -837,7 +840,7 @@ fn gen_tval(rng: &mut Rng, nleaf: usize, depth: u64) -> TVal {
 /// chương trình dừng/không dừng nhiều tầng qua impl generic và hai trait; trả (nguồn, mô hình, các lời gọi ở main)
 fn gen_term(rng: &mut Rng) -> (String, TermModel, Vec<(usize, TVal)>) {
     let nleaf = 1 + rng.below(3) as usize;
-    let mk_leaf = |rng: &mut Rng| -> Vec<(i64, Vec<(usize, TVal)>)> {
+    let mk_leaf = |rng: &mut Rng| -> Vec<LeafImpl> {
         (0..nleaf)
             .map(|_| {
                 let k0 = rng.below(100) as i64;
