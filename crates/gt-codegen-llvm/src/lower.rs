@@ -69,9 +69,9 @@ pub enum Opt {
     Release,
 }
 
-/// (`no-verify-fixpoint`: LLVM 20 mặc định ABORT tiến trình nếu instcombine chưa hội tụ sau 1 lượt — chỉ là kiểm tra nội bộ của LLVM; kết quả vẫn được Guard-post và `verify` kiểm.)
+/// (`instcombine` đã THỬ và BỊ LOẠI: thêm cờ `nuw/nneg` và xoá abort của kiểm tra gập được — Guard-post từ chối cả 6 công cụ dogfood; ADR-036 §7.)
 /// Danh sách TRẮNG pass tối ưu của hồ sơ `release` (ADR-036 §6): mỗi pass có lý do trong ADR; KHÔNG `default<O2>`, KHÔNG inline.
-pub const RELEASE_PASSES: &str = "mem2reg,sroa,early-cse,instcombine<no-verify-fixpoint>";
+pub const RELEASE_PASSES: &str = "mem2reg,sroa,early-cse";
 
 /// Lỗi cố ý chèn vào IR (chỉ để kiểm cổng).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
