@@ -623,3 +623,8 @@ Rút kinh nghiệm: prelude có BA bản (lib/core, fixture gt-types, fixture gt
 - **Hiệu năng (-O0, mọi check giữ; không phải cổng):** 1 MiB ×4,2 (đỉnh 12 MiB), 32 MiB ×4,8 (7,23 s; đỉnh 234 MiB ≈ 7× tệp), 4 MiB/200 000 từ ×4,0 (đỉnh 33 MiB).
 - **Bug thật gặp:** FB-4 (`u8 as char` không hạ được ở codegen): test hồi quy TRƯỚC (đỏ khi bỏ sửa), commit riêng 49e7bc1. Khoảng trống W1–W7 ở DOGFOOD (không có HashMap theo lệnh; không có `Display`; `Text::from_utf8` sao chép; …).
 - **Chưa kiểm:** tệp UTF-8 > 100 MiB; số từ phân biệt > 10⁶; bộ nhớ của tham chiếu Rust không đo; phương sai của phép đo; cổng đầy đủ chạy sau bước này.
+
+## CỔNG ĐẦY ĐỦ sau (ii) wordfreq (2026-10-14) — kết quả thật (`bash tools/gate.sh /d/Grit`, mã thoát 0)
+- **`GATE_RESULT=GREEN`:** gt-rt OK; `fmt` OK; `clippy -D warnings` EXIT 0; `audit` EXIT 0; **`test --workspace`: 817 đạt, 0 đỏ, 153 bộ test (SUITES=153)**; `check_expectations` OK (kèm unittest 9 + `test_gate.py` 5).
+- **Sự cố khi chạy:** lần khởi động đầu bị tôi dừng giữa chừng (clippy còn đỏ vì một lint của test mới; `taskkill` làm `cargo audit` thoát 1 và cổng báo RED đúng như thiết kế) ⇒ bỏ lần đó, sửa lint, chạy lại từ đầu; lần ghi ở trên là lần chạy hợp lệ duy nhất sau sửa.
+- Kể từ cổng trước (803 đạt/149 bộ): thêm Text (bộ sinh, mẫu M6), gt-term (instance_graph, conservative_fallback), term_graph, FB-4, wordfreq, sortlines…
