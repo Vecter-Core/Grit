@@ -104,3 +104,18 @@ Mỗi dòng = một khoảng trống/bug gặp khi viết công cụ thật. C�
 | 4 MiB toàn dòng rỗng | 0,99 s | 0,26 s | ×3,8 | 139 / 72 MiB |
 - **Bản đo TRƯỚC đó đã bị thay:** khi in từng dòng bằng hai lời gọi `write_*` (mỗi lời gọi flush stdout) tool chậm ×3,6–×27 (32 MiB: 7,24 s; 10⁶ dòng: 3,63 s; 4 MiB rỗng: 7,20 s) — thời gian chủ yếu là syscall ghi, không phải sắp xếp. Gom đầu ra một lần giảm 3–10×. Bộ nhớ đỉnh tăng bằng một Arena thứ ba (kích thước tệp: 86 → 118 MiB ở 32 MiB). Ra TỆP (PowerShell `Start-Process -RedirectStandardOutput`) trước đây 129,5 s cho 10⁶ dòng: CHƯA đo lại sau thay đổi.
 - Rust: thời gian đo TRONG tiến trình thử (không gồm khởi động); bộ nhớ Rust là ƯỚC TÍNH (tệp·2 + 16·dòng), không đo; sortlines.gt thời gian gồm khởi động tiến trình + đọc/ghi. Chưa đo lặp lại nhiều lần nên bỏ qua phương sai.
+
+## Công cụ 5: wordfreq (`examples/wordfreq`, Grit: main.gt ~160 dòng + msort.gt, dự án Rig, dùng `Text`) — 2026-10-14
+### Khoảng trống THEO THỨ TỰ CHẶN
+| # | khoảng trống | chặn? | xử lý |
+|---|---|---|---|
+| W1 | `u8 as char` không hạ được ở codegen (thông dịch chạy được) | CÓ (rig build thoát 3) | FB-4: sửa + test hồi quy (commit riêng) |
+| W2 | không có bảng băm / map | nhẹ (theo lệnh) | sắp xếp từ rồi đếm đoạn bằng nhau, rồi sắp xếp cặp (O(n log n)); HashMap ghi nhận là khoảng trống của thư viện |
+| W3 | không có số → chuỗi (`Display`) | nhẹ | viết tay `push_u64` bằng `push_char` (20 chữ số, hai vòng hữu hạn) |
+| W4 | `&str` không có `as_bytes`, so sánh, băm | nhẹ | dùng `Text::as_bytes()` và lát byte; từ là `&[u8]` cắt ở byte ASCII (UTF-8 hợp lệ nhờ cách cắt) |
+| W5 | mỗi Text/Vec cần một Arena riêng | nhẹ | 6 Arena (đúng hệ quả ADR-032 phụ lục A và Q72) |
+| W6 | `Text::from_utf8` sao chép toàn tệp (không có kiểm UTF-8 tại chỗ trên `&[u8]`) | nhẹ | chấp nhận (bộ nhớ ≈ 7× tệp); khoảng trống: `str::from_utf8(&[u8]) → Option<&str>` không sao chép |
+| W7 | không có `Vec::clear/truncate/sort` dựng sẵn | nhẹ | thu vào hai Vec rồi `msort::sort` (một Arena một Vec) |
+### Kết quả đo thật (5 test `crates/rig/tests/dogfood_wordfreq.rs` ĐẠT; so với tham chiếu Rust HashMap + sắp xếp, khớp TỪNG BYTE)
+- **Đúng:** 14 ca nhỏ (rỗng, chỉ dấu phân cách, một từ, hoà theo byte, hoa/thường, dấu gạch dưới/dấu câu, CRLF, từ UTF-8 (é, 日本語, 😀), dính ASCII-UTF-8, NUL là dấu phân cách, chữ số, 12 và đúng 10 từ phân biệt); 9 ca UTF-8 SAI (0xFF, byte nối lẻ, cắt giữa 2/4 byte, overlong `C0 AF` và `E0 80 80`, surrogate `ED A0 80`, > U+10FFFF, Latin-1 `é`) ⇒ lỗi có kiểm soát mã 2, stdout rỗng, KHÔNG abort; thiếu tệp/thiếu đối số; 1 MiB và 32 MiB văn bản ngẫu nhiên (nhiều từ, tần suất lệch); hai từ 1 MiB; 10⁶ lần `a` (đếm 1 000 000); 200 000 từ phân biệt.
+- **Hiệu năng (đo, -O0, mọi check giữ, ống pipe, một lần chạy mỗi ca):** 1 MiB (300 từ) 0,21 s (×4,2 so Rust), đỉnh 12 MiB; 32 MiB (5000 từ) 7,23 s (×4,8), đỉnh 234 MiB; 4 MiB (200 000 từ) 0,76 s (×4,0), đỉnh 33 MiB. Rust: thời gian đo trong tiến trình thử (HashMap + sắp xếp); bộ nhớ Rust không đo. Phương sai chưa đo.

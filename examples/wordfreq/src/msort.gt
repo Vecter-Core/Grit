@@ -1,0 +1,86 @@
+// msort: sắp xếp trộn BOTTOM-UP, ổn định, tổng quát theo `T: Ord + Copy` (ADR-032 phụ lục A, bước (iii)). Viết hoàn toàn bằng Grit
+// (không intrinsic). Dùng hai lát cùng độ dài (dữ liệu và bộ đệm) — người gọi lấy từ HAI `Vec` trên HAI Arena (`Vec` giữ `&!Arena`
+// độc quyền). Kết quả luôn nằm ở lát thứ nhất. Không có hợp đồng `⊳` vì đối số là tham chiếu không sao chép được (E0902): độ dài
+// khác nhau hoặc chỉ số sai bị bắt bởi kiểm biên lúc chạy (abort `index_out_of_bounds`), không bao giờ ghi ngoài vùng.
+//
+// Dừng (M8): vòng trộn `⟳ k < hi ↓ hi - k` bước 1 cố định ⇒ chứng minh được. Hai vòng có bước tiến KHÔNG chặn dưới (`lo += 2w`,
+// `width *= 2`) dùng mẫu NHIÊN LIỆU: vòng thoát vì cạn nhiên liệu thì `core::fuel_left` abort `fuel_exhausted` (không bao giờ xảy ra:
+// `lo` tăng ≥ 1 mỗi vòng nên ≤ n vòng; `width` nhân đôi nên ≤ 64 vòng).
+
+// so sánh hai lát byte theo thứ tự từ điển trên BYTE (độ dài ngắn hơn đứng trước khi là tiền tố)
+◈ ƒ cmp_bytes(a: &[u8], b: &[u8]) → Ordering ! ∅ {
+  na ≔ a.len();
+  nb ≔ b.len();
+  m ≔ ⎇ na < nb { na } ⇝ { nb };
+  μi ≔ 0usize;
+  μres ≔ 0u8;
+  ⟳ i < m ↓ m - i {
+    ca ≔ a[i];
+    cb ≔ b[i];
+    ⎇ ca < cb { res ← 1u8; i ← m; } ⇝ {
+      ⎇ ca > cb { res ← 2u8; i ← m; } ⇝ { i ← i + 1; }
+    }
+  }
+  ⎇ res == 1u8 { Ordering::Less } ⇝ {
+    ⎇ res == 2u8 { Ordering::Greater } ⇝ {
+      ⎇ na < nb { Ordering::Less } ⇝ { ⎇ na > nb { Ordering::Greater } ⇝ { Ordering::Equal } }
+    }
+  }
+}
+
+// a ≤ b (lấy bên trái khi bằng ⇒ ổn định)
+ƒ le<T: Ord>(a: &T, b: &T) → bool ! ∅ {
+  ⌥ a.cmp(b) { Ordering::Greater ↦ false, _ ↦ true }
+}
+
+// trộn hai chạy kề nhau [lo,mid) và [mid,hi) của `src` vào `dst[lo..hi)`
+ƒ merge_runs<T: Ord + Copy>(src: &[T], dst: &![T], lo: usize, mid: usize, hi: usize) ! ∅ {
+  μi ≔ lo;
+  μj ≔ mid;
+  μk ≔ lo;
+  ⟳ k < hi ↓ hi - k {
+    ⎇ i < mid ∧ (j >= hi ∨ le(&src[i], &src[j])) {
+      dst[k] ← src[i];
+      i ← i + 1;
+    } ⇝ {
+      dst[k] ← src[j];
+      j ← j + 1;
+    }
+    k ← k + 1;
+  }
+}
+
+// một lượt: trộn mọi cặp chạy độ dài `width` của `src` vào `dst`
+ƒ pass<T: Ord + Copy>(src: &[T], dst: &![T], width: usize) ! ∅ {
+  n ≔ src.len();
+  w ≔ ⎇ width < 1 { 1usize } ⇝ { width };
+  μlo ≔ 0usize;
+  μfuel ≔ (n as u64) +% 1u64;
+  ⟳ lo < n ∧ fuel > 0u64 ↓ fuel {
+    mid ≔ ⎇ lo + w < n { lo + w } ⇝ { n };
+    hi ≔ ⎇ mid + w < n { mid + w } ⇝ { n };
+    merge_runs(src, dst, lo, mid, hi);
+    lo ← lo + w + w;
+    fuel ← fuel - 1u64;
+  }
+  core::fuel_left(fuel);
+}
+
+// sắp `a` tăng dần (ổn định) dùng bộ đệm `b` cùng độ dài; kết quả ở `a`
+◈ ƒ sort<T: Ord + Copy>(a: &![T], b: &![T]) ! ∅ {
+  n ≔ a.len();
+  μwidth ≔ 1usize;
+  μin_a ≔ true;
+  μfuel ≔ 64u64;
+  ⟳ width < n ∧ fuel > 0u64 ↓ fuel {
+    ⎇ in_a { pass(&*a, &!*b, width); } ⇝ { pass(&*b, &!*a, width); }
+    in_a ← ¬in_a;
+    width ← width + width;
+    fuel ← fuel - 1u64;
+  }
+  core::fuel_left(fuel);
+  ⎇ ¬in_a {
+    μk ≔ 0usize;
+    ⟳ k < n ↓ n - k { a[k] ← b[k]; k ← k + 1; }
+  } ⇝ { }
+}

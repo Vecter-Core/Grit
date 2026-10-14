@@ -1,0 +1,9 @@
+# rig.lock — tạo bởi `rig lock`; KHÔNG sửa tay. Băm nội dung từng gói; lệch ⇒ rig từ chối build.
+version = 1
+
+[[package]]
+name = "wordfreq"
+version = "0.1.0"
+source = "root"
+deps = []
+hash = "sha256:4079681794d834511a2ecfaffa6a4f968dca28ba434af51d87e9f956f975cf44"

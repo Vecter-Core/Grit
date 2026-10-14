@@ -1,0 +1,169 @@
+// wordfreq: đếm tần suất TỪ trong một tệp UTF-8 và in 10 từ đứng đầu (công cụ thứ năm, dogfood `Text` — docs/DOGFOOD.md). Dùng: wordfreq <đường-dẫn>
+// Quy ước (README.md; bản tham chiếu Rust trong test dùng y hệt): tệp PHẢI là UTF-8 hợp lệ (kiểm bằng `Text::from_utf8`; sai ⇒ lỗi có kiểm soát,
+// stderr + mã 2, không abort). TỪ = dãy cực đại các byte thuộc [A-Za-z0-9_] hoặc ≥ 0x80 (ký tự không ASCII luôn thuộc từ ⇒ điểm cắt luôn là
+// byte ASCII ⇒ mỗi từ là UTF-8 hợp lệ); phân biệt hoa/thường; so sánh theo BYTE. In tối đa 10 dòng `<số lần> <từ>`, xếp theo số lần GIẢM dần rồi
+// theo thứ tự byte TĂNG dần. Không có bảng băm: sắp xếp các từ rồi đếm đoạn bằng nhau (msort, ổn định), rồi sắp xếp các cặp (từ, số lần).
+// Bộ nhớ: 6 Arena (một Arena một Vec/Text): Text nguồn (độ dài tệp), hai Vec từ (16 B/từ, từ ≤ độ dài tệp), hai Vec cặp (24 B/cặp), Text đầu ra.
+
+▢ Word<'a> { w: &'a [u8] }
+⊐ <'a> Copy for Word<'a> { }
+⊐ <'a> Ord for Word<'a> {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { msort::cmp_bytes(self.w, o.w) }
+}
+
+// cặp (từ, số lần): thứ tự = số lần GIẢM dần rồi byte TĂNG dần
+▢ Entry<'a> { w: &'a [u8], n: u64 }
+⊐ <'a> Copy for Entry<'a> { }
+⊐ <'a> Ord for Entry<'a> {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ self.n > o.n { Ordering::Less } ⇝ {
+      ⎇ self.n < o.n { Ordering::Greater } ⇝ { msort::cmp_bytes(self.w, o.w) }
+    }
+  }
+}
+
+ƒ is_word_byte(c: u8) → bool ! ∅ {
+  (c >= 48u8 ∧ c <= 57u8) ∨ (c >= 65u8 ∧ c <= 90u8) ∨ (c >= 97u8 ∧ c <= 122u8) ∨ c == 95u8 ∨ c >= 128u8
+}
+
+// số từ = số điểm bắt đầu từ (byte thuộc từ mà byte trước không thuộc từ)
+ƒ count_words(b: &[u8]) → usize ! ∅ {
+  μn ≔ 0usize;
+  μi ≔ 0usize;
+  μprev ≔ false;
+  ⟳ i < b.len() ↓ b.len() - i {
+    cur ≔ is_word_byte(b[i]);
+    ⎇ cur ∧ ¬prev { n ← n + 1; } ⇝ { }
+    prev ← cur;
+    i ← i + 1;
+  }
+  n
+}
+
+// ghi `n` dạng thập phân vào Text bằng `push_char`
+ƒ push_u64<'a>(t: &!Text<'a>, n: u64) ! {mem} {
+  μdigits ≔ [0u8; 20];
+  μk ≔ 0usize;
+  μv ≔ n;
+  ⟳ k < 20usize ∧ (v > 0u64 ∨ k == 0usize) ↓ 20usize - k {
+    digits[k] ← ((v % 10u64) as u8) +% 48u8;
+    v ← v / 10u64;
+    k ← k + 1;
+  }
+  μj ≔ k;
+  ⟳ j > 0usize ↓ j {
+    j ← j - 1;
+    t.push_char(digits[j] as char);
+  }
+}
+
+ƒ fail(err: &Cap<ErrOut>, path: &str, why: &str) → ! ! {io, div} {
+  err.write_str("wordfreq: ");
+  err.write_str(path);
+  err.write_str(": ");
+  err.write_str(why);
+  err.write_str("\n");
+  core::exit(2u32)
+}
+
+ƒ usage(err: &Cap<ErrOut>) → ! ! {io, div} {
+  err.write_str("usage: wordfreq <file>\n");
+  core::exit(2u32)
+}
+
+ƒ run(raw: &[u8], alloc: &Cap<Alloc>, out: &Cap<Out>, err: &Cap<ErrOut>, path: &str) ! {io, div, mem} {
+  // 1. kiểm UTF-8 (sao chép vào Text: Text là chủ sở hữu duy nhất của dữ liệu đã kiểm)
+  μa0 ≔ alloc.arena();
+  ⌥ Text::from_utf8(&!a0, raw) {
+    None ↦ fail(err, path, "invalid UTF-8"),
+    Some(src) ↦ {
+      b ≔ src.as_bytes();
+      nw ≔ count_words(b);
+      // 2. thu từ
+      μa1 ≔ alloc.arena();
+      μa2 ≔ alloc.arena();
+      μx ≔ Vec::new(&!a1);
+      μy ≔ Vec::new(&!a2);
+      x.reserve(nw);
+      y.reserve(nw);
+      μstart ≔ 0usize;
+      μi ≔ 0usize;
+      μin_word ≔ false;
+      ⟳ i < b.len() ↓ b.len() - i {
+        cur ≔ is_word_byte(b[i]);
+        ⎇ cur ∧ ¬in_word { start ← i; } ⇝ { }
+        ⎇ ¬cur ∧ in_word {
+          x.push(Word { w: &b[start..i] });
+          y.push(Word { w: &b[0..0] });
+        } ⇝ { }
+        in_word ← cur;
+        i ← i + 1;
+      }
+      ⎇ in_word {
+        x.push(Word { w: &b[start..b.len()] });
+        y.push(Word { w: &b[0..0] });
+      } ⇝ { }
+      msort::sort(x.as_mut_slice(), y.as_mut_slice());
+      // 3. đếm đoạn bằng nhau
+      μa3 ≔ alloc.arena();
+      μa4 ≔ alloc.arena();
+      μe ≔ Vec::new(&!a3);
+      μf ≔ Vec::new(&!a4);
+      e.reserve(nw);
+      f.reserve(nw);
+      ws ≔ x.as_slice();
+      μk ≔ 0usize;
+      μcur ≔ &b[0..0];
+      μcnt ≔ 0u64;
+      ⟳ k < ws.len() ↓ ws.len() - k {
+        w ≔ ws[k].w;
+        same ≔ ⌥ msort::cmp_bytes(w, cur) { Ordering::Equal ↦ true, _ ↦ false };
+        ⎇ cnt > 0u64 ∧ ¬same {
+          e.push(Entry { w: cur, n: cnt });
+          f.push(Entry { w: cur, n: cnt });
+          cnt ← 0u64;
+        } ⇝ { }
+        cur ← w;
+        cnt ← cnt + 1u64;
+        k ← k + 1;
+      }
+      ⎇ cnt > 0u64 {
+        e.push(Entry { w: cur, n: cnt });
+        f.push(Entry { w: cur, n: cnt });
+      } ⇝ { }
+      msort::sort(e.as_mut_slice(), f.as_mut_slice());
+      // 4. 10 dòng đầu vào một Text rồi ghi MỘT lần
+      μa5 ≔ alloc.arena();
+      μo ≔ Text::new(&!a5);
+      es ≔ e.as_slice();
+      lim ≔ ⎇ es.len() < 10usize { es.len() } ⇝ { 10usize };
+      μj ≔ 0usize;
+      ⟳ j < lim ↓ lim - j {
+        push_u64(&!o, es[j].n);
+        o.push_str(" ");
+        ⎇ o.push_utf8(es[j].w) { } ⇝ { fail(err, path, "internal error: word is not UTF-8") }
+        o.push_str("\n");
+        j ← j + 1;
+      }
+      out.write_bytes(o.as_bytes());
+    },
+  }
+}
+
+ƒ main() ! {io, div, mem} {
+  env ≔ root_env();
+  fs ≔ root_fs();
+  out ≔ root_out();
+  err ≔ root_err();
+  alloc ≔ root_alloc();
+  ⎇ env.arg_count() < 2usize { usage(&err) } ⇝ {
+    path ≔ env.arg(1usize);
+    ⌥ fs.open(path) {
+      Ok(f) ↦ { run(f.bytes(), &alloc, &out, &err, path); },
+      Err(IoError::NotFound) ↦ fail(&err, path, "no such file"),
+      Err(IoError::Denied) ↦ fail(&err, path, "permission denied"),
+      Err(IoError::Invalid) ↦ fail(&err, path, "invalid path"),
+      Err(IoError::Other) ↦ fail(&err, path, "i/o error"),
+    }
+  }
+}
