@@ -2,6 +2,12 @@
 
 > Cập nhật SAU MỖI bước nhỏ (mục 2 "Trạng thái" và mục 3 "Việc tiếp theo"). Nếu bị ngắt giữa chừng, mọi thứ ở đây + `git log` là đủ để tiếp tục.
 
+## TRẠNG THÁI MỚI NHẤT (2026-10-14, sau ADR-036 bước iv)
+- Đã có: sáu công cụ dogfood bằng Grit (wc, json, sha256, sortlines, wordfreq, stats), `f64` tối thiểu (E0319), `Vec/Text/Arena`, hồ sơ `release` (`--profile=release`: `mem2reg,sroa,early-cse` + Guard-post, backend O0), dev≡release trên 1820 chương trình (0 bất đồng hành vi), cổng đầy đủ xanh (836 đạt/0 đỏ/156 bộ, commit b6dcc03).
+- Chờ Giang: Q79 (f32), Q80 (`%` số thực), Q81 (instcombine/chứng minh ghi lại), Q82 (backend O2: ×1,3–3,4 theo min nhưng đưa tối ưu máy vào TCB), ADR-035/036 phần còn lại, cột 'người duyệt' của docs/TCB_INTRINSICS.md (luôn 'CHỜ GIANG').
+- FB-3 (E0311 oan, `&X<'a>` trong impl): FAIL-CLOSED, ưu tiên thấp, không chặn; né bằng `&Self`.
+- Việc tiếp theo theo lệnh Giang: mục 3 (báo cáo 'dùng được thật': công cụ, khoảng trống, bảng điều kiện chuyển pha GRIT_PLAN §7, danh sách TCB) rồi DỪNG chờ duyệt; KHÔNG viết M12/M13.
+
 ## 0. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ lập trình mới (`.gt`) **thiết kế cho AI viết code**; ký hiệu toán học/logic ngắn gọn (có bí danh ASCII). Chủ dự án: **Giang** (trả lời bằng TIẾNG VIỆT).
 2. Compiler `gritc` (Phase 1 "Seed") viết bằng **Rust**, workspace `D:\Grit`, nhiều crate `gt-*` (xem `crates/TASK.md`, GRIT_PLAN §6.1).
