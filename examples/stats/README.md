@@ -16,3 +16,7 @@ Thiếu đối số hoặc không mở được tệp: stderr (`usage: stats <fi
 rig build --locked
 target\stats.exe duong-dan\tep.txt
 ```
+
+## Giả định toán học và giới hạn
+- Làm tròn nửa lên `⌊x + 0,5⌋` (qua `to_i64`) chỉ đúng cho số KHÔNG ÂM. Công cụ đúng vì đầu vào bị giới hạn ≥ 0 (chỉ chữ số thập phân, không dấu) và mỗi số ≤ 2^53; trung bình và độ lệch chuẩn của dữ liệu như vậy luôn ≥ 0.
+- Bản tham chiếu Rust trong test dùng CÙNG công thức và CÙNG thứ tự f64 ⇒ chỉ kiểm Grit ≡ Rust về bit, không kiểm công thức đúng về toán (phương sai tổng thể hai lượt, cộng tuần tự, không Welford/Kahan; sai số làm tròn với dữ liệu rất lớn/lệch).

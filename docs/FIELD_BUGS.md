@@ -50,3 +50,9 @@ Viết `examples/json` (330 dòng) và so sánh với tham chiếu Rust + serde_
 - **Nguyên nhân gốc:** `Cg::cast` chỉ nhận cặp (số nguyên/bool/char → số nguyên); đích `Char` chưa được xử lý dù M4 cho phép `u8 as char` (mọi u8 là giá trị vô hướng hợp lệ) và thông dịch đã có.
 - **Sửa + test hồi quy:** `Cg::cast` nới không dấu u8 → i32 (và `cast_fits` luôn đúng cho cặp này). Test `gt-driver/tests/llvm_text.rs::{u8_as_char_lowers_and_encodes_latin1_scalars, u8_char_round_trip}` (hai backend, số tính tay 6195 và 200): ĐỎ khi bỏ bản sửa (đã thử), XANH khi có.
 - **Ảnh hưởng điều kiện cứng:** không.
+
+## FB-5 — `x as i64` từ số thực được M4 CHẤP NHẬN trái Q70 (ÂM TÍNH GIẢ, tìm thấy muộn) (2026-10-14, gặp khi dựng `f64`)
+- **Triệu chứng:** `x ≔ 1.5f64; x as i64` ⇒ `gritc check` xanh (chỉ ghi chú N0604); quyết định Q70 cấm `as` số thực → nguyên (chỉ `to_i64` trả `Option`). Tương tự `f32` và `%` trên số thực: M4 chấp nhận rồi mới hỏng ở codegen.
+- **Phân loại:** ÂM TÍNH GIẢ của checker M4 (trái quyết định thiết kế). An toàn bộ nhớ không bị ảnh hưởng: cast mất thông tin vẫn bị `CastLossy` bắt lúc chạy (lớp phòng thủ thứ hai).
+- **Vì sao lọt qua M4/M7:** KHÔNG có mẫu nào (fail hay pass) dùng `as` từ số thực sang nguyên; `cast` ở M4 coi mọi cặp số là hợp lệ; M5/M7 chỉ sinh/chứng minh `CastLossy`, nên không bao giờ sai ngầm nhưng cũng không phản ánh quyết định cấm. Không có test cho từng ô của bảng ép kiểu.
+- **Sửa + hồi quy:** E0319 ở `check/expr.rs::cast`; test `float_restrictions_are_e0319` và 4 mẫu `tests/fail/E0319_*`.

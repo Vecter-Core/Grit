@@ -98,3 +98,5 @@ LLVM **20.1.8** bản dựng sẵn tại `D:\Tools\llvm-20.1.8`; binding **inkwe
 - **Chèn lỗi kiểm cổng:** `GRITC_FAULT=panic:<pass>|skip:<pass>` (chỉ làm gritc từ chối thêm).
 - **WinError 1455 = thiếu BỘ NHỚ ẢO (commit limit = RAM + paging file), KHÔNG phải thiếu ổ đĩa:** kiểm cài đặt paging file; giữ `CARGO_BUILD_JOBS` thấp khi liên kết LLVM. RAM vật lý 15,6 GB.
 - **Công cụ:** `rustc/cargo 1.98.1`, MSVC (VS 2022), Python 3.12 (có `hashlib`), git-bash + PowerShell. Dấu `LNK1104` thoáng qua ⇒ thử lại.
+
+- **FB-3 (E0311 oan, `o: &X<'a>` trong `⊐ <'a> Tr for X<'a>`) — FAIL-CLOSED** (từ chối chương trình ĐÚNG, không chấp nhận chương trình sai); né bằng `&Self`; ưu tiên thấp, KHÔNG chặn việc nào.

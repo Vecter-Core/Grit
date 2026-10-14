@@ -639,3 +639,19 @@ Rút kinh nghiệm: prelude có BA bản (lib/core, fixture gt-types, fixture gt
 - **`GATE_RESULT=GREEN` ở LẦN CHẠY THỨ BA:** gt-rt OK; `fmt` OK; `clippy -D warnings` EXIT 0; `audit` EXIT 0; **`test --workspace --no-fail-fast`: 821 đạt, 0 đỏ, 154 bộ**; `check_expectations`: 842 tệp .gt (fail 417, warn 13, pass 386, lexer 8), 71 mã, 225 tham chiếu test, OK; unittest 9 + `test_gate.py` 5.
 - **Hai lần đỏ trước đó (đã sửa, không bỏ qua):** (1) cổng ĐỎ vì `tests/pass/23_literals.gt` có literal `1f32` mà E0319 (f32 chưa hỗ trợ) từ chối ⇒ đổi thành `1f64` (ghi trong chú thích mẫu); cổng cũ dùng `cargo test` fail-fast nên chỉ lộ MỘT test; (2) sau khi đổi cổng sang `--no-fail-fast` (nay báo mọi test đỏ trong một lần) lộ thêm 5 test cũ lệ thuộc `f32`/`as` số thực→nguyên/ví dụ "chưa hỗ trợ = số thực": `casts_follow_the_allowed_table`, `no_implicit_numeric_conversion_between_different_types_d1`, `suffixed_literals_have_exactly_that_type`, `d4_float_equality_is_rejected_in_every_form`, `unsupported_construct_is_refused_without_exe` ⇒ sửa test theo quyết định đã duyệt (thêm `float_restrictions_are_e0319`; ví dụ "chưa hỗ trợ" nay là mảng cỡ > u32). Không sửa mã sản phẩm để làm test xanh.
 - **Bài học:** sau khi đổi hành vi của M4 phải chạy TOÀN workspace, không chỉ các crate "liên quan"; `check_expectations` KHÔNG chạy các mẫu pass (nó chỉ kiểm cấu trúc và mẫu fail) — mẫu pass chỉ được kiểm bởi các test corpus của từng crate.
+
+## Mẫu/test cũ bị đổi trong lượt f64 (2026-10-14) — liệt kê đầy đủ (lệnh Giang, mục 0a)
+Nguyên tắc: không sửa mã sản phẩm để làm test xanh; mỗi thay đổi theo MỘT quyết định đã duyệt (Q70: `as` số thực → nguyên bị cấm; ADR-035 §B: `f32` và `%` số thực chưa hỗ trợ ở Phase 1).
+
+| # | mẫu/test | đổi gì | lý do | vì sao không phải dương/âm tính giả |
+|---|---|---|---|---|
+| 1 | `tests/pass/23_literals.gt` | `h ≔ 1f32;` → `h ≔ 1f64;` (chú thích ghi E0319) | E0319 từ chối literal `f32` | quyết định thiết kế fail-closed; mẫu kiểm DẠNG literal, không kiểm f32. **Lý do ngôn ngữ chưa chắc ⇒ OPEN_QUESTIONS Q79** |
+| 2 | `gt-types/tests/literals.rs::suffixed_literals_have_exactly_that_type` | bỏ hai ca `1f32`, `2.5f32` | như 1 | kiểu `f32` của literal vẫn được khoá trong `float_restrictions_are_e0319` |
+| 3 | `…::no_implicit_numeric_conversion_between_different_types_d1` | `a ≔ 1.5f32; b: f64 ≔ a;` → `a ≔ 1.5f64; b: f32 ≔ a;` | tránh literal `f32` | vẫn kiểm đúng D1 (không ép ngầm f64→f32), E0302 vẫn đúng một lần |
+| 4 | cùng test, ca `d ≔ 2.5f64 as i32` | → `as f64` | `as` số thực → nguyên bị cấm (Q70) | ca kiểm "ép kiểu hợp lệ không bị báo" vẫn đúng ý |
+| 5 | `…::casts_follow_the_allowed_table` | `e ≔ 1.5 as i32; g ≔ 3 as f32;` → `e ≔ 3 as f64; g ≔ 2.5f64 as f64;` | như 4 và `as f32` bị E0319 | các ô còn lại của bảng vẫn kiểm; ô số thực→nguyên nay được kiểm ở test E0319 |
+| 6 | `gt-types/tests/safety.rs` (D4) | `a ≠ 0f32` → `a ≠ a` | literal `f32` | D4 (cấm `==`/`≠` trên số thực) vẫn E0303 đúng một lần |
+| 7 | `gt-driver/tests/llvm.rs::unsupported_construct_is_refused_without_exe` | ví dụ "chưa hỗ trợ" từ số thực → `[0u8; 5000000000]` | f64 nay hạ được ⇒ ví dụ cũ hết là "chưa hỗ trợ" | test kiểm cơ chế fail-closed (không exe), không kiểm số thực |
+| + | MỚI `gt-types/tests/literals.rs::float_restrictions_are_e0319` | ca E0319 + ca hợp lệ | khoá hành vi mới | — |
+
+Mẫu nào chỉ bị đổi vì checker từ chối mà chưa rõ lý do ngôn ngữ: chỉ #1 (và #2, #3, #5, #6 cùng gốc `f32`) ⇒ đã đưa Q79.
