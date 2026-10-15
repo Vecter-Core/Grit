@@ -7,6 +7,7 @@
 - Đã duyệt: Q79 (f32 dành riêng Phase 2), Q80 (cấm % số thực), Q81 (không instcombine), Q82 (có điều kiện, đã chạy xong điều kiện).
 - CHỜ GIANG: `docs/MUTANT_ARGUMENTS.md` (361/591/554, điều kiện #9); ADR-038 (Q83 Arena chia sẻ, Q84 gói Rig `std`, Q85 ký hiệu `?`, Q86 thứ tự) — CHƯA code gì cho ADR-038; cột 'người duyệt' của TCB (42 dòng, luôn CHỜ GIANG); READINESS #6 (Giang xem KNOWN_LIMITATIONS/PROGRESS); điều kiện #2 fuzz: tích luỹ lexer/parser (xem `python tools/fuzz_total.py`; cần ≈ 45 giờ máy rảnh; chạy từng phiên 10 phút bằng `tools/fuzz_session.sh <lex|parse>`, cần PATH có thư mục ASan DLL của MSVC).
 - FB-3 (E0311 oan, né `&Self`) và FB-6 (`Option::unwrap` E0902) là fail-closed, ưu tiên thấp. 69 đột biến nguy hiểm của M7 vẫn mở (KNOWN_LIMITATIONS).
+- **Lệnh Giang 2026-10-15 (A–F):** A XONG (đối chiếu 361/591/554: (i)=0 trên 24 143 chương trình, xem MUTANT_ARGUMENTS A.1/A.3; READINESS #9 'đạt có điều kiện'). Việc B (rà fail-open gt-oblig/gt-term/gt-effects) ĐANG LÀM: sửa nằm trong `git stash` (gt-effects, gt-term, gt-oblig ghost + test `fail_closed_nodes.rs`) — `git stash pop` rồi chạy test các crate đó (+ dogfood, vì gt-term từ chối vòng lặp không có nghĩa vụ có thể chặn công cụ). Sau B: C.2 (kiểm E0703 chéo gói, DỪNG phần std nếu fail), Q86 (i)–(iv), D xong (`docs/TCB_REVIEW_GUIDE.md`), E chưa làm (`tools/fuzz_loop.sh`).
 - KHÔNG làm M12/M13. Việc kế tiếp chỉ sau khi Giang duyệt ADR-038.
 
 ## 0. Dự án trong 5 dòng
