@@ -53,6 +53,16 @@ fn lost_obligations_are_never_read_as_a_termination_proof() {
     );
     assert_eq!(codes(valid_explicit), vec!["E0702"]);
     assert_eq!(codes(valid_inferred), vec!["E0701"]);
+    // vòng MỘT KHỐI (đầu vòng tự quay về chính nó) đứng yên: khi nghĩa vụ bị mất vẫn phải bị từ chối (tiêu chí cạnh lùi phải tính cả cạnh tự quay)
+    let single_block = "ƒ f(n: u32) → () ! {div} { ⟳ ↓ n { } }";
+    set_drop_variant_obligations_for_test(false);
+    assert_eq!(codes(single_block), vec!["E0702"]);
+    set_drop_variant_obligations_for_test(true);
+    assert_eq!(
+        codes(single_block),
+        vec!["E0702"],
+        "vòng một khối đứng yên bị CHẤP NHẬN khi nghĩa vụ bị mất"
+    );
     // vòng lặp mà M7 KHẲNG ĐỊNH không có cạnh lùi khả thi (thân không bao giờ vào được) VẪN được chấp nhận dù nghĩa vụ bị mất (không phụ thuộc nghĩa vụ)
     let dead_body = "ƒ f() → () ! ∅ { μi ≔ 19u8; ⟳ i <= 16u8 ∧ i < 12u8 ↓ i { i ← i + 1; } }";
     assert!(codes(dead_body).is_empty());

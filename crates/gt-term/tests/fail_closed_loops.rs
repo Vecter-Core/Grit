@@ -129,3 +129,51 @@ fn beyond_the_ghost_limit_valid_loops_are_rejected_not_silently_accepted() {
     let c = codes(&many_loops(20, &[20], true));
     assert!(c.len() >= 2 && c.iter().all(|x| x == "E0702"), "{c:?}");
 }
+
+#[test]
+fn a_self_looping_head_block_counts_as_a_back_edge() {
+    // vòng vô hạn có `↓ n` đứng yên, thân rỗng (khối đầu có thể tự quay lại chính nó: rpo_pos[tgt] == rpo_pos[nguồn]):
+    // KHÔNG được coi là "không có cạnh lùi khả thi" (đột biến `<` thay `<=` làm chấp nhận vòng vô hạn)
+    for body in ["{ }", "{ μk ≔ 0u32; }"] {
+        let c = codes(&format!("ƒ f(n: u32) → () ! {{div}} {{ ⟳ ↓ n {body} }}"));
+        assert!(
+            c.iter().any(|x| x == "E0702" || x == "E0701"),
+            "vòng vô hạn đứng yên bị CHẤP NHẬN ({c:?}) với thân {body}"
+        );
+    }
+}
+
+/// Khối nhảy về CHÍNH NÓ (vòng một khối) CÓ tồn tại (`⟳ { }`): vì vậy tiêu chí cạnh lùi của `no_back_edge_heads` phải dùng `<=` (không phải `<`).
+/// Với vòng lặp có biến thể mà đầu vòng tự quay về chính nó, KHÔNG được coi là "không có cạnh lùi".
+#[test]
+fn single_block_loops_exist_and_keep_their_back_edge() {
+    let mut selfloops = Vec::new();
+    for src in [
+        "ƒ f() → () ! {div} { ⟳ { } }",
+        "ƒ f(n: u32) → () ! {div} { ⟳ ↓ n { } }",
+        "ƒ f(n: u32) → () ! {div} { ⟳ ↓ n { μk ≔ 0u32; } }",
+    ] {
+        let (_, m) = common::mir(src);
+        for b in &m.bodies {
+            for (i, bb) in b.blocks.iter().enumerate() {
+                if let Some(t) = &bb.terminator
+                    && t.kind.successors().iter().any(|s| s.index() == i)
+                {
+                    selfloops.push((src, i));
+                }
+            }
+        }
+    }
+    println!("vòng một khối: {selfloops:?}");
+    // chương trình vô hạn có `↓ n` đứng yên: dù đầu vòng tự quay về nó, PHẢI bị E0702/E0701
+    for src in [
+        "ƒ f(n: u32) → () ! {div} { ⟳ ↓ n { } }",
+        "ƒ f(n: u32) → () ! {div} { ⟳ ↓ n { μk ≔ 0u32; } }",
+    ] {
+        let c = codes(src);
+        assert!(
+            c.iter().any(|x| x == "E0702" || x == "E0701"),
+            "vòng vô hạn đứng yên bị CHẤP NHẬN ({c:?}): {src}"
+        );
+    }
+}
