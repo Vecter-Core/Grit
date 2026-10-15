@@ -594,27 +594,50 @@ fn cross_package_true_cycles_are_still_e0703() {
     }
 }
 
-/// KHOẢNG TRỐNG GHI NHẬN (chặn số 1 của gói `std`, lệnh Giang F.2): KHÔNG so khớp được `&Option<T>` (pattern không tự deref) và không move ra khỏi tham chiếu (E0407)
-/// ⇒ không viết được `⊐ <T: Ord> Ord for Option<T>` (hay bất kỳ phương thức `&self` nào đọc payload generic không-Copy của enum). Test này KHOÁ hiện trạng:
-/// khi ngôn ngữ có cách so khớp tham chiếu (vd. default binding modes), test này sẽ ĐỎ ⇒ cập nhật HANDOFF/ADR-038 và bật phần std.
+/// ADR-040 (Q87) đã mở khoá chặn số 1 của gói `std` (F.2): `⊐ <T: Ord> Ord for Option<T>` viết được bằng khớp mẫu qua tham chiếu (`a: &T`), định nghĩa Ở GÓI KHÁC;
+/// M8 (E0703) chấp nhận và LLVM chạy đúng cho mọi tổ hợp (Some/Some, Some/None, None/Some, None/None) và cả `Option<Option<u32>>` (đệ quy theo kiểu, không theo hàm).
 #[test]
-fn matching_a_reference_to_an_enum_is_not_expressible_yet_std_blocker() {
-    let d = tmp("optord");
-    std_app(
-        &d,
-        "⊐ Ord for u32 {\n  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { Ordering::Equal }\n}\n⊐ <T: Ord> Ord for Option<T> {\n  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {\n    ⌥ self {\n      Some(a) ↦ ⌥ o { Some(b) ↦ a.cmp(b), None ↦ Ordering::Greater },\n      None ↦ ⌥ o { Some(_) ↦ Ordering::Less, None ↦ Ordering::Equal },\n    }\n  }\n}\n",
-        "ƒ main() → u32 ! ∅ { 0 }\n",
-    );
-    let o = rig(&d.join("app"), &["check"]);
-    assert_ne!(
-        code(&o),
-        0,
-        "bất ngờ: so khớp `&Option<T>` đã được hỗ trợ ⇒ cập nhật HANDOFF"
-    );
-    assert!(
-        err(&o).contains("E0301") || out(&o).contains("E0301"),
-        "{}{}",
-        out(&o),
-        err(&o)
-    );
+fn option_ord_in_another_package_uses_reference_patterns_passes_e0703_and_runs_correctly() {
+    let std_src = "⊐ Ord for u32 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+⊐ <T: Ord> Ord for Option<T> {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⌥ self {
+      Some(a) ↦ ⌥ o { Some(b) ↦ a.cmp(b), None ↦ Ordering::Greater },
+      None ↦ ⌥ o { Some(_) ↦ Ordering::Less, None ↦ Ordering::Equal }
+    }
+  }
+}
+";
+    let cases: [(&str, &str, &str); 5] = [
+        ("Some(5u32)", "Some(3u32)", "3"),
+        ("Some(3u32)", "Some(5u32)", "1"),
+        ("Some(4u32)", "Some(4u32)", "2"),
+        ("Some(9u32)", "None", "3"),
+        ("None", "Some(0u32)", "1"),
+    ];
+    for (a, b, want) in cases {
+        let d = tmp("optord");
+        std_app(
+            &d,
+            std_src,
+            &format!(
+                "ƒ main() ! {{io}} {{
+  a: Option<u32> ≔ {a};
+  b: Option<u32> ≔ {b};
+  out ≔ root_out();
+  r ≔ ⌥ a.cmp(&b) {{ Ordering::Less ↦ 1u64, Ordering::Greater ↦ 3u64, _ ↦ 2u64 }};
+  out.write_u64(r);
+}}
+"
+            ),
+        );
+        let app = d.join("app");
+        let o = rig(&app, &["build"]);
+        assert_eq!(code(&o), 0, "{a} vs {b}: {}", err(&o));
+        assert_eq!(run_exe(&app), want, "{a} vs {b}");
+    }
 }

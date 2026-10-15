@@ -349,6 +349,8 @@ impl Builder<'_> {
         Ok(())
     }
 
+    // 8 tham số: (cổng clippy) `mode` (ADR-040) là một giá trị độc lập thêm vào cùng nhóm với `fail`/`binds`; gom vào struct chỉ để lách lint sẽ làm mờ luồng chế độ
+    #[allow(clippy::too_many_arguments)]
     fn variant_test(
         &mut self,
         vd: gt_resolve::DefId,
