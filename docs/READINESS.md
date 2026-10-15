@@ -59,5 +59,5 @@ DỪNG ở đây, chờ Giang duyệt trước khi làm bất cứ việc nào t
 
 ## CẬP NHẬT 2026-10-15 (Giang ủy quyền kiến trúc sư duyệt TCB và đột biến)
 - **Điều kiện #9 (361/591/554): CHẤP NHẬN có điều kiện** (kiến trúc sư): lập luận đơn điệu được chấp nhận vì đã kiểm BẰNG MÁY trên 24 143 chương trình (0 vi phạm tiền đề, 0 chương trình (i), đối chứng dương bắt được 238). Điều kiện mở lại: (i) nếu một luật ĐỎ mới của M6 được thêm, kiểm kê A.1 (MUTANT_ARGUMENTS) phải cập nhật và đo lại `probe_diff`; (ii) `probe_diff` bản đủ ngưỡng (`GT_PROBE_N=4000`, ≈ 6 phút) chạy TRƯỚC mỗi lần đóng milestone (không nằm trong cổng thường).
-- **TCB (d):** cả 42 dòng đã có trạng thái `ỦY QUYỀN: KIẾN TRÚC SƯ DUYỆT HỢP ĐỒNG` (17 dòng CÓ ĐIỀU KIỆN; xem TCB_INTRINSICS.md). Đây là duyệt HỢP ĐỒNG, không phải kiểm toán mã.
+- **TCB (d):** cả 42 dòng đã có trạng thái `ỦY QUYỀN: KIẾN TRÚC SƯ DUYỆT HỢP ĐỒNG` (14 dòng CÓ ĐIỀU KIỆN, 28 dòng không điều kiện; xem TCB_INTRINSICS.md). Đây là duyệt HỢP ĐỒNG, không phải kiểm toán mã.
 - **ĐIỀU KIỆN CỔNG MỚI:** nhóm CAO (H1–H10) PHẢI qua **ĐỌC MÃ ĐỐI KHÁNG** (`docs/TCB_CODE_AUDIT.md`, mục E) trước khi tuyên bố TCB đã duyệt. Cho tới khi đó: "chưa có người thứ hai đọc mã".
