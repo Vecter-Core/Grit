@@ -51,6 +51,9 @@ pub(crate) struct Gen<'a> {
     /// Lần đầu một chốt chặn phòng thủ bị chạm tới ⇒ ICE (fail-closed, nguyên tắc P3): `check_body` báo E9901 thay vì kết luận.
     pub ice: Option<String>,
     cur: (Option<Location>, Span),
+    /// đột biến đang chọn (chỉ có khi bật feature `mutant-probe`)
+    #[cfg(feature = "mutant-probe")]
+    pub mutant: Mutant,
 }
 
 fn flat(s: &Slots) -> Vec<usize> {
@@ -58,6 +61,36 @@ fn flat(s: &Slots) -> Vec<usize> {
     v.sort_unstable();
     v.dedup();
     v
+}
+
+/// Đột biến có thể chọn lúc chạy (CHỈ khi bật feature `mutant-probe`; không có feature ⇒ `probe!` luôn là `false`, mã đột biến không tồn tại).
+#[cfg(feature = "mutant-probe")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Mutant {
+    /// bản gốc
+    #[default]
+    None,
+    /// 238: `ty_invariant` coi `&T` là hiệp biến (LỎNG hơn: đối chứng dương, phải bị bắt)
+    M238,
+    /// 361: `Rvalue::Repeat` quan hệ hai chiều (CHẶT hơn)
+    M361,
+    /// 591: kết quả lời gọi quan hệ hai chiều (CHẶT hơn)
+    M591,
+    /// 554: `&self` khai báo như `&!self` (CHẶT hơn)
+    M554,
+}
+
+macro_rules! probe {
+    ($self:ident, $m:ident) => {{
+        #[cfg(feature = "mutant-probe")]
+        {
+            $self.mutant == Mutant::$m
+        }
+        #[cfg(not(feature = "mutant-probe"))]
+        {
+            false
+        }
+    }};
 }
 
 impl<'a> Gen<'a> {
@@ -75,6 +108,8 @@ impl<'a> Gen<'a> {
             adt_inv: BTreeMap::new(),
             ice: None,
             cur: (None, body.span),
+            #[cfg(feature = "mutant-probe")]
+            mutant: Mutant::None,
         };
         g.univ_map.insert(RegionRef::Static, n);
         g.setup_universals();
@@ -262,6 +297,7 @@ impl<'a> Gen<'a> {
     fn ty_invariant(&mut self, t: &Ty) -> bool {
         match t {
             Ty::Ref(true, _) | Ty::RawPtr(..) | Ty::Fn(..) => true,
+            Ty::Ref(false, _) if probe!(self, M238) => false,
             Ty::Ref(false, i) | Ty::Array(i, _) | Ty::Slice(i) => self.ty_invariant(i),
             Ty::Tuple(v) => v.iter().any(|x| self.ty_invariant(x)),
             Ty::Adt(d, args) => self.adt_invariant(*d) || args.iter().any(|x| self.ty_invariant(x)),
@@ -369,7 +405,7 @@ impl<'a> Gen<'a> {
             Rvalue::Repeat(o, _) => {
                 let s = self.operand_slots(o);
                 if let Ty::Array(el, _) = &dty {
-                    self.relate(el, &s, &dslots, false);
+                    self.relate(el, &s, &dslots, probe!(self, M361));
                 }
             }
             Rvalue::Ref(b, _, place) => {
@@ -562,7 +598,7 @@ impl<'a> Gen<'a> {
             };
             declared.push(match k {
                 gt_ast::SelfKind::Value => sd.clone(),
-                gt_ast::SelfKind::Ref => Ty::Ref(false, Box::new(sd.clone())),
+                gt_ast::SelfKind::Ref => Ty::Ref(probe!(self, M554), Box::new(sd.clone())),
                 gt_ast::SelfKind::RefMut => Ty::Ref(true, Box::new(sd.clone())),
             });
         }
@@ -599,7 +635,7 @@ impl<'a> Gen<'a> {
             self.relate(it, a, l, false);
         }
         let rl: Slots = rout.into_iter().map(|v| vec![v]).collect();
-        self.relate(&ret_inst, &rl, dslots, false);
+        self.relate(&ret_inst, &rl, dslots, probe!(self, M591));
         true
     }
 

@@ -207,3 +207,36 @@ fn builds_are_reproducible_for_every_profile() {
         let _ = std::fs::remove_dir_all(&d1);
     }
 }
+
+/// feature `mutant-probe` của gt-borrowck (đột biến chọn lúc chạy) KHÔNG có trong `gritc`: (1) hằng `MUTANT_PROBE` của bản dựng này là `false`;
+/// (2) không `Cargo.toml` nào ngoài định nghĩa ở gt-borrowck nhắc tới feature này (không crate nào bật nó, kể cả `gt-driver`, `rig`).
+#[test]
+fn release_has_no_mutant_probe() {
+    assert!(
+        !gt_borrowck::MUTANT_PROBE,
+        "bản dựng gritc có feature mutant-probe!"
+    );
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut mentions = Vec::new();
+    for e in std::fs::read_dir(&crates).expect("crates") {
+        let p = e.expect("entry").path().join("Cargo.toml");
+        if let Ok(t) = std::fs::read_to_string(&p)
+            && t.contains("mutant-probe")
+        {
+            mentions.push(p.parent().expect("cha").to_string_lossy().into_owned());
+        }
+    }
+    assert_eq!(
+        mentions.len(),
+        1,
+        "feature mutant-probe xuất hiện ở: {mentions:?}"
+    );
+    assert!(mentions[0].ends_with("gt-borrowck"), "{mentions:?}");
+    let root =
+        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.toml"))
+            .expect("Cargo.toml gốc");
+    assert!(
+        !root.contains("mutant-probe"),
+        "Cargo.toml gốc nhắc mutant-probe"
+    );
+}

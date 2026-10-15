@@ -12,7 +12,13 @@ use gt_mir::{Body, MirOutput};
 use gt_span::Span;
 use gt_types::{RegionRef, TypesOutput};
 use regions::Gen;
+#[cfg(feature = "mutant-probe")]
+pub use regions::Mutant;
 pub use regions::defensive_counters;
+
+/// `true` chỉ khi crate được dựng với feature `mutant-probe` (CHỈ trong test). Bản phát hành của `gritc` PHẢI có `false`
+/// (test `gt-driver/tests/release_policy.rs::release_has_no_mutant_probe`).
+pub const MUTANT_PROBE: bool = cfg!(feature = "mutant-probe");
 use std::collections::BTreeSet;
 
 const LIMIT: usize = 100;
@@ -46,12 +52,31 @@ fn name_of(r: &RegionRef) -> String {
 /// Kiểm một thân; trả chẩn đoán (chưa sắp xếp).
 #[must_use]
 pub fn check_body(t: &TypesOutput, body: &Body) -> Vec<Diagnostic> {
+    #[cfg(feature = "mutant-probe")]
+    {
+        check_body_impl(t, body, Mutant::None)
+    }
+    #[cfg(not(feature = "mutant-probe"))]
+    {
+        check_body_impl(t, body)
+    }
+}
+
+fn check_body_impl(
+    t: &TypesOutput,
+    body: &Body,
+    #[cfg(feature = "mutant-probe")] mutant: Mutant,
+) -> Vec<Diagnostic> {
     let pts = solve::Points::new(body);
     let live = match solve::live_before(body, &pts) {
         Ok(l) => l,
         Err(e) => return vec![ice(t, body, &e)],
     };
     let mut g = Gen::new(t, body);
+    #[cfg(feature = "mutant-probe")]
+    {
+        g.mutant = mutant;
+    }
     g.generate();
     if let Some(e) = g.ice.take() {
         return vec![ice(t, body, &e)];
@@ -120,6 +145,47 @@ fn cause_span(g: &Gen<'_>, from: usize, to: usize) -> Option<Span> {
 /// Kiểm mọi thân. Fail-closed: nếu kiểm kiểu hoặc hạ MIR đã có chẩn đoán thì không chạy (trả rỗng).
 #[must_use]
 pub fn check_program(t: &TypesOutput, m: &MirOutput) -> Report {
+    #[cfg(feature = "mutant-probe")]
+    {
+        check_program_impl(t, m, Mutant::None)
+    }
+    #[cfg(not(feature = "mutant-probe"))]
+    {
+        check_program_impl(t, m)
+    }
+}
+
+/// CHỈ TEST (feature `mutant-probe`): như `check_program` nhưng chọn đột biến của `regions.rs` lúc chạy.
+#[cfg(feature = "mutant-probe")]
+#[must_use]
+pub fn check_program_probe(t: &TypesOutput, m: &MirOutput, mutant: Mutant) -> Report {
+    check_program_impl(t, m, mutant)
+}
+
+/// CHỈ TEST (feature `mutant-probe`): tập CẠNH ràng buộc outlives `(a, b)` ("a : b") mà `Gen` sinh cho mọi thân, theo đột biến đã chọn. Dùng để kiểm TIỀN ĐỀ
+/// của lập luận đơn điệu: tập cạnh của bản gốc PHẢI là tập con của tập cạnh của mỗi đột biến CHẶT hơn (361/591/554). Không chạy borrowck.
+#[cfg(feature = "mutant-probe")]
+#[must_use]
+pub fn probe_constraint_edges(
+    t: &TypesOutput,
+    m: &MirOutput,
+    mutant: Mutant,
+) -> Vec<(String, BTreeSet<(usize, usize)>)> {
+    let mut out = Vec::new();
+    for b in &m.bodies {
+        let mut g = Gen::new(t, b);
+        g.mutant = mutant;
+        g.generate();
+        out.push((b.key.clone(), g.cons.iter().map(|c| (c.a, c.b)).collect()));
+    }
+    out
+}
+
+fn check_program_impl(
+    t: &TypesOutput,
+    m: &MirOutput,
+    #[cfg(feature = "mutant-probe")] mutant: Mutant,
+) -> Report {
     let mut bag = Diagnostics::new(LIMIT);
     if !t.report.diagnostics.is_empty() || !m.report.diagnostics.is_empty() {
         return bag.finish();
@@ -127,7 +193,10 @@ pub fn check_program(t: &TypesOutput, m: &MirOutput) -> Report {
     let result = gt_stack::run_with_big_stack(|| {
         let mut all = Vec::new();
         for b in &m.bodies {
-            all.extend(check_body(t, b));
+            #[cfg(feature = "mutant-probe")]
+            all.extend(check_body_impl(t, b, mutant));
+            #[cfg(not(feature = "mutant-probe"))]
+            all.extend(check_body_impl(t, b));
         }
         all
     });

@@ -19,5 +19,10 @@ gt-stack = { path = "../gt-stack" }
 [dev-dependencies]
 gt-parser = { path = "../gt-parser" }
 
+[features]
+# CHỈ DÙNG TRONG TEST (lệnh Giang 2026-10-14, A.2): cho phép chọn bản đột biến 238/361/591/554 của `regions.rs` lúc chạy để một binary tính
+# cả hai phán quyết. KHÔNG bật mặc định; KHÔNG được có trong `gritc` phát hành (test `release_has_no_mutant_probe` kiểm).
+mutant-probe = []
+
 [lints]
 workspace = true
