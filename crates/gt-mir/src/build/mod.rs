@@ -5,7 +5,7 @@
 //! khai báo. Lỗi bất thường (cấu trúc chưa hỗ trợ, bảng kiểu thiếu) là ICE: không bao giờ bỏ qua hàm.
 mod expr;
 mod matching;
-pub use matching::set_pat_mode_fault_for_test;
+pub use matching::{set_pat_field_fault_for_test, set_pat_mode_fault_for_test};
 
 use crate::mir::*;
 use crate::types::region_slots;

@@ -36,3 +36,4 @@
 {"suite":"bits-3way","start":37000,"count":150,"result":{"programs":150,"red_programs":18,"runs":546,"equal_3way":528,"mismatch":0,"normal":273,"aborts":{"overflow": 188, "precondition": 67},"skipped":{"ĐỎ E0601": 8, "ĐỎ E0901": 10}}}
 {"batch":"bits","profile":"release","rc":0,"secs":617}
 {"suite":"abort-targeted","kind":"divrem","start":36110,"count":1,"result":{"programs":1,"red_programs":0,"runs":6,"equal":6,"mismatch":0,"normal":5,"aborts":{"div_by_zero": 1},"unsupported":0,"timeout":0,"interp_limit":0,"skipped":{}}}
+{"suite":"refpat","profile":"release","start":1,"count":25,"programs":25,"equal":21,"expected_red":4,"mismatch":0,"forms":{"bare-name-and-wildcard": 21, "enum&": 21, "enum&!": 21, "literal-on-ref": 1, "nested-ref": 2, "nested-structural": 21, "nonexhaustive": 1, "struct&": 21, "struct&!": 21, "struct..": 16, "tuple&": 21, "tuple&!": 21, "tuple-of-refs": 21}}

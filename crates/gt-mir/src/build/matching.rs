@@ -14,6 +14,13 @@ pub fn set_pat_mode_fault_for_test(on: bool) {
     PAT_MODE_FAULT.store(on, std::sync::atomic::Ordering::SeqCst);
 }
 
+static PAT_FIELD_FAULT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Chốt kiểm thử (`GRITC_FAULT=mir:pat-field`): biến bind ở chế độ tham chiếu trỏ NHẦM trường (trường k ≥ 1 ⇒ k − 1) để chứng minh bộ sinh so sánh tự bắt. KHÔNG dùng ngoài test.
+pub fn set_pat_field_fault_for_test(on: bool) {
+    PAT_FIELD_FAULT.store(on, std::sync::atomic::Ordering::SeqCst);
+}
+
 fn pat_mode_fault() -> bool {
     PAT_MODE_FAULT.load(std::sync::atomic::Ordering::SeqCst)
 }
@@ -47,6 +54,15 @@ impl Builder<'_> {
                     let l = b.user_var(id, false, span)?;
                     match mode {
                         Some(k) => {
+                            let mut place = place;
+                            if PAT_FIELD_FAULT.load(std::sync::atomic::Ordering::SeqCst)
+                                && let Some(PlaceElem::Field(i, t)) =
+                                    place.projection.last().cloned()
+                                && i >= 1
+                            {
+                                place.projection.pop();
+                                place.projection.push(PlaceElem::Field(i - 1, t));
+                            }
                             let rv = b.new_borrow(k, place);
                             b.assign(Place::local(l), rv);
                         }

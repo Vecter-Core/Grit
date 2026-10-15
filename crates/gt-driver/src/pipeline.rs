@@ -338,6 +338,10 @@ fn run_passes(
     gt_mir::set_pat_mode_fault_for_test(
         std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-mode"),
     );
+    // `GRITC_FAULT=mir:pat-field`: biến bind trỏ nhầm trường (chỉ để kiểm bộ so sánh codegen/oracle tự bắt)
+    gt_mir::set_pat_field_fault_for_test(
+        std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-field"),
+    );
     let Some(m) = run.stage("m5.mir", || gt_mir::lower_program(&t)) else {
         run.skip(&AFTER_M4[1..]);
         return Ok(finish(run, sources, None));

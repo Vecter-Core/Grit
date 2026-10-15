@@ -26,3 +26,4 @@
 {"batch":"abort-pre","profile":"release-o2","rc":0,"secs":406}
 {"suite":"bits-3way","start":137000,"count":150,"result":{"programs":150,"red_programs":23,"runs":531,"equal_3way":508,"mismatch":0,"normal":238,"aborts":{"overflow": 223, "precondition": 47},"skipped":{"ĐỎ E0601": 8, "ĐỎ E0901": 15}}}
 {"batch":"bits","profile":"release-o2","rc":0,"secs":593}
+{"suite":"refpat","profile":"release-o2","start":1,"count":25,"programs":25,"equal":21,"expected_red":4,"mismatch":0,"forms":{"bare-name-and-wildcard": 21, "enum&": 21, "enum&!": 21, "literal-on-ref": 1, "nested-ref": 2, "nested-structural": 21, "nonexhaustive": 1, "struct&": 21, "struct&!": 21, "struct..": 16, "tuple&": 21, "tuple&!": 21, "tuple-of-refs": 21}}
