@@ -38,6 +38,8 @@ if has test; then
   mkdir -p /d/Grit/target/tmp
   OUT=/d/Grit/target/tmp/gate_test.txt
   bash -c "$CMD" > "$OUT" 2>&1; c=$?
+  cp "$OUT" /d/Grit/target/tmp/gate_test_last.txt
+  grep -E "panicked" -A4 "$OUT" | head -40
   grep -E "test result|FAILED|panicked" "$OUT" | awk '/test result/ {p+=$4; f+=$6; n++} /FAILED|panicked/ {print} END {print "TEST_PASSED="p" FAILED="f" SUITES="n}'
   n=$(grep -c "test result" "$OUT"); f=$(grep -E "test result" "$OUT" | awk '{f+=$6} END {print f+0}')
   if [ "$c" != 0 ]; then echo "TEST_CMD_EXIT=$c"; red "lệnh test thoát mã $c"; fi

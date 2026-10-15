@@ -36,8 +36,9 @@ pub const SITE_BASE: u32 = 5 << 20;
 pub const UNREP_BASE: u32 = 6 << 20;
 /// biến BÓNG (ảnh chụp giá trị lúc vào đầu vòng lặp, M8): `GHOST_BASE + id biến gốc`
 pub const GHOST_BASE: u32 = 1 << 28;
-/// số biến bóng tối đa mỗi thân (ngoài `ZONE_MAX_VARS`); vượt thì các biến thừa không có bóng ⇒ biến thể không chứng minh được (E0702/E0701)
-pub const GHOST_MAX_VARS: usize = 32;
+/// số biến bóng tối đa mỗi thân (ngoài `ZONE_MAX_VARS`); vượt thì các biến thừa không có bóng ⇒ biến thể không chứng minh được (E0702/E0701). Giới hạn THẬT của
+/// biến thể là `ZONE_MAX_VARS` (24): biến thể cần quan hệ zone của chính biến gốc, chỉ 24 biến đầu (ưu tiên biến của biến thể) vào zone ⇒ đặt bằng 24 cho khớp (đo 2026-10-15)
+pub const GHOST_MAX_VARS: usize = 24;
 /// vị từ thuần một đối số trên một local (vd `is_some(&x)`): `PRED_BASE + chỉ_số_vị_từ·1024 + local`
 pub const PRED_BASE: u32 = 7 << 20;
 

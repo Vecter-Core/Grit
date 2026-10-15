@@ -118,8 +118,8 @@ fn mutual_recursion_with_one_decreasing_edge_is_rejected() {
 
 #[test]
 fn beyond_the_ghost_limit_valid_loops_are_rejected_not_silently_accepted() {
-    // 20 vòng đúng = 40 biến bóng > GHOST_MAX_VARS (32): các vòng thừa KHÔNG có bóng ⇒ biến thể không chứng minh được ⇒ E0702 (chặn nhầm, fail-closed);
-    // KHÔNG được chấp nhận trong im lặng. Ghi ở KNOWN_LIMITATIONS: tối đa 32 biến bóng mỗi thân (≈ 16 vòng có biến thể 2 biến).
+    // 20 vòng đúng = 40 biến của biến thể > 24 (ZONE_MAX_VARS = GHOST_MAX_VARS): các vòng thừa KHÔNG có bóng ⇒ biến thể không chứng minh được ⇒ E0702 (chặn nhầm, fail-closed);
+    // KHÔNG được chấp nhận trong im lặng. Ghi ở KNOWN_LIMITATIONS: tối đa 24 biến của biến thể mỗi thân (12 vòng có biến thể 2 biến).
     let c = codes(&many_loops(20, &[], true));
     assert!(
         !c.is_empty() && c.iter().all(|x| x == "E0702"),
@@ -176,4 +176,50 @@ fn single_block_loops_exist_and_keep_their_back_edge() {
             "vòng vô hạn đứng yên bị CHẤP NHẬN ({c:?}): {src}"
         );
     }
+}
+
+/// hàm có ĐÚNG số biến của biến thể: `pairs` vòng hai biến (`↓ nK - iK`), thêm (tuỳ chọn) một vòng MỘT biến (`↓ m`)
+fn exact_variant_vars(pairs: usize, extra_single_var_loop: bool) -> String {
+    let mut params: Vec<String> = (1..=pairs).map(|k| format!("n{k}: u32")).collect();
+    let mut body = String::new();
+    for k in 1..=pairs {
+        body.push_str(&format!(
+            "  μi{k} ≔ 0u32; ⟳ i{k} < n{k} ↓ n{k} - i{k} {{ i{k} ← i{k} + 1; }}
+"
+        ));
+    }
+    if extra_single_var_loop {
+        params.push("m0: u32".to_string());
+        body.push_str(
+            "  μm ≔ m0; ⟳ m > 0 ↓ m { m ← m - 1; }
+",
+        );
+    }
+    format!(
+        "ƒ f({}) → () ! ∅ {{
+{body}}}
+",
+        params.join(", ")
+    )
+}
+
+/// GIỚI HẠN THẬT = `ZONE_MAX_VARS` = 24 biến của biến thể mỗi thân (12 vòng hai biến): biến thể cần quan hệ zone và chỉ 24 biến đầu (ưu tiên biến của biến thể) vào
+/// zone; `GHOST_MAX_VARS` được đặt bằng 24 cho khớp. Đúng 24 ⇒ mọi vòng được chứng minh; 25 ⇒ vòng có biến thứ 25 bị E0702 (chặn nhầm CÓ KIỂM SOÁT), không bị
+/// chấp nhận hay bỏ qua im lặng.
+#[test]
+fn exactly_24_variant_variables_are_handled_and_25_are_rejected_in_a_controlled_way() {
+    let t = std::time::Instant::now();
+    exactly(&exact_variant_vars(12, false), &[]); // 24 biến
+    let t24 = t.elapsed();
+    let t = std::time::Instant::now();
+    let c = codes(&exact_variant_vars(12, true)); // 25 biến
+    let t25 = t.elapsed();
+    assert!(
+        !c.is_empty() && c.iter().all(|x| x == "E0702"),
+        "25 biến của biến thể phải bị E0702 có kiểm soát, nhận {c:?}"
+    );
+    // 33 biến (16 vòng hai biến + 1 vòng một biến): cũng bị từ chối, không bị chấp nhận
+    let c = codes(&exact_variant_vars(16, true));
+    assert!(!c.is_empty() && c.iter().all(|x| x == "E0702"), "{c:?}");
+    println!("VARIANT_LIMIT_TIMING 24 biến: {t24:?}; 25 biến: {t25:?}");
 }
