@@ -4,6 +4,7 @@
 //!
 //! Fail-closed: chỉ hạ khi kiểm kiểu sạch; lỗi bất thường khi hạ là ICE (E9901), không bao giờ bỏ qua một thân.
 mod build;
+pub use build::set_pat_mode_fault_for_test;
 pub mod mir;
 pub mod print;
 pub mod types;

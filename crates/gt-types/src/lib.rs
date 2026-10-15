@@ -58,6 +58,8 @@ pub struct TypesOutput {
     /// (khoá item, tên, kiểu) của mọi biến cục bộ.
     pub locals: BTreeMap<LocalId, (String, String, Ty)>,
     pub methods: BTreeMap<NodeId, MethodRes>,
+    /// Chế độ khớp qua tham chiếu (ADR-040) tại pattern gốc của mỗi chuỗi tham chiếu: `true` = `&!`. MIR PHẢI suy ra cùng chế độ, lệch ⇒ ICE.
+    pub pat_modes: BTreeMap<NodeId, bool>,
     /// Bảng instance đã sắp xếp (lazy mono).
     pub instances: Vec<Instance>,
     /// Key of every fn with a body by NodeId (to read the instance table).
@@ -193,6 +195,7 @@ fn ice(msg: &str, resolve: ResolveOutput) -> TypesOutput {
         types: BTreeMap::new(),
         locals: BTreeMap::new(),
         methods: BTreeMap::new(),
+        pat_modes: BTreeMap::new(),
         instances: Vec::new(),
         fn_keys: BTreeMap::new(),
         regions: BTreeMap::new(),
@@ -216,6 +219,7 @@ pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesO
             types: BTreeMap::new(),
             locals: BTreeMap::new(),
             methods: BTreeMap::new(),
+            pat_modes: BTreeMap::new(),
             instances: Vec::new(),
             fn_keys: BTreeMap::new(),
             regions: BTreeMap::new(),
@@ -238,6 +242,7 @@ pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesO
             types: o.types,
             locals: o.locals,
             methods: o.methods,
+            pat_modes: o.pat_modes,
             instances: o.instances,
             fn_keys: o.fn_keys,
             regions: o.regions,
@@ -257,6 +262,7 @@ struct Outputs {
     types: BTreeMap<NodeId, Ty>,
     locals: BTreeMap<LocalId, (String, String, Ty)>,
     methods: BTreeMap<NodeId, MethodRes>,
+    pat_modes: BTreeMap<NodeId, bool>,
     instances: Vec<Instance>,
     fn_keys: BTreeMap<NodeId, String>,
     regions: BTreeMap<NodeId, RegionSig>,
@@ -392,6 +398,7 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
         types: env.out_types,
         locals: env.out_locals,
         methods: env.out_methods,
+        pat_modes: env.out_pat_modes,
         instances,
         fn_keys,
         regions: env.region_sigs,

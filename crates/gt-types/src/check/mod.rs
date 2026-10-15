@@ -115,6 +115,9 @@ pub(crate) struct Checker<'e, 'a> {
     pub in_contract: u32,
     /// chế độ tham chiếu của pattern đang kiểm (ADR-040): `Some(duy nhất?)`
     pub pat_ref: Option<bool>,
+    pub pat_modes: Vec<(NodeId, bool)>,
+    /// đang bind biến của pattern đã lỗi: biến nhận kiểu `Err` (chặn lỗi dây chuyền)
+    pub pat_poison: bool,
     pub unresolved_reported: bool,
 }
 
@@ -149,6 +152,8 @@ impl<'e, 'a> Checker<'e, 'a> {
             in_unsafe: 0,
             in_contract: 0,
             pat_ref: None,
+            pat_modes: Vec::new(),
+            pat_poison: false,
             unresolved_reported: false,
         }
     }
@@ -635,6 +640,9 @@ impl<'e, 'a> Checker<'e, 'a> {
             self.env
                 .out_locals
                 .insert(l, (self.key.clone(), info.name, r));
+        }
+        for (n, m) in std::mem::take(&mut self.pat_modes) {
+            self.env.out_pat_modes.insert(n, m);
         }
         let ms = std::mem::take(&mut self.methods);
         for (n, m) in ms {

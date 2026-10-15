@@ -21,6 +21,7 @@ impl<'e, 'a> Checker<'e, 'a> {
     /// Khai báo biến của pattern: ở chế độ tham chiếu (ADR-040) biến có kiểu `&V`/`&!V`.
     fn declare_pat(&mut self, ident: &Ident, ty: Ty) {
         let ty = match self.pat_ref {
+            _ if self.pat_poison => Ty::Err,
             Some(m) => Ty::Ref(m, Box::new(ty)),
             None => ty,
         };
@@ -41,11 +42,14 @@ impl<'e, 'a> Checker<'e, 'a> {
                     "pattern phá cấu trúc trên tham chiếu lồng: khớp qua tham chiếu chỉ một tầng; bind tên rồi dùng `⌥` lại".to_string(),
                 );
                 let saved = self.pat_ref.take();
+                self.pat_poison = true;
                 let _ = self.pat_inner(p, &Ty::Err);
+                self.pat_poison = false;
                 self.pat_ref = saved;
                 return XPat::Wild;
             }
             self.pat_ref = Some(m);
+            self.pat_modes.push((p.id, m));
             let r = self.pat_inner(p, &inner);
             self.pat_ref = None;
             return r;

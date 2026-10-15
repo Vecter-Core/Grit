@@ -7,6 +7,17 @@ use gt_ast::{Arm, Expr, Pattern, PatternKind};
 use gt_resolve::{DefKind, LocalId, Res};
 use gt_types::{AdtKind, IntTy, Ty};
 
+static PAT_MODE_FAULT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Chốt kiểm thử (`GRITC_FAULT=mir:pat-mode`): làm hạ MIR suy chế độ khớp qua tham chiếu SAI để chứng minh đường ICE E9901. KHÔNG dùng ngoài test.
+pub fn set_pat_mode_fault_for_test(on: bool) {
+    PAT_MODE_FAULT.store(on, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn pat_mode_fault() -> bool {
+    PAT_MODE_FAULT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
 /// Biến của pattern chờ gán: (định danh, chỗ nguồn, kiểu).
 /// `Some(loại)` = bind ở CHẾ ĐỘ THAM CHIẾU (ADR-040): biến là tham chiếu tới chỗ nguồn (khoản vay mới), không phải giá trị của nó.
 type Binds = Vec<(LocalId, Place, Ty, gt_span::Span, Option<BorrowKind>)>;
@@ -89,8 +100,21 @@ impl Builder<'_> {
                     "pattern phá cấu trúc trên tham chiếu lồng trong chế độ tham chiếu (M4 phải chặn E0301)",
                 );
             }
+            // ADR-040: chế độ MIR suy ra PHẢI bằng chế độ gt-types đã ghi (`pat_modes`); lệch ⇒ ICE, không hạ lặng lẽ theo chế độ khác
+            let derived = if pat_mode_fault() { !*m } else { *m };
+            if self.t.pat_modes.get(&p.id) != Some(&derived) {
+                return ice(format!(
+                    "chế độ khớp qua tham chiếu của MIR ({derived}) khác gt-types ({:?})",
+                    self.t.pat_modes.get(&p.id)
+                ));
+            }
             let deref = place.project(PlaceElem::Deref);
-            return self.test_pat_in(p, &deref, inner, Some(*m), fail, binds);
+            return self.test_pat_in(p, &deref, inner, Some(derived), fail, binds);
+        }
+        if self.destructures(p) && mode.is_none() && self.t.pat_modes.contains_key(&p.id) {
+            return ice(
+                "gt-types ghi chế độ tham chiếu cho một pattern mà MIR không thấy tham chiếu",
+            );
         }
         self.test_pat_in(p, place, ty, mode, fail, binds)
     }

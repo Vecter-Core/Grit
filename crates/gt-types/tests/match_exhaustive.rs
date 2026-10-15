@@ -153,3 +153,13 @@ fn the_approved_range_pattern_sample_is_exhaustive() {
     // tests/pass/29_range_open_patterns.gt (Q14): ..0, 0..=9, 10.. phủ hết i32 mà không cần `_`
     ok("ƒ bucket(n: i32) → i32 ! ∅ { ⌥ n { ..0 ↦ 0, 0..=9 ↦ 1, 10.. ↦ 2 } }");
 }
+
+#[test]
+fn nested_reference_pattern_reports_exactly_one_error_without_cascade() {
+    // ADR-040: tầng tham chiếu thứ hai báo E0301 MỘT lần; biến bind trong mẫu lỗi có kiểu `Err` nên không sinh lỗi phụ khi dùng
+    err(
+        "▢ P { x: u32 }\nƒ f(o: &Option<&P>) → u32 ! ∅ { ⌥ o { Some(P { x }) ↦ *x, None ↦ 0 } }",
+        "E0301",
+        1,
+    );
+}

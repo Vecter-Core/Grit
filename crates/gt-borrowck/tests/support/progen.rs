@@ -62,7 +62,7 @@ pub const PRELUDE: &str = "\
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
-pub const KINDS: [&str; 13] = [
+pub const KINDS: [&str; 18] = [
     "move",
     "reborrow",
     "borrow_in_loop",
@@ -76,6 +76,11 @@ pub const KINDS: [&str; 13] = [
     "interior_mut",
     "interior_mut_mutex",
     "interior_mut_atomic",
+    "ref_pat_unique",
+    "ref_pat_shared",
+    "ref_pat_arena",
+    "ref_pat_disjoint",
+    "ref_pat_subfield",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -262,7 +267,7 @@ impl Gen {
     }
 
     fn scenario(&mut self) -> Vec<St> {
-        match self.rng.below(100) {
+        match self.rng.below(112) {
             0..=16 => self.int_borrow(),
             17..=28 => self.reborrow(),
             29..=36 => self.moves(),
@@ -273,7 +278,8 @@ impl Gen {
             76..=79 => self.holder(),
             80..=85 => self.slot(),
             86..=94 => self.interior_mut(),
-            _ => self.flow(),
+            95..=99 => self.flow(),
+            _ => self.ref_pattern(),
         }
     }
 
@@ -766,6 +772,137 @@ impl Gen {
                 },
             ]
         }
+    }
+
+    /// ADR-040 (Q87): khớp mẫu qua tham chiếu (`⌥ p { W { b: b1, n: n1 } ↦ … }` với `p: &W`/`&!W`): biến bind là tham chiếu tới TRƯỜNG; hành động xung đột viết
+    /// TAY (`(*p).n`, `(*p).b.v`, `&!(*p).b`, ghi gốc, reset Arena) theo thứ tự ngẫu nhiên. Hai bên (borrowck, oracle động) phải đồng ý; kịch bản
+    /// "trường rời nhau" (`n` và `b.v`), "trường và trường con" (`b` và `b.v`).
+    fn ref_pattern(&mut self) -> Vec<St> {
+        let w = self.fresh("w");
+        let p = self.fresh("p");
+        let (b, n, v) = (self.fresh("fb"), self.fresh("fn"), self.fresh("fv"));
+        let a = self.fresh("a");
+        let mode = self.rng.below(10);
+        let (arena, unique) = (mode < 3, (3..6).contains(&mode));
+        let pat_kind = self.rng.below(4);
+        let (pat, has_b, has_v, has_n) = match pat_kind {
+            0 => (format!("W {{ b: {b}, n: {n} }}"), true, false, true),
+            1 => (
+                format!("W {{ b: B {{ v: {v} }}, n: {n} }}"),
+                false,
+                true,
+                true,
+            ),
+            2 => (format!("W {{ b: B {{ v: {v} }}, .. }}"), false, true, false),
+            _ => (format!("W {{ n: {n}, .. }}"), false, false, true),
+        };
+        self.tags.insert(if arena {
+            "ref_pat_arena"
+        } else if unique {
+            "ref_pat_unique"
+        } else {
+            "ref_pat_shared"
+        });
+        if has_n && (has_b || has_v) {
+            self.tags.insert("ref_pat_disjoint");
+        }
+        if has_v {
+            self.tags.insert("ref_pat_subfield");
+        }
+        let mut out = Vec::new();
+        if arena {
+            out.push(raw(format!("μ{a} ≔ Arena::new();")));
+            out.push(raw(format!("{p} ≔ {a}.alloc(mkw());")));
+        } else {
+            out.push(raw(format!("μ{w} ≔ mkw();")));
+            out.push(raw(if unique {
+                format!("{p} ≔ &!{w};")
+            } else {
+                format!("{p} ≔ &{w};")
+            }));
+        }
+        let mut pool: Vec<String> = Vec::new();
+        let k = |g: &mut Self| g.k();
+        if arena {
+            pool.push(format!("{a}.reset();"));
+            pool.push(format!("use_i((*{p}).n);"));
+            pool.push(format!("use_i((*{p}).b.v);"));
+            if has_n {
+                pool.push(format!("use_i(*{n});"));
+                pool.push(format!("use_i(*{n});"));
+            }
+            if has_b {
+                pool.push(format!("use_i(peek({b}));"));
+            }
+            if has_v {
+                pool.push(format!("use_i(*{v});"));
+            }
+        } else if unique {
+            if has_n {
+                let kk = k(self);
+                pool.push(format!("*{n} ← {kk};"));
+                pool.push(format!("use_i(*{n});"));
+            }
+            if has_b {
+                let kk = k(self);
+                pool.push(format!("bump({b});"));
+                pool.push(format!("use_i((*{b}).v);"));
+                pool.push(format!("(*{b}).v ← {kk};"));
+            }
+            if has_v {
+                let kk = k(self);
+                pool.push(format!("*{v} ← {kk};"));
+                pool.push(format!("use_i(*{v});"));
+                pool.push(format!("two(&!(*{p}).n, {v});"));
+                pool.push(format!("two(&!(*{p}).b.v, &!(*{p}).b.v);"));
+            }
+            if has_n && has_v {
+                pool.push(format!("two({n}, {v});"));
+            }
+            let kk = k(self);
+            pool.push(format!("use_i((*{p}).n);"));
+            pool.push(format!("(*{p}).n ← {kk};"));
+            pool.push(format!("use_i((*{p}).b.v);"));
+            pool.push(format!("(*{p}).b.v ← {kk};"));
+            pool.push(format!("bump(&!(*{p}).b);"));
+            pool.push(format!("two(&!(*{p}).n, &!(*{p}).b.v);"));
+        } else {
+            if has_n {
+                pool.push(format!("use_i(*{n});"));
+            }
+            if has_b {
+                pool.push(format!("use_i(peek({b}));"));
+                pool.push(format!("use_i((*{b}).v);"));
+            }
+            if has_v {
+                pool.push(format!("use_i(*{v});"));
+            }
+            let kk = k(self);
+            pool.push(format!("use_i((*{p}).n);"));
+            pool.push(format!("{w}.n ← {kk};"));
+            pool.push(format!("bump(&!{w}.b);"));
+            pool.push(format!("use_i({w}.b.v);"));
+            pool.push(format!("{w}.b.v ← {kk};"));
+        }
+        let mut acts = Vec::new();
+        for _ in 0..2 + self.rng.below(4) {
+            let i = self.rng.below(pool.len() as u64) as usize;
+            acts.push(raw(pool[i].clone()));
+        }
+        out.push(St::Raw(Raw {
+            text: format!("⌥ {p} {{ {pat} ↦ {{"),
+            role: Role::Plain,
+        }));
+        out.extend(acts);
+        out.push(raw("} };"));
+        if self.rng.chance(50) {
+            if arena {
+                out.push(raw(format!("use_i((*{p}).n);")));
+            } else {
+                out.push(raw(format!("use_i({w}.n);")));
+            }
+        }
+        out
     }
 
     /// Arena: cấp phát, dùng, reset/move/gán đè theo thứ tự ngẫu nhiên.

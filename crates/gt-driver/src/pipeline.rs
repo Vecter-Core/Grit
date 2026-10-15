@@ -334,6 +334,10 @@ fn run_passes(
         return Ok(finish(run, sources, None));
     }
     // ---- M5
+    // `GRITC_FAULT=mir:pat-mode`: hạ MIR suy chế độ khớp qua tham chiếu sai ⇒ phải ra ICE E9901 (ADR-040)
+    gt_mir::set_pat_mode_fault_for_test(
+        std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-mode"),
+    );
     let Some(m) = run.stage("m5.mir", || gt_mir::lower_program(&t)) else {
         run.skip(&AFTER_M4[1..]);
         return Ok(finish(run, sources, None));
