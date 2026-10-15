@@ -59,3 +59,8 @@ Mỗi mục: (i) làm gì · (ii) chạm vào gì · (iii) nếu hợp đồng S
 ---
 # SẮP THÊM (ADR-038, chưa có mã) — dự kiến mức rủi ro
 - `Vec::pop/clear/truncate/extend_from_slice/insert/remove/swap_remove` (7): **CAO** (bộ nhớ như `push`). `str::as_bytes`: **THẤP** (cùng con trỏ béo). `root_in`, `Cap<In>::read`: **TRUNG BÌNH** (ghi vào bộ đệm do người gọi cấp, ≤ len); `Cap<Fs>::write`: **TRUNG BÌNH**. Arena chia sẻ (đổi `Vec<'a,T>` giữ `&'a Arena`): đổi hợp đồng của H1–H6, **CAO**.
+
+---
+# NGƯỜI DUYỆT THỨ HAI (ghi 2026-10-15, theo lệnh Giang ủy quyền kiến trúc sư)
+- **Tình trạng:** cả 42 dòng của `TCB_INTRINSICS.md` nay mang trạng thái `ỦY QUYỀN: KIẾN TRÚC SƯ DUYỆT HỢP ĐỒNG` (không điều kiện cho 25 dòng, CÓ ĐIỀU KIỆN cho 17 dòng: H2 Arena::alloc, H4 Vec::new/push/reserve, H6 Text + str::slice, H7 Atomic, H8 Mutex/spawn, Cap<Fs>::read theo D.1). "Duyệt hợp đồng" = hợp đồng và bằng chứng đã được ĐỌC và CHẤP NHẬN, **KHÔNG phải đã kiểm toán mã nguồn**. Giang có thể đổi bất kỳ dòng nào về `GIANG PHẢN ĐỐI`.
+- **Nhóm CAO (H1–H10: Arena, Vec, Text, lát, Atomic, Mutex, spawn, Cell, arg) CHƯA CÓ NGƯỜI THỨ HAI ĐỌC MÃ.** Người viết mã và người duyệt hợp đồng đến từ cùng một dòng làm việc; bằng chứng hiện có là kiểm thử (E1–E4) chứ không phải đọc mã đối kháng. Điều kiện cổng mới (ghi ở READINESS.md): nhóm CAO phải qua **đọc mã đối kháng** (mục E của lệnh 2026-10-15 → `docs/TCB_CODE_AUDIT.md`) trước khi coi TCB là "đã duyệt".
