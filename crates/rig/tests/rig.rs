@@ -500,3 +500,121 @@ fn fmt_rewrites_and_check_flags_unformatted_sources() {
     assert_eq!(code(&rig(&p, &["lock"])), 0);
     assert_eq!(code(&rig(&p, &["check"])), 0);
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// F.2 (lệnh Giang 2026-10-15): generic và trait CHÉO GÓI cho thư viện chuẩn viết bằng Grit.
+// ---------------------------------------------------------------------------------------------------------------------------------
+const STD_FWD: &str = "◈ ▢ W<T> { ◈ v: T }
+⊐ Ord for u32 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+⊐ <T: Ord> Ord for W<T> {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { self.v.cmp(&o.v) }
+}
+";
+
+fn std_app(root: &Path, std_src: &str, main_src: &str) {
+    write(&root.join("std"), "rig.toml", &manifest("std", &[]));
+    write(&root.join("std"), "src/std.gt", std_src);
+    write(
+        &root.join("app"),
+        "rig.toml",
+        &manifest("app", &[("std", "../std")]),
+    );
+    write(&root.join("app"), "src/main.gt", main_src);
+}
+
+fn run_exe(app: &Path) -> String {
+    let o = Command::new(app.join("target/app.exe"))
+        .output()
+        .expect("chạy exe");
+    String::from_utf8_lossy(&o.stdout).into_owned()
+}
+
+/// Mẫu bọc-và-chuyển-tiếp `⊐ <T: Ord> Ord for W<T> { cmp → self.v.cmp(&o.v) }` định nghĩa Ở GÓI KHÁC, dùng với `W<W<W<u32>>>`: M8 (E0703) CHẤP NHẬN, LLVM chạy đúng.
+#[test]
+fn cross_package_generic_trait_forwarder_passes_e0703_and_runs_correctly() {
+    for (a, b, want) in [(5, 3, "3"), (3, 5, "1"), (4, 4, "2")] {
+        let d = tmp("fwd");
+        std_app(
+            &d,
+            STD_FWD,
+            &format!(
+                "ƒ main() ! {{io}} {{\n  a ≔ std::W {{ v: std::W {{ v: std::W {{ v: {a}u32 }} }} }};\n  b ≔ std::W {{ v: std::W {{ v: std::W {{ v: {b}u32 }} }} }};\n  out ≔ root_out();\n  r ≔ ⌥ a.cmp(&b) {{ Ordering::Less ↦ 1u64, Ordering::Greater ↦ 3u64, _ ↦ 2u64 }};\n  out.write_u64(r);\n}}\n"
+            ),
+        );
+        let app = d.join("app");
+        let o = rig(&app, &["build"]);
+        assert_eq!(code(&o), 0, "{}", err(&o));
+        assert_eq!(run_exe(&app), want, "a={a} b={b}");
+    }
+}
+
+/// Vòng THẬT chéo gói vẫn bị E0703 (không nới): impl tự gọi lại chính nó qua trait.
+#[test]
+fn cross_package_true_cycles_are_still_e0703() {
+    let main_w = "ƒ main() → u32 ! ∅ { a ≔ std::W { v: 1u32 }; b ≔ std::W { v: 2u32 }; ⌥ a.cmp(&b) { Ordering::Less ↦ 1u32, _ ↦ 0u32 } }
+";
+    let main_u =
+        "ƒ main() → u32 ! ∅ { a ≔ 1u32; b ≔ 2u32; ⌥ a.cmp(&b) { Ordering::Less ↦ 1u32, _ ↦ 0u32 } }
+";
+    for (bad, main) in [
+        (
+            "◈ ▢ W<T> { ◈ v: T }
+⊐ Ord for u32 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { self.cmp(o) }
+}
+",
+            main_u,
+        ),
+        (
+            "◈ ▢ W<T> { ◈ v: T }
+⊐ Ord for u32 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { Ordering::Equal }
+}
+⊐ <T: Ord> Ord for W<T> {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { self.cmp(o) }
+}
+",
+            main_w,
+        ),
+    ] {
+        let d = tmp("cyc");
+        std_app(&d, bad, main);
+        let o = rig(&d.join("app"), &["check"]);
+        assert_ne!(code(&o), 0, "{}", err(&o));
+        assert!(
+            err(&o).contains("E0703") || out(&o).contains("E0703"),
+            "{}{}",
+            out(&o),
+            err(&o)
+        );
+    }
+}
+
+/// KHOẢNG TRỐNG GHI NHẬN (chặn số 1 của gói `std`, lệnh Giang F.2): KHÔNG so khớp được `&Option<T>` (pattern không tự deref) và không move ra khỏi tham chiếu (E0407)
+/// ⇒ không viết được `⊐ <T: Ord> Ord for Option<T>` (hay bất kỳ phương thức `&self` nào đọc payload generic không-Copy của enum). Test này KHOÁ hiện trạng:
+/// khi ngôn ngữ có cách so khớp tham chiếu (vd. default binding modes), test này sẽ ĐỎ ⇒ cập nhật HANDOFF/ADR-038 và bật phần std.
+#[test]
+fn matching_a_reference_to_an_enum_is_not_expressible_yet_std_blocker() {
+    let d = tmp("optord");
+    std_app(
+        &d,
+        "⊐ Ord for u32 {\n  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { Ordering::Equal }\n}\n⊐ <T: Ord> Ord for Option<T> {\n  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {\n    ⌥ self {\n      Some(a) ↦ ⌥ o { Some(b) ↦ a.cmp(b), None ↦ Ordering::Greater },\n      None ↦ ⌥ o { Some(_) ↦ Ordering::Less, None ↦ Ordering::Equal },\n    }\n  }\n}\n",
+        "ƒ main() → u32 ! ∅ { 0 }\n",
+    );
+    let o = rig(&d.join("app"), &["check"]);
+    assert_ne!(
+        code(&o),
+        0,
+        "bất ngờ: so khớp `&Option<T>` đã được hỗ trợ ⇒ cập nhật HANDOFF"
+    );
+    assert!(
+        err(&o).contains("E0301") || out(&o).contains("E0301"),
+        "{}{}",
+        out(&o),
+        err(&o)
+    );
+}
