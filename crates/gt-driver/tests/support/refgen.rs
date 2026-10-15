@@ -109,6 +109,7 @@ fn pat_args(bs: &[String]) -> String {
     }
 }
 
+#[allow(clippy::needless_range_loop)] // `v` là chỉ số biến thể (số trường), không chỉ là chỉ số của `arms`
 pub fn program(seed: u64) -> RefProg {
     let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xA5A5_1234_5678_9ABC | 1);
     if seed % 6 == 5 {
