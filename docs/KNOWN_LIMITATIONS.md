@@ -293,3 +293,7 @@ Hạn chế còn lại của Guard-post: (1) R1 đếm theo (hàm, loại) — k
 ## `mutant-probe` và đối chiếu 361/591/554 (2026-10-15, lệnh Giang A.2/A.3)
 - Cargo feature `mutant-probe` của `gt-borrowck`: CHỈ test (`probe_diff`), không bật mặc định, không có trong `gritc` (test `release_has_no_mutant_probe`: hằng `MUTANT_PROBE == false` và không `Cargo.toml` nào ngoài gt-borrowck nhắc tới). Cho phép chọn bản gốc/đột biến 238/361/591/554 lúc chạy bằng `check_program_probe` và lấy tập cạnh bằng `probe_constraint_edges`. Mã đột biến KHÔNG tồn tại khi không có feature (macro `probe!` biên dịch ra `false`).
 - Kết quả: xem `docs/MUTANT_ARGUMENTS.md` mục A.3. Giới hạn: tập chênh của 554/591 chỉ ≈ 3 hình dạng; bộ sinh định hướng theo mẫu nên có thể bỏ sót hình dạng; `probe_diff` bản đủ ngưỡng (24 143 chương trình, ≈ 6 phút) chạy tay, chưa nằm trong cổng đầy đủ.
+
+## gt-term: biến bóng và tập nghĩa vụ rỗng (2026-10-15, FB-7)
+- **Tối đa `GHOST_MAX_VARS = 32` biến bóng mỗi thân** (≈ 16 vòng lặp có biến thể 2 biến): vòng lặp thứ 17 trở đi của MỘT hàm bị E0702/E0701 dù đúng (chặn nhầm, fail-closed; test `beyond_the_ghost_limit_valid_loops_are_rejected_not_silently_accepted`). Khắc phục: tách hàm.
+- Tập nghĩa vụ biến thể RỖNG chỉ được chấp nhận khi M7 khẳng định tường minh KHÔNG có cạnh lùi khả thi (`no_back_edge_heads`). Điều này dựa vào tính ĐÚNG của khẳng định "không tới được" của M7 (khoảng + zone); lỗi `dead state` sai của M7 (coi đường tới được là chết) sẽ làm vòng lặp thật được chấp nhận — cùng lớp rủi ro với việc M7 xoá check (đã có 69 đột biến nguy hiểm mở).

@@ -213,7 +213,7 @@ fn builds_are_reproducible_for_every_profile() {
 #[test]
 fn release_has_no_mutant_probe() {
     assert!(
-        !gt_borrowck::MUTANT_PROBE,
+        !std::hint::black_box(gt_borrowck::MUTANT_PROBE),
         "bản dựng gritc có feature mutant-probe!"
     );
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");

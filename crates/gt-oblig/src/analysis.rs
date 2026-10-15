@@ -37,7 +37,7 @@ pub const UNREP_BASE: u32 = 6 << 20;
 /// biến BÓNG (ảnh chụp giá trị lúc vào đầu vòng lặp, M8): `GHOST_BASE + id biến gốc`
 pub const GHOST_BASE: u32 = 1 << 28;
 /// số biến bóng tối đa mỗi thân (ngoài `ZONE_MAX_VARS`); vượt thì các biến thừa không có bóng ⇒ biến thể không chứng minh được (E0702/E0701)
-pub const GHOST_MAX_VARS: usize = 8;
+pub const GHOST_MAX_VARS: usize = 32;
 /// vị từ thuần một đối số trên một local (vd `is_some(&x)`): `PRED_BASE + chỉ_số_vị_từ·1024 + local`
 pub const PRED_BASE: u32 = 7 << 20;
 
@@ -164,6 +164,17 @@ pub struct BodyReport {
     pub ice: Option<String>,
     /// narrowing bị bỏ vì không qua kiểm hậu-điểm-cố-định
     pub narrowing_rejected: bool,
+    /// KHẲNG ĐỊNH TƯỜNG MINH (M7 → M8): đầu vòng lặp (chỉ số khối) có biến thể mà KHÔNG có cạnh lùi khả thi tới nó (vòng lặp chạy tối đa một lượt). Chỉ khi đầu vòng
+    /// nằm ở đây thì tập nghĩa vụ biến thể RỖNG mới được gt-term coi là hợp lệ; rỗng mà không có khẳng định ⇒ từ chối (ADR: tập rỗng/bị cắt không phải bằng chứng).
+    pub no_back_edge_heads: BTreeSet<u32>,
+}
+
+/// CHỈ TEST (cơ chế chèn lỗi như `set_select_impl_first_for_test`): nuốt MỌI nghĩa vụ biến thể (mô phỏng "nghĩa vụ bị mất/cắt") để kiểm gt-term KHÔNG coi tập rỗng là đã chứng minh.
+static DROP_VARIANT_FOR_TEST: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_drop_variant_obligations_for_test(on: bool) {
+    DROP_VARIANT_FOR_TEST.store(on, std::sync::atomic::Ordering::SeqCst);
 }
 
 fn ity(t: &GTy) -> Option<Ty> {
@@ -570,15 +581,15 @@ impl<'a> Ctx<'a> {
         }
         for (v, g) in self.ghosts.values().flatten() {
             let ty = if *v >= LEN_BASE {
-                Ty::new(64, false)
+                Some(Ty::new(64, false))
             } else {
-                self.itys
-                    .get(*v as usize)
-                    .copied()
-                    .flatten()
-                    .unwrap_or(Ty::new(64, false))
+                self.itys.get(*v as usize).copied().flatten()
             };
-            env.declare(*g, ty);
+            // kiểu nguyên KHÔNG biết ⇒ KHÔNG khai báo (biến chưa khai báo có khoảng `top`, không giả định gì); trước đây mặc định `u64` khai báo
+            // "không âm" cho một biến có thể có dấu = giả thiết không có cơ sở (fail-open)
+            if let Some(ty) = ty {
+                env.declare(*g, ty);
+            }
         }
         // `⊳` được đảm bảo kiểm ở mọi lời gọi ⇒ giả thiết cho cả thân
         if self.body.kind == gt_mir::BodyKind::Fn && self.info.assume_pre.contains(&self.body.node)
@@ -1400,6 +1411,9 @@ impl<'a> Ctx<'a> {
 
     /// Nghĩa vụ của một ứng viên biến thể tại một cạnh lùi.
     fn judge_variant_edge(&self, s: &AState, bb: usize, sp: &LoopSpec, j: &mut Judge<'_>) {
+        if DROP_VARIANT_FOR_TEST.load(std::sync::atomic::Ordering::SeqCst) {
+            return;
+        }
         let map: BTreeMap<VarId, Term> = sp
             .vars
             .iter()
@@ -1912,6 +1926,25 @@ pub fn analyze_body(body: &Body, info: &ProgInfo, prover: &mut dyn Prover) -> Bo
         rep.ice = Some(e);
         return rep;
     }
+    // đầu vòng nào có cạnh lùi KHẢ THI (cùng tiêu chí với việc sinh nghĩa vụ biến thể ở `edges`)?
+    let mut live_back: BTreeSet<u32> = BTreeSet::new();
+    for b in &cx.rpo {
+        let bb = b.index();
+        if let Some(s) = &states[bb] {
+            for (tgt, _) in cx.block_out(s, bb, None) {
+                let t = tgt.index();
+                if cx.rpo_pos[t] <= cx.rpo_pos[bb] && cx.specs.contains_key(&t) {
+                    live_back.insert(t as u32);
+                }
+            }
+        }
+    }
+    rep.no_back_edge_heads = cx
+        .specs
+        .keys()
+        .map(|h| *h as u32)
+        .filter(|h| !live_back.contains(h))
+        .collect();
     let mut judge = Judge {
         prover,
         budget_per_ob: 1 << 16,

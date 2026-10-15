@@ -1,0 +1,131 @@
+//! Rà soát FAIL-OPEN của gt-term (lệnh Giang 2026-10-15, mục B): một vòng lặp KHÔNG có nghĩa vụ dừng nào được xét (tập nghĩa vụ RỖNG hoặc BỊ CẮT vì vượt
+//! `GHOST_MAX_VARS = 8` biến bóng của một thân) KHÔNG BAO GIỜ được coi là "đã chứng minh dừng". Mỗi vòng sai phải bị E0701/E0702 đúng mã; vòng đúng phải qua.
+#[path = "../../gt-mir/tests/common/mod.rs"]
+mod common;
+use gt_oblig::driver::build_prog_info;
+use gt_oblig::prover::ZoneProver;
+use gt_term::check_termination;
+
+fn codes(src: &str) -> Vec<String> {
+    let (t, m) = common::mir(src);
+    assert!(
+        m.report.diagnostics.is_empty(),
+        "{:?}\n{src}",
+        common::mir_codes(&m)
+    );
+    let info = build_prog_info(&t, &m);
+    let o = check_termination(&t, &m, &info, &mut ZoneProver::new(24));
+    let mut v: Vec<String> = o
+        .report
+        .diagnostics
+        .iter()
+        .map(|d| d.code.as_str().to_string())
+        .collect();
+    v.sort();
+    v
+}
+
+fn exactly(src: &str, want: &[&str]) {
+    let c = codes(src);
+    let w: Vec<String> = want.iter().map(|x| (*x).to_string()).collect();
+    assert_eq!(c, w, "\n{src}");
+}
+
+/// hàm có `n` vòng lặp: vòng `k` dùng biến RIÊNG `ik`/`nk` (mỗi vòng cần 2 biến bóng ⇒ vượt 8 sau 4 vòng). `bad[k]` ⇒ vòng đứng yên (sai).
+fn many_loops(n: usize, bad: &[usize], explicit: bool) -> String {
+    let params: Vec<String> = (1..=n).map(|k| format!("n{k}: u32")).collect();
+    let mut body = String::new();
+    for k in 1..=n {
+        let step = if bad.contains(&k) {
+            String::new()
+        } else {
+            format!("i{k} ← i{k} + 1;")
+        };
+        if explicit {
+            body.push_str(&format!(
+                "  μi{k} ≔ 0u32; ⟳ i{k} < n{k} ↓ n{k} - i{k} {{ {step} }}\n"
+            ));
+        } else {
+            body.push_str(&format!("  μi{k} ≔ 0u32; ⟳ i{k} < n{k} {{ {step} }}\n"));
+        }
+    }
+    format!("ƒ f({}) → () ! ∅ {{\n{body}}}\n", params.join(", "))
+}
+
+#[test]
+fn many_valid_loops_with_distinct_variables_are_accepted() {
+    // đối chứng pass: 3, 6, 10 vòng đúng, mỗi vòng biến riêng (kể cả khi vượt giới hạn biến bóng của một thân)
+    for n in [3, 6, 10] {
+        exactly(&many_loops(n, &[], true), &[]);
+        exactly(&many_loops(n, &[], false), &[]);
+    }
+}
+
+#[test]
+fn stationary_variant_loops_past_the_ghost_limit_are_rejected_with_e0702() {
+    // vòng 5, 6 (vượt 8 biến bóng) đứng yên ⇒ E0702 cho từng vòng sai; trước đây vòng bị cắt nghĩa vụ được chấp nhận
+    exactly(&many_loops(6, &[5, 6], true), &["E0702", "E0702"]);
+    exactly(&many_loops(8, &[8], true), &["E0702"]);
+    exactly(
+        &many_loops(10, &[1, 9, 10], true),
+        &["E0702", "E0702", "E0702"],
+    );
+}
+
+#[test]
+fn inferred_variant_loops_without_progress_past_the_ghost_limit_are_rejected_with_e0701() {
+    exactly(&many_loops(6, &[5, 6], false), &["E0701", "E0701"]);
+    exactly(&many_loops(9, &[9], false), &["E0701"]);
+}
+
+#[test]
+fn a_variant_that_decreases_but_is_overwritten_in_the_body_is_rejected() {
+    // giảm rồi bị ghi đè ngược trong thân
+    exactly(
+        "ƒ f(n: u32) → () ! ∅ { μi ≔ 0u32; μm ≔ n; ⟳ i < m ↓ m - i { i ← i + 1; m ← m + 5; } }",
+        &["E0702"],
+    );
+}
+
+#[test]
+fn nested_loops_each_need_their_own_proof() {
+    // vòng trong đúng, vòng ngoài đứng yên
+    exactly(
+        "ƒ f(n: u32) → () ! ∅ { μi ≔ 0u32; ⟳ i < n ↓ n - i { μj ≔ 0u32; ⟳ j < 3 { j ← j + 1; } } }",
+        &["E0702"],
+    );
+    // vòng ngoài đúng, vòng trong đứng yên: vòng trong E0702. Sau vòng trong KHÔNG tới được (vòng trong không thoát) nên M7 KHẲNG ĐỊNH vòng ngoài không có cạnh lùi
+    // khả thi (chạy tối đa một lượt) ⇒ vòng ngoài không báo thêm; cả chương trình vẫn bị từ chối vì vòng trong
+    exactly(
+        "ƒ f(n: u32) → () ! ∅ { μi ≔ 0u32; ⟳ i < n { μj ≔ 0u32; ⟳ j < 3 ↓ 3 - j { } i ← i + 1; } }",
+        &["E0702"],
+    );
+    // cả hai đúng
+    exactly(
+        "ƒ f(n: u32) → () ! ∅ { μi ≔ 0u32; ⟳ i < n ↓ n - i { μj ≔ 0u32; ⟳ j < 3 ↓ 3 - j { j ← j + 1; } i ← i + 1; } }",
+        &[],
+    );
+}
+
+#[test]
+fn mutual_recursion_with_one_decreasing_edge_is_rejected() {
+    // chỉ một cạnh của chu trình giảm biến thể
+    exactly(
+        "ƒ a(n: u32) → u32 ! ∅ ↓ n { ⎇ n == 0 { 0 } ⇝ { b(n - 1) } }\nƒ b(n: u32) → u32 ! ∅ ↓ n { ⎇ n == 0 { 0 } ⇝ { a(n) } }",
+        &["E0702"],
+    );
+}
+
+#[test]
+fn beyond_the_ghost_limit_valid_loops_are_rejected_not_silently_accepted() {
+    // 20 vòng đúng = 40 biến bóng > GHOST_MAX_VARS (32): các vòng thừa KHÔNG có bóng ⇒ biến thể không chứng minh được ⇒ E0702 (chặn nhầm, fail-closed);
+    // KHÔNG được chấp nhận trong im lặng. Ghi ở KNOWN_LIMITATIONS: tối đa 32 biến bóng mỗi thân (≈ 16 vòng có biến thể 2 biến).
+    let c = codes(&many_loops(20, &[], true));
+    assert!(
+        !c.is_empty() && c.iter().all(|x| x == "E0702"),
+        "kỳ vọng chỉ E0702 (chặn nhầm có kiểm soát), nhận {c:?}"
+    );
+    // và vòng SAI vẫn bị bắt dù nằm ngoài giới hạn
+    let c = codes(&many_loops(20, &[20], true));
+    assert!(c.len() >= 2 && c.iter().all(|x| x == "E0702"), "{c:?}");
+}

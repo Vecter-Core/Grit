@@ -57,7 +57,20 @@ pub fn check_effects(t: &TypesOutput, m: &MirOutput) -> EffectsOutput {
             found.entry(e.to_string()).or_insert((span, why));
         };
         for bb in &b.blocks {
-            let Some(term) = &bb.terminator else { continue };
+            // khối không có terminator ⇒ MIR hỏng: KHÔNG được bỏ qua trong im lặng (sẽ mất hiệu ứng của lời gọi) ⇒ ICE (fail-closed)
+            let Some(term) = &bb.terminator else {
+                bag.push(mk(
+                    t,
+                    "E9901",
+                    b.node,
+                    b.span,
+                    format!(
+                        "khối không có terminator trong `{}`: không suy được hiệu ứng",
+                        b.key
+                    ),
+                ));
+                continue;
+            };
             let TerminatorKind::Call { callee, args, .. } = &term.kind else {
                 continue;
             };
@@ -150,10 +163,30 @@ pub fn check_effects(t: &TypesOutput, m: &MirOutput) -> EffectsOutput {
     for imp in &t.db.impls {
         let Some(tr) = &imp.trait_ref else { continue };
         let Some(td) = t.db.traits.get(&tr.trait_def) else {
+            if let Some(m0) = imp.members.first() {
+                bag.push(mk(
+                    t,
+                    "E9901",
+                    m0.node,
+                    m0.span,
+                    "impl trỏ tới trait không có trong bảng: không kiểm được chữ ký hiệu ứng"
+                        .to_string(),
+                ));
+            }
             continue;
         };
         for mem in &imp.members {
             let Some(tm) = td.members.iter().find(|x| x.name == mem.name) else {
+                bag.push(mk(
+                    t,
+                    "E9901",
+                    mem.node,
+                    mem.span,
+                    format!(
+                        "thành viên impl `{}` không có trong trait: không kiểm được chữ ký hiệu ứng",
+                        mem.name
+                    ),
+                ));
                 continue;
             };
             let allowed: BTreeSet<String> = tm.effects.iter().cloned().collect();
@@ -317,6 +350,15 @@ fn check_lock_order(cx: &CallCx<'_>, held: &str, bag: &mut Diagnostics) {
                 _ => None,
             })
     else {
+        // không xác định được hàm đối số của `with` ⇒ KHÔNG kiểm được thứ tự khoá: từ chối (không im lặng chấp nhận)
+        bag.push(mk(
+            t,
+            "E9901",
+            cx.b.node,
+            cx.span,
+            "không xác định được hàm đối số của `Mutex::with`: không kiểm được thứ tự khoá"
+                .to_string(),
+        ));
         return;
     };
     for e in &effs {

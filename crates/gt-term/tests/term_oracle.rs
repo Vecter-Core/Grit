@@ -32,6 +32,9 @@ fn programs() -> u64 {
 
 #[test]
 fn accepted_programs_never_run_out_of_fuel() {
+    // GT_TERM_DROP=1: MÔ PHỎNG nghĩa vụ biến thể bị mất (B.3): gt-term không được chấp nhận chương trình phân kỳ nào (kiểm "tắt bản sửa": với logic cũ test này đỏ)
+    let drop_variants = std::env::var("GT_TERM_DROP").is_ok_and(|v| v == "1");
+    gt_oblig::analysis::set_drop_variant_obligations_for_test(drop_variants);
     let n = programs();
     let mut tally: BTreeMap<&'static str, u64> = BTreeMap::new();
     let mut codes: BTreeMap<String, u64> = BTreeMap::new();
@@ -101,7 +104,7 @@ fn accepted_programs_never_run_out_of_fuel() {
         *tally.entry(key).or_default() += 1;
     }
     eprintln!("{tally:?}\nmã: {codes:?}");
-    if n < 1500 {
+    if n < 1500 || drop_variants {
         return;
     }
     let get = |k: &str| tally.get(k).copied().unwrap_or(0);

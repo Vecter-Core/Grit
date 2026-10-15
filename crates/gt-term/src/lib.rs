@@ -587,11 +587,11 @@ fn conservative_graph(
 /// Có đường đi từ đầu vòng quay lại chính nó không (cạnh lùi). Không có ⇒ vòng lặp lặp tối đa một lần.
 fn has_back_edge(b: &Body, head: gt_mir::BasicBlock) -> bool {
     let mut seen = vec![false; b.blocks.len()];
-    let mut stack: Vec<gt_mir::BasicBlock> = b.blocks[head.index()]
-        .terminator
-        .as_ref()
-        .map(|t| t.kind.successors())
-        .unwrap_or_default();
+    // khối không có terminator ⇒ MIR hỏng ⇒ KHÔNG biết có cạnh lùi hay không ⇒ coi như CÓ (bảo thủ: vòng lặp phải được chứng minh dừng)
+    let Some(ht) = &b.blocks[head.index()].terminator else {
+        return true;
+    };
+    let mut stack: Vec<gt_mir::BasicBlock> = ht.kind.successors();
     while let Some(x) = stack.pop() {
         if x == head {
             return true;
@@ -599,8 +599,9 @@ fn has_back_edge(b: &Body, head: gt_mir::BasicBlock) -> bool {
         if std::mem::replace(&mut seen[x.index()], true) {
             continue;
         }
-        if let Some(t) = &b.blocks[x.index()].terminator {
-            stack.extend(t.kind.successors());
+        match &b.blocks[x.index()].terminator {
+            Some(t) => stack.extend(t.kind.successors()),
+            None => return true,
         }
     }
     false
@@ -736,8 +737,22 @@ pub fn check_termination(
     // ---- vòng lặp ----
     let mut loop_nodes: Vec<(String, u32, NodeId, Span, bool)> = Vec::new(); // (thân, đầu, nút, span, tự suy)
     for b in &bodies {
-        let Some(f) = fns.get(&b.node) else { continue };
-        let _ = f;
+        if !fns.contains_key(&b.node) {
+            // thân KHÔNG có chữ ký hàm nhưng có vòng lặp ⇒ KHÔNG kiểm được dừng ⇒ ICE (trước đây bị bỏ qua trong im lặng)
+            if !b.loops.is_empty() {
+                bag.push(mk(
+                    t,
+                    "E9901",
+                    b.node,
+                    b.span,
+                    format!(
+                        "thân `{}` có vòng lặp nhưng không có chữ ký hàm: không kiểm được dừng",
+                        b.key
+                    ),
+                ));
+            }
+            continue;
+        }
         let mut params = BTreeMap::new();
         for i in 1..=b.arg_count {
             if let LocalKind::Arg(Some(n)) = &b.locals[i].kind {
@@ -846,14 +861,18 @@ pub fn check_termination(
                     .collect()
             })
             .unwrap_or_default();
-        let ok = if *inferred {
+        // Tập nghĩa vụ RỖNG KHÔNG tự nó là bằng chứng dừng (lệnh Giang 2026-10-15, B.3). Chỉ chấp nhận khi M7 KHẲNG ĐỊNH TƯỜNG MINH rằng KHÔNG có cạnh lùi khả thi
+        // tới đầu vòng (`BodyReport::no_back_edge_heads`: vòng lặp chạy tối đa một lượt, ví dụ thân không bao giờ vào được); nghĩa vụ bị mất/cắt/không sinh ⇒ từ chối.
+        let ok = if judged.is_empty() {
+            rep.is_some_and(|r| r.no_back_edge_heads.contains(head))
+        } else if *inferred {
             let mut cands: BTreeMap<u32, bool> = BTreeMap::new();
             for j in &judged {
                 let (_, c) = j.tag.unwrap_or((0, 0));
                 let e = cands.entry(c).or_insert(true);
                 *e &= matches!(j.status, Status::Discharged { .. });
             }
-            cands.is_empty() || cands.values().any(|v| *v)
+            cands.values().any(|v| *v)
         } else {
             judged
                 .iter()
