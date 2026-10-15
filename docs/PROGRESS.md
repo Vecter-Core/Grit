@@ -701,3 +701,15 @@ Cách so sánh: `GT_PROFILE=release` chạy lại cả bộ đối chiếu ở h
 ## Q87 / ADR-040 — khớp mẫu qua tham chiếu (2026-10-15)
 - **Đổi phân phối kịch bản oracle M6:** `Gen::scenario` đổi `below(100)` → `below(112)` (thêm kịch bản `ref_pattern`, 5 cột `ref_pat_*`). Vì vậy **các seed cũ sinh chương trình KHÁC** và số liệu oracle trước 2026-10-15 (độ phủ từng cột, số ứng viên dương tính giả, số đột biến bị bắt theo bản nhanh) **không so trực tiếp được** với số mới. Số mới (bản đủ 20 000): 544 921 khoản vay theo dõi; âm tính giả 0; từ chối&vi phạm 10 903 (khác mã 0); ứng viên dương tính giả 319 (3,51 % của 9 097), 0 "KHÁC".
 - Thăm dò codegen (4/4), đối chiếu độc lập khoản vay (3/3), corpus 12 pass + 12 fail, bộ sinh so sánh codegen `refgen` có mô hình, hai chế độ tiêm lỗi hạ MIR (`mir:pat-mode`, `mir:pat-field`, `mir:pat-field-swap`): xem HANDOFF 0f–0i.
+
+### Cổng đầy đủ LIỀN MẠCH sau Q87 (2026-10-16; `bash tools/gate.sh D:/Grit`, thoát mã 0, một lần, mọi giai đoạn)
+```
+== gt-rt (workspace riêng, M10)  3 test pass
+== fmt            FMT_OK
+== clippy         CLIPPY_EXIT=0
+== audit          AUDIT_EXIT=0
+== test           TEST_PASSED=876 FAILED=0 SUITES=166
+== check_expectations  OK: corpus nhất quán với error_codes.md (866 .gt, 72 mã)
+unittest công cụ: Ran 9 tests OK; Ran 5 tests OK
+GATE_RESULT=GREEN   GATE_EXIT=0
+```
