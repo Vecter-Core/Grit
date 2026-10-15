@@ -148,7 +148,20 @@ pub fn program(seed: u64) -> RefProg {
         f.push_str(&parts.join(", "));
         f.push_str(" } }\n");
         src.push_str(&f);
-        forms.push(if unique { "enum&!" } else { "enum&" });
+        forms.push(if unique {
+            "ref-unique(&!U)"
+        } else {
+            "ref-shared(&U)"
+        });
+        if unique && arms.iter().any(|a| !a.writes.is_empty()) {
+            forms.push("unique-with-write");
+        }
+        forms.extend([
+            "variant-0-fields",
+            "variant-1-field",
+            "variant-2-fields",
+            "variant-3-fields",
+        ]);
         for v in 0..4usize {
             let vals: Vec<u32> = (0..v).map(|_| rng.below(1000) as u32).collect();
             let lit = if v == 0 {
@@ -205,7 +218,7 @@ pub fn program(seed: u64) -> RefProg {
             vals.iter().fold(0u32, |a, x| a.wrapping_add(*x)),
         );
     }
-    forms.push("bare-name-and-wildcard");
+    forms.extend(["bare-name", "wildcard"]);
     src.push_str("ƒ e_sum(r: &E) → u32 ! ∅ { ⌥ r { E::V0 ↦ 0, E::V1(a) ↦ *a, E::V2(a, b) ↦ *a +% *b, E::V3(a, b, c) ↦ *a +% *b +% *c } }\n");
     // ---- struct
     src.push_str("▢ P { x: u32, y: u32, z: u32 }\n");
@@ -258,9 +271,13 @@ pub fn program(seed: u64) -> RefProg {
                 r,
             );
         }
-        forms.push(if unique { "struct&!" } else { "struct&" });
-        if rest {
-            forms.push("struct..");
+        forms.push(if rest {
+            "struct-with-rest(..)"
+        } else {
+            "struct-all-fields"
+        });
+        if unique && !a.writes.is_empty() {
+            forms.push("unique-with-write");
         }
     }
     src.push_str("ƒ p_sum(r: &P) → u32 ! ∅ { ⌥ r { P { x, y, z } ↦ *x +% *y +% *z } }\n");
@@ -281,7 +298,12 @@ pub fn program(seed: u64) -> RefProg {
     add(&mut main, "t_un(&!tv)".to_string(), f(na, nb));
     add(&mut main, "t_sh(&tv)".to_string(), f(na, nb));
     add(&mut main, format!("t_refs((&{ta}, &{tb}))"), f(ta, tb));
-    forms.extend(["tuple&", "tuple&!", "tuple-of-refs"]);
+    forms.extend([
+        "tuple-on-&(A,B)",
+        "tuple-on-&!(A,B)",
+        "tuple-of-refs(&A,&B)",
+    ]);
+    forms.push("unique-with-write");
     // ---- lồng 2 tầng cấu trúc (không phải tham chiếu lồng): enum chứa struct
     src.push_str("⊔ Q { N(P), M(u32, P) }\n");
     let (k1, k2) = (1 + rng.below(20) as u32, 1 + rng.below(20) as u32);
@@ -330,7 +352,7 @@ pub fn program(seed: u64) -> RefProg {
         "q_sh(&q2)".to_string(),
         k3.wrapping_add(y5.wrapping_mul(k2)).wrapping_add(z),
     );
-    forms.push("nested-structural");
+    forms.extend(["nested-two-levels", "unique-with-write"]);
     main.push_str("  acc\n}\n");
     src.push_str(&main);
     RefProg {
@@ -338,6 +360,13 @@ pub fn program(seed: u64) -> RefProg {
         expect: Expect::Value(acc),
         forms,
     }
+}
+
+/// ca ĐỎ có chủ ý theo seed (kiểm biên dịch, không cần backend)
+pub fn red(seed: u64) -> RefProg {
+    red_program(&mut Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ 0x5EED_0000_1111_2222
+        | 1))
 }
 
 fn red_program(rng: &mut Rng) -> RefProg {

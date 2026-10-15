@@ -342,6 +342,10 @@ fn run_passes(
     gt_mir::set_pat_field_fault_for_test(
         std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-field"),
     );
+    // `GRITC_FAULT=mir:pat-field-swap`: hoán đổi hai bind cùng kiểu (lệch tinh vi mà M6 vẫn chấp nhận)
+    gt_mir::set_pat_swap_fault_for_test(
+        std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-field-swap"),
+    );
     let Some(m) = run.stage("m5.mir", || gt_mir::lower_program(&t)) else {
         run.skip(&AFTER_M4[1..]);
         return Ok(finish(run, sources, None));

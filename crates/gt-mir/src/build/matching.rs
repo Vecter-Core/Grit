@@ -21,6 +21,46 @@ pub fn set_pat_field_fault_for_test(on: bool) {
     PAT_FIELD_FAULT.store(on, std::sync::atomic::Ordering::SeqCst);
 }
 
+static PAT_SWAP_FAULT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Chốt kiểm thử (`GRITC_FAULT=mir:pat-field-swap`): hai biến bind ở chế độ tham chiếu cùng cha, cùng kiểu, khác trường HOÁN ĐỔI chỗ nguồn (M6 vẫn chấp nhận vì không chồng lấn;
+/// chỉ so sánh với mô hình độc lập mới thấy). KHÔNG dùng ngoài test.
+pub fn set_pat_swap_fault_for_test(on: bool) {
+    PAT_SWAP_FAULT.store(on, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn swap_same_typed_binds(binds: &mut Binds) {
+    let mut done = vec![false; binds.len()];
+    for i in 0..binds.len() {
+        if done[i] || binds[i].4.is_none() {
+            continue;
+        }
+        for j in i + 1..binds.len() {
+            if done[j] || binds[j].4.is_none() || binds[i].2 != binds[j].2 {
+                continue;
+            }
+            let (a, b) = (&binds[i].1, &binds[j].1);
+            let n = a.projection.len();
+            if a.local == b.local
+                && n == b.projection.len()
+                && n > 0
+                && a.projection[..n - 1] == b.projection[..n - 1]
+                && matches!(
+                    (&a.projection[n - 1], &b.projection[n - 1]),
+                    (PlaceElem::Field(x, _), PlaceElem::Field(y, _)) if x != y
+                )
+            {
+                let pb = binds[j].1.clone();
+                let pa = std::mem::replace(&mut binds[i].1, pb);
+                binds[j].1 = pa;
+                done[i] = true;
+                done[j] = true;
+                break;
+            }
+        }
+    }
+}
+
 fn pat_mode_fault() -> bool {
     PAT_MODE_FAULT.load(std::sync::atomic::Ordering::SeqCst)
 }
@@ -49,6 +89,9 @@ impl Builder<'_> {
             let fail = self.new_block();
             let mut binds: Binds = Vec::new();
             self.test_pat(&arm.pattern, &sp, &sty, None, fail, &mut binds)?;
+            if PAT_SWAP_FAULT.load(std::sync::atomic::Ordering::SeqCst) {
+                swap_same_typed_binds(&mut binds);
+            }
             self.in_block(|b| {
                 for (id, place, ty, span, mode) in binds {
                     let l = b.user_var(id, false, span)?;

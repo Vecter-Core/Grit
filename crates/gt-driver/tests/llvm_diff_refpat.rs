@@ -35,9 +35,6 @@ struct Tally {
 fn one(seed: u64, dir: &std::path::Path, t: &mut Tally) {
     let p = program(seed);
     t.programs += 1;
-    for f in &p.forms {
-        *t.forms.entry(f).or_default() += 1;
-    }
     let inputs = [SourceInput {
         name: "main.gt".to_string(),
         text: p.src.clone(),
@@ -114,12 +111,24 @@ fn one(seed: u64, dir: &std::path::Path, t: &mut Tally) {
     }
 }
 
+fn count_forms(t: &mut Tally, p: &refgen::RefProg) {
+    // độ phủ theo loại: chỉ tính chương trình ĐÃ SO SÁNH (bằng mô hình ở cả thông dịch và LLVM) hoặc ĐỎ đúng mã
+    let set: std::collections::BTreeSet<&'static str> = p.forms.iter().copied().collect();
+    for f in set {
+        *t.forms.entry(f).or_default() += 1;
+    }
+}
+
 fn run(start: u64, count: u64) -> Tally {
     let dir = std::env::temp_dir().join(format!("gt-refpat-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("tạo thư mục");
     let mut t = Tally::default();
     for s in start..start + count {
+        let before = t.equal + t.expected_red;
         one(s, &dir, &mut t);
+        if t.equal + t.expected_red > before {
+            count_forms(&mut t, &program(s));
+        }
     }
     let _ = std::fs::remove_dir_all(&dir);
     t
@@ -146,7 +155,7 @@ fn batch() {
         .unwrap_or(25);
     let t = run(start, count);
     let line = format!(
-        "{{\"suite\":\"refpat\",\"profile\":\"{}\",\"start\":{start},\"count\":{count},\"programs\":{},\"equal\":{},\"expected_red\":{},\"mismatch\":{},\"forms\":{:?}}}",
+        "{{\"suite\":\"refpat\",\"v\":2,\"profile\":\"{}\",\"start\":{start},\"count\":{count},\"programs\":{},\"equal\":{},\"expected_red\":{},\"mismatch\":{},\"forms\":{:?}}}",
         profile().1,
         t.programs,
         t.equal,
@@ -164,4 +173,34 @@ fn batch() {
         writeln!(f, "{line}").expect("ghi");
     }
     assert_eq!(t.mismatch, 0, "{}", t.detail.join("\n=====\n"));
+}
+
+/// ca ĐỎ có chủ ý (không phụ thuộc hồ sơ/backend): mỗi loại ≥ 30 chương trình phải ra ĐÚNG mã đầu tiên
+#[test]
+fn intentional_red_programs_are_rejected_with_the_expected_code_at_least_30_per_kind() {
+    let mut per: std::collections::BTreeMap<&'static str, u64> = std::collections::BTreeMap::new();
+    for seed in 1..=240u64 {
+        let p = refgen::red(seed);
+        let Expect::Red(code) = &p.expect else {
+            panic!("không phải ca đỏ")
+        };
+        let inputs = [SourceInput {
+            name: "main.gt".to_string(),
+            text: p.src.clone(),
+        }];
+        let res = check(&inputs, &Options::default()).expect("check");
+        let got: Vec<String> = res
+            .report
+            .diagnostics
+            .iter()
+            .filter(|d| d.level == gt_diag::Level::Error)
+            .map(|d| d.code.as_str().to_string())
+            .collect();
+        assert!(!res.verdict.allows_output(), "{}", p.src);
+        assert_eq!(got.first().map(String::as_str), Some(*code), "{}", p.src);
+        *per.entry(p.forms[0]).or_default() += 1;
+    }
+    println!("{per:?}");
+    assert_eq!(per.len(), 4);
+    assert!(per.values().all(|n| *n >= 30), "{per:?}");
 }

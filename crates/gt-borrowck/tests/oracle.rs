@@ -319,6 +319,9 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
     let mut rej_clean_examples: Vec<(String, Vec<String>)> = Vec::new();
     let mut code_disagree: Vec<String> = Vec::new();
     let mut harness: Vec<String> = Vec::new();
+    // đột biến quan hệ trường (ADR-040): cột NÀO bị ảnh hưởng (âm tính giả / ứng viên dương tính giả theo cột)
+    let mut acc_viol_by_tag: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut rej_clean_by_tag: BTreeMap<&str, usize> = BTreeMap::new();
     let mut loans_total = 0usize;
     for seed in 1..=programs() {
         let mut g = Gen::new(seed);
@@ -345,6 +348,14 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
             }
             if viol.is_some() {
                 c.violated += 1;
+            }
+        }
+        for t in &prog.tags {
+            if e.accepted() && viol.is_some() {
+                *acc_viol_by_tag.entry(t).or_default() += 1;
+            }
+            if !e.accepted() && viol.is_none() {
+                *rej_clean_by_tag.entry(t).or_default() += 1;
             }
         }
         match (e.accepted(), viol) {
@@ -410,6 +421,8 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
     );
     eprintln!("ứng viên dương tính giả theo mã: {rej_clean_by:?}");
     eprintln!("ứng viên dương tính giả theo nguyên nhân: {rej_clean_cat:#?}");
+    eprintln!("ÂM TÍNH GIẢ theo cột: {acc_viol_by_tag:?}");
+    eprintln!("ỨNG VIÊN DƯƠNG TÍNH GIẢ theo cột: {rej_clean_by_tag:?}");
     for k in KINDS {
         let c = cov[k];
         eprintln!(
