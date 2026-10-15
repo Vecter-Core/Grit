@@ -1,0 +1,4 @@
+// expect: fail E0407
+// note: khớp theo giá trị trên *r vẫn không được move Vec ra khỏi tham chiếu
+⊔ V<'a> { Many(Vec<'a, u32>), Zero }
+ƒ n<'a>(r: &V<'a>) → usize ! {mem} { ⌥ *r { V::Many(v) ↦ 1, V::Zero ↦ 0 } }

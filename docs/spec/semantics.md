@@ -38,6 +38,7 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
   `Tên { … }` (mơ hồ với khối); phải bọc `( Tên { … } )`. Ví dụ `⎇ (p == Point { x: 0, y: 0 }) { … }`.
 - **Vòng lặp (Q10, Q11 — đã duyệt):** `⟳` là ký hiệu vòng lặp duy nhất, ba dạng: `⟳ { … }` vô hạn (bắt buộc hiệu ứng `div`, D12); `⟳ cond { … }` là while;
   `⟳ x in xs { … }` là for-in (`in` từ khoá cứng ASCII; biến lặp bất biến). Đều nhận `↓ m` và `⋈ inv` tuỳ chọn. Chi tiết termination ở §21.
+- **Khớp mẫu qua tham chiếu (ADR-040, Q87):** pattern phá cấu trúc (biến thể/struct/tuple) khớp giá trị `&U`/`&!U` thì khớp `U` qua tham chiếu và biến bind có kiểu `&V`/`&!V` (tham chiếu tới chính vị trí, không move/copy). Chỉ một tầng (tham chiếu lồng ⇒ E0301). Pattern hằng/khoảng trên `&U` vẫn E0301; `_` và tên trần trên `&U` không đổi. Không `ref`, không guard.
 - `⌥` phải đầy đủ (D6) → E0305. Mẫu trùng thừa → N0301 **[ĐỀ XUẤT]**.
 - `⟳` — xem §21 (termination của while / for-in / vòng vô hạn). `⋈` (bất biến): Phase 1 kiểm lúc chạy trong `dev`, không dùng để chứng minh (chờ 8.A).
 - Mọi đường điều khiển của hàm có kiểu trả về khác `()` phải trả giá trị (E0307).

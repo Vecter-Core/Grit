@@ -1,0 +1,4 @@
+// expect: pass
+// note: khớp qua &! trong vòng lặp, khoản vay không mang qua vòng
+▢ P { x: u32 }
+ƒ f(p: &!P) → u32 ! ∅ { μk ≔ 0u32; ⟳ k < 3 ↓ 3 - k { ⌥ p { P { x } ↦ { *x ← *x +% 1; } } k ← k + 1; } 0 }

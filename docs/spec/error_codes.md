@@ -13,11 +13,11 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0203 | Truy cập item private | M3 | E0203_private_across_files, E0203_private_import, E0203_private_item, E0203_private_module_member, E0203_private_nested_sibling |
 | E0204 | Vòng phụ thuộc module | M3 | E0204_cycle_via_imports, E0204_three_files_cycle, E0204_two_files_cycle |
 | E0205 | Shadowing (D7) | M3 | E0205_shadow_import, E0205_shadow_loop_var, E0205_shadow_param, E0205_shadow_prelude, E0205_shadowing |
-| E0301 | Sai kiểu / biểu thức chưa có ngữ nghĩa ở Phase 1 (vd range mở độc lập) | M4 | E0301_break_outside_loop, E0301_if_condition_not_bool, E0301_open_range_standalone, E0301_return_type_mismatch, E0301_type_mismatch, E0301_wrong_arity |
+| E0301 | Sai kiểu / biểu thức chưa có ngữ nghĩa ở Phase 1 (vd range mở độc lập) | M4 | E0301_break_outside_loop, E0301_if_condition_not_bool, E0301_open_range_standalone, E0301_return_type_mismatch, E0301_type_mismatch, E0301_wrong_arity, E0301_q87_binding_is_a_reference, E0301_q87_literal_on_reference, E0301_q87_nested_reference |
 | E0302 | Ép kiểu ngầm số (D1) | M4 | E0302_implicit_cast, E0302_int_to_float, E0302_mixed_operands, E0302_narrowing_argument |
 | E0303 | `==` trên số thực (D4) | M4 | E0303_float_eq, E0303_float_literal_eq, E0303_float_ne |
 | E0304 | Trường struct/biến thể/pattern sai: thiếu, thừa, không tồn tại hoặc trùng (literal `P { … }`, pattern `P { … }`, truy cập `.x`) — Q20 | M4 | E0304_duplicate_field, E0304_missing_field, E0304_pattern_missing_field, E0304_tuple_index_out_of_range, E0304_unknown_field |
-| E0305 | `⌥` không đầy đủ (D6) | M4 | E0305_int_without_wildcard, E0305_missing_bool_branch, E0305_nonexhaustive, E0305_range_gap, E0305_str_without_wildcard |
+| E0305 | `⌥` không đầy đủ (D6) | M4 | E0305_int_without_wildcard, E0305_missing_bool_branch, E0305_nonexhaustive, E0305_range_gap, E0305_str_without_wildcard, E0305_q87_nonexhaustive_through_reference |
 | E0307 | Thiếu đường trả về (gồm khối kết thúc bằng `;` mà hàm trả kiểu khác `()`) — **thuộc M5**, không phải parser (cần kiểu trả về và luồng điều khiển) | M5 | E0307_missing_return, E0307_trailing_semicolon, E0307_match_arm_falls_through, E0307_return_only_inside_loop, E0307_last_if_without_else |
 | E0308 | Gán vào biến bất biến (D5) | M4 | E0308_assign_immutable, E0308_assign_param, E0308_assign_through_shared_ref, E0308_method_needs_mut_receiver, E0308_unique_borrow_of_immutable |
 | E0309 | Ràng buộc trait không thoả / không có phương thức / mơ hồ (Q20) | M4 | E0309_ambiguous_method, E0309_bound_not_satisfied, E0309_no_such_method |
@@ -32,12 +32,12 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0315 | Lifetime/region trong chữ ký không hợp lệ: chưa khai báo, khai báo trùng/che, trường thiếu lifetime, elision mơ hồ ở kiểu trả về (ADR-019) | M4.5 | E0315_ambiguous_elision, E0315_duplicate_lifetime, E0315_enum_field_undeclared, E0315_field_elision, E0315_let_annotation, E0315_method_two_refs, E0315_shadow_impl_lifetime, E0315_undeclared_in_return, E0315_undeclared_lifetime, E0315_lifetime_arg_count, E0315_lifetime_arg_undeclared, E0315_field_elided_lifetime_arg |
 | E0316 | Lượng từ `∀`/`∃` ngoài hợp đồng (chỉ hợp lệ trong `⊳ ⊲ ↓ ⋈`) | M4 | E0316_forall_in_body, E0316_exists_in_condition, E0316_quantifier_in_let |
 | E0401 | Dùng sau move | M6 | E0401_use_after_move |
-| E0402 | Hai `&!` chồng nhau | M6 | E0402_double_unique, E0402_vec_two_on_one_arena, E0402_vec_reset_while_vec_alive, E0402_text_two_on_one_arena |
-| E0403 | `&!` chồng `&` | M6 | E0403_unique_vs_shared, E0403_vec_slice_alive_across_push, E0403_vec_arena_used_while_vec_alive, E0403_text_view_alive_across_push_str, E0403_text_bytes_alive_across_push_char, E0403_text_view_alive_across_push_utf8 |
-| E0404 | Tham chiếu sống lâu hơn giá trị bị mượn: trả tham chiếu tới local/tạm/tham số theo giá trị, biến phạm vi ngoài giữ tham chiếu tới biến phạm vi trong, hoặc vi phạm region của chữ ký (ADR-023 §8) | M6 | E0404_return_local_ref |
-| E0405 | Con trỏ thoát Arena (D27) | M6 | E0405_arena_escape |
-| E0406 | Gán khi đang bị mượn | M6 | — |
-| E0407 | Move ra khỏi chỗ đi qua `*`/`[i]`/lát, hoặc move một trường ra khỏi giá trị có `⊐ Drop for`/`Arena` (ADR-023 §3, §8) | M6 | — |
+| E0402 | Hai `&!` chồng nhau | M6 | E0402_double_unique, E0402_vec_two_on_one_arena, E0402_vec_reset_while_vec_alive, E0402_text_two_on_one_arena, E0402_q87_bind_unique_then_reborrow_unique |
+| E0403 | `&!` chồng `&` | M6 | E0403_unique_vs_shared, E0403_vec_slice_alive_across_push, E0403_vec_arena_used_while_vec_alive, E0403_text_view_alive_across_push_str, E0403_text_bytes_alive_across_push_char, E0403_text_view_alive_across_push_utf8, E0403_q87_bind_shared_then_unique_root, E0403_q87_bind_unique_then_read_root |
+| E0404 | Tham chiếu sống lâu hơn giá trị bị mượn: trả tham chiếu tới local/tạm/tham số theo giá trị, biến phạm vi ngoài giữ tham chiếu tới biến phạm vi trong, hoặc vi phạm region của chữ ký (ADR-023 §8) | M6 | E0404_return_local_ref, E0404_q87_bind_escapes_local |
+| E0405 | Con trỏ thoát Arena (D27) | M6 | E0405_arena_escape, E0405_q87_bind_then_arena_reset |
+| E0406 | Gán khi đang bị mượn | M6 | E0406_q87_bind_shared_then_overwrite_root, E0406_q87_bind_unique_then_overwrite_root |
+| E0407 | Move ra khỏi chỗ đi qua `*`/`[i]`/lát, hoặc move một trường ra khỏi giá trị có `⊐ Drop for`/`Arena` (ADR-023 §3, §8) | M6 | E0407_q87_move_vec_out_of_reference |
 | E0501 | Chia sẻ không `Send`/`Sync` qua luồng (gồm `■` static không Sync) | M8 | E0501_spawn_shared_ref, E0501_spawn_unique_ref, E0501_static_cell |
 | E0502 | Vi phạm thứ tự khoá (khoá không lấy theo cấp tăng nghiêm ngặt, cấp thiếu `#level`) | M8 | E0502_inverted_order, E0502_same_level_twice, E0502_inverted_through_calls |
 | E0503 | Memory ordering của atomic không hợp lệ hoặc không viết thẳng | M8 | E0503_load_release, E0503_store_acquire, E0503_cas_failure_release |

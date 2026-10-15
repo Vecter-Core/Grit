@@ -1,0 +1,4 @@
+// expect: fail E0405
+// note: bind qua tham chiếu cấp từ Arena rồi reset Arena
+⊔ E { A(u32), C }
+ƒ f() → u32 ! {mem} { μa ≔ Arena::new(); p ≔ a.alloc(E::A(1)); ⌥ p { E::A(x) ↦ { a.reset(); *x }, E::C ↦ 0 } }

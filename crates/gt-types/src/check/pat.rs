@@ -4,8 +4,56 @@ use crate::collect::AdtKind;
 use crate::traits::{fresh_args, subst_with};
 
 impl<'e, 'a> Checker<'e, 'a> {
-    /// Kiểm pattern `p` với kiểu `ty`; khai báo biến; trả IR vét cạn.
+    /// Pattern PHÁ CẤU TRÚC (biến thể, struct, tuple; kể cả tên trần phân giải thành biến thể không trường).
+    pub(crate) fn destructures(&self, p: &Pattern) -> bool {
+        match &p.kind {
+            PatternKind::Variant { .. } | PatternKind::Struct { .. } | PatternKind::Tuple(_) => {
+                true
+            }
+            PatternKind::Binding(ident) => matches!(
+                self.env.res.uses.get(&ident.id),
+                Some(Res::Def(vd)) if self.env.defs()[vd.index()].kind == DefKind::Variant
+            ),
+            _ => false,
+        }
+    }
+
+    /// Khai báo biến của pattern: ở chế độ tham chiếu (ADR-040) biến có kiểu `&V`/`&!V`.
+    fn declare_pat(&mut self, ident: &Ident, ty: Ty) {
+        let ty = match self.pat_ref {
+            Some(m) => Ty::Ref(m, Box::new(ty)),
+            None => ty,
+        };
+        self.declare_local(ident, ty, false);
+    }
+
+    /// Kiểm pattern `p` với kiểu `ty`; khai báo biến; trả IR vét cạn. ADR-040 (Q87): pattern phá cấu trúc khớp giá trị `&U`/`&!U` thì khớp `U` qua tham chiếu,
+    /// biến bind có kiểu tham chiếu tương ứng; chỉ MỘT tầng (tham chiếu lồng trong chế độ tham chiếu ⇒ E0301).
     pub(crate) fn pat(&mut self, p: &Pattern, ty: &Ty) -> XPat {
+        if self.destructures(p)
+            && let Ty::Ref(m, inner) = self.infer.shallow(ty)
+        {
+            if self.pat_ref.is_some() {
+                self.err(
+                    "E0301",
+                    p.id,
+                    p.span,
+                    "pattern phá cấu trúc trên tham chiếu lồng: khớp qua tham chiếu chỉ một tầng; bind tên rồi dùng `⌥` lại".to_string(),
+                );
+                let saved = self.pat_ref.take();
+                let _ = self.pat_inner(p, &Ty::Err);
+                self.pat_ref = saved;
+                return XPat::Wild;
+            }
+            self.pat_ref = Some(m);
+            let r = self.pat_inner(p, &inner);
+            self.pat_ref = None;
+            return r;
+        }
+        self.pat_inner(p, ty)
+    }
+
+    fn pat_inner(&mut self, p: &Pattern, ty: &Ty) -> XPat {
         match &p.kind {
             PatternKind::Wildcard | PatternKind::Rest => XPat::Wild,
             PatternKind::Binding(ident) => match self.env.res.uses.get(&ident.id).cloned() {
@@ -13,7 +61,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                     self.variant_pat(p, vd, &[], ty)
                 }
                 _ => {
-                    self.declare_local(ident, ty.clone(), false);
+                    self.declare_pat(ident, ty.clone());
                     XPat::Wild
                 }
             },
@@ -380,7 +428,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                 if let Some(sub) = &f.pattern {
                     let _ = self.pat(sub, &Ty::Err);
                 } else {
-                    self.declare_local(&f.name, Ty::Err, false);
+                    self.declare_pat(&f.name, Ty::Err);
                 }
                 continue;
             };
@@ -406,7 +454,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             out[i] = match &f.pattern {
                 Some(sub) => self.pat(sub, &ft),
                 None => {
-                    self.declare_local(&f.name, ft, false);
+                    self.declare_pat(&f.name, ft);
                     XPat::Wild
                 }
             };
@@ -438,7 +486,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                 Some(sub) => {
                     let _ = self.pat(sub, &Ty::Err);
                 }
-                None => self.declare_local(&f.name, Ty::Err, false),
+                None => self.declare_pat(&f.name, Ty::Err),
             }
         }
     }

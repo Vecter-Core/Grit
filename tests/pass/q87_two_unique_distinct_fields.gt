@@ -1,0 +1,5 @@
+// expect: pass
+// note: hai &! vào hai trường KHÁC của cùng một giá trị cùng sống
+▢ P { x: u32, y: u32 }
+ƒ w(p: &!P) → u32 ! ∅ { ⌥ p { P { x, y } ↦ { *x ← 1; *y ← 2; *x + *y } } }
+ƒ main() → u32 ! ∅ { μp ≔ P { x: 0, y: 0 }; w(&!p) }

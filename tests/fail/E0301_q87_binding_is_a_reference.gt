@@ -1,0 +1,3 @@
+// expect: fail E0301
+// note: biến bind qua tham chiếu là &u32, không phải u32: dùng như u32 là lỗi kiểu
+ƒ f(o: &Option<u32>) → u32 ! ∅ { ⌥ o { Some(v) ↦ v, None ↦ 0 } }

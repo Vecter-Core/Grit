@@ -1,0 +1,4 @@
+// expect: fail E0403
+// note: bind &! rồi ĐỌC giá trị gốc trong khi bind còn dùng về sau
+▢ P { x: u32, y: u32 }
+ƒ w(p: &!P) → u32 ! ∅ { ⌥ p { P { x, y } ↦ { r ≔ (*p).x; *x ← 1; r } } }

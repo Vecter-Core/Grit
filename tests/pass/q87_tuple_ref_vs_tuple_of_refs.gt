@@ -1,0 +1,5 @@
+// expect: pass
+// note: (a, b) trên &(A, B) khớp qua tham chiếu (a: &A); trên (&A, &B) khớp tuple theo giá trị, a bind chính tham chiếu (&A, không &&A)
+ƒ a(p: &(u32, u32)) → u32 ! ∅ { ⌥ p { (x, y) ↦ *x + *y } }
+ƒ b(p: (&u32, &u32)) → u32 ! ∅ { ⌥ p { (x, y) ↦ *x + *y } }
+ƒ main() → u32 ! ∅ { a(&(1, 2)) + b((&3, &4)) }

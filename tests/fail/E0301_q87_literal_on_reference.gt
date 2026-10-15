@@ -1,0 +1,3 @@
+// expect: fail E0301
+// note: pattern hằng trên &U không tương tác ngầm: vẫn lỗi kiểu
+ƒ f(r: &u32) → u32 ! ∅ { ⌥ r { 0 ↦ 1, _ ↦ 2 } }

@@ -1,0 +1,4 @@
+// expect: pass
+// note: bind &u32 sống bằng đời của tham chiếu gốc: trả về hợp lệ
+⊔ E { A(u32) }
+ƒ f(r: &E) → &u32 ! ∅ { ⌥ r { E::A(x) ↦ x } }

@@ -8,7 +8,8 @@ use gt_resolve::{DefKind, LocalId, Res};
 use gt_types::{AdtKind, IntTy, Ty};
 
 /// Biến của pattern chờ gán: (định danh, chỗ nguồn, kiểu).
-type Binds = Vec<(LocalId, Place, Ty, gt_span::Span)>;
+/// `Some(loại)` = bind ở CHẾ ĐỘ THAM CHIẾU (ADR-040): biến là tham chiếu tới chỗ nguồn (khoản vay mới), không phải giá trị của nó.
+type Binds = Vec<(LocalId, Place, Ty, gt_span::Span, Option<BorrowKind>)>;
 
 impl Builder<'_> {
     pub(crate) fn match_into(&mut self, dest: &Place, scrut: &Expr, arms: &[Arm]) -> R<()> {
@@ -29,12 +30,20 @@ impl Builder<'_> {
             self.at = (arm.span, arm.id);
             let fail = self.new_block();
             let mut binds: Binds = Vec::new();
-            self.test_pat(&arm.pattern, &sp, &sty, fail, &mut binds)?;
+            self.test_pat(&arm.pattern, &sp, &sty, None, fail, &mut binds)?;
             self.in_block(|b| {
-                for (id, place, ty, span) in binds {
+                for (id, place, ty, span, mode) in binds {
                     let l = b.user_var(id, false, span)?;
-                    let o = b.operand_of(place, &ty);
-                    b.assign(Place::local(l), Rvalue::Use(o));
+                    match mode {
+                        Some(k) => {
+                            let rv = b.new_borrow(k, place);
+                            b.assign(Place::local(l), rv);
+                        }
+                        None => {
+                            let o = b.operand_of(place, &ty);
+                            b.assign(Place::local(l), Rvalue::Use(o));
+                        }
+                    }
                 }
                 b.in_stmt(|b| b.expr_into(dest, &arm.body))
             })?;
@@ -46,12 +55,62 @@ impl Builder<'_> {
         Ok(())
     }
 
+    /// Pattern phá cấu trúc (khớp luật của gt-types `destructures`).
+    fn destructures(&self, p: &Pattern) -> bool {
+        match &p.kind {
+            PatternKind::Variant { .. } | PatternKind::Struct { .. } | PatternKind::Tuple(_) => {
+                true
+            }
+            PatternKind::Binding(ident) => matches!(
+                self.res_of(ident.id),
+                Some(Res::Def(vd)) if self.t.defs()[vd.index()].kind == DefKind::Variant
+            ),
+            _ => false,
+        }
+    }
+
     /// Phát kiểm tra pattern `p` trên chỗ `place` (kiểu `ty`): không khớp thì nhảy `fail`; khớp thì đi tiếp ở `self.cur`.
+    /// `mode`: chế độ tham chiếu (ADR-040) — `Some(duy nhất?)` khi đã đi qua một tham chiếu; pattern phá cấu trúc trên chỗ kiểu `&U`/`&!U` (khi chưa có chế độ)
+    /// khớp `U` tại `*place` và bật chế độ.
     fn test_pat(
         &mut self,
         p: &Pattern,
         place: &Place,
         ty: &Ty,
+        mode: Option<bool>,
+        fail: BasicBlock,
+        binds: &mut Binds,
+    ) -> R<()> {
+        if self.destructures(p)
+            && let Ty::Ref(m, inner) = ty
+        {
+            if mode.is_some() {
+                return ice(
+                    "pattern phá cấu trúc trên tham chiếu lồng trong chế độ tham chiếu (M4 phải chặn E0301)",
+                );
+            }
+            let deref = place.project(PlaceElem::Deref);
+            return self.test_pat_in(p, &deref, inner, Some(*m), fail, binds);
+        }
+        self.test_pat_in(p, place, ty, mode, fail, binds)
+    }
+
+    fn bind_kind(mode: Option<bool>) -> Option<BorrowKind> {
+        mode.map(|m| {
+            if m {
+                BorrowKind::Unique
+            } else {
+                BorrowKind::Shared
+            }
+        })
+    }
+
+    fn test_pat_in(
+        &mut self,
+        p: &Pattern,
+        place: &Place,
+        ty: &Ty,
+        mode: Option<bool>,
         fail: BasicBlock,
         binds: &mut Binds,
     ) -> R<()> {
@@ -59,13 +118,19 @@ impl Builder<'_> {
             PatternKind::Wildcard | PatternKind::Rest => Ok(()),
             PatternKind::Binding(ident) => match self.res_of(ident.id) {
                 Some(Res::Def(vd)) if self.t.defs()[vd.index()].kind == DefKind::Variant => {
-                    self.variant_test(vd, &[], place, ty, fail, binds)
+                    self.variant_test(vd, &[], place, ty, mode, fail, binds)
                 }
                 _ => {
                     let Some(&id) = self.t.resolve.decls.get(&ident.id) else {
                         return ice(format!("binding `{}` không có định danh", ident.name));
                     };
-                    binds.push((id, place.clone(), ty.clone(), ident.span));
+                    binds.push((
+                        id,
+                        place.clone(),
+                        ty.clone(),
+                        ident.span,
+                        Self::bind_kind(mode),
+                    ));
                     Ok(())
                 }
             },
@@ -117,7 +182,7 @@ impl Builder<'_> {
             }
             PatternKind::Variant { path, args } => match self.res_of(path.id) {
                 Some(Res::Def(vd)) if self.t.defs()[vd.index()].kind == DefKind::Variant => {
-                    self.variant_test(vd, args, place, ty, fail, binds)
+                    self.variant_test(vd, args, place, ty, mode, fail, binds)
                 }
                 _ => ice("pattern biến thể không phân giải được sau M4"),
             },
@@ -136,13 +201,19 @@ impl Builder<'_> {
                     };
                     let sub = place.project(PlaceElem::Field(k as u32, fts[k].clone()));
                     match &fp.pattern {
-                        Some(sp) => self.test_pat(sp, &sub, &fts[k], fail, binds)?,
+                        Some(sp) => self.test_pat(sp, &sub, &fts[k], mode, fail, binds)?,
                         None => {
                             // `P { x }` = `P { x: x }`
                             let Some(&id) = self.t.resolve.decls.get(&fp.name.id) else {
                                 return ice("trường viết tắt không có định danh");
                             };
-                            binds.push((id, sub, fts[k].clone(), fp.name.span));
+                            binds.push((
+                                id,
+                                sub,
+                                fts[k].clone(),
+                                fp.name.span,
+                                Self::bind_kind(mode),
+                            ));
                         }
                     }
                 }
@@ -157,6 +228,7 @@ impl Builder<'_> {
                     v,
                     &ts,
                     |k, t| place.project(PlaceElem::Field(k as u32, t.clone())),
+                    mode,
                     fail,
                     binds,
                 )
@@ -170,6 +242,7 @@ impl Builder<'_> {
         pats: &[Pattern],
         tys: &[Ty],
         sub: impl Fn(usize, &Ty) -> Place,
+        mode: Option<bool>,
         fail: BasicBlock,
         binds: &mut Binds,
     ) -> R<()> {
@@ -188,7 +261,7 @@ impl Builder<'_> {
                 return ice("pattern con vượt số thành phần sau M4");
             };
             let pl = sub(k, t);
-            self.test_pat(p, &pl, t, fail, binds)?;
+            self.test_pat(p, &pl, t, mode, fail, binds)?;
         }
         Ok(())
     }
@@ -199,6 +272,7 @@ impl Builder<'_> {
         args: &[Pattern],
         place: &Place,
         ty: &Ty,
+        mode: Option<bool>,
         fail: BasicBlock,
         binds: &mut Binds,
     ) -> R<()> {
@@ -221,6 +295,7 @@ impl Builder<'_> {
             args,
             &fts,
             |k, t| down.project(PlaceElem::Field(k as u32, t.clone())),
+            mode,
             fail,
             binds,
         )

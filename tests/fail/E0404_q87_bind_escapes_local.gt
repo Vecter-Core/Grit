@@ -1,0 +1,4 @@
+// expect: fail E0404
+// note: bind trỏ vào biến cục bộ không được thoát khỏi hàm
+⊔ E { A(u32), C }
+ƒ f() → &u32 ! ∅ { v ≔ E::A(1); ⌥ &v { E::A(x) ↦ x, E::C ↦ &0 } }

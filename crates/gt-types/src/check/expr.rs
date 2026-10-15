@@ -810,6 +810,11 @@ impl<'e, 'a> Checker<'e, 'a> {
             let bt = self.expr(&a.body, expect);
             tys.push((bt, a.body.id, a.body.span));
         }
+        // ADR-040: pattern phá cấu trúc trên `&U`/`&!U` khớp `U` ⇒ vét cạn xét trên `U` (nhánh `_`/tên trần phủ mọi giá trị nên không phụ thuộc kiểu)
+        let st = match self.infer.shallow(&st) {
+            Ty::Ref(_, inner) if arms.iter().any(|a| self.destructures(&a.pattern)) => *inner,
+            _ => st,
+        };
         self.matches.push(MatchCheck {
             node: e.id,
             span: e.span,

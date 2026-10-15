@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: chỉ MỘT tầng: pattern phá cấu trúc trên trường kiểu tham chiếu trong chế độ tham chiếu
+▢ P { x: u32 }
+ƒ f(o: &Option<&P>) → u32 ! ∅ { ⌥ o { Some(P { x }) ↦ *x, None ↦ 0 } }

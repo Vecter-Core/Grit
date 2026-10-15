@@ -1,0 +1,4 @@
+// expect: fail E0406
+// note: bind & rồi ghi đè biến gốc khi bind còn dùng
+⊔ E { A(u32), C }
+ƒ f() → u32 ! ∅ { μv ≔ E::A(1); ⌥ &v { E::A(x) ↦ { v ← E::C; *x }, E::C ↦ 0 } }

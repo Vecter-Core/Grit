@@ -1,0 +1,6 @@
+// expect: pass
+// note: &!E: biến bind là &!u32, ghi qua nó đổi giá trị gốc; hai &! vào hai trường KHÁC nhau hợp lệ
+⊔ E { A(u32), B(u32, u32), C }
+ƒ g(r: &!E) → u32 ! ∅ { ⌥ r { E::A(x) ↦ { *x ← *x +% 100; *x }, E::B(x, y) ↦ { *x ← *x +% 100; *y ← *y +% 100; *y }, E::C ↦ 0 } }
+ƒ h(r: &E) → u32 ! ∅ { ⌥ r { E::A(x) ↦ *x, E::B(x, y) ↦ *x + *y, E::C ↦ 0 } }
+ƒ main() → u32 ! ∅ { μv ≔ E::B(3, 4); a ≔ g(&!v); b ≔ h(&v); a * 1000 + b }

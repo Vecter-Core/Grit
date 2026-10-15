@@ -1,0 +1,4 @@
+// expect: pass
+// note: Option<T> qua tham chiếu (khoảng trống của F.2)
+ƒ get(o: &Option<u32>) → u32 ! ∅ { ⌥ o { Some(v) ↦ *v, None ↦ 0 } }
+ƒ main() → u32 ! ∅ { get(&Some(4)) + get(&None) }

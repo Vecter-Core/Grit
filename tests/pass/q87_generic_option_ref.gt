@@ -1,0 +1,4 @@
+// expect: pass
+// note: khớp qua tham chiếu trong hàm generic: v: &T
+ƒ or_else<T: Copy>(o: &Option<T>, d: T) → T ! ∅ { ⌥ o { Some(v) ↦ *v, None ↦ d } }
+ƒ main() → u32 ! ∅ { or_else(&Some(4u32), 9) + or_else(&None, 9) }

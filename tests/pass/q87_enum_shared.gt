@@ -1,0 +1,5 @@
+// expect: pass
+// note: enum con trỏ & khớp mẫu qua tham chiếu: biến thể 0–3 trường, biến bind là &u32 (ADR-040)
+⊔ E { A(u32), B(u32, u32), C, D(u32, u32, u32) }
+ƒ f(r: &E) → u32 ! ∅ { ⌥ r { E::A(x) ↦ *x + 1, E::B(x, y) ↦ *x * 10 + *y, E::C ↦ 7, E::D(x, y, z) ↦ *x * 100 + *y * 10 + *z } }
+ƒ main() → u32 ! ∅ { f(&E::A(5)) + f(&E::B(3, 4)) * 2 + f(&E::C) + f(&E::D(1, 2, 3)) }

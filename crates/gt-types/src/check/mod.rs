@@ -113,6 +113,8 @@ pub(crate) struct Checker<'e, 'a> {
     pub in_unsafe: u32,
     /// đang kiểm một biểu thức hợp đồng (`⊳ ⊲ ↓ ⋈`): chỗ DUY NHẤT `∀/∃` hợp lệ (E0316)
     pub in_contract: u32,
+    /// chế độ tham chiếu của pattern đang kiểm (ADR-040): `Some(duy nhất?)`
+    pub pat_ref: Option<bool>,
     pub unresolved_reported: bool,
 }
 
@@ -146,6 +148,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             entry: false,
             in_unsafe: 0,
             in_contract: 0,
+            pat_ref: None,
             unresolved_reported: false,
         }
     }

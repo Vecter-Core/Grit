@@ -131,11 +131,20 @@ fn arms_after_a_catch_all_are_not_an_error_in_m4() {
 }
 
 #[test]
-fn match_on_a_reference_scrutinee_is_a_type_error_in_phase_1() {
+fn match_on_a_reference_scrutinee_matches_through_the_reference_adr040() {
+    // ADR-040 (Q87): trước đây E0301; nay khớp qua tham chiếu, v: &i32
+    ok("ƒ f(o: &Option<i32>) → i32 ! ∅ { ⌥ o { Some(v) ↦ *v, None ↦ 0 } }");
+    // pattern hằng trên tham chiếu vẫn là lỗi kiểu (không tương tác ngầm)
     err(
-        "ƒ f(o: &Option<i32>) → i32 ! ∅ { ⌥ o { Some(v) ↦ 1, None ↦ 0 } }",
+        "ƒ f(r: &i32) → i32 ! ∅ { ⌥ r { 0 ↦ 1, _ ↦ 2 } }",
         "E0301",
-        2,
+        1,
+    );
+    // biến bind là &i32, không phải i32
+    err(
+        "ƒ f(o: &Option<i32>) → i32 ! ∅ { ⌥ o { Some(v) ↦ v, None ↦ 0 } }",
+        "E0301",
+        1,
     );
 }
 

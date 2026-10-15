@@ -1,0 +1,3 @@
+// expect: pass
+// note: hai &! vào hai thành phần khác nhau của tuple, đọc/ghi chéo
+ƒ f(a: &!(u32, u32)) → u32 ! ∅ { ⌥ a { (x, y) ↦ { *x ← *y; *y ← *x; *x } } }

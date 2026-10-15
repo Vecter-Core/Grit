@@ -1,0 +1,7 @@
+// expect: pass
+// note: tên trần và `_` trên &U không đổi: tên trần bind CHÍNH tham chiếu; `_` bỏ qua
+⊔ E { A(u32), B }
+ƒ h(r: &E) → u32 ! ∅ { ⌥ r { E::A(x) ↦ *x, E::B ↦ 0 } }
+ƒ f(r: &E) → u32 ! ∅ { ⌥ r { x ↦ h(x) } }
+ƒ g(r: &E) → u32 ! ∅ { ⌥ r { E::A(_) ↦ 1, _ ↦ 2 } }
+ƒ main() → u32 ! ∅ { f(&E::A(5)) + g(&E::B) }
