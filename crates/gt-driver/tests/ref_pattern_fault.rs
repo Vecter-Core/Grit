@@ -39,6 +39,11 @@ fn a_wrong_pattern_mode_in_mir_is_ice_e9901_never_silent() {
         let (code, out) = run(src, Some("mir:pat-mode"));
         println!("exit {code}: {}", out.lines().next().unwrap_or(""));
         assert!(out.contains("E9901"), "không có ICE: {out}");
+        // đúng khẳng định của HẠ MIR (không phải một ICE phụ ở pass sau): thông báo phải nêu chế độ khớp
+        assert!(
+            out.contains("chế độ khớp qua tham chiếu"),
+            "ICE không phải từ khẳng định chế độ: {out}"
+        );
         assert_ne!(code, 0);
     }
 }

@@ -697,3 +697,7 @@ Cách so sánh: `GT_PROFILE=release` chạy lại cả bộ đối chiếu ở h
 - Sau lần 1 đã sửa `tools/gate.sh`: giữ bản sao đầy đủ ở `target/tmp/gate_test_last.txt` và in 4 dòng sau mỗi `panicked`; `tools/test_gate.py` 5/5.
 - **Lần 2: `fmt OK`, `clippy EXIT=0`, `audit EXIT=0`, `TEST_PASSED=862 FAILED=0 SUITES=162`, `check_expectations` OK + 9 + 5 unittest OK, `GATE_RESULT=GREEN`, gate.sh thoát mã 0.** (Thêm so với 859: test giới hạn biến thể, vòng một khối, 2 test chèn lỗi.)
 - **Flake `llvm_sort` chưa tái hiện** (1/2 lần chạy cổng, 0/2 lần chạy riêng); ghi để theo dõi, nếu lặp lại có bản sao đầy đủ để chẩn đoán.
+
+## Q87 / ADR-040 — khớp mẫu qua tham chiếu (2026-10-15)
+- **Đổi phân phối kịch bản oracle M6:** `Gen::scenario` đổi `below(100)` → `below(112)` (thêm kịch bản `ref_pattern`, 5 cột `ref_pat_*`). Vì vậy **các seed cũ sinh chương trình KHÁC** và số liệu oracle trước 2026-10-15 (độ phủ từng cột, số ứng viên dương tính giả, số đột biến bị bắt theo bản nhanh) **không so trực tiếp được** với số mới. Số mới (bản đủ 20 000): 544 921 khoản vay theo dõi; âm tính giả 0; từ chối&vi phạm 10 903 (khác mã 0); ứng viên dương tính giả 319 (3,51 % của 9 097), 0 "KHÁC".
+- Thăm dò codegen (4/4), đối chiếu độc lập khoản vay (3/3), corpus 12 pass + 12 fail, bộ sinh so sánh codegen `refgen` có mô hình, hai chế độ tiêm lỗi hạ MIR (`mir:pat-mode`, `mir:pat-field`, `mir:pat-field-swap`): xem HANDOFF 0f–0i.
