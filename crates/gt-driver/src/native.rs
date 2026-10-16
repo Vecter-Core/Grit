@@ -7,6 +7,32 @@ use gt_codegen_llvm::{CodegenError, Inject, Opt, Options};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Lỗi MÔI TRƯỜNG thoáng qua khi mở/chạy tệp vừa được ghi (quét virus/chỉ mục của Windows giữ tệp: "Access is denied" os error 5, sharing violation 32). Thử lại
+/// có kiểm soát CHỈ cho loại lỗi này ở bước KHỞI CHẠY tiến trình; KHÔNG BAO GIỜ thử lại một kết quả (mã thoát/đầu ra) — kết quả sai vẫn là sai (FB flake llvm_sort).
+fn transient_io(e: &std::io::Error) -> bool {
+    e.kind() == std::io::ErrorKind::PermissionDenied || matches!(e.raw_os_error(), Some(5 | 32))
+}
+
+/// Thử `f` tối đa `ATTEMPTS` lần, chỉ lặp khi lỗi là [`transient_io`]; chờ tăng dần giữa các lần.
+pub(crate) fn retry_transient<T>(mut f: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
+    const ATTEMPTS: u32 = 8;
+    let mut i = 0;
+    loop {
+        match f() {
+            Err(e) if transient_io(&e) && i + 1 < ATTEMPTS => {
+                i += 1;
+                std::thread::sleep(std::time::Duration::from_millis(150 * u64::from(i)));
+            }
+            r => return r,
+        }
+    }
+}
+
+/// `link.exe` báo không mở được tệp đầu ra (LNK1104: tệp đang bị quét/giữ): lỗi môi trường thoáng qua, chỉ thử lại bước liên kết.
+fn transient_link_failure(output: &str) -> bool {
+    output.contains("LNK1104")
+}
+
 /// Lỗi của backend LLVM; `Env` ⇒ mã thoát 3 (môi trường), `Codegen` ⇒ chưa hỗ trợ (3) hoặc nội bộ (2), `Link` ⇒ nội bộ (2).
 #[derive(Debug)]
 pub enum NativeError {
@@ -203,7 +229,16 @@ pub fn build_exe_profile(
             "dbghelp.lib",
             "/defaultlib:msvcrt",
         ]);
-    let r = cmd.output();
+    let mut r = cmd.output();
+    for k in 1..=5u64 {
+        let again = matches!(&r, Ok(o) if !o.status.success()
+            && transient_link_failure(&format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr))));
+        if !again {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300 * k));
+        r = cmd.output();
+    }
     let _ = std::fs::remove_file(&obj);
     match r {
         Ok(o) if o.status.success() && out.is_file() => {
@@ -252,11 +287,10 @@ pub fn run_exe_timeout(exe: &Path, limit: Option<std::time::Duration>) -> RunRep
         if let Some(f) = &rt_fault {
             cmd.env("GRITRT_FAULT", f);
         }
-        let mut child = cmd
-            .env("GRITRT_RESULT_FILE", &result_file)
+        cmd.env("GRITRT_RESULT_FILE", &result_file)
             .stdout(std::fs::File::create(&out_file)?)
-            .stderr(std::fs::File::create(&err_file)?)
-            .spawn()?;
+            .stderr(std::fs::File::create(&err_file)?);
+        let mut child = retry_transient(|| cmd.spawn())?;
         let start = std::time::Instant::now();
         loop {
             if let Some(st) = child.try_wait()? {
@@ -302,5 +336,54 @@ pub fn run_exe_timeout(exe: &Path, limit: Option<std::time::Duration>) -> RunRep
             end: RunEnd::Internal(format!("không chạy được {}: {e}", exe.display())),
             value: None,
         },
+    }
+}
+
+#[cfg(test)]
+mod transient_tests {
+    use super::*;
+    use std::io::{Error, ErrorKind};
+
+    #[test]
+    fn retries_only_transient_denials_and_never_hides_other_errors() {
+        // 3 lần "Access is denied" rồi thành công ⇒ Ok sau 4 lần gọi
+        let mut calls = 0;
+        let r: std::io::Result<u32> = retry_transient(|| {
+            calls += 1;
+            if calls <= 3 {
+                Err(Error::from_raw_os_error(5))
+            } else {
+                Ok(7)
+            }
+        });
+        assert_eq!(r.expect("ok"), 7);
+        assert_eq!(calls, 4);
+        // lỗi KHÔNG thoáng qua: đúng 1 lần gọi, lỗi nguyên vẹn
+        let mut calls = 0;
+        let r: std::io::Result<u32> = retry_transient(|| {
+            calls += 1;
+            Err(Error::new(ErrorKind::NotFound, "không có"))
+        });
+        assert_eq!(r.expect_err("lỗi").kind(), ErrorKind::NotFound);
+        assert_eq!(calls, 1);
+        // từ chối kéo dài: dừng sau đúng 8 lần, trả lỗi (không treo, không nuốt)
+        let mut calls = 0;
+        let r: std::io::Result<u32> = retry_transient(|| {
+            calls += 1;
+            Err(Error::from(ErrorKind::PermissionDenied))
+        });
+        assert!(r.is_err());
+        assert_eq!(calls, 8);
+    }
+
+    #[test]
+    fn only_lnk1104_counts_as_a_transient_link_failure() {
+        assert!(transient_link_failure(
+            "LINK : fatal error LNK1104: cannot open file 'x.exe'"
+        ));
+        assert!(!transient_link_failure(
+            "error LNK2019: unresolved external symbol"
+        ));
+        assert!(!transient_link_failure(""));
     }
 }
