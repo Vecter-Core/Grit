@@ -176,7 +176,13 @@ fn build_to(profile: &str, src: &Path, out: &Path) {
 #[test]
 fn builds_are_reproducible_for_every_profile() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let multi = root.join("examples/sortlines/src");
+    // dự án nhiều tệp = các tệp của examples/sortlines/src + gói `std` (lib/std/src; sortlines phụ thuộc std, mô đun phẳng theo tên tệp như rig)
+    let multi = scratch("multi");
+    for dir in ["examples/sortlines/src", "lib/std/src"] {
+        for e in std::fs::read_dir(root.join(dir)).expect("đọc").flatten() {
+            std::fs::copy(e.path(), multi.join(e.file_name())).expect("chép");
+        }
+    }
     for profile in ["dev", "release", "release-o2"] {
         let d1 = scratch("rep1");
         let single = prog(&d1);

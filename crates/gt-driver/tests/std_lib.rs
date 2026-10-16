@@ -56,7 +56,7 @@ fn run3(
     tag: &str,
     interp_too: bool,
 ) -> Result<(Option<String>, Option<String>), String> {
-    let mut res = check(&inputs(main), &Options::default()).map_err(|e| format!("{e}"))?;
+    let mut res = check(&inputs(main), &Options::default()).map_err(|e| e.to_string())?;
     if !res.verdict.allows_output() {
         let d: Vec<String> = res
             .report

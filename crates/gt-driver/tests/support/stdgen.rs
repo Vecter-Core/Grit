@@ -238,6 +238,9 @@ fn er16(r: Result<u32, u16>) -> u64 {
     }
 }
 
+type OptFn = Box<dyn Fn(u32, bool, u32, bool) -> (String, u64)>;
+type ResFn = Box<dyn Fn(u32, u8, bool) -> (String, u64)>;
+
 const REPS: usize = 8;
 
 /// `calls` mỗi ca = REPS (ngẫu nhiên) hoặc toàn bộ chéo (edge)
@@ -398,7 +401,7 @@ pub fn program(seed: u64, edge: bool, mem_only: bool) -> Prog {
             } else {
                 (rng.below(9) as u8, rng.below(9) as u8)
             };
-            let (ka, kb) = ((la / 3) as u8, (lb / 3) as u8);
+            let (ka, kb) = (la / 3, lb / 3);
             let (la, lb) = (la % 3, lb % 3);
             let (x, y) = (oo(ka, la), oo(kb, lb));
             b.push(
@@ -419,8 +422,9 @@ pub fn program(seed: u64, edge: bool, mem_only: bool) -> Prog {
             } else {
                 (rng.below(4) as u8, rng.below(4) as u8)
             };
-            let mk =
-                |i: u8| -> (u8, i16, bool) { (i / 2, if i / 2 == 0 { -1 } else { 5 }, i % 2 == 0) };
+            let mk = |i: u8| -> (u8, i16, bool) {
+                (i / 2, if i / 2 == 0 { -1 } else { 5 }, i.is_multiple_of(2))
+            };
             let ((k1, e1, o1), (k2, e2, o2)) = (mk(ia), mk(ib));
             let (x, y) = (rs(k1, e1, o1), rs(k2, e2, o2));
             b.push(
@@ -550,10 +554,7 @@ pub fn program(seed: u64, edge: bool, mem_only: bool) -> Prog {
         cases.push(b.finish("Ord for Text", cases.len(), true));
     }
     // -------- Option: phương thức
-    let mut oprops: Vec<(
-        &'static str,
-        Box<dyn Fn(u32, bool, u32, bool) -> (String, u64)>,
-    )> = Vec::new();
+    let mut oprops: Vec<(&'static str, OptFn)> = Vec::new();
     oprops.push((
         "Option::is_none",
         Box::new(|a, pa, _, _| {
@@ -627,7 +628,7 @@ pub fn program(seed: u64, edge: bool, mem_only: bool) -> Prog {
         cases.push(b.finish(name, cases.len(), false));
     }
     // -------- Result: phương thức
-    let mut rprops: Vec<(&'static str, Box<dyn Fn(u32, u8, bool) -> (String, u64)>)> = Vec::new();
+    let mut rprops: Vec<(&'static str, ResFn)> = Vec::new();
     rprops.push((
         "Result::is_ok",
         Box::new(|k, e, ok| {
