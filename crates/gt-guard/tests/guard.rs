@@ -249,6 +249,75 @@ fn runtime_calls_need_their_class() {
     assert_eq!(w.check(), Vec::<String>::new());
 }
 
+/// FAIL_OPEN_AUDIT G1: gọi `gritrt_*` qua CON TRỎ (lời gọi gián tiếp) làm `callee_name` trả `None` ⇒ luật "lớp nghĩa vụ" và "đích mọi lời gọi" không chạy.
+/// Quy tắc mới: địa chỉ của hàm `gritrt_*` chỉ được dùng làm đích gọi TRỰC TIẾP (không lưu, không truyền làm đối số, không gọi gián tiếp).
+#[test]
+fn runtime_function_addresses_may_only_be_called_directly() {
+    let ctx = Context::create();
+    // (1) lưu địa chỉ rồi gọi gián tiếp một hàm nhạy cảm (đọc tệp) không mang !gt.obl
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let ptr = ctx.ptr_type(Default::default());
+    let i64t = ctx.i64_type();
+    let fs_read_ty = ctx.i32_type().fn_type(&[ptr.into(), i64t.into()], false);
+    let fs_read = w.m.add_function("gritrt_fs_read", fs_read_ty, None);
+    let slot = w.b.build_alloca(ptr, "slot").expect("alloca");
+    w.b.build_store(slot, fs_read.as_global_value().as_pointer_value())
+        .expect("store");
+    let fp =
+        w.b.build_load(ptr, slot, "fp")
+            .expect("load")
+            .into_pointer_value();
+    w.b.build_indirect_call(
+        fs_read_ty,
+        fp,
+        &[ptr.const_null().into(), i64t.const_zero().into()],
+        "",
+    )
+    .expect("indirect");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(
+        has(&v, "gritrt_fs_read"),
+        "gọi gián tiếp hàm runtime bị CHẤP NHẬN: {v:?}"
+    );
+
+    // (2) chỉ lưu địa chỉ (không gọi) cũng bị từ chối
+    let ctx2 = Context::create();
+    let w = world(&ctx2, true, Some(ATT));
+    let f = w.func("f");
+    let ptr = ctx2.ptr_type(Default::default());
+    let alloc = w.m.add_function(
+        "gritrt_alloc",
+        ptr.fn_type(&[ctx2.i64_type().into()], false),
+        None,
+    );
+    let slot = w.b.build_alloca(ptr, "slot").expect("alloca");
+    w.b.build_store(slot, alloc.as_global_value().as_pointer_value())
+        .expect("store");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(
+        has(&v, "gritrt_alloc"),
+        "lưu địa chỉ hàm runtime bị CHẤP NHẬN: {v:?}"
+    );
+
+    // (3) đối chứng: gọi TRỰC TIẾP hàm không nhạy cảm (gritrt_alloc, lớp None) vẫn được chấp nhận
+    let ctx3 = Context::create();
+    let w = world(&ctx3, true, Some(ATT));
+    let f = w.func("f");
+    let ptr = ctx3.ptr_type(Default::default());
+    let alloc = w.m.add_function(
+        "gritrt_alloc",
+        ptr.fn_type(&[ctx3.i64_type().into()], false),
+        None,
+    );
+    w.b.build_call(alloc, &[ctx3.i64_type().const_int(16, false).into()], "")
+        .expect("call");
+    finish_ok(&w, f);
+    assert_eq!(w.check(), Vec::<String>::new());
+}
+
 #[test]
 fn rejects_poison_flags_but_allows_plain_arithmetic_and_gep() {
     let ctx = Context::create();
