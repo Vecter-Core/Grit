@@ -27,6 +27,7 @@ E0401_moved_param_in_branch_then_use | E0401 | `b.v` | [giá trị bị move ở
 E0401_param_moved_twice | E0401 | `eat(b)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_partial_move_then_same_field | E0401 | `w.b.v` | [giá trị bị move ở đây @ `w.b`] | dùng `w` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_partial_move_then_whole | E0401 | `eatw(w)` | [giá trị bị move ở đây @ `w.b`] | dùng `w` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_qarena_handle_is_move_only | E0401 | `a.alloc(1)` | [giá trị bị move ở đây @ `a`] | dùng `a` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_reinit_one_branch_only | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_returned_then_used | E0401 | `use_i(b.v)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_tuple_field_moved_then_whole | E0401 | `pair(t)` | [giá trị bị move ở đây @ `t.0`] | dùng `t` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
@@ -151,6 +152,14 @@ E0405_outer_ref_to_inner_arena | E0405 | `{ a ≔ Arena::new(); p ← a.alloc(1)
 E0405_pass_arena_by_value_then_use | E0405 | `eata(a)` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | gán/move Arena `a` làm vô hiệu các tham chiếu đã cấp từ nó, mà chúng còn được dùng về sau
 E0405_pass_arena_unique_and_keep_ref | E0405 | `&!a` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
 E0405_q87_bind_then_arena_reset | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(E::A(1))`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_qarena_alias_shared_and_unique_args | E0405 | `&!a` | [khoản mượn bắt đầu ở đây @ `&a`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_qarena_cell_holds_arena_ref | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `&a`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_qarena_hold_then_reset | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_qarena_reset_in_branch_holding | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_qarena_reset_in_loop_holding | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(0)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_qarena_struct_holder | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_qarena_two_paths_shared_then_unique | E0405 | `&!a` | [khoản mượn bắt đầu ở đây @ `&a`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_qarena_via_fn_signature | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `&a`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
 E0405_reset_in_loop_carried | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
 E0405_reset_then_use | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
 E0405_reset_through_unique_ref_param | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
