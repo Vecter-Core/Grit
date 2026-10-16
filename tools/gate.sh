@@ -10,6 +10,10 @@ export GRIT_LLVM_DIR="${GRIT_LLVM_DIR:-D:/Tools/llvm-20.1.8}"; export PATH="$(cy
 export CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=2
 [ -n "$2" ] && export CARGO_TARGET_DIR="$2"
 bash "$(dirname "$0")/handoff_check.sh" "$1" || true   # chỉ cảnh báo, KHÔNG làm cổng đỏ
+# CẢNH BÁO (không đỏ): hook pre-commit không đi theo git clone
+if [ -f tools/pre-commit.hook ] && ! cmp -s tools/pre-commit.hook .git/hooks/pre-commit 2>/dev/null; then
+  echo "HOOK_WARN: .git/hooks/pre-commit chưa cài hoặc khác tools/pre-commit.hook — chạy: bash tools/install_hooks.sh"
+fi
 STAGES="${GATE_STAGES:-gtrt fmt clippy audit test expect deletions track}"
 rc=0
 red() { echo "GATE_RED: $1"; rc=1; }
