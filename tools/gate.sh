@@ -9,6 +9,7 @@ export TEMP='D:\Grit\target\tmp' TMP='D:\Grit\target\tmp' TMPDIR=/d/Grit/target/
 export GRIT_LLVM_DIR="${GRIT_LLVM_DIR:-D:/Tools/llvm-20.1.8}"; export PATH="$(cygpath -u "$GRIT_LLVM_DIR")/bin:$PATH"
 export CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=2
 [ -n "$2" ] && export CARGO_TARGET_DIR="$2"
+bash "$(dirname "$0")/handoff_check.sh" "$1" || true   # chỉ cảnh báo, KHÔNG làm cổng đỏ
 STAGES="${GATE_STAGES:-gtrt fmt clippy audit test expect}"
 rc=0
 red() { echo "GATE_RED: $1"; rc=1; }
