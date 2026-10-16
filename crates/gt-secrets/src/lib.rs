@@ -255,7 +255,8 @@ pub fn scan_text(file: &str, text: &str) -> Vec<Finding> {
 
 fn ty_has_secret(t: &TypesOutput, ty: &Ty, depth: usize) -> bool {
     if depth > 12 {
-        return false;
+        // quá sâu ⇒ KHÔNG biết ⇒ coi là có Secret (cảnh báo bảo thủ), không im lặng (FAIL_OPEN_AUDIT S1)
+        return true;
     }
     let sec = t.db.lang.get(&Lang::Secret);
     match ty {
