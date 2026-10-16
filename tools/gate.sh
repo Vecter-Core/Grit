@@ -10,10 +10,22 @@ export GRIT_LLVM_DIR="${GRIT_LLVM_DIR:-D:/Tools/llvm-20.1.8}"; export PATH="$(cy
 export CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=2
 [ -n "$2" ] && export CARGO_TARGET_DIR="$2"
 bash "$(dirname "$0")/handoff_check.sh" "$1" || true   # chỉ cảnh báo, KHÔNG làm cổng đỏ
-STAGES="${GATE_STAGES:-gtrt fmt clippy audit test expect}"
+STAGES="${GATE_STAGES:-gtrt fmt clippy audit test expect track}"
 rc=0
 red() { echo "GATE_RED: $1"; rc=1; }
 has() { case " $STAGES " in *" $1 "*) return 0 ;; esac; return 1; }
+
+# Giai đoạn `track` (lệnh Giang 2026-10-16): TỆP ĐÃ THEO DÕI KHÔNG ĐƯỢC ĐỔI trong lúc cổng chạy. Ảnh chụp TRƯỚC mọi giai đoạn và SAU tất cả; so sánh
+# từng đường dẫn (tệp theo dõi bị sửa/xoá — băm `git diff HEAD` của riêng tệp — hoặc tệp mới KHÔNG bị ignore xuất hiện) ⇒ ĐỎ nêu tên tệp.
+# Cây đang làm dở lúc bắt đầu vẫn dùng được: so ảnh chụp trước với sau, không đòi cây sạch. Ghi vào `target/` (bị ignore) không tính.
+tracked_snapshot() {
+  { git diff HEAD --name-only 2>/dev/null | while IFS= read -r f; do
+      echo "$f $(git diff HEAD -- "$f" 2>/dev/null | sha256sum | cut -c1-16)"
+    done
+    git ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo "?? $f"; done
+  } | LC_ALL=C sort
+}
+if has track; then TRACK_BEFORE="$(tracked_snapshot)"; fi
 
 if has gtrt; then
   echo "== gt-rt (workspace riêng, M10)"
@@ -55,6 +67,17 @@ if has expect; then
   fi
   if [ -f tools/test_gate.py ]; then
     PYTHONIOENCODING=utf-8 python -m unittest tools/test_gate.py 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || red "unittest gate"
+  fi
+fi
+if has track; then
+  echo "== track (tệp đã theo dõi không bị đổi)"
+  TRACK_AFTER="$(tracked_snapshot)"
+  if [ "$TRACK_BEFORE" != "$TRACK_AFTER" ]; then
+    echo "TRACK_CHANGED: cổng làm ĐỔI cây làm việc (tệp theo dõi bị sửa/xoá hoặc tệp mới không ignore):"
+    diff <(echo "$TRACK_BEFORE") <(echo "$TRACK_AFTER") | grep -E '^[<>]' | sed 's/^/  /' | head -40
+    red "tệp đã theo dõi bị đổi trong lúc cổng chạy"
+  else
+    echo "TRACK_OK"
   fi
 fi
 if [ "$rc" = 0 ]; then echo "GATE_RESULT=GREEN"; else echo "GATE_RESULT=RED"; fi
