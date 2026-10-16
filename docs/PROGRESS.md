@@ -807,3 +807,7 @@ Tổng 4 + 12 + 8 + 3 + 8 + 1 + 3 + 2 = 41; 866 + 41 = 907 ✓. Không có mẫu
 
 ### Cổng liền mạch sau giai đoạn `deletions` (2026-10-16; thoát 0)
 fmt OK | clippy 0 | audit 0 | test 879/0/168 | unittest công cụ 9 + 4 + 18 | `DELETIONS_OK (6 tệp từng bị xoá, đều có dòng)` | `TRACK_OK` | GATE_RESULT=GREEN, GATE_EXIT=0.
+
+## C (Arena) — 2026-10-16
+- Tấn công M6 trên Arena: 15 chương trình thử (11 vào corpus: 9 fail + 2 pass); M6 từ chối đúng (E0405 ×8, E0401 ×1: Arena không Copy nên sao chép tay cầm là move), chấp nhận 2 mẫu hợp lệ (alloc→reset→alloc mới; hai alloc qua `&Arena`). KHÔNG lỗ hổng; không sửa M6; Arena không vào `Lang::interior_mutable`.
+- Kiểm động `arena_overlap` (kind 18): gt-rt + `gritrt_dev_checks` (Guard RUNTIME 24 hàm) + golden IR 3 tệp (+1 lời gọi) + `arena_dynamic.rs` 6 test + đột biến 8/8 + oracle. Cổng liền mạch: fmt OK, clippy 0, audit 0, test **886/0/169**, deletions OK, TRACK_OK, GATE_RESULT=GREEN.
