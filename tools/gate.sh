@@ -10,7 +10,7 @@ export GRIT_LLVM_DIR="${GRIT_LLVM_DIR:-D:/Tools/llvm-20.1.8}"; export PATH="$(cy
 export CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=2
 [ -n "$2" ] && export CARGO_TARGET_DIR="$2"
 bash "$(dirname "$0")/handoff_check.sh" "$1" || true   # chỉ cảnh báo, KHÔNG làm cổng đỏ
-STAGES="${GATE_STAGES:-gtrt fmt clippy audit test expect track}"
+STAGES="${GATE_STAGES:-gtrt fmt clippy audit test expect deletions track}"
 rc=0
 red() { echo "GATE_RED: $1"; rc=1; }
 has() { case " $STAGES " in *" $1 "*) return 0 ;; esac; return 1; }
@@ -66,6 +66,10 @@ if has expect; then
   if [ -f tools/test_gate.py ]; then
     PYTHONIOENCODING=utf-8 python -m unittest tools/test_gate.py 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || red "unittest gate"
   fi
+fi
+if has deletions; then
+  echo "== deletions (mọi tệp từng bị xoá phải có dòng trong docs/DELETIONS.md)"
+  bash "$(dirname "$0")/deletions_check.sh" . || red "tệp từng bị xoá thiếu dòng/lý do trong docs/DELETIONS.md"
 fi
 if has track; then
   echo "== track (tệp đã theo dõi không bị đổi)"

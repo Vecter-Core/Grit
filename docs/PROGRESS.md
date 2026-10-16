@@ -788,3 +788,19 @@ GATE_RESULT=GREEN   GATE_EXIT=0
 - Đọc mã: `tools/mut.py` chỉ chép kho → `D:/Grit_mut/wN` (rmtree+copytree trên bản sao, loại trừ target/fuzz/mutants.out, không loại `*.md`), ghi/khôi phục chỉ trong bản sao; không git checkout/clean/restore; không chép ngược. Script đột biến tạm (`mut_std/mut_q87b/mut_b/mut_q87`): ghi bản đột biến vào tệp THẬT rồi khôi phục bằng ghi lại nội dung gốc (`finally`), không xoá. `stdexp.py`: rmtree chỉ dưới `target/tmp/stdq`.
 - `docs/TRACK_PROBE.jsonl`: 22 bước (18 đột biến std, 3 Q87, 6 đột biến `mut.py`) mỗi bước bọc `track_guard` ⇒ 22/22 `track_ok`, 0 đổi. Không tái hiện. Lịch sử xoá trong git: chỉ `TASK.md` giữ chỗ và `E1301_comment_*` (M2e). `git ls-files`: 907 `.gt` theo dõi (893 dưới tests/); 841 `.gt` ở tests/{pass,fail,warn,lexer} so với 866 trong báo cáo `check_expectations` (khác nhau vì check_expectations đếm cả `tests/golden*`, `tests/fuzz`…; không phải tệp mất).
 - `tools/track_guard.sh` (snapshot/verify, `TRACK_IGNORE`), `tools/run_guarded.sh <lệnh>`, `mut.py` verify sau MỖI đột biến (dừng mã 3 nếu đổi) + `tools/test_mut_guard.py` (4 test); `fuzz_session.sh` verify (bỏ FUZZ_LOG). Cổng liền mạch: fmt OK, clippy 0, audit 0, test 879/0/168, unittest 9 + 4 + 10, `TRACK_OK`, GATE_RESULT=GREEN, thoát 0.
+
+### Đối chiếu số tệp `.gt` đã theo dõi: 907 so với 866 (2026-10-16)
+`check_expectations` quét `tests/{pass,fail,warn,lexer}` (đệ quy, gồm mẫu nhiều tệp) = 405 + 440 + 13 + 8 = **866**. 41 tệp còn lại nằm NGOÀI vùng quét, mỗi nhóm có người tiêu thụ riêng:
+
+| thư mục | tệp | vì sao không quét | người tiêu thụ / cần `// expect:`? |
+|---|---|---|---|
+| tests/bench | 4 | chương trình benchmark, không phải mẫu pass/fail | `tools/bench.py`, `bench_profile.py` (+ `tools/bench_ref/*.rs`); KHÔNG cần |
+| tests/golden/mir | 12 | nguồn của test GOLDEN (so đầu ra MIR in ra với tệp vàng) | `crates/gt-mir/tests/golden.rs`; KHÔNG cần |
+| tests/golden/obligations | 8 | như trên, cho IR nghĩa vụ | `crates/gt-oblig/tests/golden.rs`; KHÔNG cần |
+| tests/samples | 3 | mẫu chạy thật M10 mang `// expect-result:` (giá trị chạy), không phải phán quyết | `crates/gt-driver/tests/llvm.rs`; KHÔNG cần |
+| examples/* | 8 | dự án Rig (6 công cụ dogfood) | `crates/rig/tests/dogfood*.rs`; KHÔNG cần |
+| lib/core | 1 | prelude | test prelude một nguồn (`gate.rs`, gt-types/resolve) |
+| lib/std/src | 3 | gói std | `crates/gt-driver/tests/std_lib.rs`, `rig.rs` |
+| crates/gt-parser/tests/fuzz_regressions | 2 | đầu vào gây sập của fuzz (một tệp CỐ Ý hỏng, vd `// etruexpect`) | `crates/gt-parser/tests/fuzz_regressions.rs` |
+
+Tổng 4 + 12 + 8 + 3 + 8 + 1 + 3 + 2 = 41; 866 + 41 = 907 ✓. Không có mẫu nào ngoài vùng quét mà đáng ra phải có `// expect:` (mỗi nhóm có test riêng đọc đúng định dạng của nó).

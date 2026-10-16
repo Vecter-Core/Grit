@@ -121,5 +121,117 @@ class TrackedFilesMustNotChange(unittest.TestCase):
         self.assertIn("other.txt", out)
 
 
+NL = chr(10)
+HDR = "| đường dẫn | commit | lý do |" + NL + "|---|---|---|" + NL
+
+
+class DeletionsLedger(unittest.TestCase):
+    """Giai đoạn `deletions`: mọi tệp từng bị xoá phải có dòng trong docs/DELETIONS.md (lý do không rỗng nếu dưới tests/, docs/errors/, lib/, crates/*/src/)."""
+
+    def setUp(self):
+        self.repo = tracked_repo()
+        self.addCleanup(shutil.rmtree, self.repo, True)
+        os.makedirs(os.path.join(self.repo, "tests"), exist_ok=True)
+        os.makedirs(os.path.join(self.repo, "docs"), exist_ok=True)
+        self.write("tests/mau.gt", "x" + NL)
+        self.write("docs/DELETIONS.md", HDR)
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "thêm")
+
+    def git(self, *a):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=self.repo, check=True, capture_output=True)
+
+    def write(self, rel, text):
+        with open(os.path.join(self.repo, rel), "w", encoding="utf-8", newline=NL) as f:
+            f.write(text)
+
+    def run_gate(self):
+        env = dict(os.environ, GATE_STAGES="deletions", PYTHONIOENCODING="utf-8")
+        script = os.path.join(ROOT, "tools", "gate.sh").replace(chr(92), "/")
+        p = subprocess.run(["bash", script, self.repo.replace(chr(92), "/")], cwd=self.repo, env=env, capture_output=True,
+                           text=True, encoding="utf-8", errors="replace")
+        return p.returncode, p.stdout
+
+    def delete_and_commit(self, rel):
+        os.remove(os.path.join(self.repo, rel))
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "xoá " + rel)
+
+    def test_green_when_nothing_was_ever_deleted(self):
+        rc, out = self.run_gate()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("DELETIONS_OK", out)
+
+    def test_red_when_a_deleted_file_has_no_ledger_line(self):
+        self.delete_and_commit("tests/mau.gt")
+        rc, out = self.run_gate()
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("DELETIONS_MISSING", out)
+        self.assertIn("tests/mau.gt", out)
+        self.assertIn("GATE_RESULT=RED", out)
+
+    def test_green_when_the_deletion_is_recorded_with_a_reason(self):
+        self.delete_and_commit("tests/mau.gt")
+        self.write("docs/DELETIONS.md", HDR + "| tests/mau.gt | abc1234 | đổi tên sang mau2 |" + NL)
+        rc, out = self.run_gate()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("DELETIONS_OK", out)
+
+    def test_red_when_the_line_exists_but_the_reason_is_empty_in_a_critical_dir(self):
+        self.delete_and_commit("tests/mau.gt")
+        self.write("docs/DELETIONS.md", HDR + "| tests/mau.gt | abc1234 |  |" + NL)
+        rc, out = self.run_gate()
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("DELETIONS_NO_REASON", out)
+
+    def test_green_when_a_line_is_recorded_for_a_file_that_was_not_deleted(self):
+        self.write("docs/DELETIONS.md", HDR + "| tests/khac.gt | abc1234 | dự phòng |" + NL)
+        rc, out = self.run_gate()
+        self.assertEqual(rc, 0, out)
+
+
+class CommitCheck(unittest.TestCase):
+    """tools/commit_check.sh: commit (đã stage) có tệp bị xoá phải cập nhật docs/DELETIONS.md cùng commit."""
+
+    def setUp(self):
+        self.repo = tracked_repo()
+        self.addCleanup(shutil.rmtree, self.repo, True)
+        os.makedirs(os.path.join(self.repo, "docs"), exist_ok=True)
+        with open(os.path.join(self.repo, "docs", "DELETIONS.md"), "w", encoding="utf-8", newline=NL) as f:
+            f.write(HDR)
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "thêm")
+
+    def git(self, *a):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=self.repo, check=True, capture_output=True)
+
+    def check(self):
+        script = os.path.join(ROOT, "tools", "commit_check.sh").replace(chr(92), "/")
+        p = subprocess.run(["bash", script, self.repo.replace(chr(92), "/")], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        return p.returncode, p.stdout
+
+    def test_staged_deletion_without_ledger_update_is_refused(self):
+        os.remove(os.path.join(self.repo, "other.txt"))
+        self.git("add", "-A")
+        rc, out = self.check()
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("other.txt", out)
+
+    def test_staged_deletion_with_ledger_line_in_the_same_commit_is_accepted(self):
+        os.remove(os.path.join(self.repo, "other.txt"))
+        with open(os.path.join(self.repo, "docs", "DELETIONS.md"), "a", encoding="utf-8", newline=NL) as f:
+            f.write("| other.txt | abc1234 | thử |" + NL)
+        self.git("add", "-A")
+        rc, out = self.check()
+        self.assertEqual(rc, 0, out)
+
+    def test_commit_without_deletions_is_accepted(self):
+        with open(os.path.join(self.repo, "other.txt"), "a", encoding="utf-8") as f:
+            f.write("thêm" + NL)
+        self.git("add", "-A")
+        rc, out = self.check()
+        self.assertEqual(rc, 0, out)
+
+
 if __name__ == "__main__":
     unittest.main()
