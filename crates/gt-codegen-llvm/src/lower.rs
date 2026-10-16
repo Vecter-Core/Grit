@@ -769,6 +769,12 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         let entry = self.module.add_function("gt_entry", entry_ty, None);
         let bb = self.ctx.append_basic_block(entry, "entry");
         self.builder.position_at_end(bb);
+        // hồ sơ dev: BẬT kiểm động Arena của gt-rt (`arena_overlap`; hợp đồng H2). Release/release-o2 KHÔNG kiểm (bằng chứng chỉ ở dev).
+        if opts.opt == Opt::Dev {
+            let ft = self.ctx.void_type().fn_type(&[], false);
+            let f = self.rt_fn("gritrt_dev_checks", ft);
+            llvm(self.builder.build_call(f, &[], ""))?;
+        }
         // khởi tạo static (theo thứ tự phụ thuộc) TRƯỚC main
         for node in self.static_init_order() {
             let g = self.statics[&node].0;

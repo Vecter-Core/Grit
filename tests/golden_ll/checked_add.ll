@@ -59,9 +59,12 @@ declare { i8, i1 } @llvm.uadd.with.overflow.i8(i8, i8) #1
 
 define void @gt_entry() {
 entry:
+  call void @gritrt_dev_checks()
   %main = call i8 @prog__main.06e433423c68530e()
   ret void
 }
+
+declare void @gritrt_dev_checks()
 
 declare i32 @gritrt_start(ptr)
 

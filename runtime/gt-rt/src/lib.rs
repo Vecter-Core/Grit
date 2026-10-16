@@ -18,7 +18,7 @@ use std::io::Write;
 pub const ABORT_EXIT_CODE: i32 = 70;
 
 /// Loại abort; số thứ tự là hợp đồng với codegen; TÊN trùng `AssertKind::name` của MIR (đối chiếu với thông dịch).
-pub const ABORT_KINDS: [&str; 18] = [
+pub const ABORT_KINDS: [&str; 19] = [
     "unknown",
     "overflow",
     "index_out_of_bounds",
@@ -37,6 +37,7 @@ pub const ABORT_KINDS: [&str; 18] = [
     "arg_out_of_range",
     "fuel_exhausted",
     "arena_exhausted",
+    "arena_overlap",
 ];
 
 #[unsafe(no_mangle)]
@@ -285,6 +286,73 @@ pub unsafe extern "C" fn gritrt_write_str(p: *const u8, n: u64) {
 
 struct ArenaState {
     chunks: Vec<(usize, usize, usize)>, // (địa chỉ, dung lượng, đã dùng)
+    /// kiểm động (hồ sơ dev): các vùng `[bắt đầu, kết thúc)` đã cấp TRONG THẾ HỆ hiện tại (xoá khi `reset`), khoá = địa chỉ bắt đầu
+    live: std::collections::BTreeMap<usize, usize>,
+}
+
+/// Loại abort `arena_overlap`: vùng do `alloc` cấp chồng lấn vùng khác cùng thế hệ, lệch căn lề, hoặc nằm ngoài chunk của arena.
+const ARENA_OVERLAP: i32 = 18;
+
+/// Kiểm động Arena (ADR-040 phụ lục / hợp đồng H2): BẬT ở hồ sơ `dev` (mã khởi động do codegen phát gọi `gritrt_dev_checks`) hoặc khi `GRITRT_ARENA_CHECK=1`;
+/// `GRITRT_ARENA_CHECK=0` tắt. Là BẰNG CHỨNG (bắt lỗi cấp phát lúc chạy), KHÔNG phải chứng minh; hồ sơ release/release-o2 KHÔNG kiểm.
+static ARENA_CHECK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn arena_check_on() -> bool {
+    ARENA_CHECK.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Gọi một lần ở đầu `gt_entry` của exe hồ sơ dev.
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_dev_checks() {
+    let off = std::env::var("GRITRT_ARENA_CHECK").is_ok_and(|v| v == "0");
+    ARENA_CHECK.store(!off, std::sync::atomic::Ordering::Relaxed);
+}
+
+fn arena_check_env_on() -> bool {
+    static E: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *E.get_or_init(|| std::env::var("GRITRT_ARENA_CHECK").is_ok_and(|v| v == "1"))
+}
+
+/// Chèn lỗi (CHỈ có tác dụng khi kiểm động BẬT, để chứng minh kiểm bắt được): `GRITRT_FAULT=arena_overlap` làm `alloc` trả lại vùng của lần cấp trước;
+/// `arena_misalign` trả con trỏ lệch 1 byte khi `align > 1`.
+fn arena_fault() -> Option<&'static str> {
+    static F: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    F.get_or_init(|| std::env::var("GRITRT_FAULT").ok())
+        .as_deref()
+        .filter(|f| *f == "arena_overlap" || *f == "arena_misalign")
+}
+
+/// Sau khi cấp `[p, p+size)` căn lề `align` trong arena `st`: kiểm (1) căn lề, (2) nằm trọn trong một chunk, (3) không chồng vùng nào cùng thế hệ; rồi ghi nhận.
+fn arena_verify(st: &mut ArenaState, p: usize, size: usize, align: usize) {
+    let fail = |why: &str| -> ! {
+        let mut err = std::io::stderr().lock();
+        let _ = writeln!(err, "arena: {why}");
+        drop(err);
+        gritrt_abort(ARENA_OVERLAP)
+    };
+    if !p.is_multiple_of(align) {
+        fail("con trỏ lệch căn lề");
+    }
+    let Some(end) = p.checked_add(size) else {
+        fail("vùng tràn không gian địa chỉ")
+    };
+    if size > 0 && !st.chunks.iter().any(|c| p >= c.0 && end <= c.0 + c.1) {
+        fail("vùng nằm ngoài chunk của arena");
+    }
+    if size == 0 {
+        return;
+    }
+    if let Some((_, e)) = st.live.range(..=p).next_back()
+        && *e > p
+    {
+        fail("vùng chồng lấn vùng đã cấp (cùng thế hệ)");
+    }
+    if let Some((s, _)) = st.live.range(p..).next()
+        && *s < end
+    {
+        fail("vùng chồng lấn vùng đã cấp (cùng thế hệ)");
+    }
+    st.live.insert(p, end);
 }
 
 /// Loại abort `arena_exhausted` (hết bộ nhớ của Arena hoặc vượt giới hạn); số thứ tự khớp `ABORT_KINDS`/`gt-codegen-llvm`.
@@ -311,7 +379,10 @@ const CHUNK: usize = 1 << 20;
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_arena_new() -> i32 {
     let mut g = arenas().lock().unwrap_or_else(|e| e.into_inner());
-    g.push(ArenaState { chunks: Vec::new() });
+    g.push(ArenaState {
+        chunks: Vec::new(),
+        live: std::collections::BTreeMap::new(),
+    });
     i32::try_from(g.len() - 1).unwrap_or_else(|_| gritrt_abort(0))
 }
 
@@ -329,11 +400,13 @@ pub extern "C" fn gritrt_arena_alloc(h: i32, size: u64, align: u64) -> *mut u8 {
     let Some(st) = usize::try_from(h).ok().and_then(|k| g.get_mut(k)) else {
         gritrt_abort(0)
     };
+    let check = arena_check_on() || arena_check_env_on();
     if let Some((base, cap, used)) = st.chunks.last_mut() {
         let start = (*base + *used).next_multiple_of(align) - *base;
         if start.checked_add(size).is_some_and(|e| e <= *cap) {
             *used = start + size;
-            return (*base + start) as *mut u8;
+            let p = *base + start;
+            return finish_alloc(st, p, size, align, check);
         }
     }
     let cap = CHUNK.max(size.saturating_add(align));
@@ -350,7 +423,26 @@ pub extern "C" fn gritrt_arena_alloc(h: i32, size: u64, align: u64) -> *mut u8 {
     }
     let start = base.next_multiple_of(align) - base;
     st.chunks.push((base, cap, start + size));
-    (base + start) as *mut u8
+    finish_alloc(st, base + start, size, align, check)
+}
+
+/// Kết thúc `alloc`: áp chèn lỗi (khi kiểm BẬT), kiểm động, trả con trỏ.
+fn finish_alloc(st: &mut ArenaState, p: usize, size: usize, align: usize, check: bool) -> *mut u8 {
+    if !check {
+        return p as *mut u8;
+    }
+    let mut p = p;
+    match arena_fault() {
+        Some("arena_overlap") if size > 0 => {
+            if let Some((s, _)) = st.live.iter().next_back() {
+                p = *s; // trả lại vùng của lần cấp trước
+            }
+        }
+        Some("arena_misalign") if align > 1 => p += 1,
+        _ => {}
+    }
+    arena_verify(st, p, size, align);
+    p as *mut u8
 }
 
 /// Quay lại đầu arena (giữ chunk đầu, trả các chunk còn lại). `&!Arena` ⇒ borrowck đảm bảo không còn tham chiếu tới nội dung.
@@ -370,6 +462,7 @@ pub extern "C" fn gritrt_arena_reset(h: i32) {
     if let Some(c) = st.chunks.first_mut() {
         c.2 = 0;
     }
+    st.live.clear(); // thế hệ mới
 }
 
 /// Cấp `size` byte (căn lề 16, KHÔNG khởi tạo) cho hộp tham số của `spawn`; hộp thuộc về luồng mới (không giải phóng: rò rỉ có chủ đích, nhỏ).
@@ -444,6 +537,41 @@ mod tests {
         }
         let s = unsafe { Box::from_raw(sh as *mut Shared) };
         assert_eq!(s.count, 80_000);
+    }
+
+    /// Kiểm động Arena BẬT: nhiều lần cấp ngẫu nhiên (kích thước 0..300, căn lề 1..64) qua nhiều chunk và nhiều lần `reset` KHÔNG báo nhầm (0 abort),
+    /// và mọi vùng trả ra đúng căn lề, rời nhau trong cùng thế hệ (đối chiếu độc lập bằng danh sách).
+    #[test]
+    fn arena_dynamic_check_accepts_valid_allocation_sequences() {
+        ARENA_CHECK.store(true, std::sync::atomic::Ordering::Relaxed);
+        let h = gritrt_arena_new();
+        let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
+        for _gen in 0..4 {
+            let mut seen: Vec<(usize, usize)> = Vec::new();
+            for _ in 0..4_000 {
+                let size = next() % 301;
+                let align = 1u64 << (next() % 7);
+                let big = next() % 500 == 0;
+                let size = if big { size * 5000 } else { size }; // vài khối lớn để sang chunk mới
+                let p = gritrt_arena_alloc(h, size, align) as usize;
+                assert_eq!(p % align as usize, 0);
+                let e = p + size as usize;
+                assert!(
+                    seen.iter().all(|(s, t)| e <= *s || p >= *t || size == 0),
+                    "chồng lấn"
+                );
+                if size > 0 {
+                    seen.push((p, e));
+                }
+            }
+            gritrt_arena_reset(h);
+        }
     }
 
     #[test]

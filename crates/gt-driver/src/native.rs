@@ -243,7 +243,16 @@ pub fn run_exe_timeout(exe: &Path, limit: Option<std::time::Duration>) -> RunRep
     let (result_file, out_file, err_file) = (side(".result"), side(".stdout"), side(".stderr"));
     let _ = std::fs::remove_file(&result_file);
     let spawn = (|| -> std::io::Result<std::process::ExitStatus> {
-        let mut child = Command::new(exe)
+        // `GRITC_FAULT=rt:arena-overlap|rt:arena-misalign` ⇒ `GRITRT_FAULT=arena_overlap|arena_misalign` cho exe (chèn lỗi cấp phát của gt-rt; chỉ có tác dụng
+        // khi kiểm động Arena BẬT, tức hồ sơ dev; để chứng minh kiểm bắt được)
+        let rt_fault = std::env::var("GRITC_FAULT")
+            .ok()
+            .and_then(|v| v.strip_prefix("rt:").map(|x| x.replace('-', "_")));
+        let mut cmd = Command::new(exe);
+        if let Some(f) = &rt_fault {
+            cmd.env("GRITRT_FAULT", f);
+        }
+        let mut child = cmd
             .env("GRITRT_RESULT_FILE", &result_file)
             .stdout(std::fs::File::create(&out_file)?)
             .stderr(std::fs::File::create(&err_file)?)

@@ -82,11 +82,14 @@ bb1:                                              ; preds = %bb0
 
 define void @gt_entry() {
 entry:
+  call void @gritrt_dev_checks()
   %sinit = call { i32 } @prog__COUNT.64a39aefa184457a()
   store { i32 } %sinit, ptr @"static.prog::COUNT", align 4
   %main = call i32 @prog__main.06e433423c68530e()
   ret void
 }
+
+declare void @gritrt_dev_checks()
 
 declare i32 @gritrt_start(ptr)
 
