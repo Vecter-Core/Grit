@@ -783,3 +783,8 @@ fmt FMT_OK | clippy CLIPPY_EXIT=0 | audit AUDIT_EXIT=0 | test TEST_PASSED=879 FA
 check_expectations OK | unittest công cụ 9 + 10 (5 test mới của giai đoạn track) OK | == track: TRACK_OK
 GATE_RESULT=GREEN   GATE_EXIT=0
 ```
+
+### Điều tra `lib/core/TASK.md` + lưới `track_guard` (2026-10-16)
+- Đọc mã: `tools/mut.py` chỉ chép kho → `D:/Grit_mut/wN` (rmtree+copytree trên bản sao, loại trừ target/fuzz/mutants.out, không loại `*.md`), ghi/khôi phục chỉ trong bản sao; không git checkout/clean/restore; không chép ngược. Script đột biến tạm (`mut_std/mut_q87b/mut_b/mut_q87`): ghi bản đột biến vào tệp THẬT rồi khôi phục bằng ghi lại nội dung gốc (`finally`), không xoá. `stdexp.py`: rmtree chỉ dưới `target/tmp/stdq`.
+- `docs/TRACK_PROBE.jsonl`: 22 bước (18 đột biến std, 3 Q87, 6 đột biến `mut.py`) mỗi bước bọc `track_guard` ⇒ 22/22 `track_ok`, 0 đổi. Không tái hiện. Lịch sử xoá trong git: chỉ `TASK.md` giữ chỗ và `E1301_comment_*` (M2e). `git ls-files`: 907 `.gt` theo dõi (893 dưới tests/); 841 `.gt` ở tests/{pass,fail,warn,lexer} so với 866 trong báo cáo `check_expectations` (khác nhau vì check_expectations đếm cả `tests/golden*`, `tests/fuzz`…; không phải tệp mất).
+- `tools/track_guard.sh` (snapshot/verify, `TRACK_IGNORE`), `tools/run_guarded.sh <lệnh>`, `mut.py` verify sau MỖI đột biến (dừng mã 3 nếu đổi) + `tools/test_mut_guard.py` (4 test); `fuzz_session.sh` verify (bỏ FUZZ_LOG). Cổng liền mạch: fmt OK, clippy 0, audit 0, test 879/0/168, unittest 9 + 4 + 10, `TRACK_OK`, GATE_RESULT=GREEN, thoát 0.
