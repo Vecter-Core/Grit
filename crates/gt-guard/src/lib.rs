@@ -374,6 +374,12 @@ pub fn check_module(m: &Module<'_>, input: &GuardInput<'_>) -> Vec<String> {
                 if !is_gep {
                     // bỏ phần sau `, !` (metadata) và chuỗi trong ngoặc kép
                     let body = text.split(", !").next().unwrap_or(&text);
+                    // BIỂU THỨC HẰNG `getelementptr inbounds nuw (i8, ptr @g, i64 K)` (LLVM 20 chuẩn hoá GEP struct thành offset byte sau mem2reg/sroa/early-cse) mang
+                    // cờ GEP hợp lệ y như LỆNH GEP (đã được miễn ở trên): không phải số học của chương trình. FB-9: thiếu miễn này làm hồ sơ release từ chối mọi
+                    // chương trình có `static Mutex`. CHỈ bỏ cụm từ GEP; `add nuw`/`mul nsw`... vẫn bị từ chối.
+                    let body = body
+                        .replace("getelementptr inbounds nuw", "getelementptr")
+                        .replace("getelementptr nuw", "getelementptr");
                     for tok in body.split(|c: char| !c.is_alphanumeric() && c != '_' && c != '.') {
                         if UB_FLAGS.contains(&tok) {
                             v.push(format!(

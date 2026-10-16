@@ -276,6 +276,21 @@ fn rejects_poison_flags_but_allows_plain_arithmetic_and_gep() {
     assert!(has(&v, "cờ sinh poison/UB `nsw`"), "{v:?}");
 }
 
+/// FB-9: `nuw` trên phép CỘNG vẫn bị từ chối (chỉ cụm `getelementptr inbounds nuw` của biểu thức hằng được miễn)
+#[test]
+fn nuw_on_arithmetic_is_still_rejected() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let i32t = ctx.i32_type();
+    let a = w.b.build_alloca(i32t, "a").expect("a");
+    let x = w.b.build_load(i32t, a, "x").expect("x").into_int_value();
+    let _ = w.b.build_int_nuw_add(x, x, "nuwadd").expect("nuw");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(has(&v, "cờ sinh poison/UB `nuw`"), "{v:?}");
+}
+
 #[test]
 fn rejects_unverifiable_ir() {
     let ctx = Context::create();

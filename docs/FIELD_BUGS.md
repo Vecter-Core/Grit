@@ -74,3 +74,10 @@ Viết `examples/json` (330 dòng) và so sánh với tham chiếu Rust + serde_
 - **Phân loại:** lỗi của CÔNG CỤ ĐỐI CHIẾU (thông dịch tham chiếu), KHÔNG phải của codegen hay checker an toàn; không phải false negative. Ảnh hưởng: mọi bằng chứng "thông dịch ≡ LLVM" trước đó không phủ so sánh thứ tự `char` (corpus/bộ sinh cũ không dùng).
 - **Sửa:** nhánh `(V::Char, V::Char)` trong `binop`. Test hồi quy `crates/gt-mir/tests/interp_char_compare.rs` (13 so sánh), commit ĐỎ trước rồi sửa ở commit riêng.
 - **Vì sao lọt:** bộ sinh MIR/`progen`/`obgen` chỉ sinh số nguyên, bool, Option; không có `char`.
+
+## FB-9 — hồ sơ release/release-o2 từ chối MỌI chương trình có `static Mutex` (Guard-post: `nuw` trên biểu thức hằng GEP) (2026-10-16; phát hiện khi chạy lặp H8)
+- **Triệu chứng:** `gritc build --profile=release tests/samples/threads.gt` ⇒ `E1101: cờ sinh poison/UB 'nuw' trong call void @gritrt_mutex_lock(ptr getelementptr inbounds nuw (i8, ptr @"static.threads::SUM", i64 8))`. Dev bình thường.
+- **Phân loại:** FAIL-CLOSED (từ chối, không chấp nhận sai) nhưng là KHOẢNG TRỐNG: bằng chứng "dev ≡ release" trước đó không bao giờ phủ chương trình có Mutex tĩnh (sáu công cụ dogfood không dùng Mutex).
+- **Nguyên nhân:** các pass danh sách trắng (mem2reg/sroa/early-cse) chuẩn hoá GEP struct trên static thành offset byte kèm cờ GEP `inbounds nuw` ở BIỂU THỨC HẰNG làm toán hạng của lời gọi; luật cờ UB của Guard miễn LỆNH `getelementptr` nhưng không miễn biểu thức hằng GEP nằm trong toán hạng lệnh khác.
+- **Sửa (Guard, TCB):** trước khi tách token, bỏ cụm `getelementptr inbounds nuw` / `getelementptr nuw` (cờ GEP, cùng loại đã miễn cho lệnh GEP). `add nuw`/`nsw`... vẫn bị từ chối (test `nuw_on_arithmetic_is_still_rejected`). Hồi quy: `threads_repeat.rs` dựng và chạy mẫu `threads`, `two_locks` ở release-o2 (trước sửa: build đỏ E1101; sau sửa 4×300 lần chạy đúng).
+- **Chưa làm:** đột biến chính thức cho thay đổi này (chứng cứ hiện có: trước sửa đỏ, sau sửa xanh; hai phía từ chối/chấp nhận có test). Cần ghi vào lô đột biến gt-guard lần sau.

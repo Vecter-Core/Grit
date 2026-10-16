@@ -1,0 +1,6 @@
+{"suite":"threads","sample":"threads","profile":"dev","runs":300,"bad":0,"min_ms":21,"max_ms":1028,"total_s":20.7}
+{"suite":"threads","sample":"two_locks","profile":"dev","runs":300,"bad":0,"min_ms":20,"max_ms":1024,"total_s":10.1}
+{"suite":"threads","sample":"threads","profile":"dev","runs":300,"bad":0,"min_ms":22,"max_ms":1036,"total_s":13.9}
+{"suite":"threads","sample":"threads","profile":"release-o2","runs":300,"bad":0,"min_ms":22,"max_ms":1032,"total_s":21.5}
+{"suite":"threads","sample":"two_locks","profile":"dev","runs":300,"bad":0,"min_ms":20,"max_ms":45,"total_s":8.7}
+{"suite":"threads","sample":"two_locks","profile":"release-o2","runs":300,"bad":0,"min_ms":18,"max_ms":1030,"total_s":10.1}

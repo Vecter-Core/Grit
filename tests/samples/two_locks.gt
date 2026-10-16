@@ -1,0 +1,32 @@
+// sample: đa luồng THẬT — hai luồng khoá LỒNG hai Mutex tĩnh theo cấp TĂNG (Lo=10 rồi Hi=20); không deadlock, kết quả xác định. Kết quả mong đợi: xem `// expect-result`.
+// expect-result: 4000
+#level("10")
+▢ Lo { }
+#level("20")
+▢ Hi { }
+■ LO: Mutex<u64, Lo> ≔ Mutex::new(0u64);
+■ HI: Mutex<u64, Hi> ≔ Mutex::new(0u64);
+■ DONE: Atomic<u64> ≔ Atomic::new(0u64);
+ƒ bump_hi(v: &!u64, n: u64) → u64 ! ∅ { *v ← *v +% n; *v }
+ƒ read(v: &!u64, n: u64) → u64 ! ∅ { *v }
+ƒ inner(v: &!u64, n: u64) → u64 ! {lock(Hi)} {
+  *v ← *v +% 1;
+  HI.with(bump_hi, 1u64)
+}
+ƒ worker(n: u32) ! {lock(Hi), lock(Lo)} {
+  μi ≔ 0u32;
+  ⟳ i < 1000 ↓ 1000 - i {
+    LO.with(inner, 0u64);
+    i ← i + 1;
+  }
+  DONE.fetch_add(1u64, AtomicOrdering::Release);
+}
+ƒ main() → u64 ! {lock(Hi), lock(Lo)} {
+  spawn(worker, 0u32);
+  spawn(worker, 1u32);
+  μspin ≔ 0u64;
+  ⟳ spin < 4000000000u64 ∧ DONE.load(AtomicOrdering::Acquire) < 2 ↓ 4000000000 - spin {
+    spin ← spin + 1;
+  }
+  LO.with(read, 0u64) +% HI.with(read, 0u64)
+}
