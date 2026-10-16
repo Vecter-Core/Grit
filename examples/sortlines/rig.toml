@@ -3,3 +3,4 @@ name = "sortlines"
 version = "0.1.0"
 
 [dependencies]
+std = { path = "../../lib/std" }

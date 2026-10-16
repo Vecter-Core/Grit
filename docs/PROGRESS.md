@@ -713,3 +713,58 @@ Cách so sánh: `GT_PROFILE=release` chạy lại cả bộ đối chiếu ở h
 unittest công cụ: Ran 9 tests OK; Ran 5 tests OK
 GATE_RESULT=GREEN   GATE_EXIT=0
 ```
+
+## Gói `std` (lib/std) — bước (i) Q84/Q86 (2026-10-16)
+- **Nội dung:** `lib/std/src/std.gt` (Ordering: reverse/then/is_lt/is_eq/is_gt; Option: is_none/unwrap_or/map/and_then/or/ok_or; Result: is_ok/is_err/unwrap_or/map/map_err/and_then/ok/err; `std::min`/`std::max`), `std_ord.gt` (Ord cho Ordering, Option, Result, tuple 2–3, lát `[T]`, Text), `std_ord_int.gt` (Ord cho u8–u64, usize, i8–i64, isize, char, bool; SINH bởi `tools/gen_std.py`, test khoá từng byte). Không thêm intrinsic nào; mọi hàm qua cùng cổng gritc (check đầy đủ M4–M9 + Guard).
+- **Bộ kiểm** (`crates/gt-driver/tests/std_lib.rs` + `support/stdgen.rs`): 32 chương trình ngẫu nhiên + 3 chương trình chéo biên; mỗi chương trình gọi MỌI hàm; kỳ vọng tính bằng `Ord`/`Option`/`Result` CỦA RUST (độc lập). Hồ sơ dev; số bất đồng: 0.
+| hàm / impl của std | chương trình | lần gọi | lần gọi biên | nguồn so sánh |
+|---|---|---|---|---|
+| Option::and_then | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Option::is_none | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Option::map | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Option::ok_or | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Option::or | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Option::unwrap_or | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for (A, B) | 35 | 328 | 72 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for (A, B, C) | 35 | 328 | 72 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for Option<Option<u8>> | 35 | 499 | 243 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for Option<T> | 35 | 364 | 108 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for Ordering | 35 | 315 | 315 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for Result<T, E> | 35 | 304 | 48 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for Text | 35 | 448 | 448 | mô hình Rust ≡ exe (thông dịch không mô phỏng Arena) |
+| Ord for [T] (tuple) | 35 | 376 | 221 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for [T] (u8) | 35 | 376 | 221 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for bool | 35 | 140 | 140 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for char | 35 | 556 | 556 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for i16 | 35 | 403 | 350 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for i32 | 35 | 403 | 353 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for i64 | 35 | 403 | 361 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for i8 | 35 | 403 | 345 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for isize | 35 | 403 | 353 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for u16 | 35 | 304 | 257 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for u32 | 35 | 304 | 238 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for u64 | 35 | 304 | 250 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for u8 | 35 | 304 | 258 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord for usize | 35 | 304 | 250 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord properties (i64) | 35 | 346 | 346 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord properties (i8) | 35 | 346 | 346 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord properties (u32) | 35 | 346 | 346 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ord properties (u8) | 35 | 346 | 346 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ordering::is_eq | 35 | 105 | 105 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ordering::is_gt | 35 | 105 | 105 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ordering::is_lt | 35 | 105 | 105 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ordering::reverse | 35 | 105 | 105 | mô hình Rust ≡ thông dịch ≡ exe |
+| Ordering::then | 35 | 315 | 315 | mô hình Rust ≡ thông dịch ≡ exe |
+| Result::and_then | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Result::err | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Result::is_err | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Result::is_ok | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Result::map | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Result::map_err | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Result::ok | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| Result::unwrap_or | 35 | 304 | 304 | mô hình Rust ≡ thông dịch ≡ exe |
+| std::max (u32, i8, char) | 35 | 406 | 346 | mô hình Rust ≡ thông dịch ≡ exe |
+| std::min (u32, i8, char) | 35 | 406 | 335 | mô hình Rust ≡ thông dịch ≡ exe |
+- Tính chất đại số của Ord (phản xạ, đối xứng ngược, bắc cầu, nhất quán với `==`) kiểm cho u8, u32, i8, i64 (dòng `Ord properties`): mỗi lần gọi chạy 4 kiểm; 346 lần gọi/kiểu. `==` chưa có cho Option/Result/tuple nên nhất quán-với-`==` chỉ kiểm được cho kiểu nguyên thuỷ; kiểu ghép được đối chiếu với `Ord` của Rust.
+- **Đột biến std (19 mẫu, `target/tmp/mut_std.py`, STD_RANDOM=4): 19/19 bị bắt** (đảo None/Some, Ok/Err, bỏ thành phần tuple, bỏ so độ dài lát, max thay min độ dài, dừng sớm, rank sai, đảo Text, then/reverse/min/or/is_ok, Ord u8/char/bool/i8).
+- Phát hiện khi viết bộ kiểm: **FB-8** (thông dịch MIR không so thứ tự `char`; sửa + test hồi quy, commit riêng).

@@ -8,7 +8,8 @@
 ▢ Line<'a> { b: &'a [u8] }
 ⊐ <'a> Copy for Line<'a> { }
 ⊐ <'a> Ord for Line<'a> {
-  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { msort::cmp_bytes(self.b, o.b) }
+  // so sánh từ điển trên byte bằng `Ord for [T]` của gói `std` (trước đây gọi `msort::cmp_bytes` tự viết)
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { self.b.cmp(o.b) }
 }
 
 // số dòng: số byte `\n` cộng một nếu byte cuối (khi tệp không rỗng) không phải `\n`

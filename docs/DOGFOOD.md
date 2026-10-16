@@ -134,3 +134,8 @@ Mỗi dòng = một khoảng trống/bug gặp khi viết công cụ thật. C�
 ### Kết quả đo thật (3 test `crates/rig/tests/dogfood_stats.rs` ĐẠT; Rust tính giá trị kỳ vọng bằng CÙNG công thức và thứ tự f64; khớp TỪNG BYTE)
 - **Đúng:** 14 ca nhỏ (rỗng, trắng, `0`, hằng ⇒ stddev 0, CRLF/tab, số 0 đầu, làm tròn nửa lên, 2^53 và sát 2^53, trải rộng); 11 ca token sai/quá lớn (chữ, `-5`, `1.5`, `0x10`, `+3`, chữ số Ả Rập, dấu phẩy, NUL, 2^53 + 1, 26 chữ số, sai sau token tốt) ⇒ lỗi có kiểm soát mã 2, stdout rỗng; thiếu tệp/đối số; 200 tệp ngẫu nhiên (số gần 2^53); 10^6 số; 32 MiB (≈ 1,9 triệu số).
 - **Hiệu năng (-O0, mọi check giữ; ống pipe; một lần chạy):** 10^6 số (≈ 6,9 MB) 0,17 s (×1,3 so Rust), đỉnh 13 MiB; 32 MiB 0,69 s (×1,1), đỉnh 51 MiB. Rust: thời gian trong tiến trình thử (gồm phân tích); bộ nhớ Rust không đo; phương sai chưa đo.
+
+## Cập nhật 2026-10-16: sortlines dùng gói `std`
+- `examples/sortlines` phụ thuộc `std = { path = "../../lib/std" }`; `Ord for Line` nay là `self.b.cmp(o.b)` (impl `Ord for [T]` của std) thay cho `msort::cmp_bytes` tự viết (msort.gt giữ nguyên, còn được `llvm_sort`/`llvm_diff_gtv` dùng). Cả 6 công cụ chạy lại, đối chiếu byte với bản tham chiếu Rust: wc 3, json 6, sha256 5, sortlines 7, stats 3, wordfreq 5 test đạt, 0 lỗi.
+- Hiệu năng sortlines sau khi dùng std (1 lần đo, dev, `perf_report_against_rust_sort_by`): 1 MiB ×2,3; 32 MiB 2,67 s (×1,3; trước 2,43 s, ×1,2); 1e6 dòng ngắn ×1,7; 4 MiB dòng rỗng ×3,7 (trước ×3,8). Chậm hơn khoảng 10 % ở 32 MiB (so sánh qua trait generic thay cho hàm chuyên biệt); một lần đo, chưa lặp.
+- Khoảng trống std còn lại: KNOWN_LIMITATIONS mục "Gói `std`".

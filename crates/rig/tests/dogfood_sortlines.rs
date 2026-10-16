@@ -30,10 +30,16 @@ fn copy_dir(from: &Path, to: &Path) {
 }
 
 fn build_tool() -> PathBuf {
-    let d = tmp("build");
+    // bố cục `examples/sortlines` + `lib/std` (rig.toml trỏ `../../lib/std`)
+    let root = tmp("build");
+    let d = root.join("examples/sortlines");
     copy_dir(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/sortlines"),
         &d,
+    );
+    copy_dir(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lib/std"),
+        &root.join("lib/std"),
     );
     let o = Command::new(env!("CARGO_BIN_EXE_rig"))
         .current_dir(&d)

@@ -5,5 +5,12 @@ version = 1
 name = "sortlines"
 version = "0.1.0"
 source = "root"
+deps = ["std"]
+hash = "sha256:8fd6fbabce9cb75d0b320e70039bb0e4e165f6b41a800eec7adca134e3819719"
+
+[[package]]
+name = "std"
+version = "0.1.0"
+source = "path"
 deps = []
-hash = "sha256:ca0bfee8034b6b54a3e75227a547718245606328fb7b686d700b642ffccd5d6b"
+hash = "sha256:93d342a7b9e1bc4b806fe04c18d7d0e069af91cf1230126d46e6abb76d66e410"
