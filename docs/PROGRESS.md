@@ -768,3 +768,11 @@ GATE_RESULT=GREEN   GATE_EXIT=0
 - Tính chất đại số của Ord (phản xạ, đối xứng ngược, bắc cầu, nhất quán với `==`) kiểm cho u8, u32, i8, i64 (dòng `Ord properties`): mỗi lần gọi chạy 4 kiểm; 346 lần gọi/kiểu. `==` chưa có cho Option/Result/tuple nên nhất quán-với-`==` chỉ kiểm được cho kiểu nguyên thuỷ; kiểu ghép được đối chiếu với `Ord` của Rust.
 - **Đột biến std (19 mẫu, `target/tmp/mut_std.py`, STD_RANDOM=4): 19/19 bị bắt** (đảo None/Some, Ok/Err, bỏ thành phần tuple, bỏ so độ dài lát, max thay min độ dài, dừng sớm, rank sai, đảo Text, then/reverse/min/or/is_ok, Ord u8/char/bool/i8).
 - Phát hiện khi viết bộ kiểm: **FB-8** (thông dịch MIR không so thứ tự `char`; sửa + test hồi quy, commit riêng).
+
+### Cổng đầy đủ LIỀN MẠCH sau std (2026-10-16; `bash tools/gate.sh D:/Grit`, thoát 0)
+Lần 1 ĐỎ (2 lỗi của mã mới: `release_policy` dựng sortlines thiếu gói std; clippy ở `stdgen.rs`/`std_lib.rs`) ⇒ sửa ⇒ CHẠY LẠI TOÀN BỘ (lần 2):
+```
+fmt FMT_OK | clippy CLIPPY_EXIT=0 | audit AUDIT_EXIT=0
+test TEST_PASSED=879 FAILED=0 SUITES=168 | check_expectations OK | unittest công cụ 9 + 5 OK
+GATE_RESULT=GREEN   GATE_EXIT=0   (gate.sh đã gọi tools/handoff_check.sh: in 'đã qua N commit', chỉ cảnh báo)
+```
