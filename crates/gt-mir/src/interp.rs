@@ -1026,6 +1026,16 @@ fn binop(op: BinOp, a: V, b: V) -> Result<V, Flow> {
             BinOp::BitAnd => V::Bool(x && y),
             _ => return Err(Flow::Bug("phép bool lạ".to_string())),
         },
+        // `char`: so sánh THỨ TỰ theo mã điểm (FB-8: trước đây rơi vào nhánh dưới ⇒ `Flow::Bug`, trong khi LLVM chạy đúng)
+        (V::Char(x), V::Char(y)) => match op {
+            BinOp::Eq => V::Bool(x == y),
+            BinOp::Ne => V::Bool(x != y),
+            BinOp::Lt => V::Bool(x < y),
+            BinOp::Le => V::Bool(x <= y),
+            BinOp::Gt => V::Bool(x > y),
+            BinOp::Ge => V::Bool(x >= y),
+            _ => return Err(Flow::Bug(format!("phép {op:?} trên char"))),
+        },
         (a, b) => match op {
             BinOp::Eq => V::Bool(a == b),
             BinOp::Ne => V::Bool(a != b),

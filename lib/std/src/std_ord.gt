@@ -1,0 +1,71 @@
+// std_ord: `⊐ Ord` cho kiểu ghép (Ordering, Option, Result, tuple 2–3, lát `[T]`, `Text`). Số nguyên/char/bool: std_ord_int.gt (SINH bằng tools/gen_std.py).
+// Thứ tự: `Ordering` Less < Equal < Greater; `Option` None < Some; `Result` Ok < Err (thứ tự khai báo biến thể, như Rust); tuple và lát: TỪ ĐIỂN
+// (lát: so từng phần tử tới độ dài ngắn hơn, rồi so độ dài). Mọi impl đệ quy THEO KIỂU (không theo hàm) nên M8 (E0703) chấp nhận.
+
+ƒ ord_rank(o: &Ordering) → u8 ! ∅ { ⌥ o { Ordering::Less ↦ 0u8, Ordering::Equal ↦ 1u8, Ordering::Greater ↦ 2u8 } }
+
+⊐ Ord for Ordering {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { ord_rank(self).cmp(&ord_rank(o)) }
+}
+
+⊐ <T: Ord> Ord for Option<T> {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⌥ self {
+      Some(a) ↦ ⌥ o { Some(b) ↦ a.cmp(b), None ↦ Ordering::Greater },
+      None ↦ ⌥ o { Some(_) ↦ Ordering::Less, None ↦ Ordering::Equal }
+    }
+  }
+}
+
+⊐ <T: Ord, E: Ord> Ord for Result<T, E> {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⌥ self {
+      Ok(a) ↦ ⌥ o { Ok(b) ↦ a.cmp(b), Err(_) ↦ Ordering::Less },
+      Err(a) ↦ ⌥ o { Ok(_) ↦ Ordering::Greater, Err(b) ↦ a.cmp(b) }
+    }
+  }
+}
+
+⊐ <A: Ord, B: Ord> Ord for (A, B) {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⌥ self { (a, b) ↦ ⌥ o { (c, d) ↦ ⌥ a.cmp(c) { Ordering::Equal ↦ b.cmp(d), r ↦ r } } }
+  }
+}
+
+⊐ <A: Ord, B: Ord, C: Ord> Ord for (A, B, C) {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⌥ self {
+      (a, b, c) ↦ ⌥ o {
+        (d, e, f) ↦ ⌥ a.cmp(d) {
+          Ordering::Equal ↦ ⌥ b.cmp(e) { Ordering::Equal ↦ c.cmp(f), r ↦ r },
+          r ↦ r
+        }
+      }
+    }
+  }
+}
+
+// lát: từ điển. Vòng `⟳ i < m ↓ m - i`: `i` tăng 1 mỗi lượt hoặc nhảy tới `m` khi đã có kết quả ⇒ biến thể `m - i` giảm thật.
+⊐ <T: Ord> Ord for [T] {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    na ≔ self.len();
+    nb ≔ o.len();
+    m ≔ ⎇ na < nb { na } ⇝ { nb };
+    μi ≔ 0usize;
+    μres ≔ Ordering::Equal;
+    ⟳ i < m ↓ m - i {
+      ⌥ self[i].cmp(&o[i]) {
+        Ordering::Equal ↦ { i ← i + 1; },
+        r ↦ { res ← r; i ← m; }
+      }
+    }
+    ⌥ res {
+      Ordering::Equal ↦ na.cmp(&nb),
+      r ↦ r
+    }
+  }
+}
+
+⊐ <'a> Ord for Text<'a> {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { self.as_bytes().cmp(o.as_bytes()) }
+}

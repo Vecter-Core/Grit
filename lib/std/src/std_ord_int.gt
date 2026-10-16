@@ -1,0 +1,74 @@
+// std_ord_int: `⊐ Ord` cho số nguyên, `char`, `bool`. SINH bằng `python tools/gen_std.py` — KHÔNG sửa tay (test khoá từng byte).
+// Thứ tự số học thường (có dấu cho i*, mã điểm cho char, false < true cho bool). Không macro (D8) nên mỗi kiểu một impl.
+
+⊐ Ord for u8 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for u16 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for u32 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for u64 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for usize {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for i8 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for i16 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for i32 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for i64 {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for isize {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for char {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self < *o { Ordering::Less } ⇝ { ⎇ *self > *o { Ordering::Greater } ⇝ { Ordering::Equal } }
+  }
+}
+
+⊐ Ord for bool {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ {
+    ⎇ *self { ⎇ *o { Ordering::Equal } ⇝ { Ordering::Greater } } ⇝ { ⎇ *o { Ordering::Less } ⇝ { Ordering::Equal } }
+  }
+}

@@ -1,0 +1,45 @@
+// std (Q84/Q86 bước (i), ADR-040 mở khoá): thư viện chuẩn viết bằng Grit THƯỜNG (qua cùng cổng của gritc như mã người dùng), KHÔNG thêm intrinsic nào.
+// Mọi hàm `! ∅`; tham số hàm là con trỏ hàm `ƒ(T) → U ! ∅` (hàm có hiệu ứng khác ∅ chưa dùng được với `map`/`and_then`: KNOWN_LIMITATIONS).
+// Tên hàm tự do `min`/`max` là hàm của module `std` (gọi `std::min`); phương thức của `Option`/`Result`/`Ordering` gọi trực tiếp.
+// Kiểm thử: crates/gt-driver/tests/std_lib.rs (bản tham chiếu Rust độc lập + bộ sinh ba nguồn).
+
+// ---------------------------------------------------------------- Ordering
+⊐ Ordering {
+  ƒ reverse(self) → Ordering ! ∅ {
+    ⌥ self { Ordering::Less ↦ Ordering::Greater, Ordering::Equal ↦ Ordering::Equal, Ordering::Greater ↦ Ordering::Less }
+  }
+  // `a.cmp(b).then(c.cmp(d))`: nếu bằng thì lấy `o`
+  ƒ then(self, o: Ordering) → Ordering ! ∅ {
+    ⌥ self { Ordering::Equal ↦ o, Ordering::Less ↦ Ordering::Less, Ordering::Greater ↦ Ordering::Greater }
+  }
+  ƒ is_lt(self) → bool ! ∅ { ⌥ self { Ordering::Less ↦ true, _ ↦ false } }
+  ƒ is_eq(self) → bool ! ∅ { ⌥ self { Ordering::Equal ↦ true, _ ↦ false } }
+  ƒ is_gt(self) → bool ! ∅ { ⌥ self { Ordering::Greater ↦ true, _ ↦ false } }
+}
+
+// ---------------------------------------------------------------- Option
+// `is_some`/`unwrap` là intrinsic của prelude (unwrap đòi ⊳ is_some, FB-6: KHÔNG nới E0902). Các hàm dưới khớp mẫu qua tham chiếu (ADR-040) hoặc theo giá trị.
+⊐ <T> Option<T> {
+  ƒ is_none(&self) → bool ! ∅ { ⌥ self { Some(_) ↦ false, None ↦ true } }
+  ƒ unwrap_or(self, d: T) → T ! ∅ { ⌥ self { Some(v) ↦ v, None ↦ d } }
+  ƒ map<U>(self, f: ƒ(T) → U ! ∅) → Option<U> ! ∅ { ⌥ self { Some(v) ↦ Some(f(v)), None ↦ None } }
+  ƒ and_then<U>(self, f: ƒ(T) → Option<U> ! ∅) → Option<U> ! ∅ { ⌥ self { Some(v) ↦ f(v), None ↦ None } }
+  ƒ or(self, o: Option<T>) → Option<T> ! ∅ { ⌥ self { Some(v) ↦ Some(v), None ↦ o } }
+  ƒ ok_or<E>(self, e: E) → Result<T, E> ! ∅ { ⌥ self { Some(v) ↦ Ok(v), None ↦ Err(e) } }
+}
+
+// ---------------------------------------------------------------- Result
+⊐ <T, E> Result<T, E> {
+  ƒ is_ok(&self) → bool ! ∅ { ⌥ self { Ok(_) ↦ true, Err(_) ↦ false } }
+  ƒ is_err(&self) → bool ! ∅ { ⌥ self { Ok(_) ↦ false, Err(_) ↦ true } }
+  ƒ unwrap_or(self, d: T) → T ! ∅ { ⌥ self { Ok(v) ↦ v, Err(_) ↦ d } }
+  ƒ map<U>(self, f: ƒ(T) → U ! ∅) → Result<U, E> ! ∅ { ⌥ self { Ok(v) ↦ Ok(f(v)), Err(e) ↦ Err(e) } }
+  ƒ map_err<F>(self, f: ƒ(E) → F ! ∅) → Result<T, F> ! ∅ { ⌥ self { Ok(v) ↦ Ok(v), Err(e) ↦ Err(f(e)) } }
+  ƒ and_then<U>(self, f: ƒ(T) → Result<U, E> ! ∅) → Result<U, E> ! ∅ { ⌥ self { Ok(v) ↦ f(v), Err(e) ↦ Err(e) } }
+  ƒ ok(self) → Option<T> ! ∅ { ⌥ self { Ok(v) ↦ Some(v), Err(_) ↦ None } }
+  ƒ err(self) → Option<E> ! ∅ { ⌥ self { Ok(_) ↦ None, Err(e) ↦ Some(e) } }
+}
+
+// ---------------------------------------------------------------- min / max theo Ord (bên trái khi bằng ⇒ ổn định, như `std::cmp::min`/`max` của Rust: min lấy a khi bằng, max lấy b khi bằng)
+◈ ƒ min<T: Ord + Copy>(a: T, b: T) → T ! ∅ { ⌥ b.cmp(&a) { Ordering::Less ↦ b, _ ↦ a } }
+◈ ƒ max<T: Ord + Copy>(a: T, b: T) → T ! ∅ { ⌥ b.cmp(&a) { Ordering::Less ↦ a, _ ↦ b } }
