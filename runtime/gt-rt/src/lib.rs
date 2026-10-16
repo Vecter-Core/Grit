@@ -161,6 +161,33 @@ fn file_at(h: i32) -> &'static [u8] {
     }
 }
 
+/// Đọc TOÀN BỘ nội dung từ `r`, kỳ vọng đúng `expected` byte (kích thước lúc mở). Lỗi đọc giữa chừng ⇒ `Err`; đọc ĐƯỢC ÍT/NHIỀU HƠN kỳ vọng (tệp bị cắt hoặc
+/// tăng trong lúc đọc) ⇒ `Err` — KHÔNG BAO GIỜ trả nội dung cụt như thể đầy đủ (D.1: `Cap<Fs>::read` đọc nửa chừng phải abort `io_error`).
+fn read_checked<R: std::io::Read>(mut r: R, expected: u64) -> std::io::Result<Vec<u8>> {
+    let mut v = Vec::new();
+    r.read_to_end(&mut v)?;
+    if v.len() as u64 != expected {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            format!(
+                "tệp đổi kích thước lúc đọc: đọc {} byte, kỳ vọng {expected}",
+                v.len()
+            ),
+        ));
+    }
+    Ok(v)
+}
+
+/// Thay `std::fs::read`: mở tệp, lấy kích thước, đọc bằng [`read_checked`]. Chỉ TỆP THƯỜNG có nghĩa: thư mục, tệp bị khoá, ống/thiết bị (kích thước 0 ≠ nội dung) ⇒ `Err`.
+fn read_file_checked(path: &str) -> std::io::Result<Vec<u8>> {
+    let f = std::fs::File::open(path)?;
+    let meta = f.metadata()?;
+    if !meta.is_file() {
+        return Err(std::io::Error::other("không phải tệp thường"));
+    }
+    read_checked(f, meta.len())
+}
+
 /// Đọc NGUYÊN tệp vào bộ nhớ (rò rỉ có chủ đích, sống tới hết tiến trình); trả tay cầm. Lỗi (không có tệp, quyền, đường dẫn không UTF-8) ⇒ abort `io_error`.
 ///
 /// # Safety
@@ -172,7 +199,7 @@ pub unsafe extern "C" fn gritrt_fs_read(p: *const u8, n: u64) -> i32 {
         eprintln!("io_error: đường dẫn không phải UTF-8");
         gritrt_abort(14)
     };
-    match std::fs::read(path) {
+    match read_file_checked(path) {
         Ok(v) => {
             let leaked: &'static [u8] = Box::leak(v.into_boxed_slice());
             let mut g = files().lock().unwrap_or_else(|e| e.into_inner());
@@ -196,7 +223,7 @@ pub unsafe extern "C" fn gritrt_fs_open(p: *const u8, n: u64) -> i32 {
     let Ok(path) = std::str::from_utf8(bytes) else {
         return -3;
     };
-    match std::fs::read(path) {
+    match read_file_checked(path) {
         Ok(v) => {
             let leaked: &'static [u8] = Box::leak(v.into_boxed_slice());
             let mut g = files().lock().unwrap_or_else(|e| e.into_inner());
@@ -596,6 +623,50 @@ mod tests {
             }
             gritrt_arena_reset(h);
         }
+    }
+
+    /// Đọc nửa chừng (D.1): lỗi giữa chừng, tệp cụt, tệp tăng ⇒ `Err`; đúng kích thước ⇒ `Ok` đủ byte.
+    #[test]
+    fn read_checked_never_returns_partial_content() {
+        struct Flaky {
+            sent: bool,
+        }
+        impl std::io::Read for Flaky {
+            fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+                if self.sent {
+                    return Err(std::io::Error::other("đĩa lỗi giữa chừng"));
+                }
+                self.sent = true;
+                buf[..5].copy_from_slice(b"hello");
+                Ok(5)
+            }
+        }
+        assert!(read_checked(Flaky { sent: false }, 10).is_err()); // lỗi sau 5/10 byte
+        assert!(read_checked(Flaky { sent: false }, 5).is_err()); // lỗi SAU khi đã đủ byte kỳ vọng: vẫn là lỗi, không nuốt
+        assert!(read_checked(&b"hello"[..], 10).is_err()); // tệp bị cắt: 5 < 10
+        assert!(read_checked(&b"hello world"[..], 5).is_err()); // tệp tăng: 11 > 5
+        assert_eq!(read_checked(&b"hello"[..], 5).expect("đủ"), b"hello");
+        assert_eq!(read_checked(&b""[..], 0).expect("rỗng"), b"");
+    }
+
+    #[test]
+    fn read_file_checked_rejects_directories_and_missing_files_and_reads_regular_files() {
+        let d = std::env::temp_dir().join(format!("gtrt-fs-{}", std::process::id()));
+        std::fs::create_dir_all(&d).expect("tạo");
+        assert!(read_file_checked(d.to_str().expect("utf8")).is_err());
+        let f = d.join("a.txt");
+        std::fs::write(&f, b"abc").expect("ghi");
+        assert_eq!(
+            read_file_checked(f.to_str().expect("utf8")).expect("đọc"),
+            b"abc"
+        );
+        assert!(read_file_checked(d.join("khong_co").to_str().expect("utf8")).is_err());
+        #[cfg(windows)]
+        assert!(
+            read_file_checked("NUL").is_err(),
+            "thiết bị NUL không phải tệp thường"
+        );
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]
