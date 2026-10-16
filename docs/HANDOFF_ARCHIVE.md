@@ -1,4 +1,7 @@
-> LƯU TRỮ (nguyên văn HANDOFF.md trước 2026-10-16, KHÔNG sửa). Trạng thái hiện tại: docs/HANDOFF.md.
+> # ⚠⚠ LỊCH SỬ — NHIỀU KHẲNG ĐỊNH ĐÃ LỖI THỜI; KHÔNG LÀM THEO ⚠⚠
+> Đặc biệt: KHÔNG chạy `git stash pop` (không còn stash nào; bản vá cũ đã nằm trong git), KHÔNG coi "Đang làm" hay "CHỜ GIANG" ở đây là trạng thái hiện tại. **Trạng thái hiện tại chỉ ở `docs/HANDOFF.md`.**
+> (Nguyên văn HANDOFF.md trước 2026-10-16 ở dưới, không sửa thân.)
+
 
 # HANDOFF — đọc tệp này đầu tiên để tiếp tục dự án (bất kỳ phiên/model nào)
 

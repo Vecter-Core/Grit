@@ -1,6 +1,6 @@
 # HANDOFF — TRẠNG THÁI HIỆN TẠI (đọc tệp này đầu tiên; lịch sử ở `docs/HANDOFF_ARCHIVE.md`)
 
-**Cập nhật tại commit 2ac6fe9, ngày 2026-10-16.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit 7d7cb50, ngày 2026-10-16.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 ## 1. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ (`.gt`) thiết kế cho AI viết code; ký hiệu toán/logic ngắn (có bí danh ASCII). Chủ dự án **Giang** — trả lời bằng TIẾNG VIỆT.
@@ -19,7 +19,7 @@
 - **False negative của kiểm tra an toàn = bug nghiêm trọng nhất:** vào corpus vĩnh viễn; lỗ hổng tìm bằng cách khác ⇒ mở rộng bộ sinh/oracle để tự tìm, kiểm bằng cách tắt bản sửa.
 - **Cổng đỏ ⇒ sửa rồi CHẠY LẠI TOÀN BỘ cổng** (không chạy riêng giai đoạn đã sửa).
 - **KHÔNG đổi trạng thái READINESS hay dòng TCB** khi chưa có một cổng liền mạch xanh trên mã cuối của việc đó.
-- **Ủy quyền (2026-10-15):** Giang ủy quyền kiến trúc sư duyệt TCB và đột biến. "Duyệt hợp đồng" ≠ "kiểm toán mã": nó chỉ nghĩa hợp đồng của intrinsic chấp nhận được; mã thực thi nhóm CAO còn cần đọc mã đối kháng (việc E). Dòng TCB: `ỦY QUYỀN: KIẾN TRÚC SƯ DUYỆT HỢP ĐỒNG (ngày)` (28 không điều kiện, 14 có điều kiện).
+- **Ủy quyền (2026-10-15):** Giang ủy quyền kiến trúc sư duyệt TCB và đột biến. "Duyệt hợp đồng" ≠ "kiểm toán mã": nó chỉ nghĩa hợp đồng của intrinsic chấp nhận được; mã thực thi nhóm CAO còn cần đọc mã đối kháng (việc E). Dòng TCB: `ỦY QUYỀN: KIẾN TRÚC SƯ DUYỆT HỢP ĐỒNG (ngày)` (28 không điều kiện) hoặc `… CÓ ĐIỀU KIỆN (…)` (14, đếm bằng lệnh 2026-10-16 trên `TCB_INTRINSICS.md`): `Cap<Fs>::read` (D.1); `Atomic<T>` (H7: ghi KHÔNG có TSan/loom); `Mutex::{new,with}` và `spawn` (H8, 2 dòng); `Arena::alloc` (H2, hiệu lực chỉ khi C.2 xong); `Vec::{new,push,reserve}` (H4, 3 dòng); `Text::{new,push_str,push_char,push_utf8,from_utf8}` + `str::slice` (H6, 6 dòng).
 - **Máy:** KHÔNG chạy hai `cargo` cùng lúc; `CARGO_BUILD_JOBS=2`; test `--test-threads=2`; đột biến 1 worker, lô nhỏ, kết quả ghi nối `.jsonl` sau mỗi lô.
 - **Mỗi mã lỗi mới:** `docs/errors/<mã>.md` (≥3 fail + ≥3 pass), dòng ở `docs/spec/error_codes.md`, `crates/gt-diag/src/code.rs`, `tools/check_expectations.py`.
 - **Commit từng bước nhỏ** (kết bằng dòng `Co-Authored-By` theo hướng dẫn hệ thống); không lệnh phá hoại (`reset --hard`, `stash drop/pop` khi chưa so).
