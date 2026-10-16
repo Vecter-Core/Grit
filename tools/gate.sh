@@ -18,14 +18,9 @@ has() { case " $STAGES " in *" $1 "*) return 0 ;; esac; return 1; }
 # Giai đoạn `track` (lệnh Giang 2026-10-16): TỆP ĐÃ THEO DÕI KHÔNG ĐƯỢC ĐỔI trong lúc cổng chạy. Ảnh chụp TRƯỚC mọi giai đoạn và SAU tất cả; so sánh
 # từng đường dẫn (tệp theo dõi bị sửa/xoá — băm `git diff HEAD` của riêng tệp — hoặc tệp mới KHÔNG bị ignore xuất hiện) ⇒ ĐỎ nêu tên tệp.
 # Cây đang làm dở lúc bắt đầu vẫn dùng được: so ảnh chụp trước với sau, không đòi cây sạch. Ghi vào `target/` (bị ignore) không tính.
-tracked_snapshot() {
-  { git diff HEAD --name-only 2>/dev/null | while IFS= read -r f; do
-      echo "$f $(git diff HEAD -- "$f" 2>/dev/null | sha256sum | cut -c1-16)"
-    done
-    git ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r f; do echo "?? $f"; done
-  } | LC_ALL=C sort
-}
-if has track; then TRACK_BEFORE="$(tracked_snapshot)"; fi
+GUARD="$(dirname "$0")/track_guard.sh"
+TRACK_SNAP="$(mktemp)"
+if has track; then bash "$GUARD" snapshot "$TRACK_SNAP" .; fi
 
 if has gtrt; then
   echo "== gt-rt (workspace riêng, M10)"
@@ -65,20 +60,21 @@ if has expect; then
   if [ -f tools/test_check_expectations.py ]; then
     PYTHONIOENCODING=utf-8 python -m unittest tools/test_check_expectations.py 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || red "unittest check_expectations"
   fi
+  if [ -f tools/test_mut_guard.py ]; then
+    PYTHONIOENCODING=utf-8 python -m unittest tools/test_mut_guard.py 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || red "unittest mut_guard"
+  fi
   if [ -f tools/test_gate.py ]; then
     PYTHONIOENCODING=utf-8 python -m unittest tools/test_gate.py 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || red "unittest gate"
   fi
 fi
 if has track; then
   echo "== track (tệp đã theo dõi không bị đổi)"
-  TRACK_AFTER="$(tracked_snapshot)"
-  if [ "$TRACK_BEFORE" != "$TRACK_AFTER" ]; then
-    echo "TRACK_CHANGED: cổng làm ĐỔI cây làm việc (tệp theo dõi bị sửa/xoá hoặc tệp mới không ignore):"
-    diff <(echo "$TRACK_BEFORE") <(echo "$TRACK_AFTER") | grep -E '^[<>]' | sed 's/^/  /' | head -40
-    red "tệp đã theo dõi bị đổi trong lúc cổng chạy"
+  if bash "$GUARD" verify "$TRACK_SNAP" .; then
+    :
   else
-    echo "TRACK_OK"
+    red "tệp đã theo dõi bị đổi trong lúc cổng chạy"
   fi
+  rm -f "$TRACK_SNAP"
 fi
 if [ "$rc" = 0 ]; then echo "GATE_RESULT=GREEN"; else echo "GATE_RESULT=RED"; fi
 exit $rc

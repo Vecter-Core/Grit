@@ -13,6 +13,7 @@ case "$T" in
 esac
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$ROOT/docs/FUZZ_LOG.jsonl"
+TRACK_SNAP_FUZZ="$(mktemp)"; TRACK_IGNORE='docs/FUZZ_LOG.jsonl' bash "$ROOT/tools/track_guard.sh" snapshot "$TRACK_SNAP_FUZZ" "$ROOT"
 ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 busy=$(tasklist 2>/dev/null | grep -i -E "^(cargo|rustc|link|gritc|cl|clang|rig)\.exe|^[a-z_0-9]+-[0-9a-f]{16}\.exe" | head -3)
 if [ -n "$busy" ]; then
@@ -27,5 +28,7 @@ runs=$(grep -o 'number_of_executed_units: [0-9]*' "$SLOG" 2>/dev/null | tail -1 
 runs="${runs:-0}"
 status=ok; [ "$code" -ne 0 ] && status=fail
 echo "{\"ts\":\"$(ts)\",\"target\":\"$T\",\"status\":\"$status\",\"seconds\":$SEC,\"runs\":$runs,\"exit\":$code}" >> "$LOG"
+# lưới tệp-đã-theo-dõi: phiên fuzz không được đổi gì ngoài FUZZ_LOG (ghi nối có chủ ý)
+if [ -n "${TRACK_SNAP_FUZZ:-}" ]; then TRACK_IGNORE='docs/FUZZ_LOG.jsonl' bash "$ROOT/tools/track_guard.sh" verify "$TRACK_SNAP_FUZZ" "$ROOT" || echo "!!!!! fuzz_session: tệp đã theo dõi bị đổi"; fi
 echo "phiên $T: $status, $runs lượt, ${SEC}s"
 exit "$code"

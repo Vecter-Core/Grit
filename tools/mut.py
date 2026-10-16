@@ -131,6 +131,22 @@ def gen_file(path):
     return uniq, crlf
 
 
+GUARD = os.path.join(ROOT, "tools", "track_guard.sh").replace("\\", "/")
+TRACK_SNAP = os.path.join(os.environ.get("TEMP", "."), f"mut_track_{os.getpid()}.txt")
+
+
+def track_snapshot():
+    """lưới tệp-đã-theo-dõi (lệnh Giang 2026-10-16 mục 0e): chụp kho THẬT trước lô"""
+    subprocess.run(["bash", GUARD, "snapshot", TRACK_SNAP.replace("\\", "/"), ROOT.replace("\\", "/")], check=True)
+
+
+def track_verify():
+    """sau MỖI đột biến: kho thật không được đổi (mut.py chỉ ghi trong bản sao D:/Grit_mut/wN). Trả (ok, thông báo)"""
+    r = subprocess.run(["bash", GUARD, "verify", TRACK_SNAP.replace("\\", "/"), ROOT.replace("\\", "/")],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return r.returncode == 0, r.stdout.strip()
+
+
 def mid(path, ln, new):
     return hashlib.sha1(f"{path}:{ln}:{new}".encode("utf-8")).hexdigest()[:12]
 
@@ -266,6 +282,7 @@ def cmd_run(args):
     if args.limit:
         todo = todo[: args.limit]
     print(f"{len(todo)} đột biến cần chạy ({len(done)} đã có kết quả)", flush=True)
+    track_snapshot()
     workers = [Worker(i) for i in range(args.workers)]
     for w in workers:
         w.prepare()
@@ -288,6 +305,15 @@ def cmd_run(args):
                     return
                 m, crlf = q.pop()
             res = w.evaluate(m, crlf)
+            ok, msg = track_verify()
+            if not ok:
+                # tệp đã theo dõi của kho THẬT đổi trong lúc chạy đột biến: dừng LỚN TIẾNG, ghi vào kết quả, KHÔNG âm thầm tiếp tục
+                res = dict(res, status="invalid", note="TRACK_CHANGED: " + msg[:400])
+                with wlock:
+                    with open(args.out, "a", encoding="utf-8") as f:
+                        f.write(json.dumps(res, ensure_ascii=False) + chr(10))
+                print("!!!!! " + msg, flush=True)
+                os._exit(3)
             with wlock:
                 counts[res["status"]] += 1
                 with open(args.out, "a", encoding="utf-8") as f:
