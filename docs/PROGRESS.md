@@ -804,3 +804,6 @@ GATE_RESULT=GREEN   GATE_EXIT=0
 | crates/gt-parser/tests/fuzz_regressions | 2 | đầu vào gây sập của fuzz (một tệp CỐ Ý hỏng, vd `// etruexpect`) | `crates/gt-parser/tests/fuzz_regressions.rs` |
 
 Tổng 4 + 12 + 8 + 3 + 8 + 1 + 3 + 2 = 41; 866 + 41 = 907 ✓. Không có mẫu nào ngoài vùng quét mà đáng ra phải có `// expect:` (mỗi nhóm có test riêng đọc đúng định dạng của nó).
+
+### Cổng liền mạch sau giai đoạn `deletions` (2026-10-16; thoát 0)
+fmt OK | clippy 0 | audit 0 | test 879/0/168 | unittest công cụ 9 + 4 + 18 | `DELETIONS_OK (6 tệp từng bị xoá, đều có dòng)` | `TRACK_OK` | GATE_RESULT=GREEN, GATE_EXIT=0.
