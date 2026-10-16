@@ -420,3 +420,21 @@ fn scanning_continues_past_non_matching_names_and_invalid_allows() {
     );
     assert_eq!(c, vec!["E1401", "N1401"]);
 }
+
+#[test]
+fn deeply_nested_secret_type_still_taints_and_is_reported() {
+    // FAIL_OPEN_AUDIT S1: kiểu lồng quá 12 tầng từng bị coi là "không chứa Secret" ⇒ im lặng. Nay quá sâu ⇒ cảnh báo bảo thủ.
+    let nest = |n: usize| {
+        let mut t = "Secret<u32>".to_string();
+        for _ in 0..n {
+            t = format!("Option<{t}>");
+        }
+        t
+    };
+    for n in [3usize, 11, 12, 13, 20] {
+        let ty = nest(n);
+        let src = format!("ƒ sink(s: {ty}) ! {{io}} {{ }}
+ƒ f(s: {ty}) ! {{io}} {{ sink(s); }}");
+        assert_eq!(codes(&src), vec!["S202"], "độ sâu {n}");
+    }
+}
