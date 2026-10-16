@@ -14,7 +14,9 @@
 use gt_llvm::inkwell::AtomicOrdering;
 use gt_llvm::inkwell::attributes::{Attribute, AttributeLoc};
 use gt_llvm::inkwell::module::Module;
-use gt_llvm::inkwell::values::{AnyValue, CallSiteValue, InstructionOpcode, InstructionValue};
+use gt_llvm::inkwell::values::{
+    AnyValue, AnyValueEnum, BasicValue, CallSiteValue, InstructionOpcode, InstructionValue,
+};
 
 /// Đầu vào độc lập với codegen.
 #[derive(Clone, Copy, Debug)]
@@ -112,6 +114,64 @@ fn ascii_symbol(name: &str) -> bool {
         && name
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'.')
+}
+
+/// Lệnh tạo ra một giá trị (inkwell phân loại người dùng theo KIỂU kết quả: `call` trả con trỏ ⇒ `PointerValue`, trả số ⇒ `IntValue`, `void` ⇒ `InstructionValue`).
+fn inst_of<'c>(v: AnyValueEnum<'c>) -> Option<InstructionValue<'c>> {
+    match v {
+        AnyValueEnum::InstructionValue(i) => Some(i),
+        AnyValueEnum::IntValue(x) => x.as_instruction(),
+        AnyValueEnum::PointerValue(x) => x.as_instruction(),
+        AnyValueEnum::FloatValue(x) => x.as_instruction(),
+        AnyValueEnum::StructValue(x) => x.as_instruction(),
+        AnyValueEnum::ArrayValue(x) => x.as_instruction(),
+        AnyValueEnum::VectorValue(x) => x.as_instruction(),
+        AnyValueEnum::PhiValue(x) => Some(x.as_instruction()),
+        _ => None,
+    }
+}
+
+/// FAIL_OPEN_AUDIT G1: `callee_name` chỉ nhận lời gọi TRỰC TIẾP, nên gọi `gritrt_*` qua con trỏ (hoặc `invoke`/`callbr`) tránh được luật "lớp nghĩa vụ" và luật "đích
+/// mọi lời gọi". Quy tắc đóng lỗ: (a) địa chỉ của hàm `gritrt_*` chỉ được dùng làm ĐÍCH của một `call` TRỰC TIẾP (không lưu, không truyền làm đối số, không nằm trong
+/// hằng/khởi tạo); (b) không có `invoke`/`callbr` (codegen không bao giờ phát; Phase 1 không có unwind).
+fn runtime_address_violations(m: &Module<'_>) -> Vec<String> {
+    let mut v = Vec::new();
+    for f in m.get_functions() {
+        let name = f.get_name().to_string_lossy().into_owned();
+        if !name.starts_with("gritrt_") {
+            continue;
+        }
+        let fptr = f.as_global_value().as_pointer_value();
+        let mut u = fptr.get_first_use();
+        while let Some(use_) = u {
+            // inkwell trả lời gọi dưới dạng `CallSiteValue` hoặc `InstructionValue` tuỳ đường: chuẩn hoá về lệnh
+            let user_inst = inst_of(use_.get_user());
+            let direct = match user_inst {
+                Some(i) if i.get_opcode() == InstructionOpcode::Call => {
+                    // f là đích gọi, và KHÔNG xuất hiện làm đối số (toán hạng cuối là đích)
+                    let n = i.get_num_operands();
+                    callee_name(&i).as_deref() == Some(name.as_str())
+                        && (0..n.saturating_sub(1)).all(|k| {
+                            !matches!(
+                                i.get_operand(k),
+                                Some(gt_llvm::inkwell::values::Operand::Value(
+                                    gt_llvm::inkwell::values::BasicValueEnum::PointerValue(p)
+                                )) if p == fptr
+                            )
+                        })
+                }
+                _ => false,
+            };
+            if !direct {
+                v.push(format!(
+                    "địa chỉ hàm runtime `{name}` bị dùng ngoài vai trò đích của lời gọi trực tiếp (lưu/truyền/gọi gián tiếp bị cấm: tránh luật lớp nghĩa vụ)"
+                ));
+                break;
+            }
+            u = use_.get_next_use();
+        }
+    }
+    v
 }
 
 /// Luật instance: (a) mọi tên hàm toàn ASCII; (b) mọi hàm ĐỊNH NGHĨA (trừ `gt_entry`) thuộc tập cho phép; (c) có ít nhất một instance;
@@ -313,6 +373,7 @@ pub fn check_module(m: &Module<'_>, input: &GuardInput<'_>) -> Vec<String> {
     }
 
     v.extend(instance_violations(m, input));
+    v.extend(runtime_address_violations(m));
 
     let noreturn_kind = Attribute::get_named_enum_kind_id("noreturn");
     for f in m.get_functions() {
@@ -351,6 +412,15 @@ pub fn check_module(m: &Module<'_>, input: &GuardInput<'_>) -> Vec<String> {
                             "{fname}/{bname}: lời gọi hàm ngoài `{callee}` (chỉ khai báo, không phải `llvm.*` hay runtime)"
                         ));
                     }
+                }
+                // 3c. không `invoke`/`callbr` (không qua được `callee_name`)
+                if matches!(
+                    inst.get_opcode(),
+                    InstructionOpcode::Invoke | InstructionOpcode::CallBr
+                ) {
+                    v.push(format!(
+                        "{fname}/{bname}: `invoke`/`callbr` bị cấm (không có unwind trong Phase 1; tránh luật đích lời gọi)"
+                    ));
                 }
                 // 4. unreachable
                 if inst.get_opcode() == InstructionOpcode::Unreachable {

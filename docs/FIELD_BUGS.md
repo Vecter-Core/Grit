@@ -81,3 +81,9 @@ Viết `examples/json` (330 dòng) và so sánh với tham chiếu Rust + serde_
 - **Nguyên nhân:** các pass danh sách trắng (mem2reg/sroa/early-cse) chuẩn hoá GEP struct trên static thành offset byte kèm cờ GEP `inbounds nuw` ở BIỂU THỨC HẰNG làm toán hạng của lời gọi; luật cờ UB của Guard miễn LỆNH `getelementptr` nhưng không miễn biểu thức hằng GEP nằm trong toán hạng lệnh khác.
 - **Sửa (Guard, TCB):** trước khi tách token, bỏ cụm `getelementptr inbounds nuw` / `getelementptr nuw` (cờ GEP, cùng loại đã miễn cho lệnh GEP). `add nuw`/`nsw`... vẫn bị từ chối (test `nuw_on_arithmetic_is_still_rejected`). Hồi quy: `threads_repeat.rs` dựng và chạy mẫu `threads`, `two_locks` ở release-o2 (trước sửa: build đỏ E1101; sau sửa 4×300 lần chạy đúng).
 - **Chưa làm:** đột biến chính thức cho thay đổi này (chứng cứ hiện có: trước sửa đỏ, sau sửa xanh; hai phía từ chối/chấp nhận có test). Cần ghi vào lô đột biến gt-guard lần sau.
+
+## FB-10 — Guard-post chấp nhận gọi GIÁN TIẾP hàm `gritrt_*` qua con trỏ (FAIL_OPEN_AUDIT G1) (2026-10-17)
+- **Phát hiện:** khi đọc đối kháng gt-guard cho `docs/FAIL_OPEN_AUDIT.md`: bảng RUNTIME chỉ kiểm lời gọi `call @gritrt_x` TRỰC TIẾP; một địa chỉ `@gritrt_*` đưa vào store/toán hạng khác (rồi gọi gián tiếp, hoặc qua `invoke`/`callbr`) KHÔNG bị rà ⇒ bỏ qua kiểm tên/chữ ký của bảng đóng.
+- **Phân loại:** FAIL-OPEN tiềm tàng trong TCB (không có chương trình gritc sinh ra thực tế; thấy từ đọc mã). Chưa có phản ví dụ chạy thật nào ngoài test dựng tay.
+- **Sửa:** test hồi quy commit ĐỎ trước (`runtime_function_addresses_may_only_be_called_directly`), rồi sửa: mọi lần dùng địa chỉ `gritrt_*` phải là callee trực tiếp của `call`; `invoke`/`callbr` bị từ chối. gt-guard 28/28.
+- **Còn mở:** đột biến chính thức cho quy tắc mới (chưa chạy).
