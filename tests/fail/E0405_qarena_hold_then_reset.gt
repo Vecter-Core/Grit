@@ -1,0 +1,3 @@
+// expect: fail E0405
+// note: giữ kết quả alloc rồi reset qua &!
+ƒ f() → i32 ! {mem} { μa ≔ Arena::new(); p ≔ a.alloc(1); a.reset(); *p }

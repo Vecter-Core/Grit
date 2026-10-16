@@ -1,0 +1,4 @@
+// expect: fail E0405
+// note: reset trong vòng lặp khi vẫn giữ tham chiếu cấp trước đó
+ƒ f() ! {mem} { μa ≔ Arena::new(); μk ≔ 0u32; μp ≔ a.alloc(0); ⟳ k < 3 ↓ 3 - k { a.reset(); k ← k + 1; } use_i(*p); }
+ƒ use_i(x: i32) ! ∅ { }

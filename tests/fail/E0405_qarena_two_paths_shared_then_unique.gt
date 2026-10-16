@@ -1,0 +1,3 @@
+// expect: fail E0405
+// note: hai đường mượn: &Arena cấp, &!Arena reset
+ƒ f() → i32 ! {mem} { μa ≔ Arena::new(); r ≔ &a; p ≔ r.alloc(1); q ≔ &!a; q.reset(); *p }

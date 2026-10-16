@@ -1,0 +1,4 @@
+// expect: fail E0405
+// note: Cell<&Arena> không che được reset
+ƒ f() ! {mem} { μa ≔ Arena::new(); c ≔ Cell::new(&a); r ≔ c.get(); p ≔ r.alloc(1); a.reset(); use_i(*p); }
+ƒ use_i(x: i32) ! ∅ { }

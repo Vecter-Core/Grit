@@ -1,0 +1,3 @@
+// expect: pass
+// note: alloc, reset rồi cấp lại và dùng tham chiếu MỚI là hợp lệ
+ƒ f() → i32 ! {mem} { μa ≔ Arena::new(); a.reset(); p ≔ a.alloc(1); *p }

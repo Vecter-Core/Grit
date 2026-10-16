@@ -1,0 +1,4 @@
+// expect: fail E0405
+// note: struct giữ tham chiếu cấp từ Arena rồi reset
+▢ H<'a> { r: &'a i32 }
+ƒ f() → i32 ! {mem} { μa ≔ Arena::new(); h ≔ H { r: a.alloc(1) }; a.reset(); *h.r }

@@ -1,0 +1,4 @@
+// expect: fail E0405
+// note: truyền &a và &!a cho cùng một hàm
+ƒ h(a: &Arena, b: &!Arena) ! {mem} { b.reset(); }
+ƒ f() ! {mem} { μa ≔ Arena::new(); h(&a, &!a); }

@@ -1,0 +1,3 @@
+// expect: fail E0401
+// note: Arena không Copy: sao chép tay cầm là move, dùng lại là E0401
+ƒ f() → i32 ! {mem} { μa ≔ Arena::new(); μb ≔ a; p ≔ a.alloc(1); b.reset(); *p }

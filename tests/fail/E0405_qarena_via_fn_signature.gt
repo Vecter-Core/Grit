@@ -1,0 +1,4 @@
+// expect: fail E0405
+// note: kết quả hàm mượn &Arena (chữ ký) rồi reset
+ƒ g<'a>(a: &'a Arena) → &'a i32 ! {mem} { a.alloc(1) }
+ƒ f() → i32 ! {mem} { μa ≔ Arena::new(); p ≔ g(&a); a.reset(); *p }

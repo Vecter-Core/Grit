@@ -1,0 +1,3 @@
+// expect: pass
+// note: hai alloc qua &Arena cùng sống (vùng rời nhau)
+ƒ f() → i32 ! {mem} { μa ≔ Arena::new(); p ≔ a.alloc(1); q ≔ a.alloc(2); *p + *q }

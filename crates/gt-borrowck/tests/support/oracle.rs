@@ -13,7 +13,7 @@
 use gt_ast::NodeId;
 use gt_mir::*;
 use gt_types::{IntTy, Ty};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum V {
@@ -135,6 +135,8 @@ pub struct Stats {
     pub reborrows: usize,
     pub arena_allocs: usize,
     pub arena_resets: usize,
+    /// số lần kiểm "vùng cấp ra rời nhau trong cùng thế hệ" (mô hình trừu tượng, tương ứng kiểm động `arena_overlap` của gt-rt dev)
+    pub arena_overlap_checks: usize,
     pub cell_ops: usize,
     pub moves: usize,
     pub calls: usize,
@@ -147,6 +149,12 @@ pub struct Oracle<'a> {
     loans: Vec<Loan>,
     dead: BTreeSet<(usize, usize)>,
     arenas: u32,
+    /// mô hình bố cục Arena (đối ứng kiểm động của gt-rt): con trỏ cấp kế tiếp, thế hệ, và các vùng `[bắt đầu, bắt đầu+1)` đang sống của từng arena
+    arena_cursor: BTreeMap<u32, u64>,
+    arena_gen: BTreeMap<u32, u64>,
+    arena_live: BTreeMap<(u32, u64), Vec<u64>>,
+    /// chèn lỗi (kiểm công cụ): `alloc` trả lại vùng của lần cấp trước ⇒ oracle phải báo Bug "arena_overlap"
+    pub arena_fault: bool,
     fuel: u64,
     pub stats: Stats,
 }
@@ -201,6 +209,10 @@ impl<'a> Oracle<'a> {
             loans: Vec::new(),
             dead: BTreeSet::new(),
             arenas: 0,
+            arena_cursor: BTreeMap::new(),
+            arena_gen: BTreeMap::new(),
+            arena_live: BTreeMap::new(),
+            arena_fault: false,
             fuel,
             stats: Stats::default(),
         }
@@ -716,6 +728,32 @@ impl<'a> Oracle<'a> {
         Ok(false)
     }
 
+    /// Mô hình cấp phát Arena: mỗi `alloc` nhận vùng `[c, c+1)` kế tiếp của thế hệ hiện tại; vùng phải KHÁC mọi vùng đang sống cùng (arena, thế hệ)
+    /// (đối ứng kiểm động `arena_overlap`); trùng ⇒ Bug (lỗi của mô hình/oracle, không phải của chương trình).
+    fn model_arena_alloc(&mut self, loc: &Loc) -> Result<(), Flow> {
+        let Ok(V::Arena(id)) = self.get(loc) else {
+            return Ok(());
+        };
+        let gen_ = *self.arena_gen.entry(id).or_insert(0);
+        let cur = self.arena_cursor.entry(id).or_insert(0);
+        let mut start = *cur;
+        *cur += 1;
+        let live = self.arena_live.entry((id, gen_)).or_default();
+        if self.arena_fault
+            && let Some(last) = live.last()
+        {
+            start = *last; // chèn lỗi: vùng trùng lần cấp trước
+        }
+        self.stats.arena_overlap_checks += 1;
+        if live.contains(&start) {
+            return bug(format!(
+                "arena_overlap: vùng {start} đã cấp trong thế hệ {gen_} của arena {id}"
+            ));
+        }
+        live.push(start);
+        Ok(())
+    }
+
     /// Hàm của prelude (thân KHÔNG được kiểm — trusted intrinsic): chỉ Arena.
     fn intrinsic(&mut self, key: &str, mut args: Vec<V>) -> Result<V, Flow> {
         if key.ends_with("core::abort") {
@@ -734,6 +772,7 @@ impl<'a> Oracle<'a> {
             self.use_loan(ar.loan)?;
             self.access(&ar.loc, AK::Read, Some(ar.loan))?;
             self.stats.arena_allocs += 1;
+            self.model_arena_alloc(&ar.loc)?;
             let fid = self.frames.len();
             self.frames.push(FrameData { locals: vec![v] });
             let loc = Loc {
@@ -751,6 +790,11 @@ impl<'a> Oracle<'a> {
             self.use_loan(ar.loan)?;
             self.access(&ar.loc, AK::Write, Some(ar.loan))?;
             self.stats.arena_resets += 1;
+            if let Ok(V::Arena(id)) = self.get(&ar.loc) {
+                // thế hệ mới: các vùng cũ hết hiệu lực, con trỏ cấp về 0
+                *self.arena_gen.entry(id).or_insert(0) += 1;
+                self.arena_cursor.insert(id, 0);
+            }
             return Ok(V::Unit);
         }
         // Lang item MUTABILITY BÊN TRONG (`Cell`, `Mutex`, `Atomic`; công cụ test, NGOÀI TCB, tuần tự): ghi qua `&self` mà KHÔNG làm vô hiệu

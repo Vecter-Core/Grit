@@ -313,13 +313,24 @@ fn arena_check_env_on() -> bool {
     *E.get_or_init(|| std::env::var("GRITRT_ARENA_CHECK").is_ok_and(|v| v == "1"))
 }
 
-/// Chèn lỗi (CHỈ có tác dụng khi kiểm động BẬT, để chứng minh kiểm bắt được): `GRITRT_FAULT=arena_overlap` làm `alloc` trả lại vùng của lần cấp trước;
-/// `arena_misalign` trả con trỏ lệch 1 byte khi `align > 1`.
+/// Chèn lỗi (CHỈ có tác dụng khi kiểm động BẬT, để chứng minh kiểm bắt được), `GRITRT_FAULT=`:
+/// `arena_overlap` trả lại vùng của lần cấp trước (trùng đầu); `arena_overlap_tail` (align 1) trả con trỏ chồng 1 byte vào ĐUÔI vùng trước (kiểm "vùng đứng trước");
+/// `arena_overlap_head` (align 1, size ≥ 2) trả vùng chồng đúng 1 byte vào ĐẦU vùng trước (kiểm "vùng đứng sau"); `arena_misalign` lệch 1 byte khi `align > 1`;
+/// `arena_outside` trả con trỏ ngoài chunk (+256 MiB, vẫn đúng căn lề).
 fn arena_fault() -> Option<&'static str> {
     static F: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     F.get_or_init(|| std::env::var("GRITRT_FAULT").ok())
         .as_deref()
-        .filter(|f| *f == "arena_overlap" || *f == "arena_misalign")
+        .filter(|f| {
+            matches!(
+                *f,
+                "arena_overlap"
+                    | "arena_overlap_tail"
+                    | "arena_overlap_head"
+                    | "arena_misalign"
+                    | "arena_outside"
+            )
+        })
 }
 
 /// Sau khi cấp `[p, p+size)` căn lề `align` trong arena `st`: kiểm (1) căn lề, (2) nằm trọn trong một chunk, (3) không chồng vùng nào cùng thế hệ; rồi ghi nhận.
@@ -438,7 +449,20 @@ fn finish_alloc(st: &mut ArenaState, p: usize, size: usize, align: usize, check:
                 p = *s; // trả lại vùng của lần cấp trước
             }
         }
+        Some("arena_overlap_tail") if align == 1 => {
+            if let Some((_, e)) = st.live.iter().next_back() {
+                p = *e - 1;
+            }
+        }
+        Some("arena_overlap_head") if align == 1 && size >= 2 => {
+            if let Some((s, _)) = st.live.iter().next_back()
+                && *s + 1 >= size
+            {
+                p = *s + 1 - size;
+            }
+        }
         Some("arena_misalign") if align > 1 => p += 1,
+        Some("arena_outside") => p += 1 << 28,
         _ => {}
     }
     arena_verify(st, p, size, align);

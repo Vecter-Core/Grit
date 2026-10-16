@@ -146,3 +146,33 @@ fn dev_check_can_be_switched_off_explicitly() {
     );
     assert_eq!(o.exit, 0, "{o:?}");
 }
+
+/// bố cục xác định để cô lập từng nhánh kiểm: `pad1` (u8, ở đầu chunk), `pad2` (u64, căn lề 8 ⇒ chừa KHE 7 byte sau `pad1`), rồi `x` = `[u8; 4]` (căn lề 1):
+/// - `arena_overlap_tail` đặt `x` chồng 1 byte vào ĐUÔI `pad2` ⇒ chỉ nhánh "vùng đứng trước" bắt được;
+/// - `arena_overlap_head` đặt `x` chồng đúng 1 byte vào ĐẦU `pad2` mà không chạm `pad1` (nhờ khe) ⇒ chỉ nhánh "vùng đứng sau" bắt được (và biên `<` đúng 1 byte).
+const PROG2: &str = "ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  p1 ≔ ar.alloc(1u8);
+  p2 ≔ ar.alloc(2u64);
+  x ≔ ar.alloc([1u8, 2u8, 3u8, 4u8]);
+  (*p1 as u64) + *p2 + (x[0] as u64) + (x[3] as u64)
+}
+";
+
+#[test]
+fn isolated_layout_runs_clean_and_each_injected_fault_is_caught_by_its_own_branch() {
+    let o = run(PROG2, "dev", &[]);
+    assert_eq!(o.exit, 0, "{o:?}");
+    assert_eq!(o.value, "8");
+    for (fault, why) in [
+        ("rt:arena-overlap", "chồng lấn"),
+        ("rt:arena-overlap-tail", "chồng lấn"),
+        ("rt:arena-overlap-head", "chồng lấn"),
+        ("rt:arena-outside", "ngoài chunk"),
+    ] {
+        let o = run(PROG2, "dev", &[("GRITC_FAULT", fault)]);
+        assert_eq!(o.exit, 70, "{fault}: {o:?}");
+        assert_eq!(o.kind, "arena_overlap", "{fault}: {o:?}");
+        assert!(o.stderr.contains(why), "{fault}: {o:?}");
+    }
+}

@@ -1,0 +1,3 @@
+// expect: fail E0405
+// note: reset ở một nhánh khi tham chiếu còn dùng sau nhánh
+ƒ f(c: bool) → i32 ! {mem} { μa ≔ Arena::new(); p ≔ a.alloc(1); ⎇ c { a.reset(); } ⇝ { } *p }

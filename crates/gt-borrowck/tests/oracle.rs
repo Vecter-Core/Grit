@@ -615,3 +615,41 @@ fn semantic_attacks_are_caught_by_both_sides() {
         );
     }
 }
+
+// ===================================================================== (5) mô hình bố cục Arena (đối ứng kiểm động `arena_overlap` của gt-rt dev)
+
+fn arena_oracle(fault: bool) -> (Outcome, usize) {
+    let src = format!(
+        "{}ƒ entry(c: bool, d: bool, e: bool) → i32 ! {{mem}} {{\n  μa ≔ Arena::new();\n  p ≔ a.alloc(1);\n  q ≔ a.alloc(2);\n  use_i(*p + *q);\n  a.reset();\n  r ≔ a.alloc(3);\n  use_i(*r);\n  s ≔ a.alloc(4);\n  *s\n}}\n",
+        progen::PRELUDE
+    );
+    let t = one(&src);
+    assert!(t.report.diagnostics.is_empty(), "{:?}", show(&t));
+    let m = gt_mir::lower_program(&t);
+    assert!(m.report.diagnostics.is_empty());
+    let r = gt_borrowck::check_program(&t, &m);
+    assert!(
+        r.diagnostics.is_empty(),
+        "borrowck phải chấp nhận (reset sau khi p,q đã chết)"
+    );
+    let mut o = Oracle::new(&m, FUEL);
+    o.arena_fault = fault;
+    let out = o.call_key(
+        "main::entry",
+        vec![V::Bool(false), V::Bool(false), V::Bool(false)],
+    );
+    (out, o.stats.arena_overlap_checks)
+}
+
+/// 4 lần cấp qua 2 thế hệ (reset ở giữa): vùng luôn rời nhau ⇒ oracle không báo gì; chèn lỗi (trùng vùng lần cấp trước) ⇒ Bug "arena_overlap".
+#[test]
+fn oracle_arena_layout_model_accepts_valid_generations_and_catches_an_injected_overlap() {
+    let (ok, checks) = arena_oracle(false);
+    assert!(matches!(ok, Outcome::Value(_)), "{ok:?}");
+    assert_eq!(checks, 4);
+    let (bad, _) = arena_oracle(true);
+    match bad {
+        Outcome::Bug(m) => assert!(m.contains("arena_overlap"), "{m}"),
+        o => panic!("kỳ vọng Bug arena_overlap, nhận {o:?}"),
+    }
+}
