@@ -75,7 +75,7 @@ fn diag(
     span: gt_span::Span,
     msg: String,
 ) -> Option<Diagnostic> {
-    let c = Code::parse(code).ok()?;
+    let c = Code::parse_or_internal(code);
     Some(Diagnostic::new(c, &t.file_name(node), span, msg))
 }
 
