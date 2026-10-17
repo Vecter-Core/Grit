@@ -297,3 +297,21 @@ fn body_without_a_signature_is_an_internal_error_not_skipped() {
         "thân không có chữ ký bị bỏ qua lặng lẽ: {codes:?}"
     );
 }
+
+/// FB-15 (lỗi THẬT, đạt tới được từ Grit): hàm KẾT HỢP dùng làm giá trị (`B::talk`) từng mang kiểu hàm với hiệu ứng RỖNG (`apply_pick_types` gán `Vec::new()`), nên gọi qua biến
+/// làm mất hiệu ứng khai báo (`io`, `mem`…) và một hàm `! ∅` thực hiện được I/O mà không bị E0801.
+#[test]
+fn associated_function_used_as_a_value_keeps_its_declared_effects() {
+    let prelude = "▢ B { v: u32 }\n⊐ B {\n  ƒ talk(&self) ! {io} { }\n}\n";
+    // gọi trực tiếp (đối chứng): E0801
+    only(&format!("{prelude}ƒ g(b: &B) ! ∅ {{ b.talk(); }}"), "E0801");
+    // lấy làm giá trị rồi gọi: cũng PHẢI là E0801
+    only(
+        &format!("{prelude}ƒ g(b: &B) ! ∅ {{\n  f ≔ B::talk;\n  f(b)\n}}"),
+        "E0801",
+    );
+    // khai báo đủ hiệu ứng thì sạch
+    ok(&format!(
+        "{prelude}ƒ g(b: &B) ! {{io}} {{\n  f ≔ B::talk;\n  f(b)\n}}"
+    ));
+}
