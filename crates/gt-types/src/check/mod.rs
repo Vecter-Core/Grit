@@ -570,7 +570,12 @@ impl<'e, 'a> Checker<'e, 'a> {
                             "kiểu `{s}` không `Sync` nên không chia sẻ được giữa các luồng: {why}"
                         ),
                     };
-                    self.err("E0501", o.node, o.span, msg);
+                    let code = if crate::send::is_internal(&why) {
+                        "E9901"
+                    } else {
+                        "E0501"
+                    };
+                    self.err(code, o.node, o.span, msg);
                 }
                 continue;
             }

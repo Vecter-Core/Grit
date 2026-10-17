@@ -16,6 +16,18 @@ pub(crate) enum Auto {
     Sync,
 }
 
+/// Dấu của lỗi NỘI BỘ (db không nhất quán) trong chuỗi lý do: người gọi báo E9901 thay vì E0501.
+const INTERNAL: &str = "E9901";
+
+fn internal(what: &str) -> String {
+    format!("{INTERNAL}: {what}")
+}
+
+/// `why` (từ [`Env::auto_like`]) là lỗi nội bộ, không phải "kiểu không Send/Sync"?
+pub(crate) fn is_internal(why: &str) -> bool {
+    why.contains(INTERNAL)
+}
+
 impl Auto {
     fn lang(self) -> Lang {
         match self {
@@ -84,7 +96,8 @@ impl Env<'_> {
             Ty::Infer(_) => Err("kiểu chưa xác định".to_string()),
             Ty::Adt(d, args) => {
                 let Some(adt) = self.db.adts.get(d) else {
-                    return Ok(());
+                    // db không nhất quán: KHÔNG phải "Send" (FAIL_OPEN_AUDIT S-A) ⇒ lỗi nội bộ
+                    return Err(internal("ADT không có trong cơ sở kiểu"));
                 };
                 match adt.lang {
                     Some(Lang::Arena) => {
@@ -99,7 +112,7 @@ impl Env<'_> {
                             Some(t) => self
                                 .auto_rec(t, scope, Auto::Send, seen, depth + 1)
                                 .map_err(|e| format!("`Mutex` → {e}")),
-                            None => Ok(()),
+                            None => Err(internal("`Mutex` thiếu đối số kiểu")),
                         };
                     }
                     // Atomic<T>: T chỉ là bool/số nguyên

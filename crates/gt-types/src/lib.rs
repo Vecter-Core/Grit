@@ -347,8 +347,13 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
             && let Err(why) = env.sync_like(&env.db.consts.get(&d).cloned().unwrap_or(Ty::Err), &[])
         {
             let sp = env.items[&n].item.span;
+            let code = if send::is_internal(&why) {
+                "E9901"
+            } else {
+                "E0501"
+            };
             env.err(
-                "E0501",
+                code,
                 n,
                 sp,
                 format!("`■` static phải có kiểu `Sync` (chia sẻ giữa các luồng): {why}"),
