@@ -1005,3 +1005,17 @@ impl Parser {
         self.parse_path(false)
     }
 }
+
+#[cfg(test)]
+mod push_diag_tests {
+    use super::*;
+
+    /// FAIL_OPEN_AUDIT S-C: `push_diag` với mã sai định dạng không được bỏ chẩn đoán.
+    #[test]
+    fn push_diag_with_a_malformed_code_still_records_a_diagnostic() {
+        let mut p = Parser::new(gt_span::FileId::new(0), "t.gt", 0, Vec::new());
+        p.push_diag("E01", Span::new(0, 0), "thử".to_string());
+        assert_eq!(p.diags.len(), 1, "chẩn đoán bị nuốt");
+        assert_eq!(p.diags[0].code.as_str(), "E9901");
+    }
+}

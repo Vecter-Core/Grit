@@ -291,3 +291,22 @@ pub fn completeness(t: &TypesOutput, b: &Body) -> Vec<Diagnostic> {
     }
     out
 }
+
+#[cfg(test)]
+#[path = "../../gt-types/tests/common/mod.rs"]
+mod common;
+
+#[cfg(test)]
+mod tests {
+    use super::{common, diag};
+
+    /// FAIL_OPEN_AUDIT S-C: mã chẩn đoán sai định dạng không được làm chẩn đoán biến mất.
+    #[test]
+    fn diag_with_a_malformed_code_still_yields_a_diagnostic() {
+        let t = common::ok("ƒ f() → u32 ! ∅ { 1 }");
+        let node = t.bodies[0].node;
+        let d = diag(&t, "E07", node, gt_span::Span::new(0, 0), "thử".to_string())
+            .expect("chẩn đoán bị nuốt");
+        assert_eq!(d.code.as_str(), "E9901");
+    }
+}

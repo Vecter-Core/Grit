@@ -1254,3 +1254,27 @@ pub(crate) fn count_lifetimes(g: &Option<Generics>) -> usize {
             .count()
     })
 }
+
+#[cfg(test)]
+mod err_tests {
+    use crate::testkit::with_env;
+    use gt_ast::NodeId;
+    use gt_span::{FileId, Span};
+
+    /// FAIL_OPEN_AUDIT S-C: `Env::err` với mã sai định dạng không được trả `None` (chẩn đoán biến mất).
+    #[test]
+    fn err_with_a_malformed_code_still_records_a_diagnostic() {
+        with_env("ƒ f() → u32 ! ∅ { 1 }", |env| {
+            let n = env.diags.len();
+            let idx = env.err(
+                "E03",
+                NodeId::new(FileId::new(0), 0),
+                Span::new(0, 0),
+                "thử".to_string(),
+            );
+            assert!(idx.is_some(), "chẩn đoán bị nuốt");
+            assert_eq!(env.diags.len(), n + 1);
+            assert_eq!(env.diags[n].code.as_str(), "E9901");
+        });
+    }
+}

@@ -910,3 +910,18 @@ pub(crate) fn prelude_duplicates(p: &Prelude) -> Report {
     }
     bag.finish()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// FAIL_OPEN_AUDIT S-C: `mk` với mã sai định dạng không được trả `None` (chẩn đoán biến mất).
+    #[test]
+    fn mk_with_a_malformed_code_still_yields_a_diagnostic() {
+        let t = Tables::new(vec!["a.gt".to_string()], vec![String::new()]);
+        let d = t
+            .mk("E02", FileId::new(0), Span::new(0, 0), "thử".to_string())
+            .expect("chẩn đoán bị nuốt");
+        assert_eq!(d.code.as_str(), "E9901");
+    }
+}
