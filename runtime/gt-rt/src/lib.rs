@@ -400,10 +400,17 @@ const ARENA_EXHAUSTED: i32 = 17;
 /// Chỉ làm `alloc` thất bại SỚM hơn (fail-closed): dùng để kiểm thử `arena_exhausted` và để chặn ngốn bộ nhớ.
 fn arena_limit() -> Option<usize> {
     static L: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
-    *L.get_or_init(|| {
-        std::env::var("GRITRT_ARENA_LIMIT")
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
+    *L.get_or_init(|| match std::env::var("GRITRT_ARENA_LIMIT") {
+        Ok(v) => Some(v.parse::<usize>().unwrap_or_else(|_| {
+            // giá trị sai KHÔNG được âm thầm thành "không giới hạn" (FAIL_OPEN_AUDIT R3)
+            eprintln!("arena: GRITRT_ARENA_LIMIT không phải số nguyên không âm: {v:?}");
+            gritrt_abort(ARENA_EXHAUSTED)
+        })),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(std::env::VarError::NotUnicode(_)) => {
+            eprintln!("arena: GRITRT_ARENA_LIMIT không phải UTF-8");
+            gritrt_abort(ARENA_EXHAUSTED)
+        }
     })
 }
 

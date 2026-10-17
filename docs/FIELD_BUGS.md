@@ -140,3 +140,9 @@ Phương pháp: viết test chạm đúng nhánh, hoàn nguyên CHỈ chỗ sử
 - **Phân loại:** lỗi THẬT của backend thông dịch (kết quả SAI LẶNG LẼ, không phải lỗi bộ kiểm tra); đạt tới bằng `gritc run --backend=interpreter`; thông dịch là chuẩn đối chiếu của nhiều bộ test nên có thể che/lộ sai lệch. Tìm thấy nhờ rà R3 gt-mir/interp.rs:996–999 (clamp `u128` bằng `i128::MAX`).
 - **Sửa:** `binop_u128` (so sánh/chia/%/bão hoà/quấn theo `u128`), kiểm tràn `Checked*` theo `u128::overflowing_*`, `cast` (u128→f64, vừa/không vừa giữa u128 và i128) — test `crates/gt-mir/tests/interp_u128.rs` (ĐỎ chủ ý ở 93aa345; kỳ vọng tính độc lập bằng `u128` của Rust).
 - **Chưa làm:** so sánh thông dịch ≡ LLVM cho u128 (LLVM chưa có chia 128 bit); toán tử bit/dịch u128 trong thông dịch chưa có (báo `Bug`, đóng).
+
+## FB-19 — `GRITRT_ARENA_LIMIT` sai định dạng bị coi là "không giới hạn" (2026-10-18; R3, ĐO)
+- **Triệu chứng (đo với runtime cũ, trước khi dựng lại gt_rt.lib):** `GRITRT_ARENA_LIMIT=2MiB` ⇒ exe chạy bình thường, `exit 0`, không giới hạn nào được áp dụng (`.ok().and_then(parse().ok())`).
+- **Phân loại:** lỗi THẬT nhưng nhẹ (núm điều khiển tài nguyên, KHÔNG phải kiểm tra an toàn bộ nhớ): người đặt giới hạn tưởng có mà không có; fail-open của một cấu hình.
+- **Sửa:** giá trị sai hoặc không phải UTF-8 ⇒ `arena_exhausted` (abort, mã thoát 70) kèm thông báo; không đặt ⇒ không giới hạn như cũ.
+- **Bằng chứng:** `crates/gt-driver/tests/llvm_vec.rs::malformed_arena_limit_is_not_silently_unlimited` (4 giá trị sai + 1 đúng). Test đỏ chứng kiến qua lần chạy với `gt_rt.lib` cũ (không commit riêng vì cần dựng lại runtime release).

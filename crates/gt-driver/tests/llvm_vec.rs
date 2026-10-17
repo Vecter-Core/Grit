@@ -234,6 +234,27 @@ fn arena_exhaustion_is_its_own_abort_kind() {
     assert_eq!((free.exit, free.value.as_str()), (0, "1000000"), "{free:?}");
 }
 
+/// R3 (FAIL_OPEN_AUDIT): giá trị SAI của `GRITRT_ARENA_LIMIT` không được âm thầm thành "không giới hạn" — runtime abort `arena_exhausted`.
+#[test]
+fn malformed_arena_limit_is_not_silently_unlimited() {
+    let src = "ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  x ≔ ar.alloc(7u64);
+  *x
+}
+";
+    for bad in ["2MiB", "-1", "", "1.5"] {
+        let r = run_env(src, "llvm", &[("GRITRT_ARENA_LIMIT", bad)]);
+        assert_eq!(
+            (r.exit, r.kind.as_str()),
+            (70, "arena_exhausted"),
+            "giá trị {bad:?}: {r:?}"
+        );
+    }
+    let ok = run_env(src, "llvm", &[("GRITRT_ARENA_LIMIT", "1048576")]);
+    assert_eq!((ok.exit, ok.value.as_str()), (0, "7"), "{ok:?}");
+}
+
 /// `Arena::alloc` cũng dùng chung đường `arena_exhausted`.
 #[test]
 fn arena_alloc_exhaustion_uses_the_same_kind() {
