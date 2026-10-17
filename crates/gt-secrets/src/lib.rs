@@ -316,12 +316,14 @@ fn scan_body(t: &TypesOutput, b: &Body, out: &mut Vec<Finding>) {
             tainted[i] = true;
         }
     }
+    // không biết hiệu ứng của callee (chữ ký/thành viên/kiểu hàm không tra được) ⇒ coi là CÓ `io` (bảo thủ), không im lặng (FAIL_OPEN_AUDIT R3)
+    let unknown = || vec!["io".to_string()];
     let callee_effects = |c: &Callee| -> Vec<String> {
         match c {
             Callee::Fn { node, .. } => {
                 t.db.sig_by_node(*node)
                     .map(|s| s.effects.clone())
-                    .unwrap_or_default()
+                    .unwrap_or_else(unknown)
             }
             Callee::TraitMethod {
                 trait_def, member, ..
@@ -330,11 +332,11 @@ fn scan_body(t: &TypesOutput, b: &Body, out: &mut Vec<Finding>) {
                     .get(trait_def)
                     .and_then(|td| td.members.get(*member))
                     .map(|m| m.effects.clone())
-                    .unwrap_or_default()
+                    .unwrap_or_else(unknown)
             }
             Callee::Value(o) => match gt_mir::types::operand_ty(b, o) {
                 Some(Ty::Fn(_, _, e)) => e,
-                _ => Vec::new(),
+                _ => unknown(),
             },
         }
     };
