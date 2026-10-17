@@ -454,9 +454,12 @@ impl Tables {
     }
 
     pub fn mk(&self, code: &str, file: FileId, span: Span, msg: String) -> Option<Diagnostic> {
-        Code::parse(code)
-            .ok()
-            .map(|c| Diagnostic::new(c, &self.fname(file), span, msg))
+        Some(Diagnostic::new(
+            Code::parse_or_internal(code),
+            &self.fname(file),
+            span,
+            msg,
+        ))
     }
 
     /// E0202 cho mọi tên có >1 khai báo trong cùng một module/enum (trừ prelude).
