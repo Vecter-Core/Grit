@@ -855,3 +855,169 @@ fn post_rejects_each_fast_math_flag_on_float_ops() {
         );
     }
 }
+
+/// Dựng `W` từ IR dạng chữ (cho lệnh mà trình dựng của inkwell không có: `invoke` trên LLVM 20, `callbr`). Hàm `f` là instance duy nhất.
+fn world_from_text<'a>(ctx: &'a Context, text: &str) -> W<'a> {
+    use gt_llvm::inkwell::memory_buffer::MemoryBuffer;
+    let m = ctx
+        .create_module_from_ir(MemoryBuffer::create_from_memory_range_copy(
+            text.as_bytes(),
+            "t",
+        ))
+        .unwrap_or_else(|e| {
+            panic!(
+                "IR chữ không phân tích được: {e}
+{text}"
+            )
+        });
+    let node = ctx.metadata_node(&[ctx.metadata_string(ATT).into()]);
+    m.add_global_metadata(ATTEST_KEY, &node).expect("metadata");
+    let abort = m.get_function("gritrt_abort").expect("gritrt_abort");
+    W {
+        ctx,
+        m,
+        b: ctx.create_builder(),
+        abort,
+        names: std::cell::RefCell::new(vec!["f".to_string()]),
+    }
+}
+
+/// FAIL_OPEN_AUDIT G1 (luật 3c): `invoke` KHÔNG qua `callee_name` nên tránh luật "đích mọi lời gọi" (ở đây gọi một hàm ngoài chỉ khai báo) ⇒ phải bị CẤM thẳng.
+#[test]
+fn invoke_is_rejected_even_when_its_target_would_otherwise_be_flagged() {
+    let ctx = Context::create();
+    let w = world_from_text(
+        &ctx,
+        r#"
+declare void @gritrt_abort(i32) noreturn
+declare i32 @__gxx_personality_v0(...)
+declare void @ngoai()
+define void @f() personality ptr @__gxx_personality_v0 {
+bb0:
+  invoke void @ngoai() to label %ok unwind label %lp
+ok:
+  ret void
+lp:
+  %e = landingpad { ptr, i32 } cleanup
+  resume { ptr, i32 } %e
+}
+"#,
+    );
+    let v = w.check();
+    assert!(has(&v, "`invoke`/`callbr` bị cấm"), "{v:?}");
+}
+
+#[test]
+fn callbr_is_rejected() {
+    let ctx = Context::create();
+    let w = world_from_text(
+        &ctx,
+        r#"
+declare void @gritrt_abort(i32) noreturn
+define void @f() {
+bb0:
+  callbr void asm sideeffect "", "!i"() to label %ok [label %other]
+ok:
+  ret void
+other:
+  ret void
+}
+"#,
+    );
+    let v = w.check();
+    assert!(has(&v, "`invoke`/`callbr` bị cấm"), "{v:?}");
+}
+
+/// G1 (hướng ĐỘT BIẾN `&&` → `||`): địa chỉ của hàm runtime làm ĐỐI SỐ của chính lời gọi tới nó cũng là dùng ngoài vai trò đích.
+#[test]
+fn runtime_function_address_as_an_argument_of_its_own_call_is_rejected() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let ptr = ctx.ptr_type(Default::default());
+    let i64t = ctx.i64_type();
+    let valid = w.m.add_function(
+        "gritrt_utf8_valid",
+        ctx.i32_type().fn_type(&[ptr.into(), i64t.into()], false),
+        None,
+    );
+    w.b.build_call(
+        valid,
+        &[
+            valid.as_global_value().as_pointer_value().into(),
+            i64t.const_zero().into(),
+        ],
+        "r",
+    )
+    .expect("call");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(has(&v, "gritrt_utf8_valid"), "{v:?}");
+}
+
+/// Đối chứng: gọi TRỰC TIẾP hàm runtime trả số nguyên / void / con trỏ vẫn được chấp nhận (mọi loại người dùng của địa chỉ hàm).
+#[test]
+fn direct_calls_of_runtime_functions_returning_int_void_and_pointer_are_accepted() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let ptr = ctx.ptr_type(Default::default());
+    let i64t = ctx.i64_type();
+    let valid = w.m.add_function(
+        "gritrt_utf8_valid",
+        ctx.i32_type().fn_type(&[ptr.into(), i64t.into()], false),
+        None,
+    );
+    w.b.build_call(
+        valid,
+        &[ptr.const_null().into(), i64t.const_zero().into()],
+        "r",
+    )
+    .expect("call");
+    let report = w.m.add_function(
+        "gritrt_report_int",
+        ctx.void_type().fn_type(&[i64t.into()], false),
+        None,
+    );
+    w.b.build_call(report, &[i64t.const_zero().into()], "")
+        .expect("call");
+    let alloc =
+        w.m.add_function("gritrt_alloc", ptr.fn_type(&[i64t.into()], false), None);
+    w.b.build_call(alloc, &[i64t.const_int(8, false).into()], "p")
+        .expect("call");
+    finish_ok(&w, f);
+    assert_eq!(w.check(), Vec::<String>::new());
+}
+
+/// G1 (đột biến "chỉ xét lần dùng ĐẦU TIÊN"): địa chỉ hàm runtime vừa được gọi trực tiếp vừa bị lưu — dù thứ tự nào trong danh sách dùng, lần dùng sai phải bị bắt.
+#[test]
+fn a_bad_use_is_caught_wherever_it_sits_among_the_uses_of_a_runtime_address() {
+    for store_first in [true, false] {
+        let ctx = Context::create();
+        let w = world(&ctx, true, Some(ATT));
+        let f = w.func("f");
+        let ptr = ctx.ptr_type(Default::default());
+        let i64t = ctx.i64_type();
+        let alloc =
+            w.m.add_function("gritrt_alloc", ptr.fn_type(&[i64t.into()], false), None);
+        let slot = w.b.build_alloca(ptr, "slot").expect("alloca");
+        let call = |tag: &str| {
+            w.b.build_call(alloc, &[i64t.const_int(8, false).into()], tag)
+                .expect("call");
+        };
+        if store_first {
+            w.b.build_store(slot, alloc.as_global_value().as_pointer_value())
+                .expect("store");
+            call("a");
+            call("b");
+        } else {
+            call("a");
+            call("b");
+            w.b.build_store(slot, alloc.as_global_value().as_pointer_value())
+                .expect("store");
+        }
+        finish_ok(&w, f);
+        let v = w.check();
+        assert!(has(&v, "gritrt_alloc"), "store_first={store_first}: {v:?}");
+    }
+}
