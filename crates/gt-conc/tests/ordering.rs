@@ -132,3 +132,44 @@ fn ordering_tracing_is_exact_and_scans_every_call() {
         vec!["E0503"]
     );
 }
+
+/// FAIL_OPEN_AUDIT S-E (lỗi THẬT, đạt tới được từ Grit): `Atomic::load` dùng làm giá trị hàm rồi gọi qua biến (`Callee::Value`) lách kiểm ordering (check xanh dù
+/// `load` với `Release`; backend LLVM từ chối "chưa hỗ trợ", thông dịch chạy). Quy tắc: phương thức của `Atomic` KHÔNG được dùng làm giá trị hàm (chỉ gọi trực tiếp).
+#[test]
+fn atomic_methods_used_as_function_values_are_rejected() {
+    // gọi qua biến với ordering SAI
+    only(
+        "ƒ main() → u32 ! ∅ {
+  a ≔ Atomic::new(5u32);
+  f: ƒ(&Atomic<u32>, AtomicOrdering) → u32 ! ∅ ≔ Atomic::load;
+  f(&a, AtomicOrdering::Release)
+}
+",
+        "E0503",
+    );
+    // gọi qua biến với ordering ĐÚNG: vẫn bị từ chối (không kiểm được ở chỗ gọi gián tiếp)
+    only(
+        "ƒ main() → u32 ! ∅ {
+  a ≔ Atomic::new(5u32);
+  f: ƒ(&Atomic<u32>, AtomicOrdering) → u32 ! ∅ ≔ Atomic::load;
+  f(&a, AtomicOrdering::Acquire)
+}
+",
+        "E0503",
+    );
+    // chỉ lưu giá trị, không gọi
+    only(
+        "ƒ main() → u32 ! ∅ {
+  f: ƒ(&Atomic<u32>, AtomicOrdering) → u32 ! ∅ ≔ Atomic::load;
+  0
+}
+",
+        "E0503",
+    );
+    // đối chứng: gọi TRỰC TIẾP với ordering đúng vẫn sạch
+    ok("ƒ main() → u32 ! ∅ {
+  a ≔ Atomic::new(5u32);
+  Atomic::load(&a, AtomicOrdering::Acquire)
+}
+");
+}
