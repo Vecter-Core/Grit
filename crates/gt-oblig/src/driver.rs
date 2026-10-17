@@ -596,8 +596,13 @@ fn apply_insert(t: &TypesOutput, ob: &mut Body, ins: &Insert, tails: &mut BTreeM
         }
     };
     let cur = *tails.get(&block).unwrap_or(&(block as usize));
+    // invariant: `cur` là khối đang giữ terminator gốc (`tails` theo dõi khối đuôi sau mỗi lần tách). Mất terminator ⇒ KHÔNG được bỏ qua lặng lẽ việc chèn kiểm tra
+    // lúc chạy (fail-open): panic ⇒ ICE E9901 ở tầng pass (R3, FAIL_OPEN_AUDIT).
     let Some(orig) = ob.blocks[cur].terminator.take() else {
-        return;
+        panic!(
+            "apply_insert: khối {cur} của `{}` không còn terminator — không chèn được kiểm tra {kind:?}",
+            ob.key
+        );
     };
     let src = orig.source;
     let span = src.span;
