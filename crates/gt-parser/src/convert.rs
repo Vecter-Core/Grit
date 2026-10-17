@@ -4,7 +4,7 @@ use gt_lexer::{LexError, TokenKind};
 
 /// Chuyển lỗi lexer thành `Diagnostic` (mã E0101/E12xx đã nằm trong bảng mã).
 pub fn lex_error(file: &str, e: &LexError) -> Option<Diagnostic> {
-    let code = Code::parse(e.code.as_str()).ok()?;
+    let code = Code::parse_or_internal(e.code.as_str());
     Some(Diagnostic::new(code, file, e.span, e.message.clone()))
 }
 

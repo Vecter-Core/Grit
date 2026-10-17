@@ -155,9 +155,8 @@ impl Parser {
     // ---------- lỗi ----------
 
     fn push_diag(&mut self, code: &str, span: Span, msg: String) {
-        if let Ok(c) = Code::parse(code) {
-            self.diags.push(Diagnostic::new(c, &self.file, span, msg));
-        }
+        let c = Code::parse_or_internal(code);
+        self.diags.push(Diagnostic::new(c, &self.file, span, msg));
     }
 
     /// Báo lỗi cú pháp E0101 tại `span`. Im lặng nếu: đã dừng vì độ sâu, token hiện tại là `UNKNOWN`
