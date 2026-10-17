@@ -821,7 +821,7 @@ fmt OK | clippy 0 | audit 0 | test 879/0/168 | unittest công cụ 9 + 4 + 18 | 
 
 ## (ii) D, (iii) H4/H6/H7/H8, (vi) FAIL_OPEN_AUDIT — cổng liền mạch XANH 2026-10-17
 - **Cổng:** lần 1 ĐỎ ở `fmt` + `clippy` (test 902/0/174 xanh; lỗi: `mut` thừa trong test `instance_keys`, mô-đun test B1 đặt trước mục khác, rustfmt) ⇒ sửa rồi CHẠY LẠI TOÀN BỘ: lần 2 XANH — `TEST_PASSED=902 FAILED=0 SUITES=174`, `CLIPPY_EXIT=0`, `AUDIT_EXIT=0`, fmt/expect/deletions/track OK, `GATE_RESULT=GREEN`, thoát 0 (chạy tách khỏi phiên qua WMI, stdin từ /dev/null).
-- **TCB:** 13 dòng (H4×3, H6×6, H7×1, H8×2, D.1×1) từ CÓ ĐIỀU KIỆN ⇒ không điều kiện; nay 42/42 không điều kiện. Bằng chứng ghi trong từng dòng của `docs/TCB_INTRINSICS.md`. Giới hạn: H7/H8 là bằng chứng THỰC NGHIỆM (lặp 300×, không TSan/loom), không chứng minh vắng đua dữ liệu.
+- **TCB:** 13 dòng (H4×3, H6×6, H7×1, H8×2, D.1×1) từ CÓ ĐIỀU KIỆN ⇒ không điều kiện; nay 42/42 không điều kiện (HỢP ĐỒNG + bằng chứng được chấp nhận; nhóm CAO H1–H10 CHƯA qua đọc mã đối kháng, KHÔNG tuyên bố TCB đã duyệt). Bằng chứng ghi trong từng dòng của `docs/TCB_INTRINSICS.md`. Giới hạn: H7/H8 là bằng chứng THỰC NGHIỆM (lặp 300×, không TSan/loom), không chứng minh vắng đua dữ liệu.
 - **FAIL_OPEN_AUDIT:** `docs/FAIL_OPEN_AUDIT.md`; 6 chỗ đã sửa (G1 Guard, S1, B1, B2, B3, D1; FB-10, FB-11). B1/B2/B3/D1 không có test ĐỎ→XANH thuần (xem bảng mục 0 của tài liệu); gt-mir/gt-types chỉ rà phần quyết định, ~360 hit CHƯA đọc từng dòng.
 - **Thử lại có kiểm soát (native.rs):** LNK1104 khi liên kết và PermissionDenied khi spawn; không bao giờ thử lại kết quả (KNOWN_LIMITATIONS).
 - **CHƯA chạy:** đột biến chính thức cho quy tắc G1 và cho sửa FB-9 của Guard; flake llvm_sort; std ở release/release-o2; Ord kiểu ghép; đo sortlines; mục E.

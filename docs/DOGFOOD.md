@@ -56,7 +56,7 @@ Mỗi dòng = một khoảng trống/bug gặp khi viết công cụ thật. C�
 1. `Vec`, `String`, `f64`, gọi qua trait (`Callee::TraitMethod` ⇒ `Unsupported`), nhân/chia 128 bit — chặn mọi công cụ cần giá trị chuỗi/số, bảng băm, sắp xếp, trait.
 2. Phân rã trong `≔`; `?`; stderr; `argc`.
 3. M7 chưa chứng minh `b[i]` cho `b` cục bộ mượn từ lời gọi (check runtime giữ — chậm, không sai).
-4. Mọi người duyệt TCB mới đang `CHỜ GIANG` (docs/TCB_INTRINSICS.md).
+4. Trạng thái duyệt TCB: xem docs/TCB_INTRINSICS.md. **Nhóm CAO (H1–H10) CHƯA qua đọc mã đối kháng (mục E); KHÔNG được tuyên bố TCB đã duyệt cho tới khi E xong.** Trạng thái `ỦY QUYỀN: KIẾN TRÚC SƯ DUYỆT HỢP ĐỒNG` chỉ nghĩa HỢP ĐỒNG và bằng chứng của dòng đã được chấp nhận; nó không phải kiểm toán mã thực thi.
 
 ## Công cụ 3: sha256 (`examples/sha256`, Grit ~190 dòng, dự án Rig) — 2026-10-13
 ### Khoảng trống THEO THỨ TỰ CHẶN, ghi trước khi code (đã thử bằng chương trình thật `p1/p2/p3`)
