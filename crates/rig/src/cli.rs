@@ -234,8 +234,18 @@ fn cmd_test(a: &Args) -> i32 {
     };
     let tdir = dir.join("tests");
     let mut tests: Vec<(String, String)> = Vec::new();
-    if let Ok(rd) = std::fs::read_dir(&tdir) {
-        for e in rd.flatten() {
+    // thư mục tests/ KHÔNG có thì thôi, nhưng có mà đọc lỗi/mục lỗi thì phải báo — không được âm thầm chạy ít test hơn (FAIL_OPEN_AUDIT R3)
+    let rd = match std::fs::read_dir(&tdir) {
+        Ok(rd) => Some(rd),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return fail(&format!("không đọc được thư mục tests/: {e}")),
+    };
+    if let Some(rd) = rd {
+        for e in rd {
+            let e = match e {
+                Ok(e) => e,
+                Err(err) => return fail(&format!("lỗi đọc mục trong tests/: {err}")),
+            };
             let name = e.file_name().to_string_lossy().into_owned();
             if name.ends_with(".gt") {
                 match std::fs::read_to_string(e.path()) {
@@ -473,14 +483,22 @@ fn cmd_fmt(a: &Args) -> i32 {
     }
     let mut code = 0;
     for sub in ["src", "tests"] {
-        let Ok(rd) = std::fs::read_dir(dir.join(sub)) else {
-            continue;
+        let rd = match std::fs::read_dir(dir.join(sub)) {
+            Ok(rd) => rd,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return fail(&format!("không đọc được thư mục {sub}/: {e}")),
         };
-        let mut files: Vec<PathBuf> = rd
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|x| x == "gt"))
-            .collect();
+        let mut files: Vec<PathBuf> = Vec::new();
+        for e in rd {
+            // mục đọc lỗi không được âm thầm bị bỏ khỏi việc định dạng/kiểm (FAIL_OPEN_AUDIT R3)
+            let p = match e {
+                Ok(e) => e.path(),
+                Err(err) => return fail(&format!("lỗi đọc mục trong {sub}/: {err}")),
+            };
+            if p.extension().is_some_and(|x| x == "gt") {
+                files.push(p);
+            }
+        }
         files.sort();
         for f in files {
             let name = f
