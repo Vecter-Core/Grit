@@ -48,6 +48,17 @@ pub fn check_effects(t: &TypesOutput, m: &MirOutput) -> EffectsOutput {
     // ---- hiệu ứng suy ra từ thân hàm ----
     for b in m.bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
         let Some(sig) = t.db.sig_by_node(b.node) else {
+            // thân Fn mà db không có chữ ký: db không nhất quán ⇒ KHÔNG được bỏ qua (hiệu ứng của thân sẽ không được kiểm) ⇒ ICE
+            bag.push(mk(
+                t,
+                "E9901",
+                b.node,
+                b.span,
+                format!(
+                    "không tìm thấy chữ ký của thân `{}`: không kiểm được hiệu ứng",
+                    b.key
+                ),
+            ));
             continue;
         };
         let declared: BTreeSet<String> = sig.effects.iter().cloned().collect();
