@@ -91,6 +91,55 @@ Bảo vệ sẵn có: `defensive_counters()` phải bằng (0,0) trên mọi ch�
 ## 6. gt-types (`crates/gt-types/src`) — CHỈ mẫu quyết định (217 hit; KHÔNG đọc từng dòng)
 Đã đọc: `check/mod.rs:891` (`place_mutable`: local thiếu trong bảng ⇒ coi là ghi được, `Ty::Err` ⇒ ghi được: chỉ để không kéo thêm lỗi dây chuyền sau một lỗi kiểu đã báo; **GHI NHẬN**), `db.rs:44` (`imut`: tham số kiểu không tra được ⇒ coi là có ràng buộc, bảo thủ), `check/pat.rs` (mã mới Q87, có đột biến). Chưa đọc phần còn lại.
 
-## 7. CHƯA RÀ (nói thẳng)
-- gt-mir: ~160 hit (`unwrap_or`, `.get(`, `.ok()`) chưa đọc từng dòng; gt-types: ~200 hit chưa đọc từng dòng; gt-oblig/gt-term/gt-effects đã rà ở mục B (FB-7, `FAIL_OPEN` trước); gt-conc, gt-dataflow, gt-resolve, gt-parser, gt-lexer, rig: chưa rà đợt này.
-- Kết quả "AN TOÀN" là kết quả ĐỌC MÃ, không phải chứng minh; chỉ các mục SỬA có test.
+## 7. Đợt 2 (lệnh 2026-10-17 lần 3): gt-conc, gt-types, gt-effects, gt-mir, gt-term/oblig, các crate còn lại
+Phương pháp như trên (đọc ngữ cảnh từng chỗ khớp danh sách tìm kiếm); mỗi chỗ SỬA đi theo quy trình: thực nghiệm → phân loại → test ĐỎ (commit riêng, hoàn nguyên thấy đỏ) → sửa → commit.
+
+### 7.1 Các chỗ đã SỬA (đợt 2)
+| mã | vị trí | phân loại | sửa | bằng chứng |
+|---|---|---|---|---|
+| S-A | `gt-types/src/send.rs` (ADT không có trong db ⇒ `Ok`; `Mutex` thiếu đối số ⇒ `Ok`) | chỉ qua dựng bộ nhớ | `Err` nội bộ ⇒ E9901 | 2 test đỏ→xanh (`send::tests`), đột biến |
+| S-E | `gt-conc`: phương thức `Atomic` làm giá trị né kiểm ordering | LỖI THẬT (đạt tới được) | `Const::FnItem` trỏ Atomic ⇒ E0503 | test đỏ→xanh, corpus, bộ sinh |
+| FB-13 | `gt-mir/src/build/expr.rs`: `Res::Assoc` làm giá trị ⇒ đệ quy vô hạn | LỖI THẬT (gritc chết) | `Const::FnItem`; ICE nếu không hạ được | test đỏ (tràn ngăn xếp)→xanh |
+| FB-14 | `gt-types` pat/exhaust: literal u128 bị kẹp, miền cắt | LỖI THẬT (E0305 sai) | ADR-041; oracle | test đỏ→xanh, oracle 13 kiểu |
+| S-C | 4 nơi nuốt mã chẩn đoán sai định dạng (gt-mir `diag`, gt-resolve `mk`, gt-parser `push_diag`, gt-types `Env::err`) | chỉ qua dựng bộ nhớ | `Code::parse_or_internal` | 4 test đỏ→xanh (`lex_error`: enum đóng, không dựng được mã sai) |
+| S-D | `gt-mir/src/validate.rs`: Ty::Err/Infer trong MIR | chỉ qua dựng bộ nhớ | validator từ chối | test đỏ→xanh, đột biến đoạn mới |
+| — | `gt-effects` dòng 50: thân Fn không có chữ ký bị `continue` | chỉ qua dựng bộ nhớ | ICE E9901 | test đỏ→xanh |
+| — | `needs_drop`/`has_own_drop`: ADT lạ ⇒ "không cần drop" (nuôi E0318, E0407) | chỉ qua dựng bộ nhớ | bảo thủ + ICE | test đỏ→xanh (gt-types, gt-borrowck) |
+| FB-15 | `gt-types/check/call.rs::apply_pick_types`: hiệu ứng RỖNG cho hàm kết hợp làm giá trị | LỖI THẬT (`! ∅` gọi được `io`/`mem`) | `pick_effects` | test đỏ→xanh, corpus, bộ sinh |
+| mục 2 | intrinsic của lib/core làm giá trị (né precondition, E0310, E0405…); `root_fs` làm giá trị trong `main` (điều kiện #12) | LỖI THẬT (check xanh sai: 26/43 chương trình thử) | E0313 ở M4 | `docs/INTRINSIC_AS_VALUE.md`, test đỏ→xanh, corpus, bộ sinh |
+| mục 4 | `exhaust.rs`: miền `char` coi liền khối | bảo thủ (E0305 oan) | hai đoạn | oracle char đỏ→xanh |
+
+### 7.2 Đã ĐỌC và kết luận AN TOÀN / GHI NHẬN (đợt 2)
+- **gt-conc/src/lib.rs (toàn bộ 20 chỗ):** `variant_of` mọi nhánh `None` ⇒ E0503 (bảo thủ); `check_orderings`: `lang.get(AtomicOrdering)` thiếu ⇒ return (prelude luôn có; GHI NHẬN); `sig_by_node` None ⇒ `continue` (GHI NHẬN: thành viên impl Atomic luôn có chữ ký; không dựng được test vì cần TypesOutput hỏng); `o(k).unwrap_or(4)` (thiếu tham số ordering ⇒ SeqCst mạnh nhất, chỉ khi chữ ký prelude thiếu tham số; GHI NHẬN); `Callee::TraitMethod`/`Value` không rà (Atomic không có thành viên trait; giá trị hàm Atomic nay bị E0503).
+- **gt-effects (toàn bộ 384 dòng):** ngoài chỗ đã sửa: `Callee::Value` không có kiểu hàm ⇒ E9901; `Levels::new` kiểu không `#level` bị bỏ qua (nếu dùng trong `lock(L)` thì E0502 "thiếu #level"); `Callee::TraitMethod` không bung `poly`/`lock(..)` của thành viên trait (GHI NHẬN: trait prelude `Ord`/`Drop` không có marker); Drop-glue không tính hiệu ứng: AN TOÀN vì `Drop::drop ! ∅` bắt buộc (E0802) và chỉ prelude được viết `Drop`.
+- **gt-types:** `db.rs` `satisfies_bound`/`is_copy`/`needs_drop`/`resolve_trait_method` (đọc; `Ty::Infer ⇒ true` hoãn và có `unresolved` ở `finish`: AN TOÀN); `exhaust.rs` (đọc toàn bộ: `sub_tys` trả rỗng cho ADT lạ — GHI NHẬN, nối với db không nhất quán); `check/mod.rs` `place_mutable`: local thiếu trong bảng ⇒ coi là ghi được (GHI NHẬN: chỉ tránh lỗi dây chuyền sau lỗi đã báo; chưa chứng minh không tới được); `finish` `continue` sau `unresolved` (đã báo lỗi); `collect.rs` `eval_usize` None ⇒ độ dài mảng không xác định (E0301 ở nơi dùng).
+- **gt-term:** `by_node.get(..)` None ⇒ `continue` ở hai chỗ (instance không có thân: intrinsic/khai báo; AN TOÀN), terminator không phải `Call` ⇒ `continue`, `fns.get(&b.node)` None / thiếu hợp đồng variant ⇒ `continue` (vòng lặp không biến thể xử lý chỗ khác); `conjuncts` không hiểu ⇒ bỏ (bớt giả thiết = bảo thủ).
+- **gt-oblig:** `analysis.rs:1996,2038` khối chưa có trạng thái ⇒ bỏ (khối không tới được); `driver.rs:501-506` hợp đồng Pre/Post không tìm thấy chủ ⇒ `continue` (GHI NHẬN: assert `Precondition` lúc chạy vẫn còn vì chỉ xoá khi chứng minh); `env.rs:448` zone không có cạnh ⇒ không giả thiết (bảo thủ). Các chỗ khác: xem 7.3.
+- **gt-mir:** `matching.rs` Q87 (đã có đột biến); `expr.rs` các `unwrap_or(Ty::Err)` ×3 (nay bị S-D chặn ở validator); `mod.rs` `register` (frame rỗng ⇒ local không đăng ký, chỉ ảnh hưởng StorageDead/drop; GHI NHẬN); `ty_of` None ⇒ ICE; `types.rs` `variant_fields` ADT lạ ⇒ rỗng (GHI NHẬN, nối db không nhất quán).
+- **gt-lexer (3 chỗ `.ok()`/escape), gt-parser (danh sách), rig (14 chỗ), gt-dataflow (framework `unwrap_or_default` terminator None, `movable_prefix`), gt-resolve (`Found::Silent`, `unwrap_or` chỉ định vị):** đọc, AN TOÀN (fail-closed hoặc chỉ ảnh hưởng vị trí/nhãn).
+
+### 7.3 CHƯA RÀ (nói thẳng; số = số chỗ khớp danh sách tìm kiếm, ƯỚC LƯỢNG từ grep; "đọc" = đọc ngữ cảnh)
+| tệp | chỗ khớp | trạng thái |
+|---|---|---|
+| gt-oblig/src/analysis.rs | 82 | CHƯA đọc (2 chỗ ở 7.2); bộ giải/đột biến M7 đã được kiểm theo cách khác (đột biến đầy đủ, FB-7) |
+| gt-mir/src/build/expr.rs | 62 | đọc ~12; CHƯA ~50 |
+| gt-codegen-llvm/src/lower.rs | 55 | CHƯA (chặn sau bởi Guard-pre/post) |
+| gt-mir/src/interp.rs | 54 | CHƯA (thông dịch tham chiếu, không phải kiểm tra an toàn) |
+| gt-types/src/collect.rs | 50 | đọc ~6; CHƯA ~44 |
+| gt-oblig/src/env.rs | 32 | đọc 1; CHƯA 31 |
+| gt-types/src/check/mod.rs | 31 | đọc ~8; CHƯA ~23 |
+| gt-term/src/lib.rs | 29 | đọc ~6; CHƯA ~23 |
+| gt-types/src/check/expr.rs | 28 | CHƯA đọc ngữ cảnh (chỉ liệt kê) |
+| gt-types/src/check/call.rs | 28 | đọc ~8; CHƯA ~20 |
+| gt-types/src/check/pat.rs | 26 | đọc ~8; CHƯA ~18 |
+| gt-oblig (interval 20, zone 15, driver 14, unsafe_check 9, prover 5, int 3, ir 2) | 68 | CHƯA (driver: 3 đọc) |
+| gt-mir/src (print 20, build/mod 13, matching 11, types 10, lib 8, validate 5) | 67 | đọc ~15; CHƯA ~52 |
+| gt-parser (parser 19, exprs 13, types 3, lib 2, pats 1) | 38 | đọc ~10; CHƯA ~28 (parser fail-closed theo thiết kế: `Err(expected)`) |
+| gt-types còn lại (ty 11, lib 11, validate 8, mono 7, infer 7, traits 5, region 1) | 50 | đọc ~6; CHƯA ~44 |
+| gt-resolve (tables 16, walk 7, model 2, lib/graph 2) | 27 | đọc ~10; CHƯA ~17 |
+| gt-lexer | 32 | đọc ~6; CHƯA ~26 |
+| gt-fmt (printer 14, attach 2, lib 1), gt-diag (json 7, render 5, code 5), gt-span 15 | 49 | CHƯA (định dạng/hiển thị, không quyết định chấp nhận) |
+| gt-dataflow (analyses 8, framework 1) | 9 | đọc 3; CHƯA 6 |
+| gt-secrets, gt-borrowck, gt-guard, gt-driver, gt-conc, gt-effects, rig | — | đã rà ở đợt 1 hoặc 2 (xem trên); gt-borrowck/gt-driver/gt-secrets: chỉ các chỗ quyết định (30/40/~15) |
+
+**Tổng ước lượng CHƯA đọc ngữ cảnh: khoảng 500 trong ~900 chỗ khớp (không tính gt-guard/gt-conc/gt-effects đã đọc hết).** Kết quả "AN TOÀN"/"GHI NHẬN" là kết quả ĐỌC MÃ, KHÔNG phải chứng minh; chỉ các mục SỬA có test. 6 trong 11 mục ở đợt 2 là lỗi THẬT đạt tới được từ Grit ⇒ phần CHƯA đọc có thể còn lỗi tương tự — đặc biệt các chỗ "hàm/ADT/kiểu dùng làm giá trị" (nay có bộ sinh riêng) và "thiếu ⇒ coi là ổn" ở gt-types/check.
