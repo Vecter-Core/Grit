@@ -7,6 +7,7 @@ use gt_driver::native::{build_exe_profile, run_exe_timeout};
 use gt_driver::pipeline::{attestation, mir_dump};
 use gt_driver::runner::run_main;
 use gt_driver::{Options, RunEnd, check};
+use gt_oblig::driver::Checks;
 use gt_resolve::SourceInput;
 use std::time::Duration;
 
@@ -24,12 +25,20 @@ enum Out {
 fn run_both(
     src: &str,
     opt: gt_codegen_llvm::Opt,
+    checks: Checks,
 ) -> (Option<String>, RunEnd, Option<String>, RunEnd, Vec<String>) {
     let inputs = [SourceInput {
         name: "main.gt".to_string(),
         text: src.to_string(),
     }];
-    let mut res = check(&inputs, &Options::default()).expect("check");
+    let mut res = check(
+        &inputs,
+        &Options {
+            checks,
+            ..Options::default()
+        },
+    )
+    .expect("check");
     let codes: Vec<String> = res
         .report
         .diagnostics
@@ -63,8 +72,14 @@ fn run_both(
 }
 
 fn expect(name: &str, src: &str, want: &Out) {
-    for opt in [gt_codegen_llvm::Opt::Dev, gt_codegen_llvm::Opt::ReleaseO2] {
-        let (iv, ie, lv, le, codes) = run_both(src, opt);
+    // `--checks=proven` XOÁ check đã chứng minh (thí nghiệm): đây mới là chế độ mà `⊳` làm giả thiết có thể xoá nhầm check ở đường gián tiếp; hồ sơ release từ chối proven.
+    let modes = [
+        (gt_codegen_llvm::Opt::Dev, Checks::All),
+        (gt_codegen_llvm::Opt::ReleaseO2, Checks::All),
+        (gt_codegen_llvm::Opt::Dev, Checks::Proven),
+    ];
+    for (opt, checks) in modes {
+        let (iv, ie, lv, le, codes) = run_both(src, opt, checks);
         match want {
             Out::Red(c) => {
                 assert!(
@@ -79,7 +94,7 @@ fn expect(name: &str, src: &str, want: &Out) {
                 assert_eq!(
                     le,
                     RunEnd::Aborted((*k).to_string()),
-                    "{name}: LLVM {opt:?}"
+                    "{name}: LLVM {opt:?}/{checks:?}"
                 );
             }
             Out::Value(v) => {
@@ -92,7 +107,7 @@ fn expect(name: &str, src: &str, want: &Out) {
                 assert_eq!(
                     (le, lv.as_deref()),
                     (RunEnd::Normal, Some(*v)),
-                    "{name}: LLVM {opt:?}"
+                    "{name}: LLVM {opt:?}/{checks:?}"
                 );
             }
         }
