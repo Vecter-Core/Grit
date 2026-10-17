@@ -695,7 +695,6 @@ impl<'a> Checker<'a> {
 }
 
 #[cfg(test)]
-#[allow(dead_code, clippy::unwrap_used)]
 #[path = "../../gt-types/tests/common/mod.rs"]
 mod tc;
 
