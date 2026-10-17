@@ -448,7 +448,11 @@ impl<'a> Gen<'a> {
             }
             Rvalue::Aggregate(kind, ops) => match kind {
                 AggregateKind::Tuple => {
-                    let Ty::Tuple(ts) = &dty else { return };
+                    let Ty::Tuple(ts) = &dty else {
+                        // đích của Aggregate::Tuple không phải tuple: không được bỏ qua việc liên hệ region (FAIL_OPEN_AUDIT R3)
+                        self.defend("tuple: kiểu đích không phải tuple");
+                        return;
+                    };
                     let mut o = 0;
                     for (op, t) in ops.iter().zip(ts) {
                         let n = self.nslots(t);
