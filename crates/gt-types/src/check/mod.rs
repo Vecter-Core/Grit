@@ -697,10 +697,15 @@ impl<'e, 'a> Checker<'e, 'a> {
         let Some(t) = c.args.first() else {
             return;
         };
-        if !self.vec_drop_reported
-            && self.env.db.needs_drop(t)
-            && !self.env.db.is_copy_resolved(t, scope)
-        {
+        let nd = match self.env.db.needs_drop_checked(t) {
+            Ok(b) => b,
+            Err(why) => {
+                // db không nhất quán: KHÔNG được coi là "không cần drop" (E0318 sẽ bị bỏ qua) ⇒ ICE
+                self.err("E9901", c.caller, c.span, why);
+                return;
+            }
+        };
+        if !self.vec_drop_reported && nd && !self.env.db.is_copy_resolved(t, scope) {
             self.vec_drop_reported = true; // một chẩn đoán cho mỗi hàm (tránh lặp ở `new`/`push`/…)
             let shown = t.render(self.env.defs());
             self.err(

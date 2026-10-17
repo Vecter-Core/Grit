@@ -280,6 +280,8 @@ pub(crate) struct Checker<'a> {
     pub file: String,
     pub diags: Vec<Diagnostic>,
     seen: BTreeSet<(String, usize, u32)>,
+    /// db không nhất quán gặp giữa chừng (vd ADT không có trong db): `run` trả `Err` ⇒ ICE, không kết luận.
+    fault: std::cell::RefCell<Option<String>>,
 }
 
 impl<'a> Checker<'a> {
@@ -290,6 +292,7 @@ impl<'a> Checker<'a> {
             file: t.file_name(body.node),
             diags: Vec::new(),
             seen: BTreeSet::new(),
+            fault: std::cell::RefCell::new(None),
         }
     }
 
@@ -336,8 +339,14 @@ impl<'a> Checker<'a> {
     fn has_own_drop(&self, ty: &Ty) -> bool {
         match ty {
             Ty::Adt(d, _) => {
-                self.db.adts.get(d).and_then(|a| a.lang) == Some(Lang::Arena)
-                    || self.db.has_drop_impl(ty)
+                let Some(adt) = self.db.adts.get(d) else {
+                    // ADT không có trong db: KHÔNG được coi là "không có Drop" (E0407 sẽ bị bỏ qua) ⇒ bảo thủ + ICE ở cuối `run`
+                    self.fault.borrow_mut().get_or_insert_with(|| {
+                        format!("ADT {d:?} không có trong cơ sở kiểu (has_own_drop)")
+                    });
+                    return true;
+                };
+                adt.lang == Some(Lang::Arena) || self.db.has_drop_impl(ty)
             }
             _ => false,
         }
@@ -690,7 +699,10 @@ impl<'a> Checker<'a> {
                 self.check_return(&ls, t.source);
             }
         }
-        Ok(())
+        match self.fault.borrow_mut().take() {
+            Some(f) => Err(f),
+            None => Ok(()),
+        }
     }
 }
 
@@ -719,6 +731,10 @@ mod tests {
         let ck = Checker::new(&t, &m.bodies[0]);
         let unknown = gt_types::Ty::Adt(gt_resolve::DefId::from_index(1_000_000), Vec::new());
         assert!(ck.has_own_drop(&unknown), "ADT lạ bị coi là không có Drop");
+        assert!(
+            ck.fault.borrow().is_some(),
+            "db không nhất quán phải để lại lỗi nội bộ cho `run`"
+        );
     }
 
     /// Đường thật `Checker::push`: mã sai định dạng PHẢI để lại một chẩn đoán (E9901), không được biến mất (FAIL_OPEN_AUDIT B1).

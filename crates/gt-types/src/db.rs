@@ -251,12 +251,23 @@ impl TypeDb {
 
     /// Giá trị kiểu này có cần `Drop` tường minh không (ADR-020 §9, Q26): ADT có `⊐ Drop for` (chỉ lib/core), `Arena` (luôn),
     /// tuple/mảng/ADT chứa thành phần cần drop; tham số kiểu: coi là cần (MIR đa hình). `Copy`, tham chiếu, nguyên thuỷ: không.
+    /// ADT không có trong db (db không nhất quán) ⇒ coi là CẦN drop (bảo thủ, không bao giờ "không cần"); dùng [`TypeDb::needs_drop_checked`] khi cần BÁO lỗi nội bộ.
     #[must_use]
     pub fn needs_drop(&self, ty: &Ty) -> bool {
-        self.needs_drop_inner(ty, 0)
+        self.needs_drop_inner(ty, 0, &mut None)
     }
 
-    fn needs_drop_inner(&self, ty: &Ty, depth: u32) -> bool {
+    /// Như [`TypeDb::needs_drop`] nhưng `Err` (lý do) nếu gặp ADT không có trong db — người gọi báo ICE E9901 (FAIL_OPEN_AUDIT).
+    pub fn needs_drop_checked(&self, ty: &Ty) -> Result<bool, String> {
+        let mut fault = None;
+        let r = self.needs_drop_inner(ty, 0, &mut fault);
+        match fault {
+            Some(f) => Err(f),
+            None => Ok(r),
+        }
+    }
+
+    fn needs_drop_inner(&self, ty: &Ty, depth: u32, fault: &mut Option<String>) -> bool {
         if depth > 32 {
             return true; // kiểu đệ quy sâu bất thường: an toàn là coi như cần drop
         }
@@ -273,12 +284,15 @@ impl TypeDb {
             | Ty::Ref(..)
             | Ty::Infer(_) => false,
             Ty::Param(_) => true,
-            Ty::Tuple(v) => v.iter().any(|t| self.needs_drop_inner(t, depth + 1)),
-            Ty::Array(t, n) => *n > 0 && self.needs_drop_inner(t, depth + 1),
-            Ty::Slice(t) => self.needs_drop_inner(t, depth + 1),
+            Ty::Tuple(v) => v.iter().any(|t| self.needs_drop_inner(t, depth + 1, fault)),
+            Ty::Array(t, n) => *n > 0 && self.needs_drop_inner(t, depth + 1, fault),
+            Ty::Slice(t) => self.needs_drop_inner(t, depth + 1, fault),
             Ty::Adt(d, args) => {
                 let Some(adt) = self.adts.get(d) else {
-                    return false;
+                    fault.get_or_insert_with(|| {
+                        format!("ADT {d:?} không có trong cơ sở kiểu (needs_drop)")
+                    });
+                    return true;
                 };
                 if adt.lang == Some(Lang::Arena) {
                     return true;
@@ -288,11 +302,19 @@ impl TypeDb {
                 }
                 match &adt.kind {
                     AdtKind::Struct(fs) => fs.iter().any(|f| {
-                        self.needs_drop_inner(&subst_with(&f.ty, &adt.generics, args), depth + 1)
+                        self.needs_drop_inner(
+                            &subst_with(&f.ty, &adt.generics, args),
+                            depth + 1,
+                            fault,
+                        )
                     }),
                     AdtKind::Enum(vs) => vs.iter().any(|v| {
                         v.fields.iter().any(|f| {
-                            self.needs_drop_inner(&subst_with(f, &adt.generics, args), depth + 1)
+                            self.needs_drop_inner(
+                                &subst_with(f, &adt.generics, args),
+                                depth + 1,
+                                fault,
+                            )
                         })
                     }),
                 }
@@ -382,6 +404,14 @@ mod drop_tests {
                 env.db
                     .needs_drop(&Ty::Tuple(vec![Ty::Bool, unknown.clone()]))
             );
+            // API có kiểm: báo lỗi nội bộ (người gọi ICE E9901), kể cả khi ADT lạ nằm lồng bên trong
+            assert!(env.db.needs_drop_checked(&unknown).is_err());
+            assert!(
+                env.db
+                    .needs_drop_checked(&Ty::Tuple(vec![Ty::Bool, unknown.clone()]))
+                    .is_err()
+            );
+            assert_eq!(env.db.needs_drop_checked(&Ty::Bool), Ok(false));
             let arena = *env.db.lang.get(&Lang::Arena).expect("Arena");
             assert!(
                 env.db.needs_drop(&Ty::Adt(arena, Vec::new())),
