@@ -72,6 +72,25 @@ impl Env<'_> {
                         out.push(Ctor::Range(lo, hi));
                     }
                 }
+                if matches!(ty, Ty::Char) {
+                    // miền `char` KHÔNG liền khối: 0xD800–0xDFFF không phải giá trị ⇒ bỏ khe khỏi các ctor (khoảng nằm cạnh khe được tách đôi). Trước đây khe bị
+                    // coi là phải phủ ⇒ `⌥` phủ 0..=0xD7FF và 0xE000..=0x10FFFF bị E0305 oan (bảo thủ); nay chính xác hai chiều.
+                    const GAP: (i128, i128) = (0xD800, 0xDFFF);
+                    let mut cut = Vec::new();
+                    for c in out {
+                        let Ctor::Range(lo, hi) = c else {
+                            cut.push(c);
+                            continue;
+                        };
+                        if lo < GAP.0 {
+                            cut.push(Ctor::Range(lo, hi.min(GAP.0 - 1)));
+                        }
+                        if hi > GAP.1 {
+                            cut.push(Ctor::Range(lo.max(GAP.1 + 1), hi));
+                        }
+                    }
+                    out = cut;
+                }
                 Some(out)
             }
             _ => None,
