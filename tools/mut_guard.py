@@ -44,6 +44,21 @@ def sh(cmd):
 
 def main():
     only = os.environ.get('MUT_ONLY')
+    # --resume (mặc định bật): bỏ qua đột biến đã có dòng trong OUT; dòng dở do bị ngắt được bỏ qua và kết thúc dòng trước khi ghi nối
+    done = set()
+    if os.path.exists(OUT) and os.path.getsize(OUT) > 0:
+        with io.open(OUT, encoding='utf-8') as f:
+            for ln in f:
+                try:
+                    done.add(json.loads(ln)['id'])
+                except (ValueError, KeyError):
+                    pass
+        with io.open(OUT, 'rb') as f:
+            f.seek(-1, os.SEEK_END)
+            torn = f.read(1) != b'\n'
+        if torn:
+            with io.open(OUT, 'a', encoding='utf-8', newline='') as f:
+                f.write('\n')
     out = io.open(OUT, 'a', encoding='utf-8')
     orig = io.open(P, encoding='utf-8', newline='').read()
     base = orig.replace('\r\n', '\n')
@@ -51,7 +66,10 @@ def main():
     for i, (dirn, name, a, b) in enumerate(MUTS):
         if only and str(i) not in only.split(','):
             continue
-        row = {'id': hashlib.sha1(f'{P}:{name}'.encode()).hexdigest()[:12], 'file': 'crates/gt-guard/src/lib.rs', 'line': 0, 'rule': 'TAY: ' + name,
+        rid = hashlib.sha1(f'{P}:{name}'.encode()).hexdigest()[:12]
+        if rid in done:
+            continue
+        row = {'id': rid, 'file': 'crates/gt-guard/src/lib.rs', 'line': 0, 'rule': 'TAY: ' + name,
                'old': a.strip(), 'new': b.strip() or '(xoá)', 'direction': dirn, 'source': 'tay'}
         if base.count(a) != 1:
             row.update(status='invalid', note=f'KHÔNG KHỚP đúng 1 lần ({base.count(a)})')

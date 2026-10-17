@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORK = os.environ.get("GRIT_MUT_DIR", "D:/Grit_mut")
@@ -256,13 +257,33 @@ def cmd_list(args):
     print(f"-- {n} đột biến")
 
 
-def cmd_run(args):
+def load_done(path):
+    """id các đột biến đã có dòng trong tệp kết quả (bỏ qua dòng hỏng/dở do bị ngắt giữa chừng)."""
     done = set()
-    if os.path.exists(args.out):
-        with open(args.out, encoding="utf-8") as f:
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
             for ln in f:
-                if ln.strip():
+                if not ln.strip():
+                    continue
+                try:
                     done.add(json.loads(ln)["id"])
+                except (ValueError, KeyError):
+                    pass
+    return done
+
+
+def cmd_run(args):
+    # tệp kết quả đã có dòng mà không nói --resume ⇒ từ chối (tránh vô tình trộn hai lô); --resume ⇒ bỏ qua đột biến đã có dòng
+    if not args.resume and os.path.exists(args.out) and os.path.getsize(args.out) > 0:
+        sys.exit(f"{args.out} đã có kết quả: dùng --resume để chạy tiếp (bỏ qua đột biến đã có dòng) hoặc xoá tệp.")
+    if os.path.exists(args.out) and os.path.getsize(args.out) > 0:
+        with open(args.out, "rb") as f:
+            f.seek(-1, os.SEEK_END)
+            torn = f.read(1) != b"\n"
+        if torn:  # phiên trước bị ngắt giữa lúc ghi một dòng: kết thúc dòng dở để dòng mới không dính vào nó
+            with open(args.out, "a", encoding="utf-8", newline="") as f:
+                f.write("\n")
+    done = load_done(args.out)
     only = None
     if args.only_survivors:
         # khoá theo (tệp, văn bản đã đột biến): số dòng/ID đổi khi mã nguồn dịch chuyển
@@ -293,6 +314,7 @@ def cmd_run(args):
         if st != "survived":
             sys.exit(f"BASELINE ĐỎ ở worker {w.n} ({st}): {note} — không chạy đột biến.")
     print("baseline xanh ở mọi worker", flush=True)
+    deadline = (time.time() + args.max_seconds) if args.max_seconds else None  # tính SAU baseline
     q = list(reversed(todo))
     qlock = threading.Lock()
     wlock = threading.Lock()
@@ -302,6 +324,10 @@ def cmd_run(args):
         while True:
             with qlock:
                 if not q:
+                    return
+                if deadline and time.time() > deadline:
+                    q.clear()  # hết thời gian lô: dừng SẠCH giữa hai đột biến (kết quả đã ghi; chạy tiếp bằng --resume)
+                    print("hết --max-seconds: dừng lô; chạy lại với --resume", flush=True)
                     return
                 m, crlf = q.pop()
             res = w.evaluate(m, crlf)
@@ -345,6 +371,8 @@ def main():
     b.add_argument("--workers", type=int, default=1)
     b.add_argument("--out", required=True)
     b.add_argument("--limit", type=int, default=0)
+    b.add_argument("--resume", action="store_true", help="chạy tiếp: bỏ qua đột biến đã có dòng trong --out (bắt buộc khi --out đã có nội dung)")
+    b.add_argument("--max-seconds", type=int, default=0, help="dừng lô sau chừng này giây (kiểm giữa hai đột biến); lô ngắn ≤ ~15 phút, chạy tiếp bằng --resume")
     b.add_argument("--only-survivors", help="chỉ chạy lại các đột biến đang SỐNG SÓT trong tệp .jsonl này (đã sửa mã/test từ lần trước)")
     b.add_argument("files", nargs="+")
     c = sub.add_parser("report")
