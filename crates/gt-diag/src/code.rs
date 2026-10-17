@@ -58,6 +58,13 @@ impl Code {
         }
     }
 
+    /// Như [`Code::parse`] nhưng chuỗi sai định dạng KHÔNG làm chẩn đoán biến mất: lùi về `E9901` (lỗi nội bộ ⇒ cổng từ chối). Dùng ở mọi chỗ dựng
+    /// `Diagnostic` từ mã dạng chuỗi (FAIL_OPEN_AUDIT B1/S-C: `Code::parse(..).ok()?` nuốt chẩn đoán lặng lẽ).
+    #[must_use]
+    pub fn parse_or_internal(s: &str) -> Code {
+        Code::parse(s).unwrap_or_else(|_| Code("E9901".to_string()))
+    }
+
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
@@ -108,4 +115,19 @@ const KNOWN: &[&str] = &[
 #[must_use]
 pub fn known_codes() -> Vec<Code> {
     KNOWN.iter().filter_map(|s| Code::parse(s).ok()).collect()
+}
+
+#[cfg(test)]
+mod or_internal_tests {
+    use super::Code;
+
+    #[test]
+    fn malformed_codes_fall_back_to_the_internal_error_and_valid_ones_pass_through() {
+        for ok in ["E0101", "S101", "N0606", "E9901"] {
+            assert_eq!(Code::parse_or_internal(ok).as_str(), ok);
+        }
+        for bad in ["", "E", "E04", "E04011", "e0101", "X0101", "S1010", "E01O1"] {
+            assert_eq!(Code::parse_or_internal(bad).as_str(), "E9901", "{bad:?}");
+        }
+    }
 }
