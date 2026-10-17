@@ -102,3 +102,21 @@ Phương pháp: viết test chạm đúng nhánh, hoàn nguyên CHỈ chỗ sử
 - **B2/B3** (`crates/gt-borrowck/tests/fail_open_ice.rs`, 4 test; sửa MỘT thân MIR thật rồi gọi `check_body` công khai; đối chứng: thân nguyên vẹn không báo gì). Hoàn nguyên `regions.rs` về trước bản sửa (4137b75): cả 4 **ĐỎ** — Deref không slot ⇒ `[]` (im lặng chấp nhận); ADT lạ trong phép gán ⇒ `[]`; ADT lạ sau `&!` ⇒ `[]`; phép chiếu `Field` trên số nguyên ⇒ `["E0401"]` (chẩn đoán SAI trên dữ liệu rác, không phải ICE). Bản sửa ⇒ 4/4 XANH, mỗi ca ra E9901.
 - **D1** (`crates/gt-driver/tests/instance_keys.rs`, test `an_instance_without_a_key_changes_the_attestation_hash_instead_of_disappearing`): so `mir_dump` của (a) thiếu khoá hàm của một nút với (b) bảng instance không có nút đó. Hoàn nguyên `mir_dump` về `filter_map` cũ ⇒ **ĐỎ** (hai băm trùng nhau); bản sửa ⇒ XANH.
 - **Giới hạn nói thẳng:** dữ liệu thiếu được DỰNG bằng cách sửa cấu trúc trong bộ nhớ, không phải sinh bởi gritc (Phase 1 không sinh ra). Đây chứng minh nhánh phòng thủ hoạt động, không chứng minh có đường thật dẫn tới nhánh đó.
+
+## FB-13 — gt-mir đệ quy vô hạn khi dùng hàm kết hợp làm giá trị (`B::get`) ⇒ gritc chết (tràn ngăn xếp) (2026-10-17; tìm thấy khi làm S-E)
+- **Triệu chứng:** `f: ƒ(&B) → u32 ! ∅ ≔ B::get;` ⇒ `thread 'gt-big-stack' has overflowed its stack`. `Res::Assoc` rơi xuống nhánh mặc định của `as_operand`, gọi `expr_into` → `as_rvalue` → `as_operand`… vô hạn.
+- **Phân loại:** đạt tới được từ Grit; FAIL-CLOSED (không ra mã) nhưng gritc chết thay vì báo lỗi/ICE. Không sinh mã sai.
+- **Sửa:** `Res::Assoc` ⇒ `Const::FnItem` qua `fn_item_const`; đường dẫn không hạ được ⇒ ICE E9901 (không đệ quy). Test đỏ trước (`gt-mir/tests/assoc_fn_value.rs`, tràn ngăn xếp), corpus `pass/assoc_fn_as_value`.
+
+## FB-14 — `⌥` trên `u128`: literal bị kẹp, miền bị cắt ở `i128::MAX` ⇒ `⌥` thiếu nhánh được coi là vét vạn (2026-10-17; S-B)
+- **Triệu chứng:** `⌥ x { 0..=200000000000000000000000000000000000000 ↦ 1u32 }` trên `x: u128` ⇒ check XANH; chạy với `x = 3·10^38` ⇒ `abort: unreachable` (mã thoát 70) ở LLVM, "unreachable" ở thông dịch.
+- **Phân loại:** lỗi THẬT (false negative của E0305), đạt tới được từ Grit; hậu quả là abort có kiểm soát (không UB), nhưng check đã nói "vét cạn" sai. Cũng: `-2^127` bị đọc thành `-(i128::MAX)`, `v - 1` tràn ở `..i128::MIN`.
+- **Sửa (ADR-041):** không bao giờ kẹp; cận không biểu diễn chính xác ⇒ `Opaque`; miền `u128` vô hạn (cần `_`); `i128` chính xác. Test đỏ trước (`gt-types/tests/match_int128.rs`), oracle ngẫu nhiên `match_oracle.rs` (bắt lỗi cũ khi tắt bản sửa), corpus.
+- **Đánh đổi:** `⌥` u128 phủ trọn bằng khoảng kín nay bị E0305 (KNOWN_LIMITATIONS).
+
+## FB-15 — hàm kết hợp dùng làm giá trị MẤT hiệu ứng khai báo ⇒ hàm `! ∅` thực hiện được `io`/`mem` mà không bị E0801 (2026-10-17; tìm thấy khi tổng quát hoá S-E)
+- **Triệu chứng:** `ƒ g(b: &B) ! ∅ { f ≔ B::talk; f(b) }` với `B::talk ! {io}` ⇒ check XANH. Tương tự `Cap::now`, `Arena::new`… (mọi hàm kết hợp, kể cả intrinsic của prelude).
+- **Nguyên nhân:** `apply_pick_types` trả `Ty::Fn(ps, ret, Vec::new())` — hiệu ứng RỖNG; gt-effects lấy hiệu ứng của `Callee::Value` từ kiểu hàm.
+- **Phân loại:** lỗi THẬT, đạt tới được từ Grit, FAIL-OPEN của hệ hiệu ứng (hiệu ứng là một điều kiện cứng: `io`/`mem`/`div`/`detach`/`lock`). Chưa kiểm xem `div`/`lock` có thể lách theo cách này không (hiệu ứng của thành viên được tra nguyên vẹn nay, nên cùng sửa).
+- **Sửa:** `pick_effects` tra hiệu ứng khai báo của thành viên. Test đỏ trước (`gt-effects/tests/effects.rs`), corpus `fail/E0801_assoc_fn_value_effects` + `pass/assoc_fn_value_effects`. Hệ quả hành vi: chú thích kiểu hàm `! ∅` cho một hàm kết hợp có hiệu ứng nay là E0301 (đúng).
+- **Vì sao lọt:** không bộ sinh nào sinh hàm kết hợp làm giá trị (xem mục 3 của lệnh: mở rộng bộ sinh).
