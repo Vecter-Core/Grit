@@ -250,7 +250,7 @@ impl<'a> Env<'a> {
     }
 
     pub fn err(&mut self, code: &str, node: NodeId, span: Span, msg: String) -> Option<usize> {
-        let c = Code::parse(code).ok()?;
+        let c = Code::parse_or_internal(code);
         let d = Diagnostic::new(c, &self.fname(node.file()), span, msg);
         self.diags.push(d);
         Some(self.diags.len() - 1)
