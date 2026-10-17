@@ -1,6 +1,6 @@
 # HANDOFF — TRẠNG THÁI HIỆN TẠI (đọc tệp này đầu tiên; lịch sử ở `docs/HANDOFF_ARCHIVE.md`)
 
-**Cập nhật tại commit b97338d, ngày 2026-10-18.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit bcec465, ngày 2026-10-18.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 ## 1. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ (`.gt`) thiết kế cho AI viết code; ký hiệu toán/logic ngắn (có bí danh ASCII). Chủ dự án **Giang** — trả lời bằng TIẾNG VIỆT.
@@ -61,7 +61,7 @@ ADR-036 hồ sơ release; ADR-037 nới điều kiện fuzz #2; ADR-038 (Arena c
 ## 6. VIỆC TIẾP THEO
 
 **▶ CHẾ ĐỘ CHẠY LIÊN TỤC (lệnh Giang 2026-10-17): ĐỌC `docs/RUNLIST.md` (R1–R12) rồi làm mục CHƯA/ĐANG đầu tiên; báo cáo từng mục ở `docs/RUN_REPORTS.md`; không dừng báo giữa chừng.**
-**▶ TRẠNG THÁI RUNLIST (2026-10-18): R1, R2, R3 XONG; cổng liền mạch sau R3 XANH 961/0/189, bundle `grit-b97338d`. Việc kế: R4 (GRITRT_ARENA_CHECK chỉ được THÊM kiểm tra) → R5 …R12. R3 tìm 3 lỗi thật FB-17/18/19 (FIELD_BUGS). Môi trường: shell Bash cần `export PATH=/d/Tools/llvm-20.1.8/bin:$PATH` để chạy exe LLVM/rig test; sau thay `runtime/gt-rt` phải `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml`; cổng khởi chạy tách bằng WMI với `C:/Program Files/Git/bin/bash.exe` (KHÔNG dùng bash.exe của WindowsApps).**
+**▶ TRẠNG THÁI RUNLIST (2026-10-18): R1–R4 XONG; cổng liền mạch sau R3 XANH 961/0/189, bundle `grit-b97338d`. Việc kế: R5 (chạy nặng theo lô: flake llvm_sort ≥100, std release/release-o2, Ord kiểu ghép, sortlines) → R6 …R12. R3 tìm 3 lỗi thật FB-17/18/19; R4: `GRITRT_ARENA_CHECK=0` không còn tắt kiểm ở dev. Môi trường: shell Bash cần `export PATH=/d/Tools/llvm-20.1.8/bin:$PATH` để chạy exe LLVM/rig test; sau thay `runtime/gt-rt` phải `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml`; cổng khởi chạy tách bằng WMI với `C:/Program Files/Git/bin/bash.exe` (KHÔNG dùng bash.exe của WindowsApps).**
 **Kho git (R1d, đo 2026-10-17):** nhánh làm việc chuẩn là `main` (đã đổi tên từ `master` bởi commit của Giang), `origin = https://github.com/Vecter-Core/Grit.git`, `origin/main` = commit `86c4955` "Initial commit: Push full Grit project" và NẰM TRONG lịch sử `main` (tuyến tính; `main` đi trước 18+ commit). Commit `86c4955` là SNAPSHOT DỞ (chứa `needs_drop` chưa xong lúc đó) — KHÔNG dùng làm mốc xanh. Agent KHÔNG push, KHÔNG force, KHÔNG reset, KHÔNG đổi tên nhánh.
 **Sao lưu (R1e):** sau mỗi cổng xanh chạy `bash tools/backup_bundle.sh D:/Grit` (giữ 3 bản `D:/Grit_backup/grit-<hash>.bundle`, có `git bundle verify`). Sao lưu cùng ổ KHÔNG bảo vệ khỏi hỏng ổ; việc đẩy lên remote do Giang quyết.
 **Lưới toàn vẹn (R1):** `bash tools/preflight.sh D:/Grit` trước MỖI lô nặng; giai đoạn `nul` của cổng (`tools/nul_check.sh`) quét tệp văn bản được theo dõi tìm byte NUL.
