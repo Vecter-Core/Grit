@@ -23,7 +23,7 @@ MUTS = [
     ('accept', 'luật 3c chỉ Invoke', 'InstructionOpcode::Invoke | InstructionOpcode::CallBr', 'InstructionOpcode::Invoke'),
     ('accept', 'luật 3c chỉ CallBr', 'InstructionOpcode::Invoke | InstructionOpcode::CallBr', 'InstructionOpcode::CallBr'),
     ('accept', 'không rà địa chỉ runtime (bỏ gọi)', 'runtime_address_violations(m)', 'Vec::<String>::new()'),
-    ('accept', 'chỉ rà hàm `gritrt_` đầu bảng (starts_with → ==)', 'name.starts_with("gritrt_")', 'name == "gritrt_abort"'),
+    ('accept', 'chỉ rà hàm `gritrt_` đầu bảng (starts_with → ==)', 'name.starts_with("gritrt_")', '(name == "gritrt_abort")'),
     ('reject', 'FB-9: bỏ miễn `getelementptr inbounds nuw`', '.replace("getelementptr inbounds nuw", "getelementptr")', ''),
     ('reject', 'FB-9: bỏ miễn `getelementptr nuw`', '.replace("getelementptr nuw", "getelementptr")', ''),
     ('accept', 'FB-9: miễn quá rộng (mọi " nuw")', '.replace("getelementptr inbounds nuw", "getelementptr")', '.replace(" nuw", "")'),
