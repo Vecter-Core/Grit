@@ -123,12 +123,17 @@ fn load(path: &str) -> Result<Vec<SourceInput>, String> {
         Ok(SourceInput { name, text })
     };
     if p.is_dir() {
-        let mut files: Vec<PathBuf> = std::fs::read_dir(p)
-            .map_err(|e| format!("không đọc được thư mục {path}: {e}"))?
-            .filter_map(Result::ok)
-            .map(|e| e.path())
-            .filter(|q| q.extension().is_some_and(|x| x == "gt"))
-            .collect();
+        let mut files: Vec<PathBuf> = Vec::new();
+        for e in std::fs::read_dir(p).map_err(|e| format!("không đọc được thư mục {path}: {e}"))?
+        {
+            // mục thư mục không đọc được KHÔNG được âm thầm bị bỏ khỏi tập đầu vào (sẽ cho phán quyết xanh trên tập con) — FAIL_OPEN_AUDIT R3
+            let q = e
+                .map_err(|e| format!("không đọc được mục trong thư mục {path}: {e}"))?
+                .path();
+            if q.extension().is_some_and(|x| x == "gt") {
+                files.push(q);
+            }
+        }
         files.sort();
         if files.is_empty() {
             return Err(format!("thư mục {path} không có tệp .gt"));
