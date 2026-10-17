@@ -686,3 +686,30 @@ fn has_cycle(b: &Body) -> bool {
     }
     false
 }
+
+#[cfg(test)]
+#[path = "../../gt-types/tests/common/mod.rs"]
+mod tc;
+
+#[cfg(test)]
+mod insert_tests {
+    use super::{BTreeMap, Insert, apply_insert, tc};
+
+    /// FAIL_OPEN_AUDIT R3 (driver.rs `apply_insert`): khối không còn terminator ⇒ từng `return` LẶNG LẼ ⇒ kiểm tra lúc chạy `⊳`/`⊲` KHÔNG được chèn (fail-open).
+    /// Invariant bị phá phải là lỗi NỘI BỘ (panic ⇒ ICE E9901 ở tầng pass), không bao giờ bỏ qua việc chèn.
+    #[test]
+    #[should_panic(expected = "terminator")]
+    fn apply_insert_on_a_block_without_terminator_is_an_internal_error_not_a_silent_skip() {
+        let t = tc::run(&[("main.gt", "ƒ f() → u32 ! ∅ { 1 }")]);
+        let m = gt_mir::lower_program(&t);
+        let mut ob = m.bodies[0].clone();
+        ob.blocks[0].terminator = None;
+        let ins = Insert::Pre {
+            block: 0,
+            contract: ob.node,
+            generics: Vec::new(),
+            args: Vec::new(),
+        };
+        apply_insert(&t, &mut ob, &ins, &mut BTreeMap::new());
+    }
+}
