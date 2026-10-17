@@ -231,10 +231,11 @@ fn gen_partition(r: &mut Rng, t: Ty) -> Vec<Arm> {
         }
         1 => {
             let i = r.below(arms.len() as u64) as usize;
-            if let Arm::Incl(a, b) = arms[i] {
-                if b > a && t.valid(b - 1) {
-                    arms[i] = Arm::Incl(a, b - 1);
-                }
+            if let Arm::Incl(a, b) = arms[i]
+                && b > a
+                && t.valid(b - 1)
+            {
+                arms[i] = Arm::Incl(a, b - 1);
             }
         }
         2 => arms.push(gen_arm(r, t)), // chồng thêm một nhánh ngẫu nhiên
