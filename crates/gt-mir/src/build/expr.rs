@@ -726,6 +726,8 @@ impl Builder<'_> {
                             return Ok(Operand::Const(c));
                         }
                     }
+                    // `Kiểu::hàm` (mục kết hợp) dùng làm giá trị: chỗ gọi do M4 ghi quyết định đích (FB-13)
+                    Some(Res::Assoc { .. }) => return Ok(Operand::Const(b.fn_item_const(e, &ty)?)),
                     _ => {}
                 },
                 _ if b.is_place_expr(e) => {
@@ -734,9 +736,30 @@ impl Builder<'_> {
                 }
                 _ => {}
             }
+            // `as_rvalue` của một đường dẫn lại gọi `as_operand`: đường dẫn KHÔNG hạ được thành toán hạng ở trên mà rơi xuống đây sẽ đệ quy vô hạn (FB-13) ⇒ ICE
+            if let ExprKind::Path(p) = &e.kind
+                && !matches!(b.res_of(p.id), Some(Res::Def(d)) if b.t.defs()[d.index()].kind == DefKind::Variant)
+            {
+                return ice("đường dẫn không hạ được thành toán hạng (không phải biến, hàm, hằng, biến thể)");
+            }
             let t = b.temp(ty.clone());
             b.expr_into(&Place::local(t), e)?;
             Ok(b.operand_of(Place::local(t), &ty))
+        })
+    }
+
+    /// `Const::FnItem` của hàm mà chỗ gọi `e` đã phân giải (M4 ghi `sites`). Hàm qua trait dùng như giá trị chưa hỗ trợ ⇒ ICE.
+    fn fn_item_const(&self, e: &Expr, ty: &Ty) -> R<Const> {
+        let Some(site) = self.t.sites.get(&e.id) else {
+            return ice("thiếu chỗ gọi của hàm");
+        };
+        let CallTarget::Fn(node) = site.target else {
+            return ice("hàm qua trait dùng như giá trị");
+        };
+        Ok(Const::FnItem {
+            node,
+            generics: site.generics.clone(),
+            ty: ty.clone(),
         })
     }
 
@@ -744,19 +767,7 @@ impl Builder<'_> {
     fn def_const(&self, e: &Expr, d: gt_resolve::DefId, ty: &Ty) -> R<Option<Const>> {
         let def = &self.t.defs()[d.index()];
         Ok(match def.kind {
-            DefKind::Fn => {
-                let Some(site) = self.t.sites.get(&e.id) else {
-                    return ice("thiếu chỗ gọi của hàm");
-                };
-                let CallTarget::Fn(node) = site.target else {
-                    return ice("hàm qua trait dùng như giá trị");
-                };
-                Some(Const::FnItem {
-                    node,
-                    generics: site.generics.clone(),
-                    ty: ty.clone(),
-                })
-            }
+            DefKind::Fn => Some(self.fn_item_const(e, ty)?),
             DefKind::Const | DefKind::Static => Some(Const::Item {
                 node: def.node,
                 ty: ty.clone(),
