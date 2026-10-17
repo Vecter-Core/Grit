@@ -1,6 +1,6 @@
 # HANDOFF — TRẠNG THÁI HIỆN TẠI (đọc tệp này đầu tiên; lịch sử ở `docs/HANDOFF_ARCHIVE.md`)
 
-**Cập nhật tại commit HASH, ngày 2026-10-17.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit d8be3ef, ngày 2026-10-17.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 ## 1. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ (`.gt`) thiết kế cho AI viết code; ký hiệu toán/logic ngắn (có bí danh ASCII). Chủ dự án **Giang** — trả lời bằng TIẾNG VIỆT.
