@@ -87,3 +87,11 @@ Viết `examples/json` (330 dòng) và so sánh với tham chiếu Rust + serde_
 - **Phân loại:** FAIL-OPEN tiềm tàng trong TCB (không có chương trình gritc sinh ra thực tế; thấy từ đọc mã). Chưa có phản ví dụ chạy thật nào ngoài test dựng tay.
 - **Sửa:** test hồi quy commit ĐỎ trước (`runtime_function_addresses_may_only_be_called_directly`), rồi sửa: mọi lần dùng địa chỉ `gritrt_*` phải là callee trực tiếp của `call`; `invoke`/`callbr` bị từ chối. gt-guard 28/28.
 - **Còn mở:** đột biến chính thức cho quy tắc mới (chưa chạy).
+
+## FB-11 — năm chỗ "thiếu dữ liệu ⇒ coi là ổn" tìm thấy khi rà FAIL_OPEN_AUDIT (2026-10-17)
+- **Nguồn:** `docs/FAIL_OPEN_AUDIT.md` (đọc mã gt-guard, gt-secrets, gt-borrowck, gt-driver; gt-mir/gt-types chỉ rà phần quyết định — xem "CHƯA RÀ"). Cả năm đều là NGHI/TIỀM TÀNG (đọc mã), không có chương trình thật nào đã lọt.
+- **S1** gt-secrets: kiểu `Secret` lồng > 12 tầng ⇒ mất taint ⇒ không S201/S202. Sửa: quá sâu ⇒ cảnh báo bảo thủ. Test đỏ trước (độ sâu 13) rồi xanh.
+- **B1** gt-borrowck `push`: mã chẩn đoán sai định dạng ⇒ chẩn đoán bị nuốt. Sửa: lùi về E9901. Test đơn vị (cùng commit với sửa).
+- **B2/B3** gt-borrowck `place_slots`/`relate`/`walk`/`adt_invariant`: thiếu slot region, ADT thiếu trong cơ sở kiểu, tổ hợp (phép chiếu, kiểu) lạ ⇒ nới lặng lẽ. Sửa: `defend` (ICE E9901). KHÔNG dựng được test đỏ từ mã nguồn Grit; bằng chứng = bộ đếm phòng thủ vẫn (0,0) trên oracle/corpus.
+- **D1** gt-driver `mir_dump`: instance thiếu khoá hàm bị bỏ khỏi băm của attestation. Sửa: dấu `?missing:<node>`; test bất biến mọi instance có khoá.
+- **Vì sao lọt:** các nhánh "thiếu" không với tới được từ chương trình hợp lệ nên không bộ sinh/đột biến nào chạm; chỉ đọc mã đối kháng thấy. Cùng loại với FB-7.
