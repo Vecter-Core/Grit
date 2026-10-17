@@ -8,7 +8,7 @@
 | ID | Việc | Trạng thái | Lệnh chạy lại / bằng chứng | Commit |
 |---|---|---|---|---|
 | R1 | Toàn vẹn kho: `tools/preflight.sh`, giai đoạn `nul` của cổng, 4 tệp NUL, quan hệ git, sao lưu bundle, KNOWN_LIMITATIONS | XONG | `python tools/test_preflight.py`, `python tools/test_nul_check.py`, `bash tools/nul_check.sh D:/Grit`, `bash tools/backup_bundle.sh D:/Grit`; cổng sau R1 XANH 943/0/185 + `NUL_OK (1399 tệp quét)` | 824ec22 |
-| R2 | Hàm-làm-giá-trị: M6/M7 progen/obgen + vùng qua kiểu hàm; ⊳/⊲ qua giá trị hàm; bảng ĐO vs SUY RA + cờ test; hiệu ứng qua kiểu hàm | CHƯA | | |
+| R2 | Hàm-làm-giá-trị: M6/M7 progen/obgen + vùng qua kiểu hàm; ⊳/⊲ qua giá trị hàm; bảng ĐO vs SUY RA + cờ test; hiệu ứng qua kiểu hàm | XONG (cổng kế tiếp ở R3) | `cargo test -p gt-borrowck --test oracle random_programs`, `--test fn_value_regions`; `cargo test -p gt-oblig --test oracle pruned_programs_with_function`; `cargo test -p gt-driver --test contract_via_value`; feature đo `--features gt-types/allow-intrinsic-values` | b80dffc |
 | R3 | FAIL_OPEN_AUDIT rà hết phần còn lại (`tools/fail_open_scan.py`, dấu vân tay) | CHƯA | | |
 | R4 | GRITRT_ARENA_CHECK không tắt được ở dev; grit-contract §3.3 hai luật | CHƯA | | |
 | R5 | Chạy nặng theo lô: flake llvm_sort ≥100, std release/release-o2, Ord kiểu ghép, sortlines 5 lần | CHƯA | | |

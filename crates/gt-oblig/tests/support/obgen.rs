@@ -136,6 +136,8 @@ pub struct OGen {
     pub stats: GenStats,
     counter: usize,
     helpers: Vec<Fx>,
+    /// R2a (lệnh Giang 2026-10-17): mọi lời gọi hàm phụ đi qua GIÁ TRỊ HÀM (`hv_hK ≔ hK;` đầu mỗi thân, gọi `hv_hK(...)`). KHÔNG đổi dãy số ngẫu nhiên.
+    via_value: bool,
 }
 
 struct Scope {
@@ -163,7 +165,26 @@ impl OGen {
             stats: GenStats::default(),
             counter: 0,
             helpers: Vec::new(),
+            via_value: false,
         }
+    }
+
+    /// như `new` nhưng mọi lời gọi hàm phụ qua giá trị hàm (cùng dãy số ngẫu nhiên ⇒ cùng chương trình, chỉ đổi cách gọi)
+    pub fn with_values(seed: u64) -> OGen {
+        let mut g = OGen::new(seed);
+        g.via_value = true;
+        g
+    }
+
+    /// các phép gán giá trị hàm đầu thân: một cho MỖI hàm phụ đã định nghĩa
+    fn value_bindings(&self) -> String {
+        if !self.via_value {
+            return String::new();
+        }
+        self.helpers
+            .iter()
+            .map(|h| format!("hv_{0} ≔ {0}; ", h.name))
+            .collect()
     }
 
     fn fresh(&mut self, p: &str) -> String {
@@ -439,6 +460,9 @@ impl OGen {
             self.stats.slice_calls += 1;
             args.insert(0, a2);
             args.insert(0, a1);
+        }
+        if self.via_value {
+            return Some(format!("hv_{name}({})", args.join(", ")));
         }
         Some(format!("{name}({})", args.join(", ")))
     }
@@ -724,7 +748,8 @@ impl OGen {
                     "{w} ≔ ⎇ {ix} < al0.len() {{ xs[{ix}] }} ⇝ {{ {fb} }}; "
                 ));
             }
-            let body = format!("{pre}{}", self.stmts(&mut sc, 2, n, !id_tail));
+            let vb = self.value_bindings();
+            let body = format!("{vb}{pre}{}", self.stmts(&mut sc, 2, n, !id_tail));
             let tail = if id_tail {
                 "p0".to_string()
             } else {
@@ -776,7 +801,7 @@ impl OGen {
         }
         let n = 3 + self.rng.below(4) as usize;
         // gọi MỌI hàm phụ ngay đầu (trước các phép có thể abort), trên mảng `ar0` của đầu vào: để mọi hàm đều được chạy
-        let mut calls = format!("ar0 ≔ [{}]; ", pn.join(", "));
+        let mut calls = format!("{}ar0 ≔ [{}]; ", self.value_bindings(), pn.join(", "));
         sc.arrays.push(("ar0".into(), entry_params));
         for k in 0..self.helpers.len() {
             if let Some(c) = self.call_helper(&sc, k, 1, true) {

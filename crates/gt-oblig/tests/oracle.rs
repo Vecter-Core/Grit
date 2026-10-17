@@ -116,7 +116,10 @@ fn ity_of(name: &str) -> gt_types::IntTy {
 }
 
 fn one_program(seed: u64, cov: &mut Cov, stats: &mut obgen::GenStats) {
-    let mut g = obgen::OGen::new(seed);
+    one_program_with(obgen::OGen::new(seed), seed, cov, stats);
+}
+
+fn one_program_with(mut g: obgen::OGen, seed: u64, cov: &mut Cov, stats: &mut obgen::GenStats) {
     let p = g.program();
     let s = &g.stats;
     stats.programs += s.programs;
@@ -275,6 +278,27 @@ fn programs() -> u64 {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(FULL_PROGRAMS)
+}
+
+/// R2a (lệnh Giang 2026-10-17): CÙNG bộ sinh nhưng mọi lời gọi hàm phụ đi qua GIÁ TRỊ HÀM (`hv_hK ≔ hK; hv_hK(...)`): bản đã xoá check phải hành xử Y HỆT bản kiểm đầy đủ. Hàm bị lấy
+/// làm giá trị KHÔNG được dùng `⊳` làm giả thiết xoá check (`escaped_fns`); nếu bộ giải rò `⊳` sang đường gián tiếp, oracle thấy hai bản khác nhau.
+#[test]
+fn pruned_programs_with_function_value_calls_behave_exactly_like_fully_checked_ones() {
+    let mut cov = Cov::default();
+    let mut stats = obgen::GenStats::default();
+    let n = programs().min(3000);
+    for seed in 1..=n {
+        one_program_with(obgen::OGen::with_values(seed), seed, &mut cov, &mut stats);
+    }
+    eprintln!("fn_value: sinh: {stats:?}");
+    eprintln!(
+        "fn_value: chạy {} (so sánh {}, bỏ {}, abort {}), kết thúc bình thường {}",
+        cov.runs, cov.compared, cov.skipped, cov.aborts, cov.normal_runs
+    );
+    assert!(
+        cov.compared > 0 && cov.normal_runs > 0,
+        "bộ sinh không ra lần chạy so sánh được"
+    );
 }
 
 #[test]
