@@ -6,7 +6,7 @@ use gt_mir::validate::validate;
 use gt_mir::*;
 use gt_types::Ty;
 
-const SRC: &str = "▢ B { v: u32 }\n⊐ B {\n  ƒ get(&self) → u32 ! ∅ { self.v }\n}\nƒ main() → u64 ! ∅ {\n  b ≔ B { v: 3u32 };\n  f: ƒ(&B) → u32 ! ∅ ≔ B::get;\n  x ≔ f(&b);\n  x as u64\n}\n";
+const SRC: &str = "▢ B { v: u32 }\n⊐ B {\n  ƒ get(&self) → u32 ! ∅ { self.v }\n}\nƒ id(x: u32) → u32 ! ∅ { x }\nƒ main() → u64 ! ∅ {\n  b ≔ B { v: id(3u32) };\n  f: ƒ(&B) → u32 ! ∅ ≔ B::get;\n  x ≔ f(&b);\n  x as u64\n}\n";
 
 fn body() -> (gt_types::TypesOutput, Body) {
     let (t, m) = mir(SRC);
@@ -62,6 +62,25 @@ fn err_and_infer_in_local_types_are_rejected_at_any_depth() {
 #[test]
 fn err_in_projection_cast_const_and_aggregate_types_is_rejected() {
     let (t, b) = body();
+    // (0) tham số thế (generics) của một lời gọi `Callee::Fn`
+    {
+        let mut bad = b.clone();
+        let mut done = false;
+        for bb in &mut bad.blocks {
+            if let Some(t) = &mut bb.terminator
+                && let TerminatorKind::Call {
+                    callee: Callee::Fn { generics, .. },
+                    ..
+                } = &mut t.kind
+                && !done
+            {
+                generics.push(Ty::Err);
+                done = true;
+            }
+        }
+        assert!(done, "không có lời gọi Callee::Fn để sửa");
+        rejects(&t, &bad, "Callee::Fn generics");
+    }
     // (1) kiểu trường của một phép chiếu trên đích một phép gán
     let mut bad = b.clone();
     let mut done = false;

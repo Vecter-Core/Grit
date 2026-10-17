@@ -196,6 +196,11 @@ fn only_atomic_methods_are_rejected_as_function_values() {
   g(&b) +% a.load(AtomicOrdering::Acquire)
 }
 ");
+    // phương thức Atomic truyền thẳng làm ĐỐI SỐ lời gọi
+    only(
+        "ƒ apply(f: ƒ(u32) → Atomic<u32> ! ∅) → u32 ! ∅ { 0 }\nƒ main() → u32 ! ∅ {\n  apply(Atomic::new)\n}\n",
+        "E0503",
+    );
     // phương thức Atomic nằm trực tiếp trong khởi tạo struct (toán hạng Aggregate)
     only(
         "▢ H { f: ƒ(u32) → Atomic<u32> ! ∅ }
