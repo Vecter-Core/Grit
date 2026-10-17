@@ -866,6 +866,29 @@ mod tests {
         );
     }
 
+    /// R3 (FAIL_OPEN_AUDIT gt-oblig/env.rs `join`/`widen`): biến có ở MỘT phía mà không có ở phía kia ("thiếu" = không biết, như `leq` coi `None` là đỉnh) phải thành KHOẢNG ĐỦ
+    /// của kiểu, không được giữ khoảng hẹp của một phía (quá chính xác ⇒ có thể chứng minh nhầm).
+    #[test]
+    fn join_and_widen_treat_a_variable_missing_on_one_side_as_unknown() {
+        let mut a = Env::new(&[]);
+        a.declare(1, u(8));
+        a.assume(&Prop::Le(Term::var(1), Term::int(2)), true);
+        assert_eq!(a.eval_prop(&Prop::Le(Term::var(1), Term::int(2))), Tri::Yes);
+        let b = Env::new(&[]); // không khai báo biến 1
+        let j = a.join(&b);
+        assert_eq!(
+            j.eval_prop(&Prop::Le(Term::var(1), Term::int(2))),
+            Tri::Maybe,
+            "join giữ khoảng hẹp của một phía"
+        );
+        let w = a.widen(&b, &[]);
+        assert_eq!(
+            w.eval_prop(&Prop::Le(Term::var(1), Term::int(2))),
+            Tri::Maybe,
+            "widen giữ khoảng hẹp của một phía"
+        );
+    }
+
     #[test]
     fn assignment_updates_relations_and_shift_preserves_them() {
         let mut e = Env::new(&[1, 2]);
