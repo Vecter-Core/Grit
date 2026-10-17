@@ -1,0 +1,5 @@
+// expect: fail E0311
+// note: R3: `⊐ <T> Copy for W<T>` không ràng buộc `T: Copy` làm W<Arena>/W<Cap<…>> thành Copy (nhân đôi tài nguyên tuyến tính)
+▢ W<T> { v: T }
+⊐ <T> Copy for W<T> { }
+ƒ main() ! ∅ { }

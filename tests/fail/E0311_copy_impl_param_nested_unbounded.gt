@@ -1,0 +1,5 @@
+// expect: fail E0311
+// note: R3: tham số kiểu nằm LỒNG trong trường (tuple) cũng cần `T: Copy` khai báo ở impl
+▢ W<T> { v: (T, u8) }
+⊐ <T> Copy for W<T> { }
+ƒ main() ! ∅ { }

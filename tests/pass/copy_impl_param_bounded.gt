@@ -1,0 +1,12 @@
+// expect: pass
+// note: R3: `⊐ <T: Copy> Copy for W<T>` hợp lệ; tham số không dùng trong trường thì không cần ràng buộc
+▢ W<T> { v: (T, u8) }
+⊐ <T: Copy> Copy for W<T> { }
+▢ M<T> { n: u8 }
+⊐ <T> Copy for M<T> { }
+ƒ main() → u8 ! ∅ {
+  a ≔ W { v: (1u8, 2u8) };
+  b ≔ a;
+  c ≔ a;
+  b.v.1 + c.v.0
+}

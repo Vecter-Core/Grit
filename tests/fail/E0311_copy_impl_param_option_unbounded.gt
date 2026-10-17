@@ -1,0 +1,5 @@
+// expect: fail E0311
+// note: R3: trường Option<T> không ràng buộc `T: Copy` ⇒ không được `⊐ Copy`
+▢ W<T> { v: Option<T> }
+⊐ <T> Copy for W<T> { }
+ƒ main() ! ∅ { }
