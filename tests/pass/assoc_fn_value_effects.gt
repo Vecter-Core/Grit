@@ -1,0 +1,10 @@
+// expect: pass
+// note: FB-15: khai báo đủ hiệu ứng thì dùng hàm kết hợp làm giá trị được
+▢ B { v: u32 }
+⊐ B {
+  ƒ talk(&self) ! {io} { }
+}
+ƒ g(b: &B) ! {io} {
+  f ≔ B::talk;
+  f(b)
+}

@@ -1,0 +1,10 @@
+// expect: fail E0801
+// note: FB-15: hàm kết hợp dùng làm giá trị giữ hiệu ứng khai báo; hàm ! ∅ không thể gọi io qua biến
+▢ B { v: u32 }
+⊐ B {
+  ƒ talk(&self) ! {io} { }
+}
+ƒ g(b: &B) ! ∅ {
+  f ≔ B::talk;
+  f(b)
+}

@@ -284,7 +284,34 @@ impl<'e, 'a> Checker<'e, 'a> {
             node: e.id,
             span: e.span,
         });
-        Ty::Fn(ps, Box::new(pick.ret.clone()), Vec::new())
+        Ty::Fn(ps, Box::new(pick.ret.clone()), self.pick_effects(pick))
+    }
+
+    /// Hiệu ứng KHAI BÁO của thành viên mà `pick` chọn (FB-15: trước đây kiểu hàm của hàm kết hợp dùng làm giá trị mang hiệu ứng RỖNG ⇒ gọi qua biến mất `io`/`mem`…).
+    fn pick_effects(&self, pick: &Pick) -> Vec<String> {
+        match &pick.res {
+            MethodRes::Impl {
+                impl_node, member, ..
+            } => self
+                .env
+                .db
+                .impls
+                .iter()
+                .find(|i| i.node == *impl_node)
+                .and_then(|i| i.members.get(*member))
+                .map(|m| m.effects.clone()),
+            MethodRes::TraitMethod {
+                trait_def, member, ..
+            } => self
+                .env
+                .db
+                .traits
+                .get(trait_def)
+                .and_then(|td| td.members.get(*member))
+                .map(|m| m.effects.clone()),
+        }
+        // không tra được thành viên (db không nhất quán): KHÔNG đoán là `∅`; dùng một hiệu ứng không bao giờ khai báo được để E0801/E0301 chặn (fail-closed)
+        .unwrap_or_else(|| vec!["?unknown".to_string()])
     }
 
     fn record_pick(&mut self, node: NodeId, span: gt_span::Span, pick: &Pick) {
