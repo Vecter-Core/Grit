@@ -60,6 +60,8 @@ Mỗi pass kiểm tra mới (borrow checker, hiệu ứng, biên, đa luồng...
   - `gt-borrowck` (M6): chấp nhận một thân CHỈ khi dataflow giải xong (`Ok`), không chốt chặn phòng thủ nào bị chạm (`Gen.ice` rỗng) và không có xung đột với khoản vay còn hiệu lực; `check_program` chỉ chạy khi M4 và M5 sạch (nếu không trả rỗng vì bước trước ĐÃ ĐỎ — cổng phán quyết dựa vào chẩn đoán của bước trước, không dựa vào rỗng của M6).
   - `gt-guard` (M10): chấp nhận IR CHỈ khi `check_module`/`check_post` trả rỗng: verifier LLVM sạch, metadata `!gt.attest` TỒN TẠI và bằng attestation của `check`, tập hàm định nghĩa BẰNG tập instance, mọi thao tác nhạy cảm mang lớp nghĩa vụ ĐÚNG, số `gritrt_abort` theo (hàm, loại) không giảm (Guard-post); thiếu metadata là vi phạm, không phải "không có gì để kiểm".
 
+**Nguồn đột biến (Giang, 2026-10-17, từ FB-12):** MỖI lô đột biến kiểm tra phải có ÍT NHẤT MỘT NỬA là đột biến TỰ ĐỘNG (`tools/mut.py list` liệt kê; không phải tập do chính người viết mã chọn tay). Đột biến tay chỉ BỔ SUNG cho chỗ công cụ không sinh được (arm `match`, `matches!`, `.replace`, vòng lặp danh sách). Tệp kết quả `.jsonl` ghi nguồn từng dòng (`"source": "tự động"` hoặc `"tay"`); lô nào tay > tự động là chưa đủ quy tắc. Đột biến theo hướng CHẤP NHẬN thêm đầu vào/IR sống sót phải có test bắt hoặc lập luận tương đương cụ thể.
+
 **Phạm vi đột biến (mutation testing) — Giang quyết 2026-10-06 (đã sửa lần hai), áp dụng từ M4:**
 - Đã làm đột biến (tay hoặc cargo-mutants; mọi đột biến sống sót phải có test mới hoặc được chứng minh tương đương): M1 lexer, M2 (gt-ast, gt-diag, gt-parser, gt-fmt), M3 (gt-resolve).
 - **KHÔNG làm đột biến TOÀN BỘ** gt-types, gt-hir, gt-mir, gt-dataflow (M4, M5).

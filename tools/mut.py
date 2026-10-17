@@ -243,7 +243,7 @@ class Worker:
                     f.write(orig)
                 os.utime(target, None)  # mtime MỚI để cargo biên dịch lại bản gốc (tránh artifact cũ của đột biến)
         return {"id": mid(path, ln, new), "file": os.path.relpath(path, ROOT).replace("\\", "/"), "line": ln + 1,
-                "rule": name, "old": old.strip(), "new": new.strip(), "status": status, "note": note}
+                "rule": name, "old": old.strip(), "new": new.strip(), "status": status, "note": note, "source": "tự động"}
 
 
 def cmd_list(args):

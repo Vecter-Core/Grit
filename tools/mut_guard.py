@@ -52,7 +52,7 @@ def main():
         if only and str(i) not in only.split(','):
             continue
         row = {'id': hashlib.sha1(f'{P}:{name}'.encode()).hexdigest()[:12], 'file': 'crates/gt-guard/src/lib.rs', 'line': 0, 'rule': 'TAY: ' + name,
-               'old': a.strip(), 'new': b.strip() or '(xoá)', 'direction': dirn}
+               'old': a.strip(), 'new': b.strip() or '(xoá)', 'direction': dirn, 'source': 'tay'}
         if base.count(a) != 1:
             row.update(status='invalid', note=f'KHÔNG KHỚP đúng 1 lần ({base.count(a)})')
         else:
