@@ -88,3 +88,27 @@ fn i128_match_uses_exact_bounds_including_the_minimum() {
         1,
     );
 }
+
+/// Hai lớp phòng thủ độc lập (miền `u128` vô hạn + `Opaque` cho cận không biểu diễn được): kiểm lớp THỨ HAI riêng, trên `i128` (miền hữu hạn) với literal ngoài `i128`
+/// (M4 không báo, E0601 thuộc M7): literal/cận lớn hơn `i128::MAX` KHÔNG được kẹp về `i128::MAX` hay coi là mở ⇒ không phủ gì ⇒ E0305.
+#[test]
+fn out_of_range_i128_literals_are_never_clamped_or_treated_as_open_bounds() {
+    // literal đơn 2^127: kẹp sẽ phủ nhầm i128::MAX
+    err(
+        &m(
+            "i128",
+            "..1 ↦ 1u32, 1..=170141183460469231731687303715884105726 ↦ 2u32, 170141183460469231731687303715884105728 ↦ 3u32",
+        ),
+        "E0305",
+        1,
+    );
+    // cận trên 2^127 của khoảng: coi là "mở" sẽ phủ nhầm tới i128::MAX
+    err(
+        &m(
+            "i128",
+            "..1 ↦ 1u32, 1..=170141183460469231731687303715884105728 ↦ 2u32",
+        ),
+        "E0305",
+        1,
+    );
+}
