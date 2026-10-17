@@ -256,19 +256,23 @@ impl<'e, 'a> Checker<'e, 'a> {
         self.expr(&e, None)
     }
 
+    fn pat_db_fault(&mut self, p: &Pattern, args: &[Pattern], what: &str) -> XPat {
+        self.err("E9901", p.id, p.span, format!("pattern biến thể: {what}"));
+        self.bind_all(args);
+        XPat::Wild
+    }
+
     fn variant_pat(&mut self, p: &Pattern, vd: DefId, args: &[Pattern], ty: &Ty) -> XPat {
         let parent = self.env.defs()[vd.index()].parent;
+        // db không nhất quán (biến thể mà ADT cha/enum/chỉ số không tra được): KHÔNG được coi pattern là `Wild` (phủ mọi giá trị) ⇒ ICE (R3)
         let Some(adt) = parent.and_then(|x| self.env.db.adts.get(&x)).cloned() else {
-            self.bind_all(args);
-            return XPat::Wild;
+            return self.pat_db_fault(p, args, "ADT cha của biến thể không có trong cơ sở kiểu");
         };
         let AdtKind::Enum(vs) = &adt.kind else {
-            self.bind_all(args);
-            return XPat::Wild;
+            return self.pat_db_fault(p, args, "cha của biến thể không phải enum");
         };
         let Some(vi) = vs.iter().position(|v| v.def == vd) else {
-            self.bind_all(args);
-            return XPat::Wild;
+            return self.pat_db_fault(p, args, "biến thể không có trong enum cha");
         };
         let targs = fresh_args(&mut self.infer, &adt.generics);
         let aty = Ty::Adt(adt.def, targs.clone());
@@ -402,10 +406,26 @@ impl<'e, 'a> Checker<'e, 'a> {
             self.bind_fields(fields);
             return XPat::Wild;
         }
+        // `Self { … }` mà `Self` không phải struct/enum (vd `⊐ T for u32`): TRƯỚC ĐÂY trả `Wild` lặng lẽ (rồi ICE ở M5) — nay là lỗi kiểu rõ ràng (R3)
         let Ty::Adt(d, targs) = self.infer.resolve(&aty) else {
+            self.err(
+                "E0301",
+                p.id,
+                p.span,
+                "pattern `P { … }` cần một struct, nhưng kiểu này không phải struct".to_string(),
+            );
+            self.bind_fields(fields);
             return XPat::Wild;
         };
+        // ADT không có trong db (db không nhất quán): KHÔNG được coi pattern là `Wild` (phủ mọi giá trị) ⇒ ICE
         let Some(adt) = self.env.db.adts.get(&d).cloned() else {
+            self.err(
+                "E9901",
+                p.id,
+                p.span,
+                "ADT của pattern không có trong cơ sở kiểu".to_string(),
+            );
+            self.bind_fields(fields);
             return XPat::Wild;
         };
         let AdtKind::Struct(defs) = &adt.kind else {
