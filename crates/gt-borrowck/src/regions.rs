@@ -223,14 +223,18 @@ impl<'a> Gen<'a> {
     }
 
     /// Slots của một chỗ và kiểu của nó. `derefs`: với mỗi `Deref` của một tham chiếu, (bó region của tham chiếu, là `&`?).
-    pub fn place_slots(&self, p: &Place) -> (Slots, Ty, Vec<(Vec<usize>, bool)>) {
+    pub fn place_slots(&mut self, p: &Place) -> (Slots, Ty, Vec<(Vec<usize>, bool)>) {
         let mut slots = self.local_slots(p.local);
         let mut ty = self.body.locals[p.local.index()].ty.clone();
         let mut derefs = Vec::new();
         for e in &p.projection {
             match (e, ty.clone()) {
                 (PlaceElem::Deref, Ty::Ref(m, inner)) => {
-                    let first = slots.first().cloned().unwrap_or_default();
+                    let Some(first) = slots.first().cloned() else {
+                        // tham chiếu mà không còn slot region ⇒ bó rỗng ⇒ thiếu ràng buộc reborrow: KHÔNG được nới lặng lẽ (FAIL_OPEN_AUDIT B2)
+                        self.defend("place_slots: Deref tham chiếu không còn slot region");
+                        break;
+                    };
                     derefs.push((first, !m));
                     slots = slots.into_iter().skip(1).collect();
                     ty = *inner;
@@ -255,13 +259,19 @@ impl<'a> Gen<'a> {
                 (PlaceElem::Subslice { .. }, Ty::Array(t, _) | Ty::Slice(t)) => {
                     ty = Ty::Slice(t);
                 }
-                _ => {}
+                (e, t) => {
+                    // tổ hợp (phép chiếu, kiểu) lạ: trước đây bỏ qua ⇒ slot sai lặng lẽ (FAIL_OPEN_AUDIT B2)
+                    if !matches!(t, Ty::Err) {
+                        self.defend(&format!("place_slots: phép chiếu {e:?} trên kiểu {t:?}"));
+                    }
+                    break;
+                }
             }
         }
         (slots, ty, derefs)
     }
 
-    fn operand_slots(&self, o: &Operand) -> Slots {
+    fn operand_slots(&mut self, o: &Operand) -> Slots {
         match o {
             Operand::Copy(p) | Operand::Move(p) => self.place_slots(p).0,
             Operand::Const(c) => vec![vec![self.static_r]; self.nslots(&const_ty(c))],
@@ -287,7 +297,11 @@ impl<'a> Gen<'a> {
         let tys: Vec<Ty> = match self.db.adts.get(&d).map(|a| &a.kind) {
             Some(AdtKind::Struct(fs)) => fs.iter().map(|f| f.ty.clone()).collect(),
             Some(AdtKind::Enum(vs)) => vs.iter().flat_map(|v| v.fields.clone()).collect(),
-            None => Vec::new(),
+            None => {
+                // ADT không có định nghĩa ⇒ KHÔNG được coi là "không bất biến" (nới) — FAIL_OPEN_AUDIT B3
+                self.defend("adt_invariant: ADT không có trong cơ sở kiểu");
+                return true;
+            }
         };
         let inv = tys.iter().any(|t| self.ty_invariant(t));
         self.adt_inv.insert(d, inv);
@@ -337,7 +351,10 @@ impl<'a> Gen<'a> {
             Ty::Array(t, _) | Ty::Slice(t) => self.relate(t, src, dst, inv),
             Ty::RawPtr(_, t) => self.relate(t, src, dst, true),
             Ty::Adt(d, args) => {
-                let lt = self.db.adts.get(d).map_or(0, |a| a.lt_params);
+                let Some(lt) = self.db.adts.get(d).map(|a| a.lt_params) else {
+                    self.defend("relate: ADT không có trong cơ sở kiểu");
+                    return;
+                };
                 let invariant = inv || self.adt_invariant(*d);
                 for i in 0..lt.min(src.len()) {
                     self.outl(&src[i], &dst[i]);
@@ -671,7 +688,9 @@ impl<'a> Gen<'a> {
                 self.walk(d, i, pos, names, pvars, out)
             }
             (Ty::Adt(dd, da), Ty::Adt(di, ia)) if dd == di && da.len() == ia.len() => {
-                let lt = self.db.adts.get(dd).map_or(0, |a| a.lt_params);
+                let Some(lt) = self.db.adts.get(dd).map(|a| a.lt_params) else {
+                    return self.defend("walk: ADT không có trong cơ sở kiểu");
+                };
                 for _ in 0..lt {
                     let Some(r) = pos.next() else {
                         return self.defend("walk: thiếu vị trí region");
