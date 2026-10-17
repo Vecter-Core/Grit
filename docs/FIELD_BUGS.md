@@ -133,3 +133,10 @@ Phương pháp: viết test chạm đúng nhánh, hoàn nguyên CHỈ chỗ sử
 - **Phân loại:** lỗi THẬT, đạt tới được từ Grit (4 dòng), fail-open; phát hiện nhờ đọc mã trong R3 (validate.rs:230) rồi dựng thí nghiệm.
 - **Sửa:** trường được thay bằng ĐỐI SỐ THẬT của impl (`self_ty` args) và `is_copy` xét với ràng buộc do impl khai báo (`scope_bounds`); không khai báo `T: Copy` ⇒ E0311. Kèm: thiếu ADT/trait trong db trong validate ⇒ E9901 (trước: bỏ qua lặng lẽ); thiếu region_sig ⇒ không tương thích (trước: `true`).
 - **Bằng chứng:** `tests/fail/E0311_copy_impl_param_{unbounded,nested_unbounded,option_unbounded}.gt` (ĐỎ chủ ý ở commit 36ac79d với bản cũ: 2/3 xanh sai; Option<T> đã đỏ nhờ biến suy luận chưa giải), `tests/pass/copy_impl_param_bounded.gt`. Chưa chạy: bộ sinh chương trình cho lớp này (xem R3 báo cáo).
+
+## FB-18 — thông dịch MIR tính `u128` ≥ 2^127 như số có dấu (2026-10-18; R3, ĐO)
+- **Triệu chứng (đo):** `x ≔ 340282366920938463463374607431768211455u128; x > 5u128` ⇒ thông dịch `Bool(false)` (LLVM: 1); `x / 2u128` ⇒ `Int(0)` (đúng: 2^127−1; LLVM chưa hỗ trợ chia 128 bit ⇒ báo rõ); `a + a` với `a = 10^38` bị coi là tràn (i128 `checked_add`) dù vừa u128; `CastFits` u128→i128 coi mọi giá trị vừa.
+- **Nguyên nhân:** `V::Int(i128, IntTy)` lưu u128 bằng bit; `binop`/`CheckedBinaryOp`/`cast` dùng số học i128.
+- **Phân loại:** lỗi THẬT của backend thông dịch (kết quả SAI LẶNG LẼ, không phải lỗi bộ kiểm tra); đạt tới bằng `gritc run --backend=interpreter`; thông dịch là chuẩn đối chiếu của nhiều bộ test nên có thể che/lộ sai lệch. Tìm thấy nhờ rà R3 gt-mir/interp.rs:996–999 (clamp `u128` bằng `i128::MAX`).
+- **Sửa:** `binop_u128` (so sánh/chia/%/bão hoà/quấn theo `u128`), kiểm tràn `Checked*` theo `u128::overflowing_*`, `cast` (u128→f64, vừa/không vừa giữa u128 và i128) — test `crates/gt-mir/tests/interp_u128.rs` (ĐỎ chủ ý ở 93aa345; kỳ vọng tính độc lập bằng `u128` của Rust).
+- **Chưa làm:** so sánh thông dịch ≡ LLVM cho u128 (LLVM chưa có chia 128 bit); toán tử bit/dịch u128 trong thông dịch chưa có (báo `Bug`, đóng).

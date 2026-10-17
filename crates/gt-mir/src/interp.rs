@@ -932,6 +932,17 @@ impl<'a> Interp<'a> {
             },
             Rvalue::BinaryOp(op, a, b) => binop(*op, self.operand(a)?, self.operand(b)?)?,
             Rvalue::CheckedBinaryOp(op, a, b) => match (self.operand(a)?, self.operand(b)?) {
+                (V::Int(x, IntTy::U128), V::Int(y, _)) => {
+                    // u128 lưu bằng bit trong i128: kiểm tràn phải theo số KHÔNG DẤU (FB-18)
+                    let (a, b) = (x as u128, y as u128);
+                    let (r, over) = match op {
+                        BinOp::Add => a.overflowing_add(b),
+                        BinOp::Sub => a.overflowing_sub(b),
+                        BinOp::Mul => a.overflowing_mul(b),
+                        _ => return Err(Flow::Bug("checked op lạ".to_string())),
+                    };
+                    V::Tuple(vec![V::Int(r as i128, IntTy::U128), V::Bool(over)])
+                }
                 (V::Int(x, t), V::Int(y, _)) => {
                     let exact = match op {
                         BinOp::Add => x.checked_add(y),
@@ -968,7 +979,35 @@ impl<'a> Interp<'a> {
     }
 }
 
+/// `u128` lưu bằng bit trong `i128` (giá trị ≥ 2^127 là số âm): mọi phép phụ thuộc dấu phải tính trên `u128` (FB-18).
+fn binop_u128(op: BinOp, x: u128, y: u128) -> Result<V, Flow> {
+    let int = |r: u128| V::Int(r as i128, IntTy::U128);
+    Ok(match op {
+        BinOp::Add | BinOp::AddWrap => int(x.wrapping_add(y)),
+        BinOp::Sub | BinOp::SubWrap => int(x.wrapping_sub(y)),
+        BinOp::Mul | BinOp::MulWrap => int(x.wrapping_mul(y)),
+        BinOp::Div | BinOp::Rem if y == 0 => {
+            return Err(Flow::Bug("chia/% 0 KHÔNG có assert".to_string()));
+        }
+        BinOp::Div => int(x / y),
+        BinOp::Rem => int(x % y),
+        BinOp::AddSat => int(x.saturating_add(y)),
+        BinOp::SubSat => int(x.saturating_sub(y)),
+        BinOp::MulSat => int(x.saturating_mul(y)),
+        BinOp::Eq => V::Bool(x == y),
+        BinOp::Ne => V::Bool(x != y),
+        BinOp::Lt => V::Bool(x < y),
+        BinOp::Le => V::Bool(x <= y),
+        BinOp::Gt => V::Bool(x > y),
+        BinOp::Ge => V::Bool(x >= y),
+        other => return Err(Flow::Bug(format!("phép {other:?} trên u128 chưa cài"))),
+    })
+}
+
 fn binop(op: BinOp, a: V, b: V) -> Result<V, Flow> {
+    if let (V::Int(x, IntTy::U128), V::Int(y, _)) = (&a, &b) {
+        return binop_u128(op, *x as u128, *y as u128);
+    }
     Ok(match (a, b) {
         (V::Int(x, t), V::Int(y, _)) => match op {
             BinOp::Add => V::Int(wrap(x + y, t), t),
@@ -1048,15 +1087,28 @@ fn binop(op: BinOp, a: V, b: V) -> Result<V, Flow> {
 fn cast(v: V, t: &Ty, strict: bool) -> Result<V, Flow> {
     match (v, t) {
         // số nguyên → f64: chính xác khi |x| ≤ 2^53; `strict` (CastFits) chỉ đúng trong miền đó
-        (V::Int(x, _), Ty::Float(gt_types::FloatTy::F64)) => {
-            if strict && x.unsigned_abs() > (1u128 << 53) {
+        (V::Int(x, src), Ty::Float(gt_types::FloatTy::F64)) => {
+            // u128 lưu bằng bit: giá trị ≥ 2^127 nằm trong i128 dưới dạng số âm (FB-18)
+            let (mag, neg) = if src == IntTy::U128 {
+                (x as u128, false)
+            } else {
+                (x.unsigned_abs(), x < 0)
+            };
+            if strict && mag > (1u128 << 53) {
                 return Err(Flow::Bug("mất thông tin".to_string()));
             }
-            Ok(V::Float(x as f64))
+            let f = mag as f64;
+            Ok(V::Float(if neg { -f } else { f }))
         }
         (V::Float(x), Ty::Float(gt_types::FloatTy::F64)) => Ok(V::Float(x)),
-        (V::Int(x, _), Ty::Int(to)) => {
-            if strict && !in_range(x, *to) {
+        (V::Int(x, src), Ty::Int(to)) => {
+            // `in_range` coi mọi giá trị 128 bit là vừa; u128 ≥ 2^127 (bit âm) chỉ vừa u128, và số âm thật không vừa u128 (FB-18)
+            let fits = match (src == IntTy::U128 && x < 0, *to == IntTy::U128) {
+                (true, to_u) => to_u,
+                (false, true) => x >= 0,
+                (false, false) => in_range(x, *to),
+            };
+            if strict && !fits {
                 return Err(Flow::Bug("mất thông tin".to_string()));
             }
             Ok(V::Int(wrap(x, *to), *to))

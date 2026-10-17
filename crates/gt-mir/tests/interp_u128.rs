@@ -43,3 +43,19 @@ fn u128_values_above_i128_max_compare_divide_and_check_overflow_unsigned() {
         assert_eq!(run(&src), Outcome::Value(V::Bool(want)), "{src}");
     }
 }
+
+#[test]
+fn lossy_casts_between_u128_and_i128_are_detected_by_value() {
+    // u128::MAX không vừa i128; i128 âm không vừa u128; 2^127-1 vừa i128
+    let abort = |src: String| match run(&src) {
+        Outcome::Abort(_) => (),
+        o => panic!("{src}: kỳ vọng abort, có {o:?}"),
+    };
+    abort(format!("x ≔ {MAX}; y ≔ x as i128; y < 0i128"));
+    abort("n ≔ 0i128 - 1i128; y ≔ n as u128; y > 0u128".to_string());
+    assert_eq!(
+        run(&format!("x ≔ {HALF}; y ≔ x as i128; y > 0i128")),
+        Outcome::Value(V::Bool(true))
+    );
+    abort(format!("x ≔ {MAX}; y ≔ x as u64; y == 0u64"));
+}
