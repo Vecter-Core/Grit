@@ -437,9 +437,10 @@ pub fn mir_dump(art: &Artifacts) -> String {
         .types
         .instances
         .iter()
-        .filter_map(|i| {
-            let key = art.types.fn_keys.get(&i.node)?;
-            Some(gt_types::instance_name(key, &i.args, &art.types.resolve.defs).0)
+        .map(|i| match art.types.fn_keys.get(&i.node) {
+            Some(key) => gt_types::instance_name(key, &i.args, &art.types.resolve.defs).0,
+            // instance thiếu khoá KHÔNG được rơi khỏi băm (attestation phủ ít hơn): để lại dấu riêng làm băm đổi (FAIL_OPEN_AUDIT D1)
+            None => format!("?missing:{:?}", i.node),
         })
         .collect();
     names.sort();
