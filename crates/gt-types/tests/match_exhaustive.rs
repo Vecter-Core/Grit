@@ -163,3 +163,23 @@ fn nested_reference_pattern_reports_exactly_one_error_without_cascade() {
         1,
     );
 }
+
+/// R3 (FAIL_OPEN_AUDIT check/pat.rs): pattern struct `Self { … }` khi `Self` KHÔNG phải struct (vd `⊐ T for u32`) từng được M4 chấp nhận LẶNG LẼ (trả `Wild`) rồi chết bằng ICE ở M5.
+/// Phải là lỗi kiểu rõ ràng của M4 (E0301), không phải ICE.
+#[test]
+fn struct_pattern_on_a_non_struct_self_is_a_type_error_not_a_silent_wildcard() {
+    err(
+        "⊏ T { ƒ f(&self) → u32 ! ∅; }
+⊐ T for u32 {
+  ƒ f(&self) → u32 ! ∅ {
+    ⌥ *self {
+      Self { x: a } ↦ 1u32
+    }
+  }
+}
+ƒ main() → u32 ! ∅ { 0u32 }
+",
+        "E0301",
+        1,
+    );
+}
