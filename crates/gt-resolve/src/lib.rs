@@ -145,6 +145,14 @@ fn resolve_inner(map: &SourceMap, mods: &[String], prelude: &Prelude) -> Resolve
     for ((id, _), p) in map.iter().zip(&parsed) {
         if let Some(&m) = t.item_def.get(&p.id) {
             walk::walk_items(&mut t, &p.items, m, id);
+        } else if let Some(d) = t.mk(
+            "E9901",
+            id,
+            gt_span::Span::new(0, 0),
+            "lỗi nội bộ: tệp không có module gốc trong bảng (nội dung không được phân giải)"
+                .to_string(),
+        ) {
+            t.push("E9901", d, "resolve");
         }
     }
 

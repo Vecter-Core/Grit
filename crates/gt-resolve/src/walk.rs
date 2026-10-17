@@ -40,6 +40,14 @@ pub(crate) fn walk_items(t: &mut Tables, items: &[Item], module: DefId, file: Fi
             ItemKind::Mod(m) => {
                 if let Some(&d) = t.item_def.get(&item.id) {
                     walk_items(t, &m.items, d, file);
+                } else if let Some(d) = t.mk(
+                    "E9901",
+                    file,
+                    item.span,
+                    "lỗi nội bộ: module không có định nghĩa trong bảng (nội dung không được phân giải)".to_string(),
+                ) {
+                    // KHÔNG được bỏ qua lặng lẽ cả module (FAIL_OPEN_AUDIT R3)
+                    t.push("E9901", d, "walk_items");
                 }
             }
             ItemKind::Use(_) => {}
