@@ -160,3 +160,14 @@ fn arena_is_a_lang_item_that_is_not_copy_and_cannot_be_forged_by_attribute() {
     // `#lang(arena)` ngoài prelude là E1002
     err("#lang(arena) ▢ MyArena { x: i32 }", "E1002", 1);
 }
+
+/// FB-16 (ĐO bằng feature `allow-intrinsic-values`: XANH khi tắt E0313): hàm KHÁC `main` đúc capability qua tham số kiểu hàm nhận `root_fs` — phải bị chặn tại chỗ truyền.
+#[test]
+fn passing_a_capability_source_as_a_value_to_mint_capabilities_elsewhere_is_rejected() {
+    err(
+        "ƒ h(g: ƒ() → Cap<Fs> ! ∅) ! {io} { c ≔ g(); }
+ƒ main() ! {io} { h(root_fs); }",
+        "E0313",
+        1,
+    );
+}

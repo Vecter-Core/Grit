@@ -120,3 +120,9 @@ Phương pháp: viết test chạm đúng nhánh, hoàn nguyên CHỈ chỗ sử
 - **Phân loại:** lỗi THẬT, đạt tới được từ Grit, FAIL-OPEN của hệ hiệu ứng (hiệu ứng là một điều kiện cứng: `io`/`mem`/`div`/`detach`/`lock`). Chưa kiểm xem `div`/`lock` có thể lách theo cách này không (hiệu ứng của thành viên được tra nguyên vẹn nay, nên cùng sửa).
 - **Sửa:** `pick_effects` tra hiệu ứng khai báo của thành viên. Test đỏ trước (`gt-effects/tests/effects.rs`), corpus `fail/E0801_assoc_fn_value_effects` + `pass/assoc_fn_value_effects`. Hệ quả hành vi: chú thích kiểu hàm `! ∅` cho một hàm kết hợp có hiệu ứng nay là E0301 (đúng).
 - **Vì sao lọt:** không bộ sinh nào sinh hàm kết hợp làm giá trị (xem mục 3 của lệnh: mở rộng bộ sinh).
+
+## FB-16 — điều kiện cứng #12: hàm không phải `main` đúc capability qua hàm nguồn (`root_fs`) truyền như GIÁ TRỊ (2026-10-18; R2c, ĐO)
+- **Triệu chứng (đo bằng feature `allow-intrinsic-values`, tắt E0313):** `ƒ h(g: ƒ() → Cap<Fs> ! ∅) ! {io} { c ≔ g(); x ≔ c.read("/etc/hostname"); } ƒ main() ! {io} { h(root_fs); }` ⇒ check XANH. `h` không phải `main` nhưng đúc được `Cap<Fs>` (vô hạn lần, bỏ qua thu hẹp quyền kiểu `Cap::sub`).
+- **Nguyên nhân:** `check_caps` (E0310) chỉ xét `CapUse` ghi ở nơi đường dẫn `root_*` được NHẮC; không thấy lời gọi `g()` qua tham số kiểu hàm; `main` được phép nhắc `root_fs` làm giá trị.
+- **Phân loại:** lỗi THẬT, đạt tới được từ Grit, FAIL-OPEN của mô hình capability (điều kiện cứng #12). Đã đóng từ mục 2 (E0313 cho mọi intrinsic, kể cả `root_*`); R2c ĐO xác nhận lỗ hổng tồn tại trước quy tắc.
+- **Bằng chứng:** `tests/fail/E0313_cap_mint_via_value_param.gt` (ĐỎ E0313 với bản thường; XANH với feature đo), `gt-types/tests/capabilities.rs::passing_a_capability_source_as_a_value_to_mint_capabilities_elsewhere_is_rejected`.

@@ -246,3 +246,31 @@ fn release_has_no_mutant_probe() {
         "Cargo.toml gốc nhắc mutant-probe"
     );
 }
+
+/// feature đo `allow-intrinsic-values` của gt-types (tắt E0313) KHÔNG có trong `gritc`: hằng `ALLOW_INTRINSIC_VALUES` là `false` và chỉ `gt-types/Cargo.toml` nhắc tới nó.
+#[test]
+fn release_has_no_allow_intrinsic_values() {
+    assert!(
+        !std::hint::black_box(gt_types::ALLOW_INTRINSIC_VALUES),
+        "bản dựng gritc có feature allow-intrinsic-values!"
+    );
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut mentions = Vec::new();
+    for e in std::fs::read_dir(&crates).expect("crates") {
+        let p = e.expect("entry").path().join("Cargo.toml");
+        if let Ok(t) = std::fs::read_to_string(&p)
+            && t.contains("allow-intrinsic-values")
+        {
+            mentions.push(p.parent().expect("cha").to_string_lossy().into_owned());
+        }
+    }
+    assert_eq!(mentions.len(), 1, "feature xuất hiện ở: {mentions:?}");
+    assert!(mentions[0].ends_with("gt-types"), "{mentions:?}");
+    let root =
+        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.toml"))
+            .expect("Cargo.toml gốc");
+    assert!(
+        !root.contains("allow-intrinsic-values"),
+        "Cargo.toml gốc bật feature đo"
+    );
+}

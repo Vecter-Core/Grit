@@ -16,5 +16,10 @@ gt-stack = { path = "../gt-stack" }
 [dev-dependencies]
 gt-parser = { path = "../gt-parser" }
 
+[features]
+# CHỈ DÙNG ĐỂ ĐO (R2c, lệnh Giang 2026-10-17): tắt quy tắc E0313 (intrinsic làm giá trị) để đo "trước quy tắc" trong `docs/INTRINSIC_AS_VALUE.md`. KHÔNG bật mặc định;
+# KHÔNG được có trong `gritc` (test `release_has_no_allow_intrinsic_values` kiểm).
+allow-intrinsic-values = []
+
 [lints]
 workspace = true

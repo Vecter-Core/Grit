@@ -269,7 +269,10 @@ impl<'e, 'a> Checker<'e, 'a> {
     /// Hàm của lib/core (thân prelude KHÔNG có MIR = intrinsic) dùng làm GIÁ TRỊ (không phải người được gọi trực tiếp) ⇒ E0313: mọi nghĩa vụ theo lớp (precondition,
     /// E0310, E0405, E0502…) được sinh ở điểm gọi trực tiếp nên gọi qua con trỏ né kiểm tra của cả lớp (FAIL_OPEN_AUDIT tổng quát hoá S-E). `Atomic` giữ E0503 của gt-conc.
     fn reject_intrinsic_value(&mut self, e: &Expr, callee_node: NodeId) {
-        if self.callee_pos == Some(e.id) || !self.env.is_prelude(callee_node.file()) {
+        if crate::ALLOW_INTRINSIC_VALUES
+            || self.callee_pos == Some(e.id)
+            || !self.env.is_prelude(callee_node.file())
+        {
             return;
         }
         let atomic = self.env.db.impls.iter().any(|i| {

@@ -2,6 +2,9 @@
 //! gt-types (M4): kiểm kiểu — ADR-018 (đơn hình hoá lazy, bảng impl, kiểu `!`), `semantics.md` §1, §22.
 //!
 //! Chỉ chạy khi giải tên (M3) sạch (fail-closed). Thân hàm generic kiểm đúng một lần; instance do bộ thu thập tính từ các gốc.
+/// `true` chỉ khi bật feature đo `allow-intrinsic-values` (tắt E0313). Bản `gritc` PHẢI là `false`.
+pub const ALLOW_INTRINSIC_VALUES: bool = cfg!(feature = "allow-intrinsic-values");
+
 mod check;
 mod collect;
 mod db;
