@@ -173,3 +173,37 @@ fn atomic_methods_used_as_function_values_are_rejected() {
 }
 ");
 }
+
+/// Chính xác của luật S-E (diệt đột biến `is_atomic_member`): hàm THƯỜNG và phương thức của kiểu KHÁC dùng làm giá trị hàm KHÔNG bị E0503; phương thức Atomic nằm trong
+/// khởi tạo struct cũng bị bắt.
+#[test]
+fn only_atomic_methods_are_rejected_as_function_values() {
+    ok("ƒ inc(x: u32) → u32 ! ∅ { x +% 1 }
+ƒ main() → u32 ! ∅ {
+  a ≔ Atomic::new(5u32);
+  f ≔ inc;
+  f(a.load(AtomicOrdering::Acquire))
+}
+");
+    ok("▢ B { v: u32 }
+⊐ B {
+  ƒ get(&self) → u32 ! ∅ { self.v }
+}
+ƒ main() → u32 ! ∅ {
+  a ≔ Atomic::new(5u32);
+  b ≔ B { v: 3u32 };
+  g: ƒ(&B) → u32 ! ∅ ≔ B::get;
+  g(&b) +% a.load(AtomicOrdering::Acquire)
+}
+");
+    // phương thức Atomic nằm trực tiếp trong khởi tạo struct (toán hạng Aggregate)
+    only(
+        "▢ H { f: ƒ(u32) → Atomic<u32> ! ∅ }
+ƒ main() → u32 ! ∅ {
+  h ≔ H { f: Atomic::new };
+  0
+}
+",
+        "E0503",
+    );
+}
