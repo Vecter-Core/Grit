@@ -78,7 +78,7 @@ fn err_in_projection_cast_const_and_aggregate_types_is_rejected() {
     assert!(done);
     rejects(&t, &bad, "Field(Err)");
     // (2) đích của phép ép kiểu / (3) hằng hàm / (4) đối số ADT trong Aggregate
-    for which in 2..=4 {
+    for which in 2..=5 {
         let mut bad = b.clone();
         let mut done = false;
         for bb in &mut bad.blocks {
@@ -97,6 +97,10 @@ fn err_in_projection_cast_const_and_aggregate_types_is_rejected() {
                         }
                         (4, Rvalue::Aggregate(AggregateKind::Adt(_, _, args), _)) => {
                             args.push(Ty::Err);
+                            done = true;
+                        }
+                        (5, Rvalue::Use(Operand::Const(Const::FnItem { generics, .. }))) => {
+                            generics.push(Ty::Err);
                             done = true;
                         }
                         _ => {}
