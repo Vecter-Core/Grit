@@ -320,8 +320,9 @@ struct ArenaState {
 /// Loại abort `arena_overlap`: vùng do `alloc` cấp chồng lấn vùng khác cùng thế hệ, lệch căn lề, hoặc nằm ngoài chunk của arena.
 const ARENA_OVERLAP: i32 = 18;
 
-/// Kiểm động Arena (ADR-040 phụ lục / hợp đồng H2): BẬT ở hồ sơ `dev` (mã khởi động do codegen phát gọi `gritrt_dev_checks`) hoặc khi `GRITRT_ARENA_CHECK=1`;
-/// `GRITRT_ARENA_CHECK=0` tắt. Là BẰNG CHỨNG (bắt lỗi cấp phát lúc chạy), KHÔNG phải chứng minh; hồ sơ release/release-o2 KHÔNG kiểm.
+/// Kiểm động Arena (ADR-040 phụ lục / hợp đồng H2): BẬT ở hồ sơ `dev` (mã khởi động do codegen phát gọi `gritrt_dev_checks`) hoặc khi `GRITRT_ARENA_CHECK=1`.
+/// Biến môi trường CHỈ ĐƯỢC THÊM kiểm tra (R4): `GRITRT_ARENA_CHECK=0` KHÔNG tắt kiểm ở dev (một biến môi trường không được gỡ một kiểm tra an toàn).
+/// Là BẰNG CHỨNG (bắt lỗi cấp phát lúc chạy), KHÔNG phải chứng minh; hồ sơ release/release-o2 KHÔNG kiểm.
 static ARENA_CHECK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn arena_check_on() -> bool {
@@ -331,8 +332,7 @@ fn arena_check_on() -> bool {
 /// Gọi một lần ở đầu `gt_entry` của exe hồ sơ dev.
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_dev_checks() {
-    let off = std::env::var("GRITRT_ARENA_CHECK").is_ok_and(|v| v == "0");
-    ARENA_CHECK.store(!off, std::sync::atomic::Ordering::Relaxed);
+    ARENA_CHECK.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 
 fn arena_check_env_on() -> bool {

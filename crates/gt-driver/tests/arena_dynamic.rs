@@ -133,18 +133,22 @@ fn release_profiles_do_not_check_unless_forced() {
     }
 }
 
-/// tắt kiểm bằng `GRITRT_ARENA_CHECK=0` ở dev ⇒ lỗi chèn không bị bắt
+/// R4 (lệnh Giang 2026-10-17): biến môi trường chỉ được THÊM kiểm tra. `GRITRT_ARENA_CHECK=0` ở dev KHÔNG tắt kiểm ⇒ lỗi chèn VẪN bị bắt
+/// (trước R4 test này khẳng định ngược lại: tắt được ⇒ `exit 0`).
 #[test]
-fn dev_check_can_be_switched_off_explicitly() {
-    let o = run(
-        PROG,
-        "dev",
-        &[
-            ("GRITC_FAULT", "rt:arena-overlap"),
-            ("GRITRT_ARENA_CHECK", "0"),
-        ],
-    );
-    assert_eq!(o.exit, 0, "{o:?}");
+fn dev_check_cannot_be_switched_off_by_environment() {
+    for off in ["0", "false", "off"] {
+        let o = run(
+            PROG,
+            "dev",
+            &[
+                ("GRITC_FAULT", "rt:arena-overlap"),
+                ("GRITRT_ARENA_CHECK", off),
+            ],
+        );
+        assert_eq!(o.exit, 70, "GRITRT_ARENA_CHECK={off}: {o:?}");
+        assert_eq!(o.kind, "arena_overlap", "GRITRT_ARENA_CHECK={off}: {o:?}");
+    }
 }
 
 /// bố cục xác định để cô lập từng nhánh kiểm: `pad1` (u8, ở đầu chunk), `pad2` (u64, căn lề 8 ⇒ chừa KHE 7 byte sau `pad1`), rồi `x` = `[u8; 4]` (căn lề 1):
