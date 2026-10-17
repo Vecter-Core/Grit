@@ -101,6 +101,8 @@ pub(crate) struct Checker<'e, 'a> {
     pub scope: Vec<Bound>,
     /// đã báo E0318 trong hàm này
     pub vec_drop_reported: bool,
+    /// nút của biểu thức đang đứng ở vị trí NGƯỜI ĐƯỢC GỌI (`callee` của `Call`): đường dẫn tới intrinsic chỉ được phép ở đây (gọi trực tiếp)
+    pub callee_pos: Option<NodeId>,
     pub oblig: Vec<Oblig>,
     pub types: BTreeMap<NodeId, Ty>,
     pub methods: Vec<(NodeId, MethodRes)>,
@@ -141,6 +143,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             loops: Vec::new(),
             scope: Vec::new(),
             vec_drop_reported: false,
+            callee_pos: None,
             oblig: Vec::new(),
             types: BTreeMap::new(),
             methods: Vec::new(),

@@ -1,0 +1,5 @@
+// expect: fail E0313
+// note: mục 2 / điều kiện #12: root_fs làm giá trị ngay trong main sẽ trao quyền đúc capability cho hàm khác
+ƒ main() ! {io} {
+  g ≔ root_fs;
+}

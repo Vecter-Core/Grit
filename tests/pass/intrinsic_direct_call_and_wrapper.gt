@@ -1,0 +1,7 @@
+// expect: pass
+// note: mục 2: gọi TRỰC TIẾP intrinsic và bọc trong hàm Grit thường rồi dùng hàm đó làm giá trị thì được
+ƒ my_shl(x: u32) → u32 ! ∅ { shl(x, 2u32) }
+ƒ main() → u32 ! ∅ {
+  f ≔ my_shl;
+  f(1u32)
+}

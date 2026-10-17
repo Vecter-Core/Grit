@@ -1,0 +1,13 @@
+// expect: pass
+// note: mục 2: hàm Grit thường và hàm kết hợp của kiểu người dùng dùng làm giá trị hàm (không phải intrinsic)
+▢ B { v: u32 }
+⊐ B {
+  ƒ get(&self) → u32 ! ∅ { self.v }
+}
+ƒ inc(x: u32) → u32 ! ∅ { x +% 1 }
+ƒ main() → u32 ! ∅ {
+  b ≔ B { v: 3u32 };
+  g: ƒ(&B) → u32 ! ∅ ≔ B::get;
+  f ≔ inc;
+  f(g(&b))
+}

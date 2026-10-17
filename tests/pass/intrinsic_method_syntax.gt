@@ -1,0 +1,7 @@
+// expect: pass
+// note: mục 2: cú pháp phương thức và đường dẫn gọi trực tiếp intrinsic (Cell, Atomic) vẫn hợp lệ
+ƒ main() → u32 ! ∅ {
+  c ≔ Cell::new(2u32);
+  a ≔ Atomic::new(5u32);
+  c.get() +% Atomic::load(&a, AtomicOrdering::Acquire)
+}

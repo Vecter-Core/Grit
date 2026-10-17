@@ -1,0 +1,6 @@
+// expect: fail E0313
+// note: mục 2: core::abort (intrinsic) dùng làm giá trị hàm
+ƒ main() ! {div} {
+  f: ƒ(&str) → ! ! {div} ≔ core::abort;
+  f("x")
+}

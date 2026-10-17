@@ -1,0 +1,6 @@
+// expect: fail E0313
+// note: mục 2: shl (intrinsic, precondition n < 32) dùng làm giá trị hàm né kiểm tra tại điểm gọi trực tiếp
+ƒ main() → u32 ! ∅ {
+  f: ƒ(u32, u32) → u32 ! ∅ ≔ shl;
+  f(1u32, 40u32)
+}

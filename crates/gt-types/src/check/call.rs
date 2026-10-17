@@ -75,6 +75,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                 let Some((sig, _)) = self.env.db.fns.get(&d).cloned() else {
                     return Ty::Err;
                 };
+                self.reject_intrinsic_value(e, sig.node);
                 let args = fresh_args(&mut self.infer, &sig.generics);
                 for (t, tr) in bounds_of(&sig.generics, &args) {
                     self.push_oblig(t, tr, e.id, e.span);
@@ -265,7 +266,47 @@ impl<'e, 'a> Checker<'e, 'a> {
     }
 
     /// Kiểu hàm của một ứng viên được gọi dạng `Kiểu::hàm` (có thể có tham số `self` đầu tiên).
+    /// Hàm của lib/core (thân prelude KHÔNG có MIR = intrinsic) dùng làm GIÁ TRỊ (không phải người được gọi trực tiếp) ⇒ E0313: mọi nghĩa vụ theo lớp (precondition,
+    /// E0310, E0405, E0502…) được sinh ở điểm gọi trực tiếp nên gọi qua con trỏ né kiểm tra của cả lớp (FAIL_OPEN_AUDIT tổng quát hoá S-E). `Atomic` giữ E0503 của gt-conc.
+    fn reject_intrinsic_value(&mut self, e: &Expr, callee_node: NodeId) {
+        if self.callee_pos == Some(e.id) || !self.env.is_prelude(callee_node.file()) {
+            return;
+        }
+        let atomic = self.env.db.impls.iter().any(|i| {
+            i.members.iter().any(|m| m.node == callee_node)
+                && matches!(&i.self_ty, Ty::Adt(d, _) if self.env.db.adts.get(d).and_then(|a| a.lang) == Some(crate::collect::Lang::Atomic))
+        });
+        if atomic {
+            return;
+        }
+        let name = self
+            .env
+            .db
+            .sig_by_node(callee_node)
+            .map_or_else(|| "?".to_string(), |s| s.name.clone());
+        self.err(
+            "E0313",
+            e.id,
+            e.span,
+            format!("hàm intrinsic `{name}` của lib/core không được dùng làm giá trị hàm (gọi qua con trỏ né kiểm tra theo lớp: precondition, capability, arena, khoá…); gọi trực tiếp"),
+        );
+    }
+
     fn apply_pick_types(&mut self, e: &Expr, pick: &Pick) -> Ty {
+        if let MethodRes::Impl {
+            impl_node, member, ..
+        } = &pick.res
+            && let Some(node) = self
+                .env
+                .db
+                .impls
+                .iter()
+                .find(|i| i.node == *impl_node)
+                .and_then(|i| i.members.get(*member))
+                .map(|m| m.node)
+        {
+            self.reject_intrinsic_value(e, node);
+        }
         for (t, tr) in &pick.bounds {
             self.push_oblig(t.clone(), *tr, e.id, e.span);
         }
@@ -422,7 +463,9 @@ impl<'e, 'a> Checker<'e, 'a> {
         {
             return self.method_call(e, base, n, args);
         }
+        let prev = self.callee_pos.replace(callee.id);
         let ct = self.expr(callee, None);
+        self.callee_pos = prev;
         match self.infer.shallow(&ct) {
             Ty::Fn(params, ret, _) => {
                 if params.len() != args.len() {

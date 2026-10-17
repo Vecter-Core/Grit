@@ -1,0 +1,7 @@
+// expect: fail E0313
+// note: mục 2: phương thức Cap<Clock>::now (intrinsic) dùng làm giá trị hàm
+ƒ main() → u64 ! {io} {
+  c ≔ root_clock();
+  f: ƒ(&Cap<Clock>) → u64 ! {io} ≔ Cap::now;
+  f(&c)
+}
