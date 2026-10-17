@@ -1,0 +1,7 @@
+// expect: pass
+// note: R2d: khoá lock(Lo) khai báo đủ ở main
+#level("10")
+▢ Lo { }
+■ M: Mutex<u32, Lo> ≔ Mutex::new(0u32);
+ƒ g(v: &!u32, n: u32) → u32 ! ∅ { n }
+ƒ main() → u32 ! {lock(Lo)} { M.with(g, 1u32) }

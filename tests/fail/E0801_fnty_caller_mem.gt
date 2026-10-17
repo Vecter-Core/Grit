@@ -1,0 +1,5 @@
+// expect: fail E0801
+// note: R2d: gọi hàm nhận tham số kiểu hàm có hiệu ứng mem từ chỗ khai báo ∅
+ƒ w(x: u32) → u32 ! {mem} { x }
+ƒ apply(f: ƒ(u32) → u32 ! {mem}, x: u32) → u32 ! {mem} { f(x) }
+ƒ main() → u32 ! ∅ { apply(w, 1u32) }

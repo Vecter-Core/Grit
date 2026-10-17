@@ -1,0 +1,5 @@
+// expect: fail E0301
+// note: R2d: hiệu ứng trong KIỂU hàm khớp CHÍNH XÁC (không có kiểu con): truyền hàm ∅ vào tham số ! {mem} bị từ chối
+ƒ w(x: u32) → u32 ! ∅ { x }
+ƒ apply(f: ƒ(u32) → u32 ! {mem}, x: u32) → u32 ! {mem} { f(x) }
+ƒ main() → u32 ! {mem} { apply(w, 1u32) }

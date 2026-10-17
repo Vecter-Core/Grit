@@ -1,0 +1,4 @@
+// expect: fail E0801
+// note: R2d: hàm gọi tham số kiểu hàm có hiệu ứng div nhưng khai báo ∅
+ƒ apply(f: ƒ(u32) → u32 ! {div}, x: u32) → u32 ! ∅ { f(x) }
+ƒ main() → u32 ! ∅ { 0u32 }

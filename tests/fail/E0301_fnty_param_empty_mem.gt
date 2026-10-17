@@ -1,0 +1,5 @@
+// expect: fail E0301
+// note: R2d: truyền hàm có hiệu ứng mem vào tham số kiểu hàm ! ∅ bị từ chối
+ƒ w(x: u32) → u32 ! {mem} { x }
+ƒ apply(f: ƒ(u32) → u32 ! ∅, x: u32) → u32 ! ∅ { f(x) }
+ƒ main() → u32 ! {mem} { apply(w, 1u32) }

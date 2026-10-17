@@ -1,0 +1,5 @@
+// expect: pass
+// note: R2d: hiệu ứng io khớp qua tham số kiểu hàm
+ƒ w(x: u32) → u32 ! {io} { x }
+ƒ apply(f: ƒ(u32) → u32 ! {io}, x: u32) → u32 ! {io} { f(x) }
+ƒ main() → u32 ! {io} { apply(w, 1u32) }
