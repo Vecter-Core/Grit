@@ -14,7 +14,10 @@ pub fn validate(body: &Body, db: &TypeDb) -> Result<(), Vec<String>> {
         db,
         errs: Vec::new(),
     };
-    v.structure();
+    v.unresolved_types();
+    if v.errs.is_empty() {
+        v.structure();
+    }
     if v.errs.is_empty() {
         v.storage();
     }
@@ -150,9 +153,115 @@ pub fn reachable(body: &Body) -> Vec<bool> {
     seen
 }
 
+/// `Ty::Err`/`Ty::Infer` ở BẤT KỲ độ sâu nào (M5 chỉ chạy khi M4 sạch ⇒ không bao giờ được xuất hiện trong MIR; FAIL_OPEN_AUDIT S-D).
+fn unresolved(t: &Ty) -> bool {
+    match t {
+        Ty::Err | Ty::Infer(_) => true,
+        Ty::Tuple(v) | Ty::Adt(_, v) => v.iter().any(unresolved),
+        Ty::Array(t, _) | Ty::Slice(t) | Ty::Ref(_, t) | Ty::RawPtr(_, t) => unresolved(t),
+        Ty::Fn(p, r, _) => p.iter().any(unresolved) || unresolved(r),
+        Ty::Int(_) | Ty::Float(_) | Ty::Bool | Ty::Char | Ty::Str | Ty::Never | Ty::Param(_) => {
+            false
+        }
+    }
+}
+
+fn place_tys<'p>(p: &'p Place, out: &mut Vec<&'p Ty>) {
+    for e in &p.projection {
+        if let PlaceElem::Field(_, t) = e {
+            out.push(t);
+        }
+    }
+}
+
+fn operand_tys<'p>(o: &'p Operand, out: &mut Vec<&'p Ty>) {
+    match o {
+        Operand::Copy(p) | Operand::Move(p) => place_tys(p, out),
+        Operand::Const(Const::FnItem { generics, ty, .. }) => {
+            out.push(ty);
+            out.extend(generics.iter());
+        }
+        Operand::Const(Const::Item { ty, .. }) => out.push(ty),
+        Operand::Const(_) => {}
+    }
+}
+
 impl V<'_> {
     fn err(&mut self, m: String) {
         self.errs.push(m);
+    }
+
+    /// Mọi `Ty` đến được từ thân không được chứa `Err`/`Infer`.
+    fn unresolved_types(&mut self) {
+        let b = self.body;
+        let mut tys: Vec<&Ty> = b.locals.iter().map(|l| &l.ty).collect();
+        for bb in &b.blocks {
+            for s in &bb.statements {
+                match &s.kind {
+                    StatementKind::Assign(p, rv) => {
+                        place_tys(p, &mut tys);
+                        let (os, ps) = rvalue_operands(rv);
+                        for o in os {
+                            operand_tys(o, &mut tys);
+                        }
+                        for p in ps {
+                            place_tys(p, &mut tys);
+                        }
+                        match rv {
+                            Rvalue::Cast(_, t) | Rvalue::CastFits(_, t) => tys.push(t),
+                            Rvalue::Aggregate(AggregateKind::Array(t), _) => tys.push(t),
+                            Rvalue::Aggregate(AggregateKind::Adt(_, _, args), _) => {
+                                tys.extend(args.iter());
+                            }
+                            _ => {}
+                        }
+                    }
+                    StatementKind::FakeRead(_, p) => place_tys(p, &mut tys),
+                    StatementKind::StorageLive(_)
+                    | StatementKind::StorageDead(_)
+                    | StatementKind::Nop => {}
+                }
+            }
+            if let Some(t) = &bb.terminator {
+                match &t.kind {
+                    TerminatorKind::SwitchInt { discr, .. } => operand_tys(discr, &mut tys),
+                    TerminatorKind::Drop { place, .. } => place_tys(place, &mut tys),
+                    TerminatorKind::Call {
+                        callee, args, dest, ..
+                    } => {
+                        match callee {
+                            Callee::Fn { generics, .. } => tys.extend(generics.iter()),
+                            Callee::TraitMethod {
+                                self_ty, generics, ..
+                            } => {
+                                tys.push(self_ty);
+                                tys.extend(generics.iter());
+                            }
+                            Callee::Value(o) => operand_tys(o, &mut tys),
+                        }
+                        for a in args {
+                            operand_tys(a, &mut tys);
+                        }
+                        place_tys(dest, &mut tys);
+                    }
+                    TerminatorKind::Assert { cond, kind, .. } => {
+                        operand_tys(cond, &mut tys);
+                        for o in assert_operands(kind) {
+                            operand_tys(o, &mut tys);
+                        }
+                        if let AssertKind::CastLossy { to, .. } = kind {
+                            tys.push(to);
+                        }
+                    }
+                    TerminatorKind::Goto(_)
+                    | TerminatorKind::Return
+                    | TerminatorKind::Unreachable => {}
+                }
+            }
+        }
+        if tys.iter().any(|t| unresolved(t)) {
+            self.err("kiểu chưa giải quyết (Err/Infer) trong MIR (M4 phải chặn trước)".to_string());
+        }
     }
 
     fn structure(&mut self) {
