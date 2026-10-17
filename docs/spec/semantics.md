@@ -40,6 +40,8 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
   `⟳ x in xs { … }` là for-in (`in` từ khoá cứng ASCII; biến lặp bất biến). Đều nhận `↓ m` và `⋈ inv` tuỳ chọn. Chi tiết termination ở §21.
 - **Khớp mẫu qua tham chiếu (ADR-040, Q87):** pattern phá cấu trúc (biến thể/struct/tuple) khớp giá trị `&U`/`&!U` thì khớp `U` qua tham chiếu và biến bind có kiểu `&V`/`&!V` (tham chiếu tới chính vị trí, không move/copy). Chỉ một tầng (tham chiếu lồng ⇒ E0301). Pattern hằng/khoảng trên `&U` vẫn E0301; `_` và tên trần trên `&U` không đổi. Không `ref`, không guard.
 - `⌥` phải đầy đủ (D6) → E0305. Mẫu trùng thừa → N0301 **[ĐỀ XUẤT]**.
+  - Vét cạn số nguyên/`char` bằng PHÂN TÁCH KHOẢNG, chính xác hai chiều cho mọi kiểu NGOẠI TRỪ `u128` (ADR-041, FB-14): literal không bao giờ bị kẹp; cận không biểu diễn được trong `i128` ⇒ mẫu không phủ gì; `⌥` trên `u128` luôn cần nhánh `_`/tên (SOUND nhưng KHÔNG COMPLETE: khoảng kín phủ trọn `u128` vẫn bị E0305, gợi ý thêm `_`). `i128` chính xác kể cả biên −2^127.
+  - Miền `char` KHÔNG liền khối: 0xD800–0xDFFF không phải giá trị; `0..=0xD7FF` + `0xE000..=0x10FFFF` là vét cạn, `0..=0x10FFFF` cũng vét cạn.
 - `⟳` — xem §21 (termination của while / for-in / vòng vô hạn). `⋈` (bất biến): Phase 1 kiểm lúc chạy trong `dev`, không dùng để chứng minh (chờ 8.A).
 - Mọi đường điều khiển của hàm có kiểu trả về khác `()` phải trả giá trị (E0307).
 
