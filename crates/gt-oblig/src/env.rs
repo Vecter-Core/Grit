@@ -773,9 +773,11 @@ impl Env {
             return self.clone();
         }
         let mut r = self.clone();
-        for (v, (_, iv)) in &mut r.iv {
-            if let Some((_, oi)) = o.iv.get(v) {
-                *iv = iv.join(*oi);
+        for (v, (ty, iv)) in &mut r.iv {
+            match o.iv.get(v) {
+                Some((_, oi)) => *iv = iv.join(*oi),
+                // biến thiếu ở phía kia = KHÔNG BIẾT (như `leq` coi `None` là đỉnh): khoảng đủ của kiểu, không giữ khoảng hẹp của một phía
+                None => *iv = ty.range(),
             }
         }
         r.zone = self.zone.join(&o.zone);
@@ -798,9 +800,12 @@ impl Env {
         }
         let mut r = self.clone();
         for (v, (ty, iv)) in &mut r.iv {
-            if let Some((_, ni)) = new.iv.get(v) {
-                // không vượt kiểu
-                *iv = iv.widen(*ni, thresholds).meet(ty.range()).unwrap_or(*iv);
+            match new.iv.get(v) {
+                Some((_, ni)) => {
+                    // không vượt kiểu
+                    *iv = iv.widen(*ni, thresholds).meet(ty.range()).unwrap_or(*iv);
+                }
+                None => *iv = ty.range(), // thiếu ở phía mới = không biết
             }
         }
         r.zone = self.zone.widen(&new.zone);
