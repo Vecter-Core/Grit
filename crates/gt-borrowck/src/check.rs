@@ -274,19 +274,6 @@ fn diag_code(code: &str) -> Code {
     Code::parse(code).unwrap_or_else(|_| Code::parse("E9901").expect("E9901 hợp lệ"))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::diag_code;
-
-    #[test]
-    fn malformed_diagnostic_code_falls_back_to_the_internal_error_instead_of_vanishing() {
-        assert_eq!(diag_code("E0401").as_str(), "E0401");
-        for bad in ["", "E04", "X0401", "E04O1", "e0401", "E04011"] {
-            assert_eq!(diag_code(bad).as_str(), "E9901", "{bad:?}");
-        }
-    }
-}
-
 pub(crate) struct Checker<'a> {
     pub body: &'a Body,
     pub db: &'a TypeDb,
@@ -704,5 +691,18 @@ impl<'a> Checker<'a> {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::diag_code;
+
+    #[test]
+    fn malformed_diagnostic_code_falls_back_to_the_internal_error_instead_of_vanishing() {
+        assert_eq!(diag_code("E0401").as_str(), "E0401");
+        for bad in ["", "E04", "X0401", "E04O1", "e0401", "E04011"] {
+            assert_eq!(diag_code(bad).as_str(), "E9901", "{bad:?}");
+        }
     }
 }

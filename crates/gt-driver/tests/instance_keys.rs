@@ -12,7 +12,7 @@ fn every_instance_has_a_function_key_and_the_dump_hashes_the_instance_table() {
         name: "main.gt".to_string(),
         text: GEN.to_string(),
     }];
-    let mut res = check(&inputs, &Options::default()).expect("check");
+    let res = check(&inputs, &Options::default()).expect("check");
     assert!(res.verdict.allows_output(), "{:?}", res.report.diagnostics);
     let art = res.open_gate().expect("cổng");
     assert!(art.types.instances.len() >= 2, "cần ≥ 2 instance sinh ra");

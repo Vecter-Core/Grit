@@ -433,8 +433,10 @@ fn deeply_nested_secret_type_still_taints_and_is_reported() {
     };
     for n in [3usize, 11, 12, 13, 20] {
         let ty = nest(n);
-        let src = format!("ƒ sink(s: {ty}) ! {{io}} {{ }}
-ƒ f(s: {ty}) ! {{io}} {{ sink(s); }}");
+        let src = format!(
+            "ƒ sink(s: {ty}) ! {{io}} {{ }}
+ƒ f(s: {ty}) ! {{io}} {{ sink(s); }}"
+        );
         assert_eq!(codes(&src), vec!["S202"], "độ sâu {n}");
     }
 }
