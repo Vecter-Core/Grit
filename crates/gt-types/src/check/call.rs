@@ -279,6 +279,14 @@ impl<'e, 'a> Checker<'e, 'a> {
         if atomic {
             return;
         }
+        // nguồn capability gốc (`root_*`) ngoài `main`: E0310 ở `check_caps` đã chặn; không báo trùng (giữ nguyên mã E0310 của corpus)
+        if !self.entry
+            && let Some(sig) = self.env.db.sig_by_node(callee_node)
+            && self.has_cap(&sig.ret)
+            && !sig.params.iter().any(|p| self.has_cap(p))
+        {
+            return;
+        }
         let name = self
             .env
             .db

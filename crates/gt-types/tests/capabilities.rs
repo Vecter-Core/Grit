@@ -92,10 +92,8 @@ fn a_generic_that_conjures_a_capability_from_nothing_is_a_root_source() {
 
 #[test]
 fn referencing_a_root_source_as_a_value_is_also_rejected() {
-    // ngoài `main`: E0310 (nguồn capability chỉ ở `main`) VÀ E0313 (intrinsic không dùng làm giá trị, mục 2 lệnh 2026-10-17)
-    let mut c = codes(&one("ƒ f() ! {io} { g ≔ root_fs; }"));
-    c.sort();
-    assert_eq!(c, vec!["E0310".to_string(), "E0313".to_string()]);
+    // ngoài `main`: chỉ E0310 (nguồn capability chỉ ở `main`; E0313 không báo trùng)
+    err("ƒ f() ! {io} { g ≔ root_fs; }", "E0310", 1);
     // ngay trong `main` cũng bị E0313: truyền `root_fs` làm giá trị sẽ trao quyền ĐÚC capability cho hàm khác (điều kiện cứng #12)
     err("ƒ main() ! {io} { g ≔ root_fs; }", "E0313", 1);
 }
