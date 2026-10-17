@@ -360,3 +360,33 @@ pub fn set_select_impl_fault_for_test(on: bool) {
 fn select_impl_fault() -> bool {
     SELECT_FAULT.with(std::cell::Cell::get)
 }
+
+#[cfg(test)]
+mod drop_tests {
+    use crate::collect::Lang;
+    use crate::testkit::with_env;
+    use crate::ty::Ty;
+    use gt_resolve::DefId;
+
+    /// FAIL_OPEN_AUDIT: ADT không có trong db KHÔNG được coi là "không cần drop" (nuôi E0318 và các quyết định drop của MIR): phải bảo thủ.
+    #[test]
+    fn unknown_adt_is_never_assumed_not_to_need_drop() {
+        with_env("ƒ f() → u32 ! ∅ { 1 }", |env| {
+            let unknown = Ty::Adt(DefId::from_index(1_000_000), Vec::new());
+            assert!(
+                env.db.needs_drop(&unknown),
+                "ADT lạ bị coi là không cần drop"
+            );
+            // lồng trong tuple/mảng cũng vậy
+            assert!(
+                env.db
+                    .needs_drop(&Ty::Tuple(vec![Ty::Bool, unknown.clone()]))
+            );
+            let arena = *env.db.lang.get(&Lang::Arena).expect("Arena");
+            assert!(
+                env.db.needs_drop(&Ty::Adt(arena, Vec::new())),
+                "đối chứng: Arena cần drop"
+            );
+        });
+    }
+}

@@ -710,6 +710,17 @@ mod tests {
         }
     }
 
+    /// FAIL_OPEN_AUDIT (needs_drop/has_own_drop): ADT không có trong db (db không nhất quán) từng được coi là "không có Drop" ⇒ E0407 (move trường ra khỏi kiểu có Drop) bị bỏ qua
+    /// lặng lẽ. Phải bảo thủ (coi là CÓ Drop) và báo lỗi nội bộ.
+    #[test]
+    fn unknown_adt_is_never_assumed_to_be_free_of_drop() {
+        let t = tc::run(&[("main.gt", "ƒ f() → u32 ! ∅ { 1 }")]);
+        let m = gt_mir::lower_program(&t);
+        let ck = Checker::new(&t, &m.bodies[0]);
+        let unknown = gt_types::Ty::Adt(gt_resolve::DefId::from_index(1_000_000), Vec::new());
+        assert!(ck.has_own_drop(&unknown), "ADT lạ bị coi là không có Drop");
+    }
+
     /// Đường thật `Checker::push`: mã sai định dạng PHẢI để lại một chẩn đoán (E9901), không được biến mất (FAIL_OPEN_AUDIT B1).
     #[test]
     fn push_with_a_malformed_code_still_records_a_diagnostic() {
