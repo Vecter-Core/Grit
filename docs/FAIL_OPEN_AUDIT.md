@@ -1,6 +1,8 @@
 # FAIL_OPEN_AUDIT — rà soát "im lặng chấp nhận" ở các crate quyết định (2026-10-17)
 
-KẾT QUẢ TÓM TẮT: 6 chỗ fail-open/nghi fail-open đã SỬA (G1, S1, B1, B2, B3, D1); phần còn lại AN TOÀN/GHI NHẬN theo đọc mã. Bảng "cách kiểm chứng" ở mục 0.
+<!-- FOS:BEGIN -->**Đã rà / tổng chỗ khớp = 1292 / 1292** (CHƯA RÀ 0; `python tools/fail_open_scan.py stats`; dấu vân tay ở `docs/FAIL_OPEN_LEDGER.jsonl`). "Đọc mã" KHÁC "chứng minh".<!-- FOS:END -->
+
+KẾT QUẢ TÓM TẮT (cập nhật R3, 2026-10-18): đợt 1 sửa 6 chỗ (G1, S1, B1, B2, B3, D1); đợt 2 sửa thêm (mục 7.1); R3 rà NỐT 1292/1292 chỗ khớp bằng sổ cái và tìm thêm 3 lỗi thật (FB-17, FB-18, FB-19, mục 8) cùng 6 sửa phòng thủ; phần còn lại AN TOÀN/GHI NHẬN theo ĐỌC mã (không phải chứng minh). Bảng "cách kiểm chứng" ở mục 0.
 
 Mục tiêu (lệnh Giang): tìm chỗ mà dữ liệu thiếu / lỗi / `None` / nhánh mặc định bị đọc thành "ĐÚNG/an toàn". Quy tắc đối chiếu: `grit-contract.md` §3.3 "không có khẳng định tường minh thì không phải đã chứng minh".
 Phương pháp: `grep` mẫu `unwrap_or(`, `unwrap_or_default`, `.ok()`, `let _ =`, `_ =>`, `.get(`, `continue`/`return` sớm, `map_or`, `is_some_and`, `is_none_or`, rồi ĐỌC ngữ cảnh từng lần gặp ở các crate ưu tiên. Mỗi dòng: `tệp:dòng | mẫu | kết luận | lý do / cách sửa`. Kết luận: **AN TOÀN** (thiếu ⇒ từ chối/ICE hoặc không ảnh hưởng phán quyết), **SỬA** (fail-open thật hoặc đủ nghi: sửa với test hồi quy, commit riêng, FIELD_BUGS), **GHI NHẬN** (chấp nhận có lý do, nêu giới hạn).
@@ -118,28 +120,27 @@ Phương pháp như trên (đọc ngữ cảnh từng chỗ khớp danh sách t�
 - **gt-mir:** `matching.rs` Q87 (đã có đột biến); `expr.rs` các `unwrap_or(Ty::Err)` ×3 (nay bị S-D chặn ở validator); `mod.rs` `register` (frame rỗng ⇒ local không đăng ký, chỉ ảnh hưởng StorageDead/drop; GHI NHẬN); `ty_of` None ⇒ ICE; `types.rs` `variant_fields` ADT lạ ⇒ rỗng (GHI NHẬN, nối db không nhất quán).
 - **gt-lexer (3 chỗ `.ok()`/escape), gt-parser (danh sách), rig (14 chỗ), gt-dataflow (framework `unwrap_or_default` terminator None, `movable_prefix`), gt-resolve (`Found::Silent`, `unwrap_or` chỉ định vị):** đọc, AN TOÀN (fail-closed hoặc chỉ ảnh hưởng vị trí/nhãn).
 
-### 7.3 CHƯA RÀ (nói thẳng; số = số chỗ khớp danh sách tìm kiếm, ƯỚC LƯỢNG từ grep; "đọc" = đọc ngữ cảnh)
-| tệp | chỗ khớp | trạng thái |
-|---|---|---|
-| gt-oblig/src/analysis.rs | 82 | CHƯA đọc (2 chỗ ở 7.2); bộ giải/đột biến M7 đã được kiểm theo cách khác (đột biến đầy đủ, FB-7) |
-| gt-mir/src/build/expr.rs | 62 | đọc ~12; CHƯA ~50 |
-| gt-codegen-llvm/src/lower.rs | 55 | CHƯA (chặn sau bởi Guard-pre/post) |
-| gt-mir/src/interp.rs | 54 | CHƯA (thông dịch tham chiếu, không phải kiểm tra an toàn) |
-| gt-types/src/collect.rs | 50 | đọc ~6; CHƯA ~44 |
-| gt-oblig/src/env.rs | 32 | đọc 1; CHƯA 31 |
-| gt-types/src/check/mod.rs | 31 | đọc ~8; CHƯA ~23 |
-| gt-term/src/lib.rs | 29 | đọc ~6; CHƯA ~23 |
-| gt-types/src/check/expr.rs | 28 | CHƯA đọc ngữ cảnh (chỉ liệt kê) |
-| gt-types/src/check/call.rs | 28 | đọc ~8; CHƯA ~20 |
-| gt-types/src/check/pat.rs | 26 | đọc ~8; CHƯA ~18 |
-| gt-oblig (interval 20, zone 15, driver 14, unsafe_check 9, prover 5, int 3, ir 2) | 68 | CHƯA (driver: 3 đọc) |
-| gt-mir/src (print 20, build/mod 13, matching 11, types 10, lib 8, validate 5) | 67 | đọc ~15; CHƯA ~52 |
-| gt-parser (parser 19, exprs 13, types 3, lib 2, pats 1) | 38 | đọc ~10; CHƯA ~28 (parser fail-closed theo thiết kế: `Err(expected)`) |
-| gt-types còn lại (ty 11, lib 11, validate 8, mono 7, infer 7, traits 5, region 1) | 50 | đọc ~6; CHƯA ~44 |
-| gt-resolve (tables 16, walk 7, model 2, lib/graph 2) | 27 | đọc ~10; CHƯA ~17 |
-| gt-lexer | 32 | đọc ~6; CHƯA ~26 |
-| gt-fmt (printer 14, attach 2, lib 1), gt-diag (json 7, render 5, code 5), gt-span 15 | 49 | CHƯA (định dạng/hiển thị, không quyết định chấp nhận) |
-| gt-dataflow (analyses 8, framework 1) | 9 | đọc 3; CHƯA 6 |
-| gt-secrets, gt-borrowck, gt-guard, gt-driver, gt-conc, gt-effects, rig | — | đã rà ở đợt 1 hoặc 2 (xem trên); gt-borrowck/gt-driver/gt-secrets: chỉ các chỗ quyết định (30/40/~15) |
+### 7.3 (ĐÃ ĐÓNG bởi R3, 2026-10-18) — bảng "CHƯA RÀ" cũ được thay bằng sổ cái từng chỗ
+Mọi chỗ khớp (1292) đều có dòng trong `docs/FAIL_OPEN_LEDGER.jsonl` với vân tay (`tools/fail_open_scan.py`), kết luận (`an_toan` 1269 / `da_sua` 23 / `nghi_van` 0 / `khong_ra_duoc` 0) và lý do. `python tools/fail_open_scan.py check` ⇒ "CHƯA RÀ 0; nghi vấn chưa xử lý 0". Dòng sổ cái gắn vân tay theo nội dung dòng: sửa dòng đó làm sổ cái "lỗi thời" và `check` đòi rà lại.
 
-**Tổng ước lượng CHƯA đọc ngữ cảnh: khoảng 500 trong ~900 chỗ khớp (không tính gt-guard/gt-conc/gt-effects đã đọc hết).** Kết quả "AN TOÀN"/"GHI NHẬN" là kết quả ĐỌC MÃ, KHÔNG phải chứng minh; chỉ các mục SỬA có test. 6 trong 11 mục ở đợt 2 là lỗi THẬT đạt tới được từ Grit ⇒ phần CHƯA đọc có thể còn lỗi tương tự — đặc biệt các chỗ "hàm/ADT/kiểu dùng làm giá trị" (nay có bộ sinh riêng) và "thiếu ⇒ coi là ổn" ở gt-types/check.
+## 8. R3 — kết quả rà nốt (lệnh chạy liên tục 2026-10-18)
+**"Đọc mã" KHÁC "chứng minh".** Con số 1292/1292 nghĩa là: mỗi chỗ khớp mẫu đã được ĐỌC cùng ngữ cảnh và phân loại, KHÔNG phải mỗi chỗ đã được chứng minh an toàn. Phạm vi: chỉ các mẫu của công cụ (`unwrap_or`, `.get(`, `.ok()`, `let _ =`, `_ =>`, `else { continue/return }`, `map_or`, `is_some_and`, `is_none_or`…) trong `crates/**/src` và `runtime/gt-rt/src`; KHÔNG phủ: fail-open viết dưới dạng khác (vd `if cond { return }` tự chế, `match` với nhánh đầu đã sai), các tệp `tests/`, `build.rs`, `tools/*.py|sh`, mã sinh. Tệp không có chỗ khớp (gt-ast, gt-stack, gt-llvm) không có dòng sổ cái.
+
+### 8.1 LỖI THẬT tìm thấy khi rà R3 (mỗi cái: thí nghiệm → test ĐỎ → sửa → FIELD_BUGS)
+| mã | vị trí | loại | sửa / bằng chứng |
+|---|---|---|---|
+| FB-17 | `gt-types/src/validate.rs::validate_copy_impl` | LỖI THẬT, đạt tới từ Grit: `⊐ <T> Copy for W<T> { }` không `T: Copy` ⇒ `W<Cap<Fs>>`/`W<Arena>` Copy (nhân đôi capability — điều kiện #12; đo bằng `a ≔ W { v: root_fs() }; b ≔ a; c ≔ a;` xanh) | E0311; ma trận hình dạng trường × ràng buộc (`gt-types/tests/copy_impl_bounds.rs`) + 3 fail / 1 pass corpus; test đỏ commit `36ac79d` |
+| FB-18 | `gt-mir/src/interp.rs` | LỖI THẬT của backend thông dịch: u128 ≥ 2^127 so sánh/chia/kiểm tràn như số có dấu (`u128::MAX > 5` ⇒ false) | `binop_u128`, kiểm tràn và ép kiểu; `gt-mir/tests/interp_u128.rs`; test đỏ `93aa345` |
+| FB-19 | `runtime/gt-rt/src/lib.rs::arena_limit` | LỖI THẬT nhẹ: `GRITRT_ARENA_LIMIT` sai định dạng ⇒ "không giới hạn" | abort `arena_exhausted`; `gt-driver/tests/llvm_vec.rs::malformed_arena_limit_is_not_silently_unlimited` |
+
+### 8.2 Sửa phòng thủ (không dựng được chương trình Grit chạm tới; không có test ĐỎ→XANH — nói thẳng)
+- `gt-types/validate.rs`: thiếu ADT/trait trong db ⇒ E9901 (trước: bỏ qua lặng lẽ kiểm Copy/impl); thiếu `region_sig` ⇒ không tương thích (trước: `true`).
+- `gt-types/db.rs` `imut`: ADT lạ ⇒ `true` (commit `9407370`, có test xanh; test đỏ có chủ ý ở `6c50640`).
+- `gt-borrowck/regions.rs`: đích của `Aggregate::Tuple` không phải tuple ⇒ `defend` (E9901), trước: `return`.
+- `gt-secrets/lib.rs`: hiệu ứng callee không tra được ⇒ coi là `io` (bảo thủ) cho S202.
+- `gt-resolve/walk.rs`, `lib.rs`: module/tệp không có định nghĩa ⇒ E9901 thay vì bỏ qua cả nội dung.
+- `gt-driver/cli.rs::load`, `rig/cli.rs` (`test`, `fmt`): mục thư mục đọc lỗi không còn bị bỏ khỏi tập đầu vào/test (trước: `filter_map(Result::ok)`/`.flatten()` ⇒ có thể xanh trên tập con). Không có test tự động (cần lỗi I/O thư mục).
+
+### 8.3 Giới hạn đã biết phát hiện thêm
+- `find_impl` kiểm bound của impl ADT khác với scope RỖNG ⇒ `T: Copy` do người dùng khai báo không được công nhận qua `Option<T>` (từ chối oan, không mất an toàn) — KNOWN_LIMITATIONS, khoá bằng `known_incompleteness_…`.
+- Thông dịch MIR: toán tử bit/dịch cho u128 chưa có (báo `Bug`, đóng); so sánh thông dịch ≡ LLVM cho u128 chưa làm (LLVM thiếu chia 128 bit).
