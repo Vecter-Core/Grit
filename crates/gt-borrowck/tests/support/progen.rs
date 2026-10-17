@@ -62,7 +62,7 @@ pub const PRELUDE: &str = "\
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
-pub const KINDS: [&str; 18] = [
+pub const KINDS: [&str; 19] = [
     "move",
     "reborrow",
     "borrow_in_loop",
@@ -81,6 +81,7 @@ pub const KINDS: [&str; 18] = [
     "ref_pat_arena",
     "ref_pat_disjoint",
     "ref_pat_subfield",
+    "fn_value_call",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -267,7 +268,7 @@ impl Gen {
     }
 
     fn scenario(&mut self) -> Vec<St> {
-        match self.rng.below(112) {
+        match self.rng.below(124) {
             0..=16 => self.int_borrow(),
             17..=28 => self.reborrow(),
             29..=36 => self.moves(),
@@ -279,7 +280,8 @@ impl Gen {
             80..=85 => self.slot(),
             86..=94 => self.interior_mut(),
             95..=99 => self.flow(),
-            _ => self.ref_pattern(),
+            100..=111 => self.ref_pattern(),
+            _ => self.calls_via_value(),
         }
     }
 
@@ -1008,6 +1010,28 @@ impl Gen {
                 2 => raw(format!("{y} ← {k};")),
                 _ => raw_r(format!("use_i(*{r});"), Role::UseRef { var: r.clone() }),
             });
+        }
+        out
+    }
+
+    /// R2a (lệnh Giang 2026-10-17): như `calls` nhưng MỌI lời gọi đi qua GIÁ TRỊ HÀM (`fv ≔ idr; r ≔ fv(&x);`). Kiểu hàm trong `Ty` không mang region ⇒ M6 phải BẢO THỦ
+    /// (kết quả có thể mượn từ MỌI đối số; mọi đối số outlive nhau): ca sai vẫn bị từ chối, ca đúng của `pick2` bị từ chối oan (dương tính giả có lý do).
+    fn calls_via_value(&mut self) -> Vec<St> {
+        self.tags.insert("fn_value_call");
+        let names = ["idr", "pick2", "pick", "first", "two", "mix"];
+        let mut out = Vec::new();
+        for st in self.calls() {
+            match st {
+                St::Raw(mut r) => {
+                    if let Some(n) = names.iter().find(|n| r.text.contains(&format!("{n}("))) {
+                        let fv = self.fresh("fv");
+                        out.push(raw(format!("{fv} ≔ {n};")));
+                        r.text = r.text.replacen(&format!("{n}("), &format!("{fv}("), 1);
+                    }
+                    out.push(St::Raw(r));
+                }
+                other => out.push(other),
+            }
         }
         out
     }

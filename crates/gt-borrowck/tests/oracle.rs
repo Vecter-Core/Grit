@@ -378,7 +378,11 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
                 *rej_clean_by.entry(e.bc.join(",")).or_default() += 1;
                 // phân loại theo NGUYÊN NHÂN KHÔNG-ĐẦY-ĐỦ đã biết (ADR-023 §1, §6, §11)
                 let body = src.replace(progen::PRELUDE, "");
-                let cat = if body.contains("pick(")
+                let cat = if body.contains("fv") && body.contains("≔ pick2;") {
+                    "kiểu hàm KHÔNG mang region (ADR-042): gọi `pick2` qua giá trị hàm ⇒ M6 bảo thủ, kết quả buộc với MỌI đối số (oracle thấy thân thật chỉ mượn từ `x`)"
+                } else if body.contains("≔ pick;")
+                    || body.contains("≔ first;")
+                    || body.contains("pick(")
                     || body.contains("pick2(")
                     || body.contains("first(")
                 {
