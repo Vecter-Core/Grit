@@ -49,6 +49,9 @@ impl Env<'_> {
                 Some(AdtKind::Enum(vs)) => Some((0..vs.len()).map(Ctor::Variant).collect()),
                 None => None,
             },
+            // `u128`: giá trị > `i128::MAX` không biểu diễn được trong `Pat::Range(i128, i128)` ⇒ KHÔNG mô hình hoá miền, coi là vô hạn (chỉ `_`/tên phủ được)
+            // thay vì cắt miền (FAIL_OPEN_AUDIT S-B, FB-14). Đánh đổi: `⌥` u128 bằng khoảng kín không bao giờ vét cạn; phải có nhánh `_`.
+            Ty::Int(IntTy::U128) => None,
             Ty::Int(_) | Ty::Char => {
                 let (min, max) = int_domain(ty)?;
                 let mut cuts: Vec<i128> = vec![min];

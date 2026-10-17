@@ -1,0 +1,7 @@
+// expect: fail E0305
+// note: FB-14: ⌥ u128 chỉ phủ tới i128::MAX (và tới 2·10^38) từng bị coi là vét cạn; nay thiếu nhánh `_` ⇒ E0305
+ƒ f(x: u128) → u32 ! ∅ {
+  ⌥ x {
+    0..=200000000000000000000000000000000000000 ↦ 1u32
+  }
+}

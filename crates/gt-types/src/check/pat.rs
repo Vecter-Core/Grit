@@ -174,11 +174,11 @@ impl<'e, 'a> Checker<'e, 'a> {
         match &l.kind {
             LitKind::Bool(b) => XPat::Bool(*b),
             LitKind::Int(s) => match crate::collect::parse_int_literal(s) {
-                Some((v, _)) => {
-                    let v = i128::try_from(v).unwrap_or(i128::MAX);
-                    let v = if l.negative { -v } else { v };
-                    XPat::Range(v, v)
-                }
+                // KHÔNG BAO GIỜ kẹp (FAIL_OPEN_AUDIT S-B): giá trị không biểu diễn chính xác bằng `i128` ⇒ `Opaque` (không phủ gì, bảo thủ)
+                Some((v, _)) => match signed_value(v, l.negative) {
+                    Some(v) => XPat::Range(v, v),
+                    None => XPat::Opaque,
+                },
                 None => XPat::Opaque,
             },
             LitKind::Char(c) => match decode_char(c) {
@@ -193,8 +193,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         match &l.kind {
             LitKind::Int(s) => {
                 let (v, _) = crate::collect::parse_int_literal(s)?;
-                let v = i128::try_from(v).ok()?;
-                Some(if l.negative { -v } else { v })
+                signed_value(v, l.negative)
             }
             LitKind::Char(c) => decode_char(c).map(i128::from),
             _ => None,
@@ -231,12 +230,17 @@ impl<'e, 'a> Checker<'e, 'a> {
                 );
                 return XPat::Wild;
             }
-            if let Some(v) = Self::lit_value(l) {
-                if is_start {
-                    lo = v;
-                } else {
-                    hi = if inclusive { v } else { v - 1 };
-                }
+            // cận không biểu diễn chính xác (hoặc `v - 1` tràn) ⇒ KHÔNG coi là "không giới hạn": cả pattern thành `Opaque` (FAIL_OPEN_AUDIT S-B)
+            let Some(v) = Self::lit_value(l) else {
+                return XPat::Opaque;
+            };
+            if is_start {
+                lo = v;
+            } else {
+                let Some(h) = (if inclusive { Some(v) } else { v.checked_sub(1) }) else {
+                    return XPat::Opaque;
+                };
+                hi = h;
             }
         }
         XPat::Range(lo, hi)
@@ -497,6 +501,19 @@ impl<'e, 'a> Checker<'e, 'a> {
 }
 
 /// Giải mã literal ký tự (văn bản nguồn giữa hai dấu nháy, có thể có escape đơn giản) thành điểm mã.
+/// Giá trị có dấu CHÍNH XÁC của một literal số nguyên (độ lớn `v`, dấu `negative`) trong `i128`; `None` nếu không biểu diễn được (vd độ lớn > `i128::MAX`,
+/// chỉ có ở `u128`). Biên dưới `-2^127` biểu diễn được dù độ lớn `2^127` vượt `i128::MAX`.
+fn signed_value(v: u128, negative: bool) -> Option<i128> {
+    if negative {
+        if v == 1u128 << 127 {
+            return Some(i128::MIN);
+        }
+        i128::try_from(v).ok().map(|x| -x)
+    } else {
+        i128::try_from(v).ok()
+    }
+}
+
 pub(crate) fn decode_char(s: &str) -> Option<u32> {
     let inner = s
         .strip_prefix('\'')
