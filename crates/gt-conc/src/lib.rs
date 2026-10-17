@@ -8,7 +8,7 @@
 //! gọi (`a.load(o)`, `Atomic::load(&a, o)`) cùng đi qua một chỗ.
 use gt_diag::{Code, Diagnostic, Diagnostics};
 use gt_mir::{
-    AggregateKind, Body, BodyKind, Callee, Local, MirOutput, Operand, Rvalue, StatementKind,
+    AggregateKind, Body, BodyKind, Callee, Const, Local, MirOutput, Operand, Rvalue, StatementKind,
     TerminatorKind,
 };
 use gt_span::Span;
@@ -64,11 +64,79 @@ fn variant_of(b: &Body, op: &Operand, ord_def: gt_resolve::DefId, depth: u32) ->
     }
 }
 
+/// `node` là thành viên của một `impl` có `Self = Atomic<_>`?
+fn is_atomic_member(t: &TypesOutput, node: gt_ast::NodeId) -> bool {
+    t.db.impls.iter().any(|i| {
+        i.members.iter().any(|mm| mm.node == node)
+            && matches!(&i.self_ty, Ty::Adt(d, _) if t.db.adts.get(d).and_then(|a| a.lang) == Some(Lang::Atomic))
+    })
+}
+
+/// Mọi toán hạng một câu lệnh/terminator có thể mang (để tìm `Const::FnItem`).
+fn operands_of<'b>(kind: &'b StatementKind, out: &mut Vec<&'b Operand>) {
+    if let StatementKind::Assign(_, rv) = kind {
+        match rv {
+            Rvalue::Use(o)
+            | Rvalue::Repeat(o, _)
+            | Rvalue::Cast(o, _)
+            | Rvalue::CastFits(o, _)
+            | Rvalue::UnaryOp(_, o) => out.push(o),
+            Rvalue::BinaryOp(_, a, b) | Rvalue::CheckedBinaryOp(_, a, b) => {
+                out.push(a);
+                out.push(b);
+            }
+            Rvalue::Aggregate(_, ops) => out.extend(ops.iter()),
+            Rvalue::Ref(..) | Rvalue::Len(_) | Rvalue::Discriminant(_) => {}
+        }
+    }
+}
+
+/// FAIL_OPEN_AUDIT S-E: kiểm ordering chỉ thấy lời gọi TRỰC TIẾP (`Callee::Fn`). Phương thức của `Atomic` dùng làm GIÁ TRỊ hàm rồi gọi qua biến/đối số
+/// (`Callee::Value`) lách hoàn toàn kiểm ordering ⇒ TỪ CHỐI mọi `Const::FnItem` trỏ tới phương thức của `Atomic` (fail-closed: không phân giải được đích thì không tin).
+fn check_atomic_fn_values(t: &TypesOutput, b: &Body, bag: &mut Diagnostics) {
+    for bb in &b.blocks {
+        let mut ops: Vec<(&Operand, Span)> = Vec::new();
+        for s in &bb.statements {
+            let mut v = Vec::new();
+            operands_of(&s.kind, &mut v);
+            ops.extend(v.into_iter().map(|o| (o, s.source.span)));
+        }
+        if let Some(term) = &bb.terminator {
+            let sp = term.source.span;
+            match &term.kind {
+                TerminatorKind::Call { callee, args, .. } => {
+                    if let Callee::Value(o) = callee {
+                        ops.push((o, sp));
+                    }
+                    ops.extend(args.iter().map(|o| (o, sp)));
+                }
+                TerminatorKind::SwitchInt { discr, .. } => ops.push((discr, sp)),
+                TerminatorKind::Assert { cond, .. } => ops.push((cond, sp)),
+                _ => {}
+            }
+        }
+        for (o, sp) in ops {
+            if let Operand::Const(Const::FnItem { node, .. }) = o
+                && is_atomic_member(t, *node)
+            {
+                bag.push(mk(
+                    t,
+                    b.node,
+                    sp,
+                    "phương thức của `Atomic` không được dùng làm giá trị hàm (không kiểm được memory ordering ở lời gọi gián tiếp); gọi trực tiếp `a.load(AtomicOrdering::…)`"
+                        .to_string(),
+                ));
+            }
+        }
+    }
+}
+
 pub fn check_orderings(t: &TypesOutput, m: &MirOutput, bag: &mut Diagnostics) {
     let Some(&ord_def) = t.db.lang.get(&Lang::AtomicOrdering) else {
         return;
     };
     for b in m.bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
+        check_atomic_fn_values(t, b, bag);
         for bb in &b.blocks {
             let Some(term) = &bb.terminator else { continue };
             let TerminatorKind::Call {

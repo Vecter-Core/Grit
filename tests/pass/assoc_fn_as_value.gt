@@ -1,0 +1,11 @@
+// expect: pass
+// note: FB-13: hàm kết hợp dùng làm giá trị hàm (trước đây gt-mir đệ quy vô hạn, tràn ngăn xếp)
+▢ B { v: u32 }
+⊐ B {
+  ƒ get(&self) → u32 ! ∅ { self.v }
+}
+ƒ main() → u32 ! ∅ {
+  b ≔ B { v: 3u32 };
+  f: ƒ(&B) → u32 ! ∅ ≔ B::get;
+  f(&b)
+}

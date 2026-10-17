@@ -1,0 +1,6 @@
+// expect: fail E0503
+// note: FAIL_OPEN_AUDIT S-E: phương thức Atomic dùng làm giá trị hàm lách kiểm ordering; bị từ chối
+ƒ f(a: &Atomic<u32>) → u32 ! ∅ {
+  g: ƒ(&Atomic<u32>, AtomicOrdering) → u32 ! ∅ ≔ Atomic::load;
+  g(a, AtomicOrdering::Release)
+}
