@@ -23,6 +23,13 @@ impl Env<'_> {
             return;
         };
         let Some(td) = self.db.traits.get(&tr.trait_def).cloned() else {
+            // db không nhất quán: không được bỏ qua kiểm impl (FAIL_OPEN_AUDIT R3) ⇒ lỗi nội bộ
+            self.err(
+                "E9901",
+                imp.node,
+                imp.span,
+                "lỗi nội bộ: trait của `⊐ … for` không có trong cơ sở kiểu".to_string(),
+            );
             return;
         };
         let node = imp.node;
@@ -106,7 +113,8 @@ impl Env<'_> {
             self.region_sigs.get(&trait_member),
             self.region_sigs.get(&impl_member),
         ) else {
-            return true;
+            // thiếu chữ ký region: KHÔNG coi là tương thích (fail-closed; collect luôn ghi cho mọi hàm/thành viên)
+            return false;
         };
         let flat = |s: &crate::region::RegionSig| -> Vec<RegionRef> {
             s.inputs
@@ -190,7 +198,7 @@ impl Env<'_> {
     }
 
     fn validate_copy_impl(&mut self, imp: &ImplDef, node: gt_ast::NodeId) {
-        let Ty::Adt(d, _) = &imp.self_ty else {
+        let Ty::Adt(d, self_args) = &imp.self_ty else {
             if !matches!(imp.self_ty, Ty::Err) {
                 self.err(
                     "E0311",
@@ -202,6 +210,13 @@ impl Env<'_> {
             return;
         };
         let Some(adt) = self.db.adts.get(d).cloned() else {
+            // db không nhất quán: KHÔNG được bỏ qua kiểm trường (FAIL_OPEN_AUDIT R3) ⇒ lỗi nội bộ
+            self.err(
+                "E9901",
+                node,
+                imp.span,
+                "lỗi nội bộ: ADT của `⊐ Copy for` không có trong cơ sở kiểu".to_string(),
+            );
             return;
         };
         if matches!(
@@ -221,15 +236,13 @@ impl Env<'_> {
             AdtKind::Struct(fs) => fs.iter().map(|f| f.ty.clone()).collect(),
             AdtKind::Enum(vs) => vs.iter().flat_map(|v| v.fields.clone()).collect(),
         };
+        // Copy của trường được xét THEO đối số thật của impl (`W<T>` ⇒ T là tham số của impl) với ràng buộc impl khai báo:
+        // `⊐ <T> Copy for W<T>` (không `T: Copy`) với trường kiểu T bị từ chối (R3; trước đây dùng biến suy luận ⇒ luôn "Copy").
+        let scope = crate::traits::scope_bounds(&imp.generics.iter().collect::<Vec<_>>());
         let mut infer = InferCtx::new();
-        let gens: Vec<Ty> = fresh_args(&mut infer, &adt.generics);
         for t in tys {
-            let ft = subst_with(&t, &adt.generics, &gens);
-            let ft = match &ft {
-                Ty::Param(_) => continue, // trường kiểu tham số: ràng buộc `T: Copy` do impl tự khai báo
-                _ => ft,
-            };
-            if !self.is_copy_ignoring_self(&mut infer, &ft, *d) {
+            let ft = subst_with(&t, &adt.generics, self_args);
+            if !self.is_copy_ignoring_self(&mut infer, &ft, *d, &scope) {
                 let s = ft.render(self.defs());
                 self.err(
                     "E0311",
@@ -243,11 +256,17 @@ impl Env<'_> {
     }
 
     /// `is_copy` nhưng coi chính ADT đang xét là Copy (tránh vòng tự tham chiếu).
-    fn is_copy_ignoring_self(&self, infer: &mut InferCtx, ty: &Ty, own: gt_resolve::DefId) -> bool {
+    fn is_copy_ignoring_self(
+        &self,
+        infer: &mut InferCtx,
+        ty: &Ty,
+        own: gt_resolve::DefId,
+        scope: &[crate::traits::Bound],
+    ) -> bool {
         if matches!(ty, Ty::Adt(d, _) if *d == own) {
             return true;
         }
-        self.db.is_copy(infer, ty, &[], 0)
+        self.db.is_copy(infer, ty, scope, 0)
     }
 
     /// Hai impl chồng lấn: cùng trait mà đầu đề hợp nhất được; hoặc cùng kiểu (inherent) và trùng tên thành viên.
