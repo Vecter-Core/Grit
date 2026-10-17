@@ -266,3 +266,34 @@ fn two_level_types_with_the_same_short_name_are_ambiguous() {
         "E0502",
     );
 }
+
+/// FAIL_OPEN_AUDIT (gt-effects dòng 50): thân hàm KHÔNG tìm thấy chữ ký (`sig_by_node` = None) từng bị `continue` bỏ qua ⇒ hiệu ứng của thân không được kiểm.
+/// db không nhất quán ⇒ phải là ICE E9901 (dựng trong bộ nhớ: đổi `node` của thân thành NodeId không có trong db).
+#[test]
+fn body_without_a_signature_is_an_internal_error_not_skipped() {
+    let (t, mut m) = common::mir("ƒ out() → () ! {io} { }\nƒ f() → () ! ∅ { out(); }");
+    // đối chứng: nguyên vẹn ⇒ E0801 (gọi io trong hàm ∅)
+    assert!(
+        check_effects(&t, &m)
+            .report
+            .diagnostics
+            .iter()
+            .any(|d| d.code.as_str() == "E0801")
+    );
+    let i = m
+        .bodies
+        .iter()
+        .position(|b| b.key.ends_with("::f"))
+        .expect("thân f");
+    m.bodies[i].node = gt_ast::NodeId::new(gt_span::FileId::new(0), 9_999_999);
+    let codes: Vec<String> = check_effects(&t, &m)
+        .report
+        .diagnostics
+        .iter()
+        .map(|d| d.code.as_str().to_string())
+        .collect();
+    assert!(
+        codes.iter().any(|c| c == "E9901"),
+        "thân không có chữ ký bị bỏ qua lặng lẽ: {codes:?}"
+    );
+}
