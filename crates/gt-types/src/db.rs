@@ -48,8 +48,9 @@ impl TypeDb {
                 self.imut(t, params, seen)
             }
             Ty::Adt(d, args) => {
+                // ADT không có trong db (db không nhất quán): KHÔNG được coi là "không có mutability bên trong" — bảo thủ `true` (vị từ không còn được mô hình hoá thuần)
                 let Some(adt) = self.adts.get(d) else {
-                    return false;
+                    return true;
                 };
                 if adt.lang.is_some_and(Lang::interior_mutable) {
                     return true;
