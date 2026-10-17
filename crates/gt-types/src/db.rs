@@ -412,6 +412,11 @@ mod drop_tests {
                     .is_err()
             );
             assert_eq!(env.db.needs_drop_checked(&Ty::Bool), Ok(false));
+            // R3 (FAIL_OPEN_AUDIT db.rs `imut`): ADT không có trong db KHÔNG được coi là "không có mutability bên trong" (M7 sẽ coi vị từ là thuần)
+            assert!(
+                env.db.may_have_interior_mut(&unknown, &[]),
+                "ADT lạ bị coi là không có mutability bên trong"
+            );
             let arena = *env.db.lang.get(&Lang::Arena).expect("Arena");
             assert!(
                 env.db.needs_drop(&Ty::Adt(arena, Vec::new())),
