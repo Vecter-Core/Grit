@@ -825,3 +825,18 @@ fmt OK | clippy 0 | audit 0 | test 879/0/168 | unittest công cụ 9 + 4 + 18 | 
 - **FAIL_OPEN_AUDIT:** `docs/FAIL_OPEN_AUDIT.md`; 6 chỗ đã sửa (G1 Guard, S1, B1, B2, B3, D1; FB-10, FB-11). B1/B2/B3/D1 không có test ĐỎ→XANH thuần (xem bảng mục 0 của tài liệu); gt-mir/gt-types chỉ rà phần quyết định, ~360 hit CHƯA đọc từng dòng.
 - **Thử lại có kiểm soát (native.rs):** LNK1104 khi liên kết và PermissionDenied khi spawn; không bao giờ thử lại kết quả (KNOWN_LIMITATIONS).
 - **CHƯA chạy:** đột biến chính thức cho quy tắc G1 và cho sửa FB-9 của Guard; flake llvm_sort; std ở release/release-o2; Ord kiểu ghép; đo sortlines; mục E.
+
+## Bộ sinh hàm làm GIÁ TRỊ (luật bộ sinh cho S-E / FB-13 / FB-15) — 2026-10-17
+`crates/gt-driver/tests/fn_value_gen.rs` (`GT_FNGEN_N`, mặc định 32 mỗi loại; ~160 s ở dev). Oracle ĐỘC LẬP: mô hình Rust (quy tắc hiệu ứng callee ⊆ caller; intrinsic không là giá trị ⇒ E0313; Atomic ⇒ E0503); chương trình xanh ⇒ giá trị mô hình == thông dịch == exe LLVM (dev).
+| loại | chương trình | xanh (3 nguồn khớp) | đỏ kỳ vọng (đúng mã) |
+|---|---|---|---|
+| hàm thường | 32 | 22 | 10 (E0801) |
+| qua chuỗi biến | 32 | 20 | 12 (E0801) |
+| hàm kết hợp `&self` (`B::get`) | 32 | 27 | 5 (E0801) |
+| hàm kết hợp `self` (`B::take`) | 32 | 23 | 9 (E0801) |
+| hàm generic | 32 | 25 | 7 (E0801) |
+| truyền qua tham số kiểu hàm | 32 | 22 | 10 (E0801) |
+| intrinsic (shl/shr/band/bor/bxor/rotr/rotl/bnot) | 32 | 0 | 32 (E0313) |
+| phương thức Atomic | 32 | 0 | 32 (E0503) |
+Tổng 256: 139+3 = 142 xanh với ba nguồn khớp, 114 đỏ đúng mã, 0 bất đồng. **Tắt bản sửa thì bộ sinh TỰ bắt** (N=8, mỗi lần một bản sửa, hoàn nguyên bằng `git checkout`): FB-15 (hiệu ứng rỗng) ĐỎ; quy tắc E0313 ĐỎ; S-E gt-conc ĐỎ; FB-13 (bỏ nhánh `Res::Assoc`) ĐỎ (nay qua ICE chốt chặn, không còn tràn ngăn xếp).
+**Nói thẳng:** bộ sinh oracle M6/M7 (`progen`/`obgen`) CHƯA được mở rộng sinh hàm làm giá trị — dùng bộ sinh RIÊNG này vì hai bộ kia sinh chương trình số nguyên/mượn thuần, thêm giá trị hàm vào đó cần mô hình vay/nghĩa vụ mới. Chưa có hàm làm giá trị trong oracle động M6 (mượn qua con trỏ hàm) — việc mở.
