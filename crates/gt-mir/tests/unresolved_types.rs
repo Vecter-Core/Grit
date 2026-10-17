@@ -42,6 +42,10 @@ fn err_and_infer_in_local_types_are_rejected_at_any_depth() {
         ("Infer", Ty::Infer(7)),
         ("Tuple(Infer)", Ty::Tuple(vec![Ty::Bool, Ty::Infer(1)])),
         ("Array(Err)", Ty::Array(Box::new(Ty::Err), 3)),
+        (
+            "Adt(Err)",
+            Ty::Adt(gt_resolve::DefId::from_index(0), vec![Ty::Err]),
+        ),
         ("Slice(Err)", Ty::Slice(Box::new(Ty::Err))),
         ("RawPtr(Err)", Ty::RawPtr(false, Box::new(Ty::Err))),
         (
