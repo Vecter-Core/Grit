@@ -233,5 +233,30 @@ class CommitCheck(unittest.TestCase):
         self.assertEqual(rc, 0, out)
 
 
+class NulStage(unittest.TestCase):
+    """Giai đoạn `nul` của cổng: tệp văn bản được theo dõi chứa byte NUL ⇒ ĐỎ nêu tên tệp (sự cố 2026-10-17)."""
+
+    def run_gate(self, repo):
+        env = dict(os.environ, GATE_STAGES="nul", PYTHONIOENCODING="utf-8")
+        script = os.path.join(ROOT, "tools", "gate.sh").replace(chr(92), "/")
+        p = subprocess.run(["bash", script, repo.replace(chr(92), "/")], cwd=repo, env=env, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
+        return p.returncode, p.stdout
+
+    def test_clean_repo_is_green_and_nul_file_is_red(self):
+        repo = tracked_repo()
+        self.addCleanup(shutil.rmtree, repo, True)
+        rc, out = self.run_gate(repo)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("NUL_OK", out)
+        with open(os.path.join(repo, "tracked.txt"), "wb") as f:
+            f.write(bytes(64))
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-am", "nul"], cwd=repo, check=True, capture_output=True)
+        rc, out = self.run_gate(repo)
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("tracked.txt", out)
+        self.assertIn("GATE_RESULT=RED", out)
+
+
 if __name__ == "__main__":
     unittest.main()

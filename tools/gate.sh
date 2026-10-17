@@ -14,7 +14,7 @@ bash "$(dirname "$0")/handoff_check.sh" "$1" || true   # chỉ cảnh báo, KHÔ
 if [ -f tools/pre-commit.hook ] && ! cmp -s tools/pre-commit.hook .git/hooks/pre-commit 2>/dev/null; then
   echo "HOOK_WARN: .git/hooks/pre-commit chưa cài hoặc khác tools/pre-commit.hook — chạy: bash tools/install_hooks.sh"
 fi
-STAGES="${GATE_STAGES:-gtrt fmt clippy audit test expect deletions track}"
+STAGES="${GATE_STAGES:-nul gtrt fmt clippy audit test expect deletions track}"
 rc=0
 red() { echo "GATE_RED: $1"; rc=1; }
 has() { case " $STAGES " in *" $1 "*) return 0 ;; esac; return 1; }
@@ -26,6 +26,10 @@ GUARD="$(dirname "$0")/track_guard.sh"
 TRACK_SNAP="$(mktemp)"
 if has track; then bash "$GUARD" snapshot "$TRACK_SNAP" .; fi
 
+if has nul; then
+  echo "== nul (tệp văn bản được theo dõi không chứa byte NUL; sự cố 2026-10-17)"
+  bash "$(dirname "$0")/nul_check.sh" . || red "tệp văn bản chứa byte NUL"
+fi
 if has gtrt; then
   echo "== gt-rt (workspace riêng, M10)"
   cargo fmt --manifest-path runtime/gt-rt/Cargo.toml --check || red "gt-rt fmt"
@@ -67,6 +71,11 @@ if has expect; then
   if [ -f tools/test_mut_guard.py ]; then
     PYTHONIOENCODING=utf-8 python -m unittest tools/test_mut_guard.py 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || red "unittest mut_guard"
   fi
+  for t in test_mut_resume test_preflight test_nul_check; do
+    if [ -f tools/$t.py ]; then
+      PYTHONIOENCODING=utf-8 python -m unittest tools/$t.py 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || red "unittest $t"
+    fi
+  done
   if [ -f tools/test_gate.py ]; then
     PYTHONIOENCODING=utf-8 python -m unittest tools/test_gate.py 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || red "unittest gate"
   fi
