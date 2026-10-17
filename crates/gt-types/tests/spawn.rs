@@ -135,3 +135,25 @@ fn polymorphic_recursion_is_cut_off_by_the_depth_guard() {
         "E0501",
     );
 }
+
+/// Đột biến sống sót (send.rs:67 `== → !=`): thông điệp phải gọi ĐÚNG tên đặc tính bị thiếu (Send vs Sync), không đảo nhau.
+#[test]
+fn the_message_names_the_missing_auto_trait_correctly() {
+    let msgs = |src: &str| -> Vec<String> {
+        one(src)
+            .report
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect()
+    };
+    // thiếu Send (tham số kiểu trần được spawn)
+    let m = msgs("ƒ w<T>(x: T) ! ∅ { }\nƒ run<T>(x: T) ! ∅ { spawn(w, x); }");
+    assert!(
+        m.iter().any(|s| s.contains("ràng buộc `Send`")),
+        "thiếu Send mà thông điệp không nêu Send: {m:?}"
+    );
+    // thiếu Sync (static chứa Cell)
+    let m = msgs("■ C: Cell<u32> ≔ Cell::new(1u32);");
+    assert!(m.iter().any(|s| s.contains("Sync")), "{m:?}");
+}
