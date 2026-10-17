@@ -128,3 +128,37 @@ impl Env<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Auto;
+    use crate::collect::Lang;
+    use crate::testkit::with_env;
+    use crate::ty::Ty;
+    use gt_resolve::DefId;
+
+    /// FAIL_OPEN_AUDIT S-A: ADT không có trong cơ sở kiểu (db không nhất quán) từng được tính là `Send`/`Sync`; phải là lỗi NỘI BỘ (E9901), không bao giờ `Ok`.
+    #[test]
+    fn adt_missing_from_the_database_is_an_internal_error_never_send() {
+        with_env("ƒ f() → u32 ! ∅ { 1 }", |env| {
+            let lost = Ty::Adt(DefId::from_index(1_000_000), Vec::new());
+            for which in [Auto::Send, Auto::Sync] {
+                let r = env.auto_like(&lost, &[], which);
+                let why = r.expect_err("ADT lạ KHÔNG được là Send/Sync");
+                assert!(why.contains("E9901"), "phải là lỗi nội bộ: {why}");
+            }
+        });
+    }
+
+    /// `Mutex` không có đối số kiểu (db không nhất quán) cũng là lỗi nội bộ, không `Ok`.
+    #[test]
+    fn mutex_without_its_type_argument_is_an_internal_error() {
+        with_env("ƒ f() → u32 ! ∅ { 1 }", |env| {
+            let m = *env.db.lang.get(&Lang::Mutex).expect("prelude có Mutex");
+            let why = env
+                .auto_like(&Ty::Adt(m, Vec::new()), &[], Auto::Send)
+                .expect_err("Mutex thiếu đối số");
+            assert!(why.contains("E9901"), "{why}");
+        });
+    }
+}

@@ -10,6 +10,8 @@ mod infer;
 mod mono;
 mod region;
 mod send;
+#[cfg(test)]
+mod testkit;
 mod traits;
 mod ty;
 mod validate;
