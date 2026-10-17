@@ -26,3 +26,34 @@ fn every_instance_has_a_function_key_and_the_dump_hashes_the_instance_table() {
     let dump = mir_dump(art);
     assert!(dump.contains("\ninstances "), "{dump}");
 }
+
+fn artifacts() -> gt_driver::pipeline::Artifacts {
+    let inputs = [SourceInput {
+        name: "main.gt".to_string(),
+        text: GEN.to_string(),
+    }];
+    let mut res = check(&inputs, &Options::default()).expect("check");
+    assert!(res.verdict.allows_output());
+    res.take_gated().expect("cổng")
+}
+
+/// Chạm nhánh `?missing` TRỰC TIẾP: một instance mà bảng khoá hàm không có. Bản cũ (`filter_map`) bỏ nó khỏi băm ⇒ băm trùng với
+/// băm của chương trình KHÔNG có instance đó (attestation phủ ít hơn mà không ai biết). Bản đúng: hai băm KHÁC nhau, và cả hai khác bản gốc.
+#[test]
+fn an_instance_without_a_key_changes_the_attestation_hash_instead_of_disappearing() {
+    let original = mir_dump(&artifacts());
+    // (a) mất khoá hàm của nút đầu tiên (mọi instance của nút đó)
+    let mut a = artifacts();
+    let node = a.types.instances[0].node;
+    assert!(a.types.fn_keys.remove(&node).is_some());
+    let missing_key = mir_dump(&a);
+    // (b) chương trình "không có" các instance đó
+    let mut b = artifacts();
+    b.types.instances.retain(|i| i.node != node);
+    let no_instance = mir_dump(&b);
+    assert_ne!(missing_key, original, "thiếu khoá mà băm không đổi");
+    assert_ne!(
+        missing_key, no_instance,
+        "instance thiếu khoá bị bỏ khỏi băm: trùng băm với chương trình không có nó"
+    );
+}

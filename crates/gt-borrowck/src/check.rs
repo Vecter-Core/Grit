@@ -695,8 +695,13 @@ impl<'a> Checker<'a> {
 }
 
 #[cfg(test)]
+#[allow(dead_code, clippy::unwrap_used)]
+#[path = "../../gt-types/tests/common/mod.rs"]
+mod tc;
+
+#[cfg(test)]
 mod tests {
-    use super::diag_code;
+    use super::{Checker, diag_code, tc};
 
     #[test]
     fn malformed_diagnostic_code_falls_back_to_the_internal_error_instead_of_vanishing() {
@@ -704,5 +709,18 @@ mod tests {
         for bad in ["", "E04", "X0401", "E04O1", "e0401", "E04011"] {
             assert_eq!(diag_code(bad).as_str(), "E9901", "{bad:?}");
         }
+    }
+
+    /// Đường thật `Checker::push`: mã sai định dạng PHẢI để lại một chẩn đoán (E9901), không được biến mất (FAIL_OPEN_AUDIT B1).
+    #[test]
+    fn push_with_a_malformed_code_still_records_a_diagnostic() {
+        let t = tc::run(&[("main.gt", "ƒ f() → u32 ! ∅ { 1 }")]);
+        let m = gt_mir::lower_program(&t);
+        let body = &m.bodies[0];
+        let mut ck = Checker::new(&t, body);
+        let idx = ck.push("E04", body.span, "thử".to_string(), (0, 0));
+        assert!(idx.is_some(), "push trả None ⇒ chẩn đoán bị nuốt");
+        assert_eq!(ck.diags.len(), 1);
+        assert_eq!(ck.diags[0].code.as_str(), "E9901");
     }
 }
