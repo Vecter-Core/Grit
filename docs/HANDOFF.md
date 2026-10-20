@@ -81,3 +81,10 @@ ADR-036 hồ sơ release; ADR-037 nới điều kiện fuzz #2; ADR-038 (Arena c
 - **Kiểm corpus:** `PYTHONIOENCODING=utf-8 python tools/check_expectations.py`.
 - **Chèn lỗi:** `GRITC_FAULT=panic:<pass>|skip:<pass>|types:select-impl|ir:*|post:*|mir:pat-*`.
 - **LNK1104** thoáng qua (quét exe của Windows Defender) ⇒ chạy lại; **WinError 1455** = thiếu bộ nhớ ảo. Công cụ: rustc/cargo 1.98.1, MSVC VS 2022, Python 3.12, git-bash + PowerShell.
+
+## 7. Kiểm toán ngoài 2026-10-20 và các sửa đã làm (Giang ủy quyền tự duyệt; KHÔNG đổi READINESS/TCB — chờ cổng liền mạch xanh trên Windows)
+Kiểm toán chạy từ container Linux (kết quả đầy đủ: `audit/RESULTS.md`, `audit/ANALYSIS.md` trên nhánh làm việc). Đã sửa (mỗi mục có mẫu corpus/test khoá lại):
+- **F-01 (nghiêm trọng)**: M6 không thấy nhiều toán hạng cùng một câu lệnh (`(b, b)`, `two(b, b)`…) ⇒ `check_uses` áp move ngay sau mỗi truy cập; `tests/same_stmt.rs`, 14 mẫu `E0401_{same_stmt,dup}_*`. **Chưa làm**: kịch bản `dup_operand` cho `progen` của oracle động (oracle hiện chưa tự phát hiện lớp lỗi này) + kiểm bằng đột biến vùng `check_uses`.
+- F-02 `gritc --no-default-features` dựng được; F-03 kiểu chứa chính nó theo giá trị ⇒ E0301; F-04 `[T]`/`str` theo giá trị ⇒ E0301; F-05 gọi nguồn capability qua giá trị hàm ⇒ E0310; F-06 `main` chạy trên luồng 256 MiB; F-07 tên biến ở vị trí kiểu ⇒ E0301 (không còn ICE); F-08 tài liệu E1201–E1204/E1301/E9901.
+- Port **Linux x86_64** (LLVM thật, `libgt_rt.a`, `cc`), `ci.yml` + `deny.toml` (CHƯA chạy trên GitHub).
+**Còn mở / cần Giang quyết**: D4 vòng qua `⌥ a { 1.5 ↦ … }` (so sánh số thực ngầm; ADR-018 cho phép với `_`); alias vòng không dùng không bị báo (vô hại); các mục "rủi ro đọc mã" ở `audit/ANALYSIS.md` §4; chạy `bash tools/gate.sh` đầy đủ + đột biến + fuzz 24 h trên máy Windows.

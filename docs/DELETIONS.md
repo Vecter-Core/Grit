@@ -12,6 +12,8 @@ Commit xoá tệp phải cập nhật tệp này CÙNG commit (`tools/commit_che
 | crates/gt-fmt/src/comments.rs | d370890 | M2e: luật chú thích theo từng vị trí được thay bằng MỘT cơ chế gắn token (`attach.rs`, ADR-016, Q16b); `comments.rs` bị thay thế |
 | tests/fail/E1301_comment_in_expression.gt | d370890 | M2e: cơ chế gắn token chấp nhận chú thích ở vị trí này (ADR-016: 0 từ chối khi chèn `// zz` sau mọi token), nên mẫu "fail E1301" không còn đúng; E1301 chỉ còn là biện pháp cuối cùng (KNOWN_LIMITATIONS) |
 | tests/fail/E1301_comment_in_signature.gt | d370890 | như trên (chú thích trong chữ ký) |
+| .github/workflows/TASK.md | d0a9180 | việc giữ chỗ đã làm: thay bằng .github/workflows/ci.yml |
+| deny.toml.TASK.md | d0a9180 | việc giữ chỗ đã làm: thay bằng deny.toml |
 
 ## Ghi chú về `lib/core/TASK.md`
 Tệp này biến mất khỏi cây làm việc (không qua commit) ngày 2026-10-16 và đã khôi phục bằng `git checkout`; nguyên nhân chưa rõ (xem KNOWN_LIMITATIONS "Tệp bị xoá không rõ nguyên nhân"). Nó vẫn được theo dõi, nên KHÔNG có dòng ở đây (chưa bị xoá trong lịch sử). Nếu sau này chủ ý xoá (giống các `TASK.md` giữ chỗ khác khi M12 đóng), thêm dòng ở đây trong CÙNG commit.
