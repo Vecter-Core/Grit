@@ -1,0 +1,4 @@
+// probe: reject E0702|E0701
+// why: bước là tham số có thể bằng 0
+ƒ f(step: u32) → u32 ! ∅ { μi ≔ 0u32; ⟳ i < 10 ↓ 10 - i { i ← i + step; } i }
+ƒ main() → u32 ! ∅ { f(0) }

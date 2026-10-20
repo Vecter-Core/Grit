@@ -1,0 +1,5 @@
+// probe: reject E0701|E0702|E0703
+// why: a→b không giảm, b→a giảm: vẫn có thể vô hạn trên cạnh a→b? (cần mọi cạnh giảm)
+ƒ a(n: u32) → u32 ! ∅ ↓ n { b(n) }
+ƒ b(n: u32) → u32 ! ∅ ↓ n { ⎇ n == 0 { 0 } ⇝ { a(n - 1) } }
+ƒ main() → u32 ! ∅ { a(3) }

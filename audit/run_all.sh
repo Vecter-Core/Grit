@@ -62,6 +62,14 @@ STAGES+=(
   "L03_native_rig_tests|3600|core|[bản sao 2] cargo test -p rig (rig build/run/test + 6 công cụ dogfood bằng exe native)"
   "L04_native_other_crates|1800|core|[bản sao 2] cargo test -p gt-guard -p gt-codegen-llvm -p gt-llvm + gt-rt"
   "L05_native_diff|1800|core|[bản sao 2] vi sai thông dịch ≡ exe native trên số học ngẫu nhiên (bộ sinh riêng)"
+  "L06_native_unsound_demo|600|core|[bản sao 2] chạy THẬT chương trình XANH nhưng dùng-sau-reset Arena (nhân đôi tay cầm): có đọc nhầm không"
+  "L07_native_stack_limits|900|core|[bản sao 2] chương trình HỢP LỆ gây tràn ngăn xếp native: có abort có kiểm soát (mã 70) không"
+  "L08_native_compiler_crash|600|core|[bản sao 2] đầu vào được M4–M9 cho qua nhưng làm CHÍNH gritc sập (kiểu kích thước vô hạn…)"
+  "G11_fmt_meta|900|core|[bản sao] metamorphic: gritc fmt không đổi phán quyết (841 mẫu)"
+  "G12_alias_meta|900|core|[bản sao] metamorphic: alias ASCII ≡ canonical không đổi phán quyết (816 mẫu)"
+  "G13_order_meta|900|core|[bản sao] metamorphic: xáo thứ tự khai báo không đổi phán quyết (429 mẫu × 2)"
+  "G14_diff_arrays|1800|core|[bản sao] vi sai M7 all≡proven trên chỉ số mảng/lát (nơi M7 xoá kiểm tra biên)"
+  "P01_proposed_fix_f01|2400|core|[bản sao 3] ĐỀ XUẤT sửa F-01 (9 dòng ở gt-borrowck/check.rs): 14 probe có bị chặn không, corpus/test có hồi quy không"
   "H01_llvm_probe|300|opt|Thử lấy LLVM 20 cho Linux (khả năng port)"
   "I01_fuzz_tools|1500|opt|Công cụ fuzz: nightly + cargo-fuzz (cài nếu thiếu, ngoài dự án)"
   "I02_fuzz_lex|900|opt|[bản sao] cargo-fuzz lexer ${FUZZ_SECONDS:-300}s (ASan, libFuzzer)"
@@ -70,7 +78,17 @@ STAGES+=(
 
 # ---------- tiện ích ----------
 note() { printf 'SUMMARY: %s\n' "$*"; }
-in_copy() { [ -d "$COPY/.git" ] || { echo "chưa có bản sao $COPY (chạy G00_copy_patch trước)"; return 77; }; }
+make_copy() {
+  mkdir -p "$WORK" || return 1
+  rm -rf "$COPY"
+  git clone -q "$ROOT" "$COPY" || return 1
+  (cd "$COPY" && patch -p1 < "$AUDIT/patches/driver_nollvm.patch" && cargo build --locked -p gt-driver --no-default-features --all-targets) || return 1
+}
+# mỗi giai đoạn nhóm G tự dựng bản sao nếu chưa có (vd container mới sau khi phiên bị ngắt) — không bao giờ ghi BLOCKED chỉ vì mất bản sao
+in_copy() {
+  [ -x "$COPY/target/debug/gritc" ] && return 0
+  echo "chưa có bản sao $COPY: dựng lại (G00)"; make_copy || { echo "không dựng được bản bản sao"; return 1; }
+}
 gritc_bin() { echo "$COPY/target/debug/gritc"; }
 
 # ---------- các giai đoạn ----------
@@ -197,14 +215,9 @@ st_F02_tool_tests() {
 }
 
 st_G00_copy_patch() {
-  mkdir -p "$WORK" || return 1
-  rm -rf "$COPY"
-  git clone -q "$ROOT" "$COPY" || return 1
+  make_copy || return 1
   cd "$COPY" || return 1
   echo "bản sao tại $COPY ở commit $(git log -1 --format=%h)"
-  patch -p1 < "$AUDIT/patches/driver_nollvm.patch" || return 1
-  echo "== dựng gritc (không LLVM) trong bản sao"
-  cargo build --locked -p gt-driver --no-default-features --all-targets || return 1
   ls -la "$COPY/target/debug/gritc" && "$COPY/target/debug/gritc" --version 2>&1 | head -2
   note "đã vá 1 tệp (crates/gt-driver/src/cli.rs, +17 dòng) trong BẢN SAO để gritc dựng không cần LLVM"
 }
@@ -315,7 +328,17 @@ st_G10_mutfuzz() {
 }
 
 LCOPY="$WORK/grit_linux"
-in_lcopy() { [ -d "$LCOPY/.git" ] || { echo "chưa có $LCOPY (chạy L01_linux_port trước)"; return 77; }; }
+make_lcopy() {
+  [ -e /usr/lib/x86_64-linux-gnu/libLLVM-20.so ] || { echo "thiếu libLLVM-20.so (gói libllvm20)"; return 77; }
+  mkdir -p "$WORK" && rm -rf "$LCOPY" && git clone -q "$ROOT" "$LCOPY" || return 1
+  (cd "$LCOPY" && patch -p1 < "$AUDIT/patches/linux_port.patch" \
+    && (cd runtime/gt-rt && cargo build --release --locked) \
+    && GRIT_LLVM_DIR=/usr cargo build --locked -p gt-driver --all-targets) || return 1
+}
+in_lcopy() {
+  [ -x "$LCOPY/target/debug/gritc" ] && [ -f "$LCOPY/runtime/gt-rt/target/release/libgt_rt.a" ] && return 0
+  echo "chưa có $LCOPY: dựng lại (L01)"; make_lcopy
+}
 lgritc() { echo "$LCOPY/target/debug/gritc"; }
 
 st_L01_linux_port() {
@@ -355,6 +378,89 @@ st_L05_native_diff() {
   in_lcopy || return $?
   local g; g="$(lgritc)"; [ -x "$g" ] || return 77
   python3 "$AUDIT/diff_checks.py" --gritc "$g" --n "${NATIVE_DIFF_N:-600}" --seed 3 --jobs 2 "--left=--backend=interpreter" "--right=--backend=llvm"
+}
+
+st_L06_native_unsound_demo() {
+  in_lcopy || return $?
+  local g; g="$(lgritc)"; [ -x "$g" ] || return 77
+  local f="$AUDIT/probes/m6_dup_arena_reuse_demo.gt" out rc=0
+  "$g" check "$f" > "$WORK/demo.chk" 2>&1; local crc=$?
+  echo "gritc check: exit=$crc ($(tail -1 "$WORK/demo.chk"))"
+  if [ "$crc" != 0 ]; then note "gritc từ chối chương trình (đã sửa lỗ hổng?)"; return 0; fi
+  for prof in dev release release-o2; do
+    out=$("$g" run "$f" --profile=$prof 2>&1 | tail -1)
+    echo "profile=$prof: $out"
+    case "$out" in *"trả về 1234"*) ;; *) rc=1;; esac
+  done
+  note "kỳ vọng đúng ngữ nghĩa: main trả 1234 (giá trị đã cấp); nhận giá trị khác = bộ nhớ đã bị tái dùng sau reset (UB) trong chương trình được gritc cho qua"
+  return $rc
+}
+
+st_L07_native_stack_limits() {
+  in_lcopy || return $?
+  local g; g="$(lgritc)"; [ -x "$g" ] || return 77
+  local rc=0 f out code
+  for f in stack_array stack_recursion; do
+    "$g" check "$AUDIT/native_cases/$f.gt" 2>&1 | tail -1
+    out=$(timeout 120 "$g" run "$AUDIT/native_cases/$f.gt" 2>&1 | tail -1); code=${PIPESTATUS[0]}
+    echo "$f: exit=$code :: $out"
+    case "$code" in 0|70|71) ;; *) rc=1;; esac
+  done
+  note "D3 đòi abort có kiểm soát (70) khi lỗi không khôi phục; nhận mã khác 0/70/71 = tiến trình bị HĐH giết (tràn ngăn xếp), gt-rt không có bảo vệ"
+  return $rc
+}
+
+st_L08_native_compiler_crash() {
+  in_lcopy || return $?
+  local g; g="$(lgritc)"; [ -x "$g" ] || return 77
+  local rc=0 f code
+  for f in "$AUDIT"/native_cases/crash_*.gt; do
+    timeout 120 "$g" run "$f" > "$WORK/crash.out" 2>&1; code=$?
+    echo "$(basename "$f"): exit=$code :: $(tail -2 "$WORK/crash.out" | tr '\n' ' ' | cut -c1-160)"
+    case "$code" in 0|1|2|3|70|71) ;; *) rc=1;; esac
+  done
+  note "mã thoát hợp lệ của gritc là 0/1/2/3 (D17); 134/139 = tiến trình gritc tự sập (SIGABRT/SIGSEGV)"
+  return $rc
+}
+
+st_G11_fmt_meta() {
+  in_copy || return $?
+  python3 "$AUDIT/fmt_meta.py" --gritc "$(gritc_bin)"
+}
+
+st_G12_alias_meta() {
+  in_copy || return $?
+  python3 "$AUDIT/alias_meta.py" --gritc "$(gritc_bin)"
+}
+
+st_G13_order_meta() {
+  in_copy || return $?
+  python3 "$AUDIT/order_meta.py" --gritc "$(gritc_bin)"
+}
+
+st_G14_diff_arrays() {
+  in_copy || return $?
+  python3 "$AUDIT/diff_checks.py" --gritc "$(gritc_bin)" --gen arrays --n "${DIFF_N:-2500}" --seed 9 --jobs 2
+}
+
+st_P01_proposed_fix_f01() {
+  local FCOPY="$WORK/grit_fix"
+  mkdir -p "$WORK" && rm -rf "$FCOPY" && git clone -q "$ROOT" "$FCOPY" || return 1
+  cd "$FCOPY" || return 1
+  patch -p1 < "$AUDIT/patches/driver_nollvm.patch" >/dev/null && patch -p1 < "$AUDIT/patches/proposed_F01_check_uses.patch" || return 1
+  cargo build --locked -p gt-driver --no-default-features 2>&1 | tail -2 || return 1
+  local g="$FCOPY/target/debug/gritc" rc=0
+  echo "== probe (kỳ vọng: không còn m6_* nào FALSE_NEGATIVE)"
+  python3 "$AUDIT/probes_run.py" --gritc "$g" > "$WORK/p01_probes.txt" 2>&1; grep -E 'SUMMARY|m6_' "$WORK/p01_probes.txt"
+  grep -q 'FALSE_NEGATIVE *m6_' "$WORK/p01_probes.txt" && rc=1
+  echo "== corpus qua CLI (kỳ vọng 855/855)"
+  python3 "$AUDIT/corpus_cli.py" --gritc "$g" --jobs 2 | head -3 | tee "$WORK/p01_corpus.txt"; grep -q 'lệch 0' "$WORK/p01_corpus.txt" || rc=1
+  echo "== cargo test -p gt-borrowck (kỳ vọng không hồi quy)"
+  cargo test --locked -p gt-borrowck --no-fail-fast -- --test-threads="$TEST_THREADS" > "$WORK/p01_test.txt" 2>&1
+  grep -E 'test result|FAILED|panicked' "$WORK/p01_test.txt" | tail -20
+  grep -qE 'FAILED|panicked' "$WORK/p01_test.txt" && rc=1
+  note "đề xuất sửa F-01: $( [ $rc = 0 ] && echo 'ĐẠT — 14 probe bị chặn, corpus 855/855, gt-borrowck xanh' || echo 'CÓ VẤN ĐỀ, xem log' )"
+  return $rc
 }
 
 st_H01_llvm_probe() {

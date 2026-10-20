@@ -1,0 +1,5 @@
+// probe: reject E0203|E0304
+// why: dựng struct có trường private từ ngoài mô-đun
+▦ m { ◈ ▢ S { x: i32 } }
+ƒ f() → m::S ! ∅ { m::S { x: 1 } }
+ƒ main() → i32 ! ∅ { 0 }

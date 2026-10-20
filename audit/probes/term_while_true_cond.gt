@@ -1,0 +1,3 @@
+// probe: reject E0701|E0702
+// why: ⟳ true ↓ … không phải vòng vô hạn có div
+ƒ main() → u32 ! ∅ { μn ≔ 5u32; ⟳ true ↓ n { n ← n + 0; } n }

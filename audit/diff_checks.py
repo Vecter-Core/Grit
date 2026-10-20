@@ -75,6 +75,42 @@ class Gen:
         return f"ƒ f(a: {self.ty}, b: {self.ty}) → {self.ty} ! ∅ {{ {body} {res} }}\n"
 
 
+class GenArr:
+    """Bộ sinh thứ hai: chỉ số mảng/lát (usize) — nơi M7 xoá kiểm tra biên. Tham số a, b: usize."""
+
+    def __init__(self, rng):
+        self.r = rng
+        self.n = self.r.randint(2, 6)
+        self.ty = "usize"
+        self.lo, self.hi = 0, 2**64 - 1
+
+    def idx(self, i=None):
+        c = self.r.choice(["a", "b", "a % 5", "(a + b) % 4", "a / 2", "(a +% b) % 3", "a - b", "a + 1", "b * 2", "0usize", "1usize", f"{self.n - 1}usize", f"{self.n}usize"])
+        if i and self.r.random() < 0.5:
+            c = self.r.choice([i, f"{i} + 1", f"{i} / 2", f"{i} * 2", f"({i} + a) % 5"])
+        return c
+
+    def cond(self, i=None):
+        return f"{self.idx(i)} {self.r.choice(['<', '≤', '>', '≥'])} {self.r.choice(['xs.len()', 'a', 'b', str(self.n) + 'usize', str(self.n - 1) + 'usize'])}"
+
+    def program(self):
+        elems = ", ".join(f"{k + 1}usize" for k in range(self.n))
+        body = [f"xs ≔ [{elems}];", "μr ≔ 0usize;"]
+        for _ in range(self.r.randint(1, 3)):
+            k = self.r.random()
+            if k < 0.35:
+                body.append(f"⎇ {self.cond()} {{ r ← r + xs[{self.idx()}]; }}")
+            elif k < 0.6:
+                body.append(f"⎇ {self.cond()} {{ r ← r + xs[{self.idx()}]; }} ⇝ {{ r ← r + 1usize; }}")
+            elif k < 0.8:
+                lo, hi = self.idx(), self.idx()
+                body.append(f"⎇ {lo} ≤ {hi} ∧ {hi} ≤ xs.len() {{ s ≔ &xs[{lo}..{hi}]; r ← r + s.len(); ⎇ s.len() > 0 {{ r ← r + s[0]; }} }}")
+            else:
+                b = self.r.choice([self.n, self.n + 1, 3])
+                body.append(f"μi ≔ 0usize; ⟳ i < {b}usize ↓ {b}usize - i {{ r ← r + xs[{self.idx('i')}]; i ← i + 1usize; }}")
+        return f"ƒ f(a: usize, b: usize) → usize ! ∅ {{ {' '.join(body)} r }}\n"
+
+
 def norm_value(v):
     """Thông dịch in `Int(45, I32)`, exe native báo `45`: chuẩn hoá về số nguyên."""
     import re
@@ -103,13 +139,20 @@ def run(gritc, src, mode, tmp, a, b):
 
 
 def one(args):
-    gritc, idx, seed, left, right = args
+    gritc, idx, seed, left, right, kind = args
     rng = random.Random(seed * 1000003 + idx)
-    ty = rng.choice(list(TYPES))
-    g = Gen(rng, ty)
-    src = g.program()
-    lo, hi = g.lo, g.hi
-    cands = [lo, lo + 1, -1 if lo < 0 else 0, 0, 1, 2, 5, 99, 100, 127, 128, hi // 2, hi - 1, hi]
+    if kind == "arrays":
+        g = GenArr(rng)
+        ty = "usize"
+        src = g.program()
+        lo, hi = g.lo, g.hi
+        cands = [0, 1, 2, 3, 4, 5, 6, 7, 100, hi, hi - 1]
+    else:
+        ty = rng.choice(list(TYPES))
+        g = Gen(rng, ty)
+        src = g.program()
+        lo, hi = g.lo, g.hi
+        cands = [lo, lo + 1, -1 if lo < 0 else 0, 0, 1, 2, 5, 99, 100, 127, 128, hi // 2, hi - 1, hi]
     out = {"ty": ty, "src": src, "cases": []}
     tmp = tempfile.mkdtemp(prefix="dc_")
     for _ in range(6):
@@ -134,13 +177,14 @@ def main():
     ap.add_argument("--n", type=int, default=300)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--jobs", type=int, default=2)
+    ap.add_argument("--gen", default="arith", choices=["arith", "arrays"], help="bộ sinh: số học hoặc chỉ số mảng/lát")
     ap.add_argument("--left", default="--backend=interpreter --checks=all", help="đối số của bên trái (mặc định giữ mọi check)")
     ap.add_argument("--right", default="--backend=interpreter --checks=proven", help="đối số của bên phải")
     a = ap.parse_args()
     stats = {"programs": 0, "rejected": 0, "runs": 0, "aborts": 0, "diffs": 0, "ice": 0}
     diffs = []
     with ThreadPoolExecutor(a.jobs) as ex:
-        for res in ex.map(one, [(a.gritc, i, a.seed, a.left, a.right) for i in range(a.n)]):
+        for res in ex.map(one, [(a.gritc, i, a.seed, a.left, a.right, a.gen) for i in range(a.n)]):
             stats["programs"] += 1
             if "rejected" in res:
                 stats["rejected"] += 1

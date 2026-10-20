@@ -1,0 +1,1 @@
+- 66/72 mã có `gritc explain`; 6 mã lỗi vì **thiếu `docs/errors/<mã>.md`** (bảng `EXPLAIN` được nhúng từ thư mục đó lúc biên dịch): `E1201–E1204` (Unicode), `E1301` (fmt) và **`E9901` (ICE — mã người dùng cần nhất khi gritc hỏng)**. Liên quan B05, ANALYSIS F-08.

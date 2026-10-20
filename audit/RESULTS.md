@@ -1,6 +1,6 @@
 # KẾT QUẢ CHẠY TOÀN BỘ DỰ ÁN GRIT (tự sinh — đừng sửa tay; ghi chú tay đặt ở `audit/results/<ID>.note.md`)
 
-- Mã nguồn được chạy: `c56f9d1 2026-10-20 audit: bộ chạy toàn bộ dự án + kế hoạch + probe thử tấn công (điểm lưu 1)` (nhánh làm việc hiện tại; bộ chạy KHÔNG sửa tệp nào của dự án).
+- Mã nguồn được chạy: `024d46d 2026-10-20 audit: điểm lưu 2 — probe thử tấn công (162), fuzz token, vi sai M7/backend, port Linux có backend LLVM, kết quả giai đoạn A–C/G` (nhánh làm việc hiện tại; bộ chạy KHÔNG sửa tệp nào của dự án).
 - Môi trường: Linux container (xem giai đoạn A00). Dự án được thiết kế cho **Windows x86_64 MSVC + LLVM 20.1.8** (docs/ENVIRONMENT.md).
 - Cách chạy/tiếp tục: `bash audit/run_all.sh` (tự bỏ qua giai đoạn đã xong; xem `audit/PLAN.md`).
 
@@ -8,11 +8,11 @@
 
 | Trạng thái | Số giai đoạn |
 |---|---|
-| PASS | 25 |
-| FAIL | 4 |
-| BLOCKED | 1 |
-| RUNNING | 2 |
-| PENDING | 18 |
+| PASS | 39 |
+| FAIL | 12 |
+| BLOCKED | 3 |
+| RUNNING | 1 |
+| PENDING | 2 |
 
 PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · BLOCKED = KHÔNG chạy được trong môi trường này (có bằng chứng) · TIMEOUT = quá hạn · SKIP = bỏ qua có chủ ý · PENDING = chưa tới lượt.
 
@@ -24,10 +24,10 @@ PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · 
 | A01_fetch | Tải phụ thuộc theo Cargo.lock (--locked) | **PASS** | 0 | 0 |
 | A02_inventory | Kiểm kê dự án: crate, tệp, LOC, tệp nhị phân bị theo dõi, CI/deny | **PASS** | 0 | 1 |
 | B01_fmt | cargo fmt --all --check | **PASS** | 0 | 1 |
-| B02_clippy | clippy -D warnings (17 crate thuần) | **FAIL** | 101 | 2 |
+| B02_clippy | clippy -D warnings (17 crate thuần) | **FAIL** | 101 | 13 |
 | B03_audit | cargo audit (lỗ hổng phụ thuộc) | **PASS** | 0 | 129 |
 | B04_ci_deny | CI (ci.yml) và deny.toml có tồn tại không | **FAIL** | 1 | 0 |
-| B05_codes | Mọi mã chẩn đoán đã biết có tài liệu + ≥3 mẫu fail + ≥3 mẫu pass (GRIT_PLAN §0.5) | PENDING | | |
+| B05_codes | Mọi mã chẩn đoán đã biết có tài liệu + ≥3 mẫu fail + ≥3 mẫu pass (GRIT_PLAN §0.5) | **FAIL** | 1 | 0 |
 | C00_build | Dựng 17 crate thuần (mọi target, kể cả test) | **PASS** | 0 | 0 |
 | C_gt-span | cargo test -p gt-span | **PASS** | 0 | 1 |
 | C_gt-lexer | cargo test -p gt-lexer | **PASS** | 0 | 9 |
@@ -44,32 +44,39 @@ PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · 
 | C_gt-oblig | cargo test -p gt-oblig | **PASS** | 0 | 275 |
 | C_gt-effects | cargo test -p gt-effects | **PASS** | 0 | 0 |
 | C_gt-conc | cargo test -p gt-conc | **PASS** | 0 | 1 |
-| C_gt-term | cargo test -p gt-term | **RUNNING** | - | 0 |
-| C_gt-secrets | cargo test -p gt-secrets | PENDING | | |
-| D01_native_probe | Dựng nguyên trạng gt-driver/rig/gt-llvm (cần LLVM 20 + Windows) | PENDING | | |
-| E01_gtrt | runtime/gt-rt (runtime native, chỉ Windows x86_64) | PENDING | | |
-| F01_expect | tools/check_expectations.py (nhất quán corpus + mã lỗi) | PENDING | | |
-| F02_tool_tests | unittest của tools/*.py | PENDING | | |
+| C_gt-term | cargo test -p gt-term | **PASS** | 0 | 359 |
+| C_gt-secrets | cargo test -p gt-secrets | **PASS** | 0 | 1 |
+| D01_native_probe | Dựng nguyên trạng gt-driver/rig/gt-llvm (cần LLVM 20 + Windows) | **BLOCKED** | 77 | 4 |
+| E01_gtrt | runtime/gt-rt (runtime native, chỉ Windows x86_64) | **BLOCKED** | 77 | 0 |
+| F01_expect | tools/check_expectations.py (nhất quán corpus + mã lỗi) | **PASS** | 0 | 1 |
+| F02_tool_tests | unittest của tools/*.py | **PASS** | 0 | 8 |
 | G00_copy_patch | Bản sao NGOÀI dự án + vá tối thiểu để gritc dựng không cần LLVM | **PASS** | 0 | 10 |
 | G01_driver_tests | [bản sao] cargo test -p gt-driver --no-default-features | **FAIL** | 101 | 21 |
 | G02_rig_tests | [bản sao] cargo test -p rig --no-default-features | **FAIL** | 101 | 6 |
 | G03_corpus_cli | [bản sao] gritc check trên toàn bộ tests/{pass,fail,warn} | **PASS** | 0 | 12 |
 | G04_run_programs | [bản sao] gritc run: mẫu, bench, 6 công cụ examples/ | **PASS** | 0 | 670 |
-| G05_fmt_idempotent | [bản sao] gritc fmt: tính lũy đẳng trên corpus pass | PENDING | | |
-| G06_determinism | [bản sao] gritc build hai lần ⇒ cùng băm (D9) | PENDING | | |
-| G07_explain | [bản sao] gritc explain cho mọi mã trong KNOWN | PENDING | | |
-| G08_probes | [bản sao] ~110 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả | PENDING | | |
-| G09_diff_checks | [bản sao] vi sai M7: --checks=all ≡ --checks=proven trên số học ngẫu nhiên (bộ sinh riêng) | PENDING | | |
-| G10_mutfuzz | [bản sao] fuzz đột biến token qua CLI gritc (ICE/crash/treo) | PENDING | | |
+| G05_fmt_idempotent | [bản sao] gritc fmt: tính lũy đẳng trên corpus pass | **PASS** | 0 | 7 |
+| G06_determinism | [bản sao] gritc build hai lần ⇒ cùng băm (D9) | **PASS** | 0 | 4 |
+| G07_explain | [bản sao] gritc explain cho mọi mã trong KNOWN | **FAIL** | 1 | 0 |
+| G08_probes | [bản sao] ~110 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả | **FAIL** | 1 | 6 |
+| G09_diff_checks | [bản sao] vi sai M7: --checks=all ≡ --checks=proven trên số học ngẫu nhiên (bộ sinh riêng) | **PASS** | 0 | 407 |
+| G10_mutfuzz | [bản sao] fuzz đột biến token qua CLI gritc (ICE/crash/treo) | **FAIL** | 1 | 122 |
 | L01_linux_port | [bản sao 2] port Linux (vá 5 tệp): gt-rt + gritc có backend LLVM 20 + liên kết bằng cc | **PASS** | 0 | 26 |
-| L02_native_driver_tests | [bản sao 2] cargo test -p gt-driver (backend LLVM thật: llvm*, release*, threads, vec, utf8…) | **RUNNING** | - | 0 |
-| L03_native_rig_tests | [bản sao 2] cargo test -p rig (rig build/run/test + 6 công cụ dogfood bằng exe native) | PENDING | | |
-| L04_native_other_crates | [bản sao 2] cargo test -p gt-guard -p gt-codegen-llvm -p gt-llvm + gt-rt | PENDING | | |
-| L05_native_diff | [bản sao 2] vi sai thông dịch ≡ exe native trên số học ngẫu nhiên (bộ sinh riêng) | PENDING | | |
+| L02_native_driver_tests | [bản sao 2] cargo test -p gt-driver (backend LLVM thật: llvm*, release*, threads, vec, utf8…) | **FAIL** | 101 | 237 |
+| L03_native_rig_tests | [bản sao 2] cargo test -p rig (rig build/run/test + 6 công cụ dogfood bằng exe native) | **PASS** | 0 | 32 |
+| L04_native_other_crates | [bản sao 2] cargo test -p gt-guard -p gt-codegen-llvm -p gt-llvm + gt-rt | **PASS** | 0 | 1 |
+| L05_native_diff | [bản sao 2] vi sai thông dịch ≡ exe native trên số học ngẫu nhiên (bộ sinh riêng) | **PASS** | 0 | 229 |
+| L06_native_unsound_demo | [bản sao 2] chạy THẬT chương trình XANH nhưng dùng-sau-reset Arena (nhân đôi tay cầm): có đọc nhầm không | **FAIL** | 1 | 0 |
+| L07_native_stack_limits | [bản sao 2] chương trình HỢP LỆ gây tràn ngăn xếp native: có abort có kiểm soát (mã 70) không | **FAIL** | 1 | 1 |
+| L08_native_compiler_crash | [bản sao 2] đầu vào được M4–M9 cho qua nhưng làm CHÍNH gritc sập (kiểu kích thước vô hạn…) | **FAIL** | 1 | 0 |
+| G11_fmt_meta | [bản sao] metamorphic: gritc fmt không đổi phán quyết (841 mẫu) | **PASS** | 0 | 65 |
+| G12_alias_meta | [bản sao] metamorphic: alias ASCII ≡ canonical không đổi phán quyết (816 mẫu) | **PASS** | 0 | 56 |
+| G13_order_meta | [bản sao] metamorphic: xáo thứ tự khai báo không đổi phán quyết (429 mẫu × 2) | PENDING | | |
+| G14_diff_arrays | [bản sao] vi sai M7 all≡proven trên chỉ số mảng/lát (nơi M7 xoá kiểm tra biên) | PENDING | | |
 | H01_llvm_probe | Thử lấy LLVM 20 cho Linux (khả năng port) | **BLOCKED** | 77 | 1 |
-| I01_fuzz_tools | Công cụ fuzz: nightly + cargo-fuzz (cài nếu thiếu, ngoài dự án) | PENDING | | |
-| I02_fuzz_lex | [bản sao] cargo-fuzz lexer 300s (ASan, libFuzzer) | PENDING | | |
-| I03_fuzz_parse | [bản sao] cargo-fuzz parser 300s (ASan, libFuzzer) | PENDING | | |
+| I01_fuzz_tools | Công cụ fuzz: nightly + cargo-fuzz (cài nếu thiếu, ngoài dự án) | **PASS** | 0 | 29 |
+| I02_fuzz_lex | [bản sao] cargo-fuzz lexer 300s (ASan, libFuzzer) | **PASS** | 0 | 317 |
+| I03_fuzz_parse | [bản sao] cargo-fuzz parser 300s (ASan, libFuzzer) | **RUNNING** | - | 0 |
 
 ## Chi tiết từng giai đoạn
 
@@ -157,8 +164,8 @@ SUMMARY: workspace 22 crate; 1477 tệp theo dõi
 
 ### B02_clippy — clippy -D warnings (17 crate thuần)
 
-- **Trạng thái:** FAIL (mã thoát 101, 2s, bắt đầu 2026-10-20T11:17:04Z)
-- **rustc/clippy:** 2 dòng `error`, 1 dòng `warning`
+- **Trạng thái:** FAIL (mã thoát 101, 13s, bắt đầu 2026-10-20T11:50:51Z)
+- **rustc/clippy:** 4 dòng `error`, 1 dòng `warning`
 
 **Lỗi (dòng `error` đầu tiên):**
 ```
@@ -166,31 +173,41 @@ error: unused import: `std::process::Command`
  --> crates/gt-lexer/tests/leak_check.rs:6:5
   |
 6 | use std::process::Command;
+error: doc list item without indentation
+ --> crates/gt-types/tests/match_oracle.rs:5:5
+  |
+5 | //! Giá trị luôn xử lý như độ lệch `u128` so với giá trị nhỏ nhất của kiểu (lật bit dấu cho `i128`) nên không dùng số học tràn.
 ```
 
 <details><summary>Đuôi log (18 dòng cuối)</summary>
 
 ```
-    Checking unicode-normalization v0.1.25
-    Checking zmij v1.0.23
-    Checking memchr v2.8.3
-    Checking itoa v1.0.18
-    Checking gt-lexer v0.1.0 (/home/user/Grit/crates/gt-lexer)
-    Checking gt-diag v0.1.0 (/home/user/Grit/crates/gt-diag)
-    Checking gt-ast v0.1.0 (/home/user/Grit/crates/gt-ast)
-error: unused import: `std::process::Command`
- --> crates/gt-lexer/tests/leak_check.rs:6:5
+  = help: if this is supposed to be its own paragraph, add a blank line
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#doc_lazy_continuation
+  = note: `-D clippy::doc-lazy-continuation` implied by `-D clippy::all`
+  = help: to override `-D clippy::all` add `#[allow(clippy::doc_lazy_continuation)]`
+help: indent this line
   |
-6 | use std::process::Command;
-  |     ^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: `-D unused-imports` implied by `-D warnings`
-  = help: to override `-D warnings` add `#[allow(unused_imports)]`
+5 | //!   Giá trị luôn xử lý như độ lệch `u128` so với giá trị nhỏ nhất của kiểu (lật bit dấu cho `i128`) nên không dùng số học tràn.
+  |     ++
 
-error: could not compile `gt-lexer` (test "leak_check") due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
+error: could not compile `gt-types` (test "match_oracle") due to 1 previous error
+    Checking gt-dataflow v0.1.0 (/home/user/Grit/crates/gt-dataflow)
+    Checking gt-oblig v0.1.0 (/home/user/Grit/crates/gt-oblig)
+    Checking gt-effects v0.1.0 (/home/user/Grit/crates/gt-effects)
+    Checking gt-borrowck v0.1.0 (/home/user/Grit/crates/gt-borrowck)
+    Checking gt-conc v0.1.0 (/home/user/Grit/crates/gt-conc)
+    Checking gt-secrets v0.1.0 (/home/user/Grit/crates/gt-secrets)
+    Checking gt-term v0.1.0 (/home/user/Grit/crates/gt-term)
+    Checking gt-span v0.1.0 (/home/user/Grit/crates/gt-span)
 ```
 </details>
+
+
+**Ghi chú của người phân tích:**
+
+- Lần chạy đầu dừng ở lỗi đầu tiên (không có `--keep-going`). Chạy lại tay với `--keep-going` (thư mục build riêng) cho **đúng 2 lỗi, cả hai ở tệp test, không ở mã sản phẩm**: (1) `crates/gt-lexer/tests/leak_check.rs:6` `unused import: std::process::Command` — `Command` chỉ dùng ở nhánh `cfg(windows)`/`cfg(macos)` nên trên Linux là import thừa; (2) `crates/gt-types/tests/match_oracle.rs:5` lint `doc_lazy_continuation` (clippy 1.97 trên máy này; dự án dùng 1.98.1).
+- Bốn crate native (`gt-llvm`, `gt-codegen-llvm`, `gt-guard`, `gt-driver`) và `rig` không clippy được ở môi trường này (cần LLVM).
 
 
 ### B03_audit — cargo audit (lỗ hổng phụ thuộc)
@@ -236,6 +253,32 @@ THIẾU deny.toml (chỉ có deny.toml.TASK.md)
 SUMMARY: dự án CHƯA có CI và CHƯA có deny.toml dù GRIT_PLAN §0.7 yêu cầu
 ```
 </details>
+
+
+### B05_codes — Mọi mã chẩn đoán đã biết có tài liệu + ≥3 mẫu fail + ≥3 mẫu pass (GRIT_PLAN §0.5)
+
+- **Trạng thái:** FAIL (mã thoát 1, 0s, bắt đầu 2026-10-20T11:50:15Z)
+- 72 mã trong KNOWN; 8 mã chưa đủ tài liệu/mẫu theo GRIT_PLAN §0.5
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: 72 mã trong KNOWN; 8 mã chưa đủ tài liệu/mẫu theo GRIT_PLAN §0.5
+THIẾU E1101: tài liệu có 0 mẫu fail/warn và 0 mẫu pass (cần ≥3 và ≥3)
+THIẾU E1201: không có docs/errors/E1201.md
+THIẾU E1202: không có docs/errors/E1202.md
+THIẾU E1203: không có docs/errors/E1203.md
+THIẾU E1204: không có docs/errors/E1204.md
+THIẾU E1301: không có docs/errors/E1301.md
+THIẾU E9901: không có docs/errors/E9901.md
+THIẾU N0606: tài liệu có 0 mẫu fail/warn và 0 mẫu pass (cần ≥3 và ≥3)
+```
+</details>
+
+
+**Ghi chú của người phân tích:**
+
+- Kiểm toàn bộ 72 mã trong `KNOWN` (không chỉ danh sách `DOC_REQUIRED` mà `tools/check_expectations.py` dùng). 8 mã thiếu: 6 không có tài liệu (E1201–E1204, E1301, E9901), 2 có tài liệu nhưng 0 mẫu liệt kê (E1101 — test nằm ở gt-guard; N0606 — ghi chú của `--checks=proven`). Một số mã này có test trong crate (lexer/guard) nên là thiếu *tài liệu + mẫu corpus*, không nhất thiết thiếu *test*; nhưng GRIT_PLAN §0.5 đòi cả hai.
 
 
 ### C00_build — Dựng 17 crate thuần (mọi target, kể cả test)
@@ -711,6 +754,221 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 </details>
 
 
+### C_gt-term — cargo test -p gt-term
+
+- **Trạng thái:** PASS (mã thoát 0, 359s, bắt đầu 2026-10-20T11:44:00Z)
+- **cargo test:** 29 đạt / 0 lỗi / 1 ignore trong 9 bộ test
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+test dump_term ... ignored
+test given_variants_must_decrease_and_be_bounded ... ok
+test indirect_recursion_is_rejected_even_with_a_variant ... ok
+test infinite_loop_with_variant_still_needs_div ... ok
+test counting_loops_are_inferred_or_verified ... ok
+test methods_multiplication_and_leading_conjuncts ... ok
+test loops_without_provable_progress_are_red ... ok
+test recursive_variant_never_uses_a_modified_parameter ... ok
+test recursion_needs_a_decreasing_variant_or_div ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+   Doc-tests gt_term
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+```
+</details>
+
+
+### C_gt-secrets — cargo test -p gt-secrets
+
+- **Trạng thái:** PASS (mã thoát 0, 1s, bắt đầu 2026-10-20T11:49:59Z)
+- **cargo test:** 15 đạt / 0 lỗi / 0 ignore trong 3 bộ test
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+test s101_in_comment_and_non_matches ... ok
+test s101_known_patterns_in_string_literals ... ok
+test s102_high_entropy_literal_assigned_to_secret_like_name ... ok
+test s102_non_matches ... ok
+test s201_declassify_and_s202_flow_to_io_sinks ... ok
+test scanning_continues_past_non_matching_names_and_invalid_allows ... ok
+test pattern_boundaries_are_exact ... ok
+test taint_needs_only_one_tainted_local_among_many_operands ... ok
+test taint_flows_through_many_shapes_and_only_real_declassify_counts ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+   Doc-tests gt_secrets
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+```
+</details>
+
+
+### D01_native_probe — Dựng nguyên trạng gt-driver/rig/gt-llvm (cần LLVM 20 + Windows)
+
+- **Trạng thái:** BLOCKED (mã thoát 77, 4s, bắt đầu 2026-10-20T11:50:00Z)
+- 4/4 lệnh dựng nguyên trạng thất bại
+- **rustc/clippy:** 8 dòng `error`, 2 dòng `warning`
+
+**Lỗi (dòng `error` đầu tiên):**
+```
+error: failed to run custom build command for `gt-llvm v0.1.0 (/home/user/Grit/crates/gt-llvm)`
+note: To improve backtraces for build dependencies, set the CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG=true environment variable to enable debug information generation.
+
+Caused by:
+error[E0433]: cannot find module or crate `gt_codegen_llvm` in this scope
+  --> crates/gt-driver/src/cli.rs:73:53
+   |
+73 |             "--profile=release-o2" => cli.profile = gt_codegen_llvm::Opt::ReleaseO2,
+error[E0433]: cannot find module or crate `gt_codegen_llvm` in this scope
+  --> crates/gt-driver/src/cli.rs:25:14
+   |
+25 |     profile: gt_codegen_llvm::Opt,
+error[E0433]: cannot find module or crate `gt_codegen_llvm` in this scope
+  --> crates/gt-driver/src/cli.rs:73:53
+   |
+73 |             "--profile=release-o2" => cli.profile = gt_codegen_llvm::Opt::ReleaseO2,
+error[E0433]: cannot find module or crate `gt_codegen_llvm` in this scope
+  --> crates/gt-driver/src/cli.rs:25:14
+   |
+25 |     profile: gt_codegen_llvm::Opt,
+error: failed to run custom build command for `gt-llvm v0.1.0 (/home/user/Grit/crates/gt-llvm)`
+note: To improve backtraces for build dependencies, set the CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG=true environment variable to enable debug information generation.
+
+Caused by:
+```
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+Caused by:
+  process didn't exit successfully: `/home/user/Grit/target/debug/build/gt-llvm-da143656b7cdde03/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rerun-if-env-changed=GRIT_LLVM_DIR
+
+  --- stderr
+
+  thread 'main' (27166) panicked at crates/gt-llvm/build.rs:11:5:
+  không thấy D:/Tools/llvm-20.1.8/lib/LLVM-C.lib — GRIT_LLVM_DIR sai?
+  stack backtrace:
+     0: __rustc::rust_begin_unwind
+     1: core::panicking::panic_fmt
+     2: build_script_build::main
+     3: <fn() as core::ops::function::FnOnce<()>>::call_once
+  note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+warning: build failed, waiting for other jobs to finish...
+>>> THẤT BẠI: -p gt-llvm 
+SUMMARY: 4/4 lệnh dựng nguyên trạng thất bại
+```
+</details>
+
+
+**Ghi chú của người phân tích:**
+
+- Bằng chứng: (1) `-p gt-driver` và `-p gt-llvm` ⇒ `failed to run custom build command for gt-llvm` (build.rs đòi `GRIT_LLVM_DIR/lib/LLVM-C.lib`; `.cargo/config.toml` đặt mặc định `D:/Tools/llvm-20.1.8`); (2) `-p gt-driver --no-default-features` và `-p rig --no-default-features` ⇒ **E0433 ×5** `cannot find module or crate gt_codegen_llvm` ở `cli.rs:25,60,71–73`. Tức là **kể cả cách "dựng không LLVM" mà tài liệu mô tả cũng hỏng**. ANALYSIS F-02.
+
+
+### E01_gtrt — runtime/gt-rt (runtime native, chỉ Windows x86_64)
+
+- **Trạng thái:** BLOCKED (mã thoát 77, 0s, bắt đầu 2026-10-20T11:50:04Z)
+- gt-rt dừng bằng compile_error! trên Linux: runtime native chỉ có cho x86_64 Windows (ADR-029)
+- **rustc/clippy:** 2 dòng `error`, 0 dòng `warning`
+
+**Lỗi (dòng `error` đầu tiên):**
+```
+error: gt-rt Phase 1 chỉ hỗ trợ x86_64 Windows (ADR-029); target khác phải được thêm có chủ đích
+  --> src/lib.rs:11:1
+   |
+11 | / compile_error!(
+```
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+== fmt gt-rt
+FMT_OK
+== dựng gt-rt (release)
+   Compiling gt-rt v0.0.0 (/home/user/Grit/runtime/gt-rt)
+error: gt-rt Phase 1 chỉ hỗ trợ x86_64 Windows (ADR-029); target khác phải được thêm có chủ đích
+  --> src/lib.rs:11:1
+   |
+11 | / compile_error!(
+12 | |     "gt-rt Phase 1 chỉ hỗ trợ x86_64 Windows (ADR-029); target khác phải được thêm có chủ đích"
+13 | | );
+   | |_^
+
+error: could not compile `gt-rt` (lib) due to 1 previous error
+SUMMARY: gt-rt dừng bằng compile_error! trên Linux: runtime native chỉ có cho x86_64 Windows (ADR-029)
+```
+</details>
+
+
+**Ghi chú của người phân tích:**
+
+- `runtime/gt-rt/src/lib.rs:10`: `compile_error!` cho mọi target ngoài `windows`+`x86_64`. Bản port Linux ở giai đoạn L01 thay `SRWLOCK` bằng khoá quay và bỏ cổng này: gt-rt dựng staticlib 22 MB và 6 test đạt.
+
+
+### F01_expect — tools/check_expectations.py (nhất quán corpus + mã lỗi)
+
+- **Trạng thái:** PASS (mã thoát 0, 1s, bắt đầu 2026-10-20T11:50:04Z)
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+Đã kiểm 881 file .gt: fail=440, warn=13, pass=402, lexer=8
+Bảng mã lỗi: 72 mã, 246 tham chiếu test
+OK: corpus nhất quán với error_codes.md
+```
+</details>
+
+
+### F02_tool_tests — unittest của tools/*.py
+
+- **Trạng thái:** PASS (mã thoát 0, 8s, bắt đầu 2026-10-20T11:50:05Z)
+- **unittest:** Ran 9 tests in 1.087s
+- **unittest:** OK
+- **unittest:** Ran 4 tests in 0.508s
+- **unittest:** OK
+- **unittest:** Ran 3 tests in 4.029s
+- **unittest:** OK
+- **unittest:** Ran 18 tests in 2.820s
+- **unittest:** OK
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+================ unittest tools/test_mut_guard.py
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.508s
+
+OK
+================ unittest tools/test_mut_resume.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 4.029s
+
+OK
+================ unittest tools/test_gate.py
+..................
+----------------------------------------------------------------------
+Ran 18 tests in 2.820s
+
+OK
+```
+</details>
+
+
 ### G00_copy_patch — Bản sao NGOÀI dự án + vá tối thiểu để gritc dựng không cần LLVM
 
 - **Trạng thái:** PASS (mã thoát 0, 10s, bắt đầu 2026-10-20T11:32:41Z)
@@ -886,6 +1144,13 @@ error: 3 targets failed:
     `-p gt-driver --test release_traps`
 ```
 </details>
+
+
+**Ghi chú của người phân tích:**
+
+- **Cả 9 test lỗi đều do bản dựng KHÔNG có backend LLVM, không phải lỗi logic**: 8 test nằm trong `release_guard.rs`/`release_traps.rs` (đòi `--profile=release`) và 1 test `cli.rs::directory_input_and_version` (đòi `--version` in "backend mặc định: llvm"). Các tệp này không được `#![cfg(feature = "llvm")]` bao lại như 18 tệp `llvm*.rs` khác ⇒ với `--no-default-features` chúng đỏ thay vì bị loại — **khuyết điểm cấu hình test** (xem ANALYSIS F-02).
+- Phần chạy được và XANH: `gate.rs` (19 test: cổng phán quyết ĐỎ/ICE ⇒ không output, canary E0601/E0307, pass bắt buộc, chèn lỗi), `cli.rs` 9/10, `release_policy.rs` 6/6, `instance_keys.rs` 2/2, `ref_pattern_fault.rs` 1/1.
+- Giai đoạn này chạy trên **bản sao có vá 17 dòng** (`audit/patches/driver_nollvm.patch`) vì nguyên trạng `gt-driver --no-default-features` không biên dịch (D01).
 
 
 ### G02_rig_tests — [bản sao] cargo test -p rig --no-default-features
@@ -1106,6 +1371,11 @@ error: 7 targets failed:
 </details>
 
 
+**Ghi chú của người phân tích:**
+
+- 11 test đạt (4 unit + 5 `rig.rs` + 1 `dogfood_wordfreq` + …), phần còn lại đỏ vì `rig build/run/test` và 6 công cụ dogfood cần backend LLVM + liên kết exe (bản sao không có). Xem giai đoạn L03 (bản sao có port Linux) cho kết quả với backend native thật.
+
+
 ### G03_corpus_cli — [bản sao] gritc check trên toàn bộ tests/{pass,fail,warn}
 
 - **Trạng thái:** PASS (mã thoát 0, 12s, bắt đầu 2026-10-20T11:33:18Z)
@@ -1160,6 +1430,127 @@ SUMMARY: mẫu/bench chạy bằng thông dịch: 8 chương trình; exit0=2 abo
 </details>
 
 
+**Ghi chú của người phân tích:**
+
+- Giai đoạn này **chỉ thông tin** (luôn trả 0). Đọc kết quả đúng cách: thông dịch MIR chỉ chạy được chương trình thuần số học/mảng (`arrays_slices` = 79, `numeric` = 11630 đúng kỳ vọng); `threads`/`two_locks` (static + spawn) và cả 6 công cụ `examples/*` (cần `root_env`/`root_fs`/I/O của runtime native) thoát mã 2 với thông báo "lỗi nội bộ: không có thân MIR cho $prelude::…" — thông dịch không có thân cho intrinsic của prelude. Đây là giới hạn đã ghi (DOGFOOD, BENCHMARK) nhưng thông báo "lỗi nội bộ" dễ gây hiểu nhầm là bug của gritc.
+- `fib.gt`/`loop_sum.gt` thoát 71 (hết nhiên liệu 50 triệu bước), `slice_sum.gt` quá 600 s (thông dịch sao chép mảng mỗi lần `Use`): bench thiết kế cho backend native.
+- Giới hạn đệ quy của thông dịch = **200 khung** (`gt-mir/src/interp.rs:125`): chương trình hợp lệ, dừng, đệ quy sâu hơn 200 (vd `rec(100000)` có `↓ n`) thoát 71.
+
+
+### G05_fmt_idempotent — [bản sao] gritc fmt: tính lũy đẳng trên corpus pass
+
+- **Trạng thái:** PASS (mã thoát 0, 7s, bắt đầu 2026-10-20T11:44:41Z)
+- gritc fmt trên 398 mẫu pass: bị từ chối 0; không lũy đẳng 0; (mẫu gốc chưa ở dạng chuẩn: 338)
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: gritc fmt trên 398 mẫu pass: bị từ chối 0; không lũy đẳng 0; (mẫu gốc chưa ở dạng chuẩn: 338)
+```
+</details>
+
+
+### G06_determinism — [bản sao] gritc build hai lần ⇒ cùng băm (D9)
+
+- **Trạng thái:** PASS (mã thoát 0, 4s, bắt đầu 2026-10-20T11:44:48Z)
+- tính tất định (D9): 50 mẫu dựng hai lần; khác nhau 0; không dựng được 33
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: tính tất định (D9): 50 mẫu dựng hai lần; khác nhau 0; không dựng được 33
+```
+</details>
+
+
+### G07_explain — [bản sao] gritc explain cho mọi mã trong KNOWN
+
+- **Trạng thái:** FAIL (mã thoát 1, 0s, bắt đầu 2026-10-20T11:44:52Z)
+- gritc explain: 72 mã trong KNOWN (code.rs); lỗi 6
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+explain E1201 LỖI
+explain E1202 LỖI
+explain E1203 LỖI
+explain E1204 LỖI
+explain E1301 LỖI
+explain E9901 LỖI
+SUMMARY: gritc explain: 72 mã trong KNOWN (code.rs); lỗi 6
+```
+</details>
+
+
+**Ghi chú của người phân tích:**
+
+- 66/72 mã có `gritc explain`; 6 mã lỗi vì **thiếu `docs/errors/<mã>.md`** (bảng `EXPLAIN` được nhúng từ thư mục đó lúc biên dịch): `E1201–E1204` (Unicode), `E1301` (fmt) và **`E9901` (ICE — mã người dùng cần nhất khi gritc hỏng)**. Liên quan B05, ANALYSIS F-08.
+
+
+### G08_probes — [bản sao] ~110 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả
+
+- **Trạng thái:** FAIL (mã thoát 1, 6s, bắt đầu 2026-10-20T11:44:52Z)
+- 162 probe tự viết; FALSE_NEGATIVE=22; KNOWN_GAP=3; OK=137
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+FALSE_NEGATIVE  m6_same_stmt_call_args_double_move            kỳ vọng=reject E0401                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  m6_same_stmt_cap_duplicated                   kỳ vọng=reject E0401                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  m6_same_stmt_generic_dup                      kỳ vọng=reject E0401                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  m6_same_stmt_method_self_and_arg              kỳ vọng=reject E0401                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  m6_same_stmt_struct_lit_double_move           kỳ vọng=reject E0401                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  m6_same_stmt_tuple_double_move                kỳ vọng=reject E0401                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  m6_same_stmt_tuple_use_after_move             kỳ vọng=reject E0401                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  m6_same_stmt_unique_ref_duplicated            kỳ vọng=reject E0401                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  m6_same_stmt_use_after_move_in_args           kỳ vọng=reject E0401                 verdict=green E=[] S=[]
+KNOWN_GAP       secret_evasion_split_consts                   kỳ vọng=warn S101                    verdict=green E=[] S=[]
+KNOWN_GAP       secret_evasion_unicode_escape                 kỳ vọng=warn S101                    verdict=green E=[] S=[]
+FALSE_NEGATIVE  ty_alias_cycle                                kỳ vọng=reject                       verdict=green E=[] S=[]
+FALSE_NEGATIVE  type_recursive_enum                           kỳ vọng=reject                       verdict=green E=[] S=[]
+FALSE_NEGATIVE  type_recursive_struct                         kỳ vọng=reject                       verdict=green E=[] S=[]
+FALSE_NEGATIVE  type_recursive_struct_used                    kỳ vọng=reject                       verdict=green E=[] S=[]
+FALSE_NEGATIVE  type_slice_field_by_value                     kỳ vọng=reject E0301                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  type_slice_param_by_value                     kỳ vọng=reject E0301                 verdict=green E=[] S=[]
+FALSE_NEGATIVE  type_str_param_by_value                       kỳ vọng=reject E0301                 verdict=green E=[] S=[]
+```
+</details>
+
+
+**Ghi chú của người phân tích:**
+
+- **FAIL ở đây nghĩa là tìm thấy lỗ hổng**, không phải chạy hỏng. Số `FALSE_NEGATIVE` (≈23) gom theo nguyên nhân: nhóm `m6_same_stmt_*`/`m6_dup_*` (14 tệp) = **F-01**; `type_recursive_*` (3) = F-03; `type_slice_*`/`type_str_*` (3) = F-04; `cap_fnptr_launder` (1) = F-05; `d4_float_in_match_literal` (1) = F-09/D4; `ty_alias_cycle` (1) = vô hại. 3 `KNOWN_GAP` là giới hạn dự án đã tự ghi (Cyrillic thuần, 2 né quét secret). Phần còn lại (~150) khớp kỳ vọng — danh sách ở ANALYSIS §2 cuối.
+- Để tái hiện riêng từng lỗi: `gritc check audit/probes/<tên>.gt` trên bản sao (`$AUDIT_WORK/grit/target/debug/gritc`).
+
+
+### G09_diff_checks — [bản sao] vi sai M7: --checks=all ≡ --checks=proven trên số học ngẫu nhiên (bộ sinh riêng)
+
+- **Trạng thái:** PASS (mã thoát 0, 407s, bắt đầu 2026-10-20T11:50:15Z)
+- vi sai [--backend=interpreter --checks=all] ≡ [--backend=interpreter --checks=proven]: programs=3000; rejected=1228; runs=10632; aborts=4017; diffs=0; ice=0; seed=5
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: vi sai [--backend=interpreter --checks=all] ≡ [--backend=interpreter --checks=proven]: programs=3000; rejected=1228; runs=10632; aborts=4017; diffs=0; ice=0; seed=5
+```
+</details>
+
+
+### G10_mutfuzz — [bản sao] fuzz đột biến token qua CLI gritc (ICE/crash/treo)
+
+- **Trạng thái:** FAIL (mã thoát 1, 122s, bắt đầu 2026-10-20T11:57:02Z)
+- fuzz đột biến token qua CLI gritc: 8000 mẫu, seed 11; ICE=1; OK_GREEN=2068; OK_RED=5931
+- ICE x1: lỗi nội bộ của compiler (ICE): MIR của `m_NaNfNfaN::pass_through` không hợp lệ:
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: fuzz đột biến token qua CLI gritc: 8000 mẫu, seed 11; ICE=1; OK_GREEN=2068; OK_RED=5931
+SUMMARY: ICE x1: lỗi nội bộ của compiler (ICE): MIR của `m_NaNfNfaN::pass_through` không hợp lệ: 
+```
+</details>
+
+
 ### L01_linux_port — [bản sao 2] port Linux (vá 5 tệp): gt-rt + gritc có backend LLVM 20 + liên kết bằng cc
 
 - **Trạng thái:** PASS (mã thoát 0, 26s, bắt đầu 2026-10-20T11:44:03Z)
@@ -1191,6 +1582,275 @@ SUMMARY: port Linux: vá 5 tệp (gt-llvm/build.rs, gt-driver/build.rs+native.rs
 </details>
 
 
+**Ghi chú của người phân tích:**
+
+- **Port Linux THỬ NGHIỆM thành công trên bản sao (5 tệp, +62/−26 dòng; `audit/patches/linux_port.patch`)**: `gt-llvm/build.rs` liên kết `libLLVM-20.so` của hệ thống (gói `libllvm20` 20.1.2 — KHÔNG phải 20.1.8 mà dự án ghim), `gt-driver/build.rs`+`rig/build.rs` bỏ cờ `/DELAYLOAD`, `gt-driver/src/native.rs` liên kết bằng `cc -no-pie` thay `link.exe`, `gt-rt` bỏ `compile_error!` và thay `SRWLOCK` bằng khoá quay trên ô 8 byte. Không đổi dòng nào của logic kiểm tra/codegen.
+- Hệ quả: `gritc build/run` sinh **exe ELF thật** (chương trình mẫu trả 45) — tức là toàn bộ backend LLVM + IR Guard + gt-rt chạy được ở đây qua bản sao, nên các giai đoạn L02–L07 có bằng chứng native thật (khác BLOCKED của D01/E01 trên mã nguyên trạng).
+
+
+### L02_native_driver_tests — [bản sao 2] cargo test -p gt-driver (backend LLVM thật: llvm*, release*, threads, vec, utf8…)
+
+- **Trạng thái:** FAIL (mã thoát 101, 237s, bắt đầu 2026-10-20T11:44:37Z)
+- **cargo test:** 135 đạt / 5 lỗi / 5 ignore trong 29 bộ test
+- **rustc/clippy:** 2 dòng `error`, 0 dòng `warning`
+
+**Test lỗi (5):**
+- `built_exe_does_not_depend_on_llvm_dll`
+- `check_runs_without_llvm_on_path`
+- `golden_ir_checked_add_and_abort_blocks`
+- `golden_ir_slice_bounds`
+- `golden_ir_static_atomic_and_mutex`
+
+<details><summary>Chi tiết panic (tối đa 12)</summary>
+
+`built_exe_does_not_depend_on_llvm_dll`
+```
+thread 'built_exe_does_not_depend_on_llvm_dll' (28991) panicked at crates/gt-driver/tests/llvm.rs:325:77:
+dumpbin
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::option::expect_failed
+```
+`check_runs_without_llvm_on_path`
+```
+thread 'check_runs_without_llvm_on_path' (31572) panicked at crates/gt-driver/tests/llvm.rs:394:5:
+assertion `left == right` failed: gritc: phán quyết green; 0 lỗi, 0 cảnh báo, 0 ghi chú; backend: llvm
+gritc: đã ghi /tmp/gt-llvm-test-28986-15-nollvm/p.exe (backend: llvm)
+  left: Some(0)
+ right: Some(3)
+stack backtrace:
+```
+`golden_ir_checked_add_and_abort_blocks`
+```
+thread 'golden_ir_checked_add_and_abort_blocks' (1569) panicked at crates/gt-driver/tests/llvm.rs:708:9:
+assertion `left == right` failed: IR của `checked_add` đổi so với golden /tmp/claude-0/-home-user-Grit/95de13cb-b880-56c6-959a-865f7f8f23cf/scratchpad/work/grit_linux/crates/gt-driver/../../tests/golden_ll/checked_add.ll
+  left: "; ModuleID = 'grit'\nsource_filename = \"grit\"\ntarget datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-pc-linux-gnu\"\n\n@gt.attestation = constant [65 x i8] c\"2e255f837911913202f74bc2c9cca3081c612effeaf5d761506356
+ right: "; ModuleID = 'grit'\nsource_filename = \"grit\"\ntarget datalayout = \"e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-pc-windows-msvc\"\n\n@gt.attestation = constant [65 x i8] c\"2e255f837911913202f74bc2c9cca3081c612effeaf5d761506
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+```
+`golden_ir_slice_bounds`
+```
+thread 'golden_ir_slice_bounds' (1997) panicked at crates/gt-driver/tests/llvm.rs:708:9:
+assertion `left == right` failed: IR của `slice_sum` đổi so với golden /tmp/claude-0/-home-user-Grit/95de13cb-b880-56c6-959a-865f7f8f23cf/scratchpad/work/grit_linux/crates/gt-driver/../../tests/golden_ll/slice_sum.ll
+  left: "; ModuleID = 'grit'\nsource_filename = \"grit\"\ntarget datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-pc-linux-gnu\"\n\n@gt.attestation = constant [65 x i8] c\"7f0a8dbb6c00f094ade96593421462406510be455cec8ebb38cf8a
+ right: "; ModuleID = 'grit'\nsource_filename = \"grit\"\ntarget datalayout = \"e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-pc-windows-msvc\"\n\n@gt.attestation = constant [65 x i8] c\"7f0a8dbb6c00f094ade96593421462406510be455cec8ebb38c
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+```
+`golden_ir_static_atomic_and_mutex`
+```
+thread 'golden_ir_static_atomic_and_mutex' (2444) panicked at crates/gt-driver/tests/llvm.rs:708:9:
+assertion `left == right` failed: IR của `static_atomic` đổi so với golden /tmp/claude-0/-home-user-Grit/95de13cb-b880-56c6-959a-865f7f8f23cf/scratchpad/work/grit_linux/crates/gt-driver/../../tests/golden_ll/static_atomic.ll
+  left: "; ModuleID = 'grit'\nsource_filename = \"grit\"\ntarget datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-pc-linux-gnu\"\n\n@\"static.prog::COUNT\" = global { i32 } zeroinitializer\n@gt.attestation = constant [65 x i8]
+ right: "; ModuleID = 'grit'\nsource_filename = \"grit\"\ntarget datalayout = \"e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-pc-windows-msvc\"\n\n@\"static.prog::COUNT\" = global { i32 } zeroinitializer\n@gt.attestation = constant [65 x 
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+```
+</details>
+
+**Lỗi (dòng `error` đầu tiên):**
+```
+error: test failed, to rerun pass `-p gt-driver --test llvm`
+     Running tests/llvm_diff.rs (target/debug/deps/llvm_diff-59cca6caaea4235a)
+
+running 2 tests
+error: 1 target failed:
+    `-p gt-driver --test llvm`
+```
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.52s
+
+     Running tests/vec_overflow.rs (target/debug/deps/vec_overflow-4b25924a0547a34e)
+
+running 2 tests
+test small_reserve_and_push_do_not_false_alarm ... ok
+test forced_multiplication_overflow_aborts_overflow_and_the_boundary_is_exact ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.30s
+
+   Doc-tests gt_driver
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: 1 target failed:
+    `-p gt-driver --test llvm`
+```
+</details>
+
+
+**Ghi chú của người phân tích:**
+
+- **135 test đạt, 5 lỗi — cả 5 là lỗi của chính cổng Windows, không phải lỗi codegen**: `built_exe_does_not_depend_on_llvm_dll` (gọi `dumpbin.exe` của MSVC), `check_runs_without_llvm_on_path` (kiểm `LLVM-C.dll` trên PATH — khái niệm Windows), và 3 test `golden_ir_*`.
+- **Bằng chứng mạnh về tính tất định/di động của codegen**: chạy lại 3 test golden với `GT_UPDATE_GOLDEN=1` trong bản sao rồi `git diff tests/golden_ll` ⇒ IR sinh trên Linux (libLLVM 20.1.2) **giống từng byte** golden sinh trên Windows (LLVM 20.1.8), CHỈ khác đúng hai dòng `target datalayout` và `target triple` ở mỗi tệp (6 dòng đổi cho 3 tệp). Cả băm attestation trong IR cũng khớp.
+- Gồm các bộ khó nhất của dự án chạy với exe native thật: `llvm_diff*` (so thông dịch ≡ exe), `release_*` (dev ≡ release, Guard-post), `threads_repeat`, `vec_overflow`, `utf8_diff`, `arena_dynamic`, `fs_read_io_error`, `std_lib`, `release_policy` (tái lập bản dựng).
+
+
+### L03_native_rig_tests — [bản sao 2] cargo test -p rig (rig build/run/test + 6 công cụ dogfood bằng exe native)
+
+- **Trạng thái:** PASS (mã thoát 0, 32s, bắt đầu 2026-10-20T11:48:35Z)
+- **cargo test:** 47 đạt / 0 lỗi / 3 ignore trong 10 bộ test
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+test failing_test_exits_1_and_names_the_abort ... ok
+test fmt_rewrites_and_check_flags_unformatted_sources ... ok
+test lock_missing_is_created_stale_is_always_refused_and_locked_flag_is_strict ... ok
+test manifest_errors_are_fail_closed_with_clear_messages ... ok
+test module_name_collisions_and_prefix_rule_are_loud_errors ... ok
+test new_check_build_run_roundtrip ... ok
+test builds_are_reproducible_byte_for_byte ... ok
+test three_package_project_builds_runs_and_tests_with_diamond_loaded_once ... ok
+test option_ord_in_another_package_uses_reference_patterns_passes_e0703_and_runs_correctly ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.84s
+
+   Doc-tests rig
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+```
+</details>
+
+
+**Ghi chú của người phân tích:**
+
+- **47 test đạt, 0 lỗi** với backend native thật (bản sao có port Linux): `rig new/check/build/run/test/add/lock/fmt/clean`, dự án 3 gói, tái lập byte-for-byte, và cả **6 công cụ dogfood** (`wc`, `json`, `sha256`, `sortlines`, `wordfreq`, `stats` viết bằng Grit, dựng bằng `rig build`, chạy exe ELF) khớp bản tham chiếu độc lập (NIST vector + `hashlib` cho sha256, `serde_json` cho json, mô hình Rust cho phần còn lại). 3 test `ignored` là bench hiệu năng (`--ignored`).
+- Lưu ý: kết quả này là của **bản port** (LLVM 20.1.2, Linux, liên kết `cc`), không phải môi trường mà dự án nhắm tới; nó xác nhận LOGIC của backend và công cụ, không xác nhận các tính chất riêng Windows (MSVC, `LLVM-C.dll`, quét virus).
+
+
+### L04_native_other_crates — [bản sao 2] cargo test -p gt-guard -p gt-codegen-llvm -p gt-llvm + gt-rt
+
+- **Trạng thái:** PASS (mã thoát 0, 1s, bắt đầu 2026-10-20T11:49:07Z)
+- **cargo test:** 39 đạt / 0 lỗi / 0 ignore trong 9 bộ test
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gt_guard
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gt_llvm
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+</details>
+
+
+**Ghi chú của người phân tích:**
+
+- `gt-guard` (IR Guard), `gt-codegen-llvm`, `gt-llvm` và `gt-rt` (6 test) đều đạt trên bản port — gồm các test IR dựng tay của Guard và các lỗi chèn.
+
+
+### L05_native_diff — [bản sao 2] vi sai thông dịch ≡ exe native trên số học ngẫu nhiên (bộ sinh riêng)
+
+- **Trạng thái:** PASS (mã thoát 0, 229s, bắt đầu 2026-10-20T11:49:08Z)
+- vi sai [--backend=interpreter] ≡ [--backend=llvm]: programs=600; rejected=252; runs=2088; aborts=767; diffs=0; ice=0; seed=3
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: vi sai [--backend=interpreter] ≡ [--backend=llvm]: programs=600; rejected=252; runs=2088; aborts=767; diffs=0; ice=0; seed=3
+```
+</details>
+
+
+### L06_native_unsound_demo — [bản sao 2] chạy THẬT chương trình XANH nhưng dùng-sau-reset Arena (nhân đôi tay cầm): có đọc nhầm không
+
+- **Trạng thái:** FAIL (mã thoát 1, 0s, bắt đầu 2026-10-20T11:45:33Z)
+- kỳ vọng đúng ngữ nghĩa: main trả 1234 (giá trị đã cấp); nhận giá trị khác = bộ nhớ đã bị tái dùng sau reset (UB) trong chương trình được gritc cho qua
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+gritc check: exit=0 (gritc: phán quyết green; 0 lỗi, 0 cảnh báo, 0 ghi chú; backend: interpreter)
+profile=dev: chạy xong (backend: llvm); main trả về 99
+profile=release: chạy xong (backend: llvm); main trả về 99
+profile=release-o2: chạy xong (backend: llvm); main trả về 99
+SUMMARY: kỳ vọng đúng ngữ nghĩa: main trả 1234 (giá trị đã cấp); nhận giá trị khác = bộ nhớ đã bị tái dùng sau reset (UB) trong chương trình được gritc cho qua
+```
+</details>
+
+
+### L07_native_stack_limits — [bản sao 2] chương trình HỢP LỆ gây tràn ngăn xếp native: có abort có kiểm soát (mã 70) không
+
+- **Trạng thái:** FAIL (mã thoát 1, 1s, bắt đầu 2026-10-20T11:47:48Z)
+- D3 đòi abort có kiểm soát (70) khi lỗi không khôi phục; nhận mã khác 0/70/71 = tiến trình bị HĐH giết (tràn ngăn xếp), gt-rt không có bảo vệ
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+gritc: phán quyết green; 0 lỗi, 0 cảnh báo, 0 ghi chú; backend: interpreter
+stack_array: exit=2 :: gritc: lỗi nội bộ khi chạy: chương trình bị hệ điều hành dừng
+gritc: phán quyết green; 0 lỗi, 0 cảnh báo, 1 ghi chú; backend: interpreter
+stack_recursion: exit=2 :: gritc: lỗi nội bộ khi chạy: chương trình bị hệ điều hành dừng
+SUMMARY: D3 đòi abort có kiểm soát (70) khi lỗi không khôi phục; nhận mã khác 0/70/71 = tiến trình bị HĐH giết (tràn ngăn xếp), gt-rt không có bảo vệ
+```
+</details>
+
+
+### L08_native_compiler_crash — [bản sao 2] đầu vào được M4–M9 cho qua nhưng làm CHÍNH gritc sập (kiểu kích thước vô hạn…)
+
+- **Trạng thái:** FAIL (mã thoát 1, 0s, bắt đầu 2026-10-20T11:49:57Z)
+- mã thoát hợp lệ của gritc là 0/1/2/3 (D17); 134/139 = tiến trình gritc tự sập (SIGABRT/SIGSEGV)
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+/home/user/Grit/audit/run_all.sh: line 397: 19095 Aborted                 timeout 120 "$g" run "$f" > "$WORK/crash.out" 2>&1
+crash_recursive_type.gt: exit=134 :: thread 'main' (19101) has overflowed its stack fatal runtime error: stack overflow, aborting 
+SUMMARY: mã thoát hợp lệ của gritc là 0/1/2/3 (D17); 134/139 = tiến trình gritc tự sập (SIGABRT/SIGSEGV)
+```
+</details>
+
+
+### G11_fmt_meta — [bản sao] metamorphic: gritc fmt không đổi phán quyết (841 mẫu)
+
+- **Trạng thái:** PASS (mã thoát 0, 65s, bắt đầu 2026-10-20T11:57:41Z)
+- fmt metamorphic: 841 mẫu; phán quyết không đổi 816; fmt từ chối 25; ĐỔI 0
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: fmt metamorphic: 841 mẫu; phán quyết không đổi 816; fmt từ chối 25; ĐỔI 0
+```
+</details>
+
+
+### G12_alias_meta — [bản sao] metamorphic: alias ASCII ≡ canonical không đổi phán quyết (816 mẫu)
+
+- **Trạng thái:** PASS (mã thoát 0, 56s, bắt đầu 2026-10-20T11:58:46Z)
+- alias ASCII ≡ canonical: 816 mẫu; giống 816; KHÁC 0; bỏ qua 25 (lỗi cú pháp/Unicode cố ý)
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: alias ASCII ≡ canonical: 816 mẫu; giống 816; KHÁC 0; bỏ qua 25 (lỗi cú pháp/Unicode cố ý)
+```
+</details>
+
+
 ### H01_llvm_probe — Thử lấy LLVM 20 cho Linux (khả năng port)
 
 - **Trạng thái:** BLOCKED (mã thoát 77, 1s, bắt đầu 2026-10-20T11:41:07Z)
@@ -1217,6 +1877,66 @@ HTTP/1.1 200 Connection Established
 
 HTTP/2 200 
 SUMMARY: kết quả thăm dò xem log; chưa dựng gì
+```
+</details>
+
+
+### I01_fuzz_tools — Công cụ fuzz: nightly + cargo-fuzz (cài nếu thiếu, ngoài dự án)
+
+- **Trạng thái:** PASS (mã thoát 0, 29s, bắt đầu 2026-10-20T11:50:37Z)
+- nightly + cargo-fuzz sẵn sàng
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+   Compiling fastrand v2.4.1
+   Compiling once_cell v1.21.4
+   Compiling toml_writer v1.1.1+spec-1.1.0
+   Compiling either v1.16.0
+   Compiling rayon v1.12.0
+   Compiling toml v1.1.2+spec-1.1.0
+   Compiling tempfile v3.27.0
+   Compiling clap v4.6.1
+   Compiling cargo_metadata v0.23.1
+   Compiling rustc_version v0.4.1
+   Compiling num_cpus v1.17.0
+   Compiling cargo-fuzz v0.13.2
+    Finished `release` profile [optimized] target(s) in 28.51s
+  Installing /root/.cargo/bin/cargo-fuzz
+   Installed package `cargo-fuzz v0.13.2` (executable `cargo-fuzz`)
+cargo 1.101.0-nightly (3960fa69b 2026-10-12)
+cargo-fuzz 0.13.2
+SUMMARY: nightly + cargo-fuzz sẵn sàng
+```
+</details>
+
+
+### I02_fuzz_lex — [bản sao] cargo-fuzz lexer 300s (ASan, libFuzzer)
+
+- **Trạng thái:** PASS (mã thoát 0, 317s, bắt đầu 2026-10-20T11:51:06Z)
+- fuzz lex: 300s, thoát 0, 0 tệp artifact (crash/timeout/oom) — chép vào audit/results/fuzz_artifacts/lex nếu có
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+"\000\000\000\001" # Uses: 50
+".+" # Uses: 57
+"\000\021\000\000" # Uses: 52
+"\022\000\000\000\000\000\000\000" # Uses: 30
+"\007\000\000\000\000\000\000\000" # Uses: 31
+"X\000\000\000" # Uses: 21
+"e\000\000\000" # Uses: 26
+"\000\000\000<" # Uses: 23
+"\005\375" # Uses: 24
+"ze\314\256" # Uses: 15
+"\000&" # Uses: 10
+"\001w" # Uses: 7
+"\000\000\000\000\000\000\000f" # Uses: 2
+"\377\377\377\377\377\377\377\012" # Uses: 4
+"pu3" # Uses: 0
+###### End of recommended dictionary. ######
+Done 2667202 runs in 301 second(s)
+SUMMARY: fuzz lex: 300s, thoát 0, 0 tệp artifact (crash/timeout/oom) — chép vào audit/results/fuzz_artifacts/lex nếu có
 ```
 </details>
 

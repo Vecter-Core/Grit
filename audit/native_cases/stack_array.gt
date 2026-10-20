@@ -1,0 +1,2 @@
+// case: mảng 20 MB trên ngăn xếp (hợp lệ, check XANH) — D3 đòi lỗi không khôi phục = abort tức thì mã 70, không phải bị hệ điều hành giết
+ƒ main() → i32 ! ∅ { a ≔ [7u8; 20000000]; a[5] as i32 }
