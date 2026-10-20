@@ -54,7 +54,7 @@ STAGES+=(
   "G05_fmt_idempotent|1200|core|[bản sao] gritc fmt: tính lũy đẳng trên corpus pass"
   "G06_determinism|1200|core|[bản sao] gritc build hai lần ⇒ cùng băm (D9)"
   "G07_explain|300|core|[bản sao] gritc explain cho mọi mã trong KNOWN"
-  "G08_probes|600|core|[bản sao] ~180 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả"
+  "G08_probes|600|core|[bản sao] ~110 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả"
   "G09_diff_checks|1500|core|[bản sao] vi sai M7: --checks=all ≡ --checks=proven trên số học ngẫu nhiên (bộ sinh riêng)"
   "G10_mutfuzz|1500|core|[bản sao] fuzz đột biến token qua CLI gritc (ICE/crash/treo)"
   "L01_linux_port|1500|core|[bản sao 2] port Linux (vá 5 tệp): gt-rt + gritc có backend LLVM 20 + liên kết bằng cc"

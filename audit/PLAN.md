@@ -7,7 +7,7 @@ trực tiếp vào dự án — chỉ ghi vào tệp kết quả**.
 ## Các tệp (tất cả nằm trong `audit/`, tệp của dự án không bị chạm)
 | Tệp | Vai trò |
 |---|---|
-| `run_all.sh` | **Tệp chạy toàn bộ dự án.** 58 giai đoạn, mỗi giai đoạn có timeout, log riêng, trạng thái riêng, tự kiểm `git status` trước/sau. |
+| `run_all.sh` | **Tệp chạy toàn bộ dự án.** ~50 giai đoạn, mỗi giai đoạn có timeout, log riêng, trạng thái riêng, tự kiểm `git status` trước/sau. |
 | `state.tsv` | Điểm lưu: `ID  TRẠNG-THÁI  mã-thoát  bắt-đầu  giây  ghi-chú`. Quyết định giai đoạn nào còn phải chạy. |
 | `RESULTS.md` | **Tệp kết quả** (tự sinh sau mỗi giai đoạn): bảng tổng hợp + chi tiết từng giai đoạn. |
 | `ANALYSIS.md` | **Phân tích**: cái gì lỗi (có tái hiện + nguyên nhân gốc + hướng sửa), cái gì chưa có, rủi ro, thứ tự ưu tiên. |
@@ -49,9 +49,8 @@ Kết quả trên bản sao KHÔNG phải kết quả trên Windows: chúng xác
 | C | `C00_build`, `C_<crate>` ×17 | dựng và test từng crate thuần theo thứ tự phụ thuộc, `--test-threads=2` (quy tắc dự án) |
 | D/E | `D01_native_probe` `E01_gtrt` | chứng minh bằng lệnh thật rằng mã nguyên trạng không dựng được ngoài Windows |
 | F | `F01_expect` `F02_tool_tests` | công cụ Python của dự án |
-| G | `G00`…`G14` | bản sao 1: test gt-driver/rig, corpus qua CLI, chạy chương trình, fmt lũy đẳng, tất định, explain, **probe tấn công**, vi sai M7 (số học `G09`, chỉ số mảng `G14`), fuzz token, **3 kiểm metamorphic** (`G11` fmt, `G12` alias ASCII↔canonical, `G13` thứ tự khai báo) |
+| G | `G00`…`G10` | bản sao 1: test gt-driver/rig, corpus qua CLI, chạy chương trình, fmt lũy đẳng, tất định, explain, **probe tấn công**, vi sai M7, fuzz token |
 | L | `L01`…`L08` | bản sao 2: port Linux, test native gt-driver/rig/guard/codegen/rt, vi sai thông dịch≡native, **demo dùng-sau-reset**, tràn ngăn xếp, sập trình biên dịch |
-| P | `P01_proposed_fix_f01` | bản sao 3: áp **đề xuất** sửa F-01 (`patches/proposed_F01_check_uses.patch`) rồi chạy lại probe, corpus, test gt-borrowck — chứng minh bản sửa chặn được mà không hồi quy (KHÔNG áp vào dự án) |
 | H/I | `H01_llvm_probe` `I01`–`I03` | khả năng có LLVM 20 cho Linux; cài nightly+cargo-fuzz; fuzz lexer/parser thật (libFuzzer+ASan, mặc định 300 s mỗi cái — `FUZZ_SECONDS`) |
 
 Không chạy (và lý do): đột biến (`tools/mut*.py`: nhiều giờ, ghi vào bản sao riêng của dự án), `probe_diff` bản đủ (~29 phút), `GT_FULL8=1` (~11 phút),
