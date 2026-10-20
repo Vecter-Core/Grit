@@ -1,0 +1,3 @@
+// probe: reject E0404
+// why: E0404: tham chiếu sống lâu hơn giá trị
+ƒ main() → i32 ! ∅ { μr ≔ &0; ⎇ true { x ≔ 5; r ← &x; } *r }

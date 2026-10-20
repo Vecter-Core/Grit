@@ -1,0 +1,3 @@
+// probe: accept
+// why: biến thể i32 giảm dần: kiểm tràn đảm bảo kết thúc (abort ở MIN) — probe đoán sai, đây là hành vi đúng
+ƒ main() → i32 ! ∅ { μi ≔ 10i32; ⟳ i ≠ 0 ↓ i { i ← i - 1; } i }

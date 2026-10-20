@@ -1,0 +1,5 @@
+// probe: reject E0407
+// why: E0407: move ra khỏi tham chiếu
+▢ B { v: i32 }
+ƒ take(r: &B) → B ! ∅ { *r }
+ƒ main() → i32 ! ∅ { b ≔ B { v: 1 }; c ≔ take(&b); c.v }

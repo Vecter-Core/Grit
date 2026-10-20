@@ -1,0 +1,7 @@
+// probe: reject E0402|E0301|E0308
+// why: D5: biến của vòng for-in bất biến
+ƒ main() → i32 ! ∅ {
+  μs ≔ 0;
+  ⟳ i in 0..3 { i ← 5; s ← s + i; }
+  s
+}

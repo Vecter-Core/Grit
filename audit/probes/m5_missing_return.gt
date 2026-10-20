@@ -1,0 +1,4 @@
+// probe: reject E0307
+// why: E0307: thiếu đường trả về
+ƒ f(c: bool) → i32 ! ∅ { ⎇ c { ⏎ 1; } }
+ƒ main() → i32 ! ∅ { f(true) }

@@ -1,0 +1,4 @@
+// probe: reject E0310
+// why: E0310: main đưa root_out làm GIÁ TRỊ hàm cho hàm khác ⇒ hàm đó tự đúc capability
+ƒ helper(mk: ƒ() → Cap<Out> ! ∅) ! {io} { o ≔ mk(); o.write_u64(1); }
+ƒ main() → i32 ! {io} { helper(root_out); 0 }

@@ -1,0 +1,3 @@
+// probe: reject E0601
+// why: E0601: -(i8::MIN)
+ƒ main() → i8 ! ∅ { x ≔ -128i8; -x }

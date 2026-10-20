@@ -1,0 +1,3 @@
+// probe: reject E0601
+// why: E0601: 255u8 + 1u8
+ƒ main() → u8 ! ∅ { a ≔ 255u8; b ≔ 1u8; a + b }

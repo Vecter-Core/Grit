@@ -1,0 +1,5 @@
+// probe: reject E0501
+// why: struct chứa tham chiếu không Send
+▢ H<'a> { r: &'a i32 }
+ƒ worker(h: H) ! ∅ { }
+ƒ main() → i32 ! {detach} { x ≔ 1; spawn(worker, H { r: &x }); 0 }

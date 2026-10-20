@@ -1,0 +1,6 @@
+// probe: reject E0401
+// why: two(b, b): move cùng giá trị hai lần làm hai đối số
+▢ B { v: i32 }
+ƒ two(a: B, b: B) ! ∅ { }
+ƒ f(b: B) ! ∅ { two(b, b); }
+ƒ main() → i32 ! ∅ { 0 }

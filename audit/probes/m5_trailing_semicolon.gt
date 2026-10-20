@@ -1,0 +1,3 @@
+// probe: reject E0307
+// why: E0307: dấu ; thừa ở đuôi
+ƒ main() → i32 ! ∅ { 1; }

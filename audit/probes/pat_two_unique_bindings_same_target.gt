@@ -1,0 +1,4 @@
+// probe: reject
+// why: hai nhánh/phần bind cùng một &! không được sống đồng thời
+ƒ h(o: &!Option<i32>) → i32 ! ∅ { ⌥ o { Some(v) ↦ { w ≔ &!*o; *v ← 1; *w ← 2; 0 }, None ↦ 0 } }
+ƒ main() → i32 ! ∅ { 0 }

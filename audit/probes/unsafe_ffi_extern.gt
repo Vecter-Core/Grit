@@ -1,0 +1,4 @@
+// probe: reject E0101
+// why: D14: \extern bị cấm
+\extern ƒ f() ! ∅;
+ƒ main() → i32 ! ∅ { 0 }

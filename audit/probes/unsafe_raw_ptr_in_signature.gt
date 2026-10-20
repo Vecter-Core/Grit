@@ -1,0 +1,4 @@
+// probe: reject E1001
+// why: E1001: con trỏ thô trong chữ ký
+ƒ f(p: *□ i32) ! ∅ { }
+ƒ main() → i32 ! ∅ { 0 }

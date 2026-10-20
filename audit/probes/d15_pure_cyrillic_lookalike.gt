@@ -1,0 +1,4 @@
+// probe: reject
+// why: D15: định danh thuần Cyrillic trông như Latin
+// known: KNOWN_LIMITATIONS 'Lexer (M1)': homoglyph thuần một bảng chữ chưa phát hiện
+ƒ main() → i32 ! ∅ { арр ≔ 1; app ≔ 2; арр + app }

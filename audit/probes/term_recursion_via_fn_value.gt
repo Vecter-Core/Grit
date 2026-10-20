@@ -1,0 +1,5 @@
+// probe: reject E0703|E0701|E0702
+// why: đệ quy qua giá trị hàm
+ƒ g(n: u32) → u32 ! ∅ { n }
+ƒ f(n: u32) → u32 ! ∅ ↓ n { h ≔ f; h(n) }
+ƒ main() → u32 ! ∅ { f(3) }

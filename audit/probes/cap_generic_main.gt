@@ -1,0 +1,4 @@
+// probe: reject E0310
+// why: E0310: hàm generic tên main
+ƒ helper<T>(x: T) ! {io} { o ≔ root_out(); o.write_u64(1); }
+ƒ main() → i32 ! {io} { helper(1); 0 }

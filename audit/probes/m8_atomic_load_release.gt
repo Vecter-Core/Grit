@@ -1,0 +1,4 @@
+// probe: reject E0503
+// why: E0503: load với Release
+■ A: Atomic<u32> ≔ Atomic::new(0u32);
+ƒ main() → u32 ! ∅ { A.load(AtomicOrdering::Release) }

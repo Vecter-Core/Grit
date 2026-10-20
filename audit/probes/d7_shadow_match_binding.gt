@@ -1,0 +1,3 @@
+// probe: reject E0205
+// why: D7: pattern che biến ngoài
+ƒ main() → i32 ! ∅ { v ≔ 5; o ≔ Option::Some(1); ⌥ o { Option::Some(v) ↦ v, Option::None ↦ 0 } }

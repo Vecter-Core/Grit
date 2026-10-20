@@ -1,0 +1,6 @@
+// probe: reject
+// why: D5: biến gán tên trong pattern bất biến
+ƒ main() → i32 ! ∅ {
+  o ≔ Option::Some(3);
+  ⌥ o { Option::Some(v) ↦ { v ← 4; v }, Option::None ↦ 0 }
+}

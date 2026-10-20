@@ -1,0 +1,3 @@
+// probe: reject
+// why: D4: khớp literal số thực là == ngầm; grammar (pat_lit) lại cho phép float_lit
+ƒ main() → i32 ! ∅ { a ≔ 1.5f64; ⌥ a { 1.5 ↦ 1, _ ↦ 0 } }

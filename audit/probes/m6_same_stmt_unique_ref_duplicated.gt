@@ -1,0 +1,4 @@
+// probe: reject E0401
+// why: (a, a) với a: &!i32 ⇒ hai &! cùng trỏ một chỗ (alias khả biến)
+ƒ g(a: &!i32) → (&!i32, &!i32) ! ∅ { (a, a) }
+ƒ main() → i32 ! ∅ { 0 }

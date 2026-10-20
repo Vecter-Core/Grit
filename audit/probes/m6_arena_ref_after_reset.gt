@@ -1,0 +1,3 @@
+// probe: reject E0405
+// why: E0405: dùng tham chiếu Arena sau reset
+ƒ main() → i32 ! {mem} { μa ≔ Arena::new(); r ≔ a.alloc(5); a.reset(); *r }

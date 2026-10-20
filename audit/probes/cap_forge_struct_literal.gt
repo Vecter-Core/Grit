@@ -1,0 +1,3 @@
+// probe: reject E0313
+// why: E0313: dựng Cap bằng literal
+ƒ main() → i32 ! {io} { c ≔ Cap { v: 1 }; 0 }

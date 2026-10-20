@@ -1,0 +1,6 @@
+// probe: reject E0401
+// why: P { a: b, b: b }
+▢ B { v: i32 }
+▢ P { a: B, b: B }
+ƒ f(b: B) → P ! ∅ { P { a: b, b: b } }
+ƒ main() → i32 ! ∅ { 0 }

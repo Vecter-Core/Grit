@@ -1,0 +1,3 @@
+// probe: reject E0702|E0701
+// why: bước +% có thể quấn vòng ⇒ không giảm
+ƒ main() → u8 ! ∅ { μi ≔ 0u8; ⟳ i < 200 ↓ 200 - i { i ← i +% 100; } i }

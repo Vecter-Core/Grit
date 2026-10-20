@@ -1,0 +1,5 @@
+// probe: reject
+// why: D5: &self không được ghi trường
+▢ C { n: i32 }
+⊐ C { ƒ inc(&self) ! ∅ { self.n ← self.n +% 1; } }
+ƒ main() → i32 ! ∅ { c ≔ C { n: 0 }; c.inc(); 0 }

@@ -1,0 +1,3 @@
+// probe: reject E0601
+// why: E0601: u64 nhân tràn
+ƒ main() → u64 ! ∅ { a ≔ 4294967296u64; a * a }

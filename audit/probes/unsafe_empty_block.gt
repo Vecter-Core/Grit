@@ -1,0 +1,3 @@
+// probe: reject E1001
+// why: E1001: mọi ⚠ của người dùng bị từ chối
+ƒ main() → i32 ! ∅ { ⚠ { } 0 }
