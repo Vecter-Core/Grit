@@ -1,6 +1,6 @@
 # KẾT QUẢ CHẠY TOÀN BỘ DỰ ÁN GRIT (tự sinh — đừng sửa tay; ghi chú tay đặt ở `audit/results/<ID>.note.md`)
 
-- Mã nguồn được chạy: `c82abcf 2026-10-20 audit: điểm lưu 3 — phân tích ANALYSIS.md, stage L (backend native trên bản port Linux), metamorphic, vi sai, đề xuất sửa F-01` (nhánh làm việc hiện tại; bộ chạy KHÔNG sửa tệp nào của dự án).
+- Mã nguồn được chạy: `261bbd8 2026-10-20 audit: checkpoint 4 — G11–G13, I03 results; real numbers in ANALYSIS` (nhánh làm việc hiện tại; bộ chạy KHÔNG sửa tệp nào của dự án).
 - Môi trường: Linux container (xem giai đoạn A00). Dự án được thiết kế cho **Windows x86_64 MSVC + LLVM 20.1.8** (docs/ENVIRONMENT.md).
 - Cách chạy/tiếp tục: `bash audit/run_all.sh` (tự bỏ qua giai đoạn đã xong; xem `audit/PLAN.md`).
 
@@ -8,10 +8,10 @@
 
 | Trạng thái | Số giai đoạn |
 |---|---|
-| PASS | 41 |
+| PASS | 42 |
 | FAIL | 12 |
 | BLOCKED | 3 |
-| PENDING | 2 |
+| PENDING | 1 |
 
 PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · BLOCKED = KHÔNG chạy được trong môi trường này (có bằng chứng) · TIMEOUT = quá hạn · SKIP = bỏ qua có chủ ý · PENDING = chưa tới lượt.
 
@@ -71,7 +71,7 @@ PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · 
 | G11_fmt_meta | [bản sao] metamorphic: gritc fmt không đổi phán quyết (841 mẫu) | **PASS** | 0 | 65 |
 | G12_alias_meta | [bản sao] metamorphic: alias ASCII ≡ canonical không đổi phán quyết (816 mẫu) | **PASS** | 0 | 56 |
 | G13_order_meta | [bản sao] metamorphic: xáo thứ tự khai báo không đổi phán quyết (429 mẫu × 2) | **PASS** | 0 | 47 |
-| G14_diff_arrays | [bản sao] vi sai M7 all≡proven trên chỉ số mảng/lát (nơi M7 xoá kiểm tra biên) | PENDING | | |
+| G14_diff_arrays | [bản sao] vi sai M7 all≡proven trên chỉ số mảng/lát (nơi M7 xoá kiểm tra biên) | **PASS** | 0 | 206 |
 | P01_proposed_fix_f01 | [bản sao 3] ĐỀ XUẤT sửa F-01 (9 dòng ở gt-borrowck/check.rs): 14 probe có bị chặn không, corpus/test có hồi quy không | PENDING | | |
 | H01_llvm_probe | Thử lấy LLVM 20 cho Linux (khả năng port) | **BLOCKED** | 77 | 1 |
 | I01_fuzz_tools | Công cụ fuzz: nightly + cargo-fuzz (cài nếu thiếu, ngoài dự án) | **PASS** | 0 | 29 |
@@ -1860,6 +1860,19 @@ SUMMARY: alias ASCII ≡ canonical: 816 mẫu; giống 816; KHÁC 0; bỏ qua 25
 
 ```
 SUMMARY: order metamorphic: 429 mẫu (2 hoán vị mỗi mẫu); giống 429; KHÁC 0; bỏ qua 412
+```
+</details>
+
+
+### G14_diff_arrays — [bản sao] vi sai M7 all≡proven trên chỉ số mảng/lát (nơi M7 xoá kiểm tra biên)
+
+- **Trạng thái:** PASS (mã thoát 0, 206s, bắt đầu 2026-10-20T12:02:07Z)
+- vi sai [--backend=interpreter --checks=all] ≡ [--backend=interpreter --checks=proven]: programs=2500; rejected=1495; runs=6030; aborts=2481; diffs=0; ice=0; seed=9
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: vi sai [--backend=interpreter --checks=all] ≡ [--backend=interpreter --checks=proven]: programs=2500; rejected=1495; runs=6030; aborts=2481; diffs=0; ice=0; seed=9
 ```
 </details>
 
