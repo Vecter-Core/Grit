@@ -1,0 +1,3 @@
+// probe: reject
+// why: break ngoài vòng lặp
+ƒ main() → i32 ! ∅ { ⊠; 0 }

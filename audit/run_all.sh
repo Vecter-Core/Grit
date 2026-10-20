@@ -55,8 +55,17 @@ STAGES+=(
   "G06_determinism|1200|core|[bản sao] gritc build hai lần ⇒ cùng băm (D9)"
   "G07_explain|300|core|[bản sao] gritc explain cho mọi mã trong KNOWN"
   "G08_probes|600|core|[bản sao] ~110 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả"
+  "G09_diff_checks|1500|core|[bản sao] vi sai M7: --checks=all ≡ --checks=proven trên số học ngẫu nhiên (bộ sinh riêng)"
+  "G10_mutfuzz|1500|core|[bản sao] fuzz đột biến token qua CLI gritc (ICE/crash/treo)"
+  "L01_linux_port|1500|core|[bản sao 2] port Linux (vá 5 tệp): gt-rt + gritc có backend LLVM 20 + liên kết bằng cc"
+  "L02_native_driver_tests|5400|core|[bản sao 2] cargo test -p gt-driver (backend LLVM thật: llvm*, release*, threads, vec, utf8…)"
+  "L03_native_rig_tests|3600|core|[bản sao 2] cargo test -p rig (rig build/run/test + 6 công cụ dogfood bằng exe native)"
+  "L04_native_other_crates|1800|core|[bản sao 2] cargo test -p gt-guard -p gt-codegen-llvm -p gt-llvm + gt-rt"
+  "L05_native_diff|1800|core|[bản sao 2] vi sai thông dịch ≡ exe native trên số học ngẫu nhiên (bộ sinh riêng)"
   "H01_llvm_probe|300|opt|Thử lấy LLVM 20 cho Linux (khả năng port)"
-  "I01_fuzz_probe|300|opt|Công cụ fuzz (nightly + cargo-fuzz) có sẵn không"
+  "I01_fuzz_tools|1500|opt|Công cụ fuzz: nightly + cargo-fuzz (cài nếu thiếu, ngoài dự án)"
+  "I02_fuzz_lex|900|opt|[bản sao] cargo-fuzz lexer ${FUZZ_SECONDS:-300}s (ASan, libFuzzer)"
+  "I03_fuzz_parse|900|opt|[bản sao] cargo-fuzz parser ${FUZZ_SECONDS:-300}s (ASan, libFuzzer)"
 )
 
 # ---------- tiện ích ----------
@@ -292,6 +301,62 @@ st_G08_probes() {
   python3 "$AUDIT/probes_run.py" --gritc "$g" --dir "$AUDIT/probes"
 }
 
+st_G09_diff_checks() {
+  in_copy || return $?
+  local g; g="$(gritc_bin)"; [ -x "$g" ] || return 77
+  python3 "$AUDIT/diff_checks.py" --gritc "$g" --n "${DIFF_N:-3000}" --seed 5 --jobs 2
+}
+
+st_G10_mutfuzz() {
+  in_copy || return $?
+  local g; g="$(gritc_bin)"; [ -x "$g" ] || return 77
+  mkdir -p "$AUDIT/results/fuzz_artifacts/mutfuzz"
+  python3 "$AUDIT/mutfuzz.py" --gritc "$g" --n "${MUTFUZZ_N:-8000}" --seed 11 --jobs 2 --out "$AUDIT/results/fuzz_artifacts/mutfuzz"
+}
+
+LCOPY="$WORK/grit_linux"
+in_lcopy() { [ -d "$LCOPY/.git" ] || { echo "chưa có $LCOPY (chạy L01_linux_port trước)"; return 77; }; }
+lgritc() { echo "$LCOPY/target/debug/gritc"; }
+
+st_L01_linux_port() {
+  [ -e /usr/lib/x86_64-linux-gnu/libLLVM-20.so ] || { note "thiếu libLLVM-20.so (gói libllvm20): không port được"; return 77; }
+  mkdir -p "$WORK" && rm -rf "$LCOPY" && git clone -q "$ROOT" "$LCOPY" || return 1
+  cd "$LCOPY" && patch -p1 < "$AUDIT/patches/linux_port.patch" || return 1
+  echo "== gt-rt (staticlib, Linux)"
+  (cd runtime/gt-rt && cargo build --release --locked 2>&1 | tail -3 && cargo test --locked 2>&1 | grep -E 'test result|FAILED') || return 1
+  echo "== gritc có backend LLVM"
+  GRIT_LLVM_DIR=/usr cargo build --locked -p gt-driver --all-targets 2>&1 | tail -3 || return 1
+  local g; g="$(lgritc)"
+  printf 'ƒ main() → i32 ! ∅ { μs ≔ 0; μi ≔ 0; ⟳ i < 10 ↓ 10 - i { s ← s + i; i ← i + 1; } s }\n' > "$WORK/n1.gt"
+  "$g" run "$WORK/n1.gt" 2>&1 | tail -2
+  "$g" build "$WORK/n1.gt" -o "$WORK/n1.exe" >/dev/null 2>&1 && file "$WORK/n1.exe" | cut -c1-100
+  note "port Linux: vá 5 tệp (gt-llvm/build.rs, gt-driver/build.rs+native.rs, rig/build.rs, gt-rt/src/lib.rs, +62/−26 dòng); LLVM hệ thống $(ls /usr/lib/x86_64-linux-gnu/libLLVM.so.20* 2>/dev/null | head -1 | sed 's/.*libLLVM.so.//') (gói libllvm20) thay vì 20.1.8 của dự án"
+}
+
+st_L02_native_driver_tests() {
+  in_lcopy || return $?
+  cd "$LCOPY" && GRIT_LLVM_DIR=/usr cargo test --locked -p gt-driver --no-fail-fast -- --test-threads="$TEST_THREADS"
+}
+
+st_L03_native_rig_tests() {
+  in_lcopy || return $?
+  cd "$LCOPY" && GRIT_LLVM_DIR=/usr cargo test --locked -p rig --no-fail-fast -- --test-threads="$TEST_THREADS"
+}
+
+st_L04_native_other_crates() {
+  in_lcopy || return $?
+  cd "$LCOPY" && GRIT_LLVM_DIR=/usr cargo test --locked -p gt-guard -p gt-codegen-llvm -p gt-llvm --no-fail-fast -- --test-threads="$TEST_THREADS"
+  local rc=$?
+  (cd runtime/gt-rt && cargo test --locked 2>&1 | grep -E 'test result|FAILED')
+  return $rc
+}
+
+st_L05_native_diff() {
+  in_lcopy || return $?
+  local g; g="$(lgritc)"; [ -x "$g" ] || return 77
+  python3 "$AUDIT/diff_checks.py" --gritc "$g" --n "${NATIVE_DIFF_N:-600}" --seed 3 --jobs 2 "--left=--backend=interpreter" "--right=--backend=llvm"
+}
+
 st_H01_llvm_probe() {
   echo "== apt"; apt-cache policy llvm-20 libllvm20 llvm-20-dev 2>&1 | head -12
   echo "== tải LLVM 20.1.8 bản Linux từ GitHub (chỉ HEAD)"
@@ -302,19 +367,44 @@ st_H01_llvm_probe() {
   return 77
 }
 
-st_I01_fuzz_probe() {
+st_I01_fuzz_tools() {
   rustup toolchain list
-  if rustup toolchain list | grep -q nightly && command -v cargo-fuzz >/dev/null 2>&1; then echo "có nightly + cargo-fuzz"; return 0; fi
-  note "thiếu nightly và/hoặc cargo-fuzz: không chạy được fuzz lexer/parser (crates/*/fuzz)"
-  return 77
+  if ! rustup toolchain list | grep -q '^nightly'; then
+    rustup toolchain install nightly --profile minimal --no-self-update || { note "không cài được nightly"; return 77; }
+  fi
+  if ! cargo fuzz --help >/dev/null 2>&1; then
+    cargo install cargo-fuzz --locked || { note "không cài được cargo-fuzz"; return 77; }
+  fi
+  cargo +nightly --version && cargo fuzz --version
+  note "nightly + cargo-fuzz sẵn sàng"
 }
+
+fuzz_one() { # target crate
+  in_copy || return $?
+  command -v cargo-fuzz >/dev/null 2>&1 || { note "chưa có cargo-fuzz (chạy I01_fuzz_tools)"; return 77; }
+  local secs="${FUZZ_SECONDS:-300}" dir="$COPY/crates/$2/fuzz"
+  cd "$dir" || return 1
+  cargo +nightly fuzz run "$1" -- -max_total_time="$secs" -rss_limit_mb=4096 2>&1 | tail -40
+  local rc=${PIPESTATUS[0]}
+  local n; n=$(ls "$dir/artifacts/$1" 2>/dev/null | wc -l)
+  mkdir -p "$AUDIT/results/fuzz_artifacts/$1"
+  if [ "$n" -gt 0 ]; then cp "$dir/artifacts/$1"/* "$AUDIT/results/fuzz_artifacts/$1/" 2>/dev/null; fi
+  note "fuzz $1: ${secs}s, thoát $rc, $n tệp artifact (crash/timeout/oom) — chép vào audit/results/fuzz_artifacts/$1 nếu có"
+  [ "$rc" = 0 ] && [ "$n" = 0 ]
+}
+
+st_I02_fuzz_lex() { fuzz_one lex gt-lexer; }
+st_I03_fuzz_parse() { fuzz_one parse gt-parser; }
 
 # ---------- khung chạy ----------
 state_get() { awk -F'\t' -v id="$1" '$1==id {print $2}' "$STATE" 2>/dev/null; }
-state_put() { # id status rc start secs note
-  local tmp; tmp="$(mktemp)"
-  { grep -v -P "^$1\t" "$STATE" 2>/dev/null || true; printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$6"; } > "$tmp"
-  sort -t $'\t' -k1,1 "$tmp" > "$STATE"; rm -f "$tmp"
+state_put() { # id status rc start secs note — có khoá tệp để hai bộ chạy song song không ghi đè nhau
+  (
+    flock 9
+    local tmp; tmp="$(mktemp)"
+    { grep -v -P "^$1\t" "$STATE" 2>/dev/null || true; printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$6"; } > "$tmp"
+    sort -t $'\t' -k1,1 "$tmp" > "$STATE"; rm -f "$tmp"
+  ) 9> "$STATE.lock"
 }
 repo_snapshot() { git -C "$ROOT" status --porcelain --untracked-files=all -- . ':!audit' 2>/dev/null | sort; }
 

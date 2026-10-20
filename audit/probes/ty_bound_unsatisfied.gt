@@ -1,0 +1,6 @@
+// probe: reject E0309
+// why: gọi hàm generic với kiểu không thoả ràng buộc Copy
+▢ B { v: i32 }
+ƒ f<T: Copy>(x: T) ! ∅ { }
+ƒ g(b: B) ! ∅ { f(b); }
+ƒ main() → i32 ! ∅ { 0 }

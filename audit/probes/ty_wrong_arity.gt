@@ -1,0 +1,4 @@
+// probe: reject E0301
+// why: gọi sai số đối số
+ƒ f(a: i32, b: i32) → i32 ! ∅ { a }
+ƒ main() → i32 ! ∅ { f(1) }

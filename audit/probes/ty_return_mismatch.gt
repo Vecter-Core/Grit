@@ -1,0 +1,4 @@
+// probe: reject E0301
+// why: kiểu trả về sai
+ƒ f() → i32 ! ∅ { true }
+ƒ main() → i32 ! ∅ { 0 }

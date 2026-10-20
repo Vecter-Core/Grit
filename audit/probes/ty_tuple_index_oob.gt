@@ -1,0 +1,3 @@
+// probe: reject
+// why: chỉ số tuple ngoài phạm vi
+ƒ main() → i32 ! ∅ { t ≔ (1, 2); t.5 }

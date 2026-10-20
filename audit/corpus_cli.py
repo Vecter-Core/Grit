@@ -39,6 +39,16 @@ def collect(tests):
 
 def run_one(gritc, case):
     kind, name, path, expect = case
+    import re as _re, shutil, tempfile
+    tmpdir = None
+    if os.path.isfile(path):
+        # tên tệp là tên module (phải là định danh hợp lệ): mẫu như `01_add.gt` bị `BadModuleName` nếu đưa thẳng ⇒ chép sang tên hợp lệ
+        tmpdir = tempfile.mkdtemp(prefix="corp_")
+        # test trong crate nạp mẫu đơn dưới tên module `main` (mẫu E02xx dùng `main::...`); tên tệp thật như `01_add.gt` còn bị `BadModuleName`
+        safe = "main.gt"
+        dst = os.path.join(tmpdir, safe)
+        shutil.copyfile(path, dst)
+        path = dst
     try:
         r = subprocess.run(
             [gritc, "check", path, "--json"],
@@ -46,6 +56,9 @@ def run_one(gritc, case):
         )
     except subprocess.TimeoutExpired:
         return case, "TIMEOUT", [], None
+    finally:
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
     try:
         j = json.loads(r.stdout)
     except Exception:

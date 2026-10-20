@@ -1,0 +1,195 @@
+diff --git a/crates/gt-driver/build.rs b/crates/gt-driver/build.rs
+index 3d336b0..8c93c26 100644
+--- a/crates/gt-driver/build.rs
++++ b/crates/gt-driver/build.rs
+@@ -3,7 +3,7 @@ use std::{env, fs, path::PathBuf};
+ 
+ fn main() {
+     // Nạp LLVM-C.dll TRỄ (ADR-029): `rustc-link-arg` của crate thư viện KHÔNG lan sang crate dùng nó, nên phát ở đây cho bin và test.
+-    if env::var_os("CARGO_FEATURE_LLVM").is_some() {
++    if env::var_os("CARGO_FEATURE_LLVM").is_some() && env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+         println!("cargo:rustc-link-arg-bins=/DELAYLOAD:LLVM-C.dll");
+         println!("cargo:rustc-link-arg-tests=/DELAYLOAD:LLVM-C.dll");
+         println!("cargo:rustc-link-arg-tests=/IGNORE:4199");
+diff --git a/crates/gt-driver/src/native.rs b/crates/gt-driver/src/native.rs
+index 306a084..c9de041 100644
+--- a/crates/gt-driver/src/native.rs
++++ b/crates/gt-driver/src/native.rs
+@@ -66,6 +66,12 @@ impl std::fmt::Display for NativeError {
+ }
+ 
+ /// `LLVM-C.dll` phải nằm trên PATH (nạp trễ: thiếu thì dừng Ở ĐÂY với thông báo rõ, không để tiến trình chết lúc nạp).
++#[cfg(not(windows))]
++fn check_llvm_dll() -> Result<(), NativeError> {
++    Ok(())
++}
++
++#[cfg(windows)]
+ fn check_llvm_dll() -> Result<(), NativeError> {
+     let path = std::env::var_os("PATH").unwrap_or_default();
+     if std::env::split_paths(&path).any(|d| d.join("LLVM-C.dll").is_file()) {
+@@ -92,7 +98,11 @@ fn rt_lib() -> Result<PathBuf, NativeError> {
+         };
+     }
+     let dev =
+-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtime/gt-rt/target/release/gt_rt.lib");
++        Path::new(env!("CARGO_MANIFEST_DIR")).join(if cfg!(windows) {
++            "../../runtime/gt-rt/target/release/gt_rt.lib"
++        } else {
++            "../../runtime/gt-rt/target/release/libgt_rt.a"
++        });
+     if dev.is_file() {
+         Ok(dev)
+     } else {
+@@ -103,6 +113,12 @@ fn rt_lib() -> Result<PathBuf, NativeError> {
+     }
+ }
+ 
++#[cfg(not(windows))]
++fn linker() -> Result<Command, NativeError> {
++    Ok(Command::new("cc"))
++}
++
++#[cfg(windows)]
+ fn linker() -> Result<Command, NativeError> {
+     let Some(tool) = find_msvc_tools::find_tool("x86_64-pc-windows-msvc", "link.exe") else {
+         return Err(NativeError::Env(
+@@ -215,6 +231,7 @@ pub fn build_exe_profile(
+         .map_err(|e| NativeError::Link(format!("không ghi được {}: {e}", obj.display())))?;
+     let mut cmd = linker()?;
+     // /Brepro: bỏ dấu thời gian khỏi PE ⇒ cùng nguồn cho cùng nhị phân (tái lập, M11); không sinh PDB nên không rò đường dẫn
++    #[cfg(windows)]
+     cmd.arg("/NOLOGO")
+         .arg("/Brepro")
+         .arg("/SUBSYSTEM:CONSOLE")
+@@ -229,6 +246,14 @@ pub fn build_exe_profile(
+             "dbghelp.lib",
+             "/defaultlib:msvcrt",
+         ]);
++    #[cfg(not(windows))]
++    cmd.arg("-no-pie")
++        .arg("-Wl,--build-id=none")
++        .arg("-o")
++        .arg(out)
++        .arg(&obj)
++        .arg(&rt)
++        .args(["-lpthread", "-ldl", "-lm"]);
+     let mut r = cmd.output();
+     for k in 1..=5u64 {
+         let again = matches!(&r, Ok(o) if !o.status.success()
+diff --git a/crates/gt-llvm/build.rs b/crates/gt-llvm/build.rs
+index 419d9c7..b60b07b 100644
+--- a/crates/gt-llvm/build.rs
++++ b/crates/gt-llvm/build.rs
+@@ -1,21 +1,5 @@
+-//! Liên kết ĐỘNG `LLVM-C.lib` ↔ `LLVM-C.dll` của LLVM 20.1.8 bản dựng sẵn (ADR-029 §2; spike đạt 2026-10-12).
+-//! Nạp DLL TRỄ: `gritc check/fmt/explain` chạy được khi PATH không có LLVM; thiếu DLL lúc cần ⇒ gritc báo và thoát 3.
++//! BẢN THỬ PORT LINUX (bộ kiểm toán): liên kết libLLVM-20.so của hệ thống (gói libllvm20).
+ fn main() {
+-    println!("cargo:rerun-if-env-changed=GRIT_LLVM_DIR");
+-    let Ok(dir) = std::env::var("GRIT_LLVM_DIR") else {
+-        panic!(
+-            "thiếu GRIT_LLVM_DIR (thư mục LLVM 20.1.8, xem docs/ENVIRONMENT.md); KHÔNG đoán đường dẫn"
+-        );
+-    };
+-    let lib = std::path::Path::new(&dir).join("lib").join("LLVM-C.lib");
+-    assert!(
+-        lib.is_file(),
+-        "không thấy {} — GRIT_LLVM_DIR sai?",
+-        lib.display()
+-    );
+-    println!("cargo:rustc-link-search=native={dir}/lib");
+-    println!("cargo:rustc-link-lib=dylib=LLVM-C");
+-    println!("cargo:rustc-link-lib=dylib=delayimp");
+-    // `rustc-link-arg` chỉ áp cho mục tiêu của CHÍNH crate này; crate dùng nó (gt-driver) tự phát /DELAYLOAD cho bin/test của nó.
+-    println!("cargo:rustc-link-arg=/DELAYLOAD:LLVM-C.dll");
++    println!("cargo:rustc-link-search=native=/usr/lib/x86_64-linux-gnu");
++    println!("cargo:rustc-link-lib=dylib=LLVM-20");
+ }
+diff --git a/crates/rig/build.rs b/crates/rig/build.rs
+index 664bb09..452a02c 100644
+--- a/crates/rig/build.rs
++++ b/crates/rig/build.rs
+@@ -1,6 +1,6 @@
+ // Nạp LLVM-C.dll TRỄ cho `rig` (như gritc; ADR-029): `rig new/lock/fmt/clean` chạy được khi PATH không có LLVM.
+ fn main() {
+-    if std::env::var_os("CARGO_FEATURE_LLVM").is_some() {
++    if std::env::var_os("CARGO_FEATURE_LLVM").is_some() && std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+         println!("cargo:rustc-link-arg-bins=/DELAYLOAD:LLVM-C.dll");
+         println!("cargo:rustc-link-arg-tests=/DELAYLOAD:LLVM-C.dll");
+         println!("cargo:rustc-link-arg-tests=/IGNORE:4199");
+diff --git a/runtime/gt-rt/src/lib.rs b/runtime/gt-rt/src/lib.rs
+index 502bb44..4307cc5 100644
+--- a/runtime/gt-rt/src/lib.rs
++++ b/runtime/gt-rt/src/lib.rs
+@@ -7,10 +7,8 @@
+ //! * `gritrt_spawn(f, arg)` tạo luồng HĐH thật chạy `f(arg)`; không có `join` (đúng ngữ nghĩa M8).
+ #![allow(unsafe_code)]
+ 
+-#[cfg(not(all(windows, target_arch = "x86_64")))]
+-compile_error!(
+-    "gt-rt Phase 1 chỉ hỗ trợ x86_64 Windows (ADR-029); target khác phải được thêm có chủ đích"
+-);
++#[cfg(not(all(any(windows, target_os = "linux"), target_arch = "x86_64")))]
++compile_error!("gt-rt (bản thử port của bộ kiểm toán): chỉ x86_64 Windows hoặc Linux");
+ 
+ use std::io::Write;
+ 
+@@ -83,9 +81,11 @@ pub extern "C" fn gritrt_report_int(value: i64, signed: i32) {
+     }
+ }
+ 
++#[cfg(windows)]
+ #[repr(C)]
+ struct SrwLock(*mut u8);
+ 
++#[cfg(windows)]
+ #[link(name = "kernel32")]
+ unsafe extern "system" {
+     fn AcquireSRWLockExclusive(l: *mut SrwLock);
+@@ -94,6 +94,7 @@ unsafe extern "system" {
+ 
+ /// # Safety
+ /// `lock` trỏ tới ô 8 byte căn lề 8, khởi tạo 0 và sống suốt thời gian khoá (codegen đảm bảo: ô nằm trong `Mutex`).
++#[cfg(windows)]
+ #[unsafe(no_mangle)]
+ pub unsafe extern "C" fn gritrt_mutex_lock(lock: *mut u8) {
+     unsafe { AcquireSRWLockExclusive(lock.cast()) }
+@@ -101,11 +102,37 @@ pub unsafe extern "C" fn gritrt_mutex_lock(lock: *mut u8) {
+ 
+ /// # Safety
+ /// Như `gritrt_mutex_lock`; luồng gọi đang giữ khoá (M8 đảm bảo `with` bao cặp lock/unlock).
++#[cfg(windows)]
+ #[unsafe(no_mangle)]
+ pub unsafe extern "C" fn gritrt_mutex_unlock(lock: *mut u8) {
+     unsafe { ReleaseSRWLockExclusive(lock.cast()) }
+ }
+ 
++/// BẢN THỬ PORT LINUX (bộ kiểm toán, KHÔNG có trong dự án gốc): khoá quay + nhường luồng trên ô 8 byte khởi tạo 0.
++///
++/// # Safety
++/// `lock` trỏ tới ô 8 byte căn lề 8, khởi tạo 0.
++#[cfg(not(windows))]
++#[unsafe(no_mangle)]
++pub unsafe extern "C" fn gritrt_mutex_lock(lock: *mut u8) {
++    let a = unsafe { &*lock.cast::<std::sync::atomic::AtomicU64>() };
++    while a
++        .compare_exchange_weak(0, 1, std::sync::atomic::Ordering::Acquire, std::sync::atomic::Ordering::Relaxed)
++        .is_err()
++    {
++        std::thread::yield_now();
++    }
++}
++
++/// # Safety
++/// Như `gritrt_mutex_lock`.
++#[cfg(not(windows))]
++#[unsafe(no_mangle)]
++pub unsafe extern "C" fn gritrt_mutex_unlock(lock: *mut u8) {
++    let a = unsafe { &*lock.cast::<std::sync::atomic::AtomicU64>() };
++    a.store(0, std::sync::atomic::Ordering::Release);
++}
++
+ /// Con trỏ thô gửi qua luồng; tính `Send` do kiểm tĩnh E0501 ở compiler bảo đảm (đối số của `spawn` là `Send`).
+ struct Arg(*mut u8);
+ unsafe impl Send for Arg {}

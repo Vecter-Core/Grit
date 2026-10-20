@@ -1,0 +1,3 @@
+// probe: reject E0309|E0301
+// why: phương thức không tồn tại
+ƒ main() → i32 ! ∅ { x ≔ 5; x.nope() }

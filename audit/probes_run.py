@@ -66,7 +66,7 @@ def main():
             st = "OK" if verdict in ("green", "yellow") else "FALSE_POSITIVE"
         elif exp.startswith("warn"):
             want = exp.split()[1]
-            st = "OK" if (verdict == "yellow" and want in scodes) else "WRONG_CODE"
+            st = "OK" if (verdict == "yellow" and want in scodes) else ("KNOWN_GAP" if known else "WRONG_CODE")
         else:
             st = "BAD_PROBE_HEADER"
         rows.append((name, exp, verdict, ecodes, scodes, st))
