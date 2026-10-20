@@ -1,7 +1,7 @@
 ### G08_probes — [bản sao] ~110 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả
 
-- **Trạng thái:** FAIL (mã thoát 1, 6s, bắt đầu 2026-10-20T11:44:52Z)
-- 162 probe tự viết; FALSE_NEGATIVE=22; KNOWN_GAP=3; OK=137
+- **Trạng thái:** FAIL (mã thoát 1, 4s, bắt đầu 2026-10-20T12:10:15Z)
+- 181 probe tự viết; FALSE_NEGATIVE=23; KNOWN_GAP=3; OK=155
 
 <details><summary>Đuôi log (18 dòng cuối)</summary>
 

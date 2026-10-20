@@ -1,6 +1,6 @@
 # KẾT QUẢ CHẠY TOÀN BỘ DỰ ÁN GRIT (tự sinh — đừng sửa tay; ghi chú tay đặt ở `audit/results/<ID>.note.md`)
 
-- Mã nguồn được chạy: `261bbd8 2026-10-20 audit: checkpoint 4 — G11–G13, I03 results; real numbers in ANALYSIS` (nhánh làm việc hiện tại; bộ chạy KHÔNG sửa tệp nào của dự án).
+- Mã nguồn được chạy: `8f3f344 2026-10-20 audit: G14 result + ANALYSIS row (checkpoint 5)` (nhánh làm việc hiện tại; bộ chạy KHÔNG sửa tệp nào của dự án).
 - Môi trường: Linux container (xem giai đoạn A00). Dự án được thiết kế cho **Windows x86_64 MSVC + LLVM 20.1.8** (docs/ENVIRONMENT.md).
 - Cách chạy/tiếp tục: `bash audit/run_all.sh` (tự bỏ qua giai đoạn đã xong; xem `audit/PLAN.md`).
 
@@ -8,10 +8,9 @@
 
 | Trạng thái | Số giai đoạn |
 |---|---|
-| PASS | 42 |
+| PASS | 43 |
 | FAIL | 12 |
 | BLOCKED | 3 |
-| PENDING | 1 |
 
 PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · BLOCKED = KHÔNG chạy được trong môi trường này (có bằng chứng) · TIMEOUT = quá hạn · SKIP = bỏ qua có chủ ý · PENDING = chưa tới lượt.
 
@@ -57,7 +56,7 @@ PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · 
 | G05_fmt_idempotent | [bản sao] gritc fmt: tính lũy đẳng trên corpus pass | **PASS** | 0 | 7 |
 | G06_determinism | [bản sao] gritc build hai lần ⇒ cùng băm (D9) | **PASS** | 0 | 4 |
 | G07_explain | [bản sao] gritc explain cho mọi mã trong KNOWN | **FAIL** | 1 | 0 |
-| G08_probes | [bản sao] ~110 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả | **FAIL** | 1 | 6 |
+| G08_probes | [bản sao] ~180 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả | **FAIL** | 1 | 4 |
 | G09_diff_checks | [bản sao] vi sai M7: --checks=all ≡ --checks=proven trên số học ngẫu nhiên (bộ sinh riêng) | **PASS** | 0 | 407 |
 | G10_mutfuzz | [bản sao] fuzz đột biến token qua CLI gritc (ICE/crash/treo) | **FAIL** | 1 | 122 |
 | L01_linux_port | [bản sao 2] port Linux (vá 5 tệp): gt-rt + gritc có backend LLVM 20 + liên kết bằng cc | **PASS** | 0 | 26 |
@@ -72,7 +71,7 @@ PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · 
 | G12_alias_meta | [bản sao] metamorphic: alias ASCII ≡ canonical không đổi phán quyết (816 mẫu) | **PASS** | 0 | 56 |
 | G13_order_meta | [bản sao] metamorphic: xáo thứ tự khai báo không đổi phán quyết (429 mẫu × 2) | **PASS** | 0 | 47 |
 | G14_diff_arrays | [bản sao] vi sai M7 all≡proven trên chỉ số mảng/lát (nơi M7 xoá kiểm tra biên) | **PASS** | 0 | 206 |
-| P01_proposed_fix_f01 | [bản sao 3] ĐỀ XUẤT sửa F-01 (9 dòng ở gt-borrowck/check.rs): 14 probe có bị chặn không, corpus/test có hồi quy không | PENDING | | |
+| P01_proposed_fix_f01 | [bản sao 3] ĐỀ XUẤT sửa F-01 (9 dòng ở gt-borrowck/check.rs): 14 probe có bị chặn không, corpus/test có hồi quy không | **PASS** | 0 | 240 |
 | H01_llvm_probe | Thử lấy LLVM 20 cho Linux (khả năng port) | **BLOCKED** | 77 | 1 |
 | I01_fuzz_tools | Công cụ fuzz: nightly + cargo-fuzz (cài nếu thiếu, ngoài dự án) | **PASS** | 0 | 29 |
 | I02_fuzz_lex | [bản sao] cargo-fuzz lexer 300s (ASan, libFuzzer) | **PASS** | 0 | 317 |
@@ -1489,8 +1488,8 @@ SUMMARY: gritc explain: 72 mã trong KNOWN (code.rs); lỗi 6
 
 ### G08_probes — [bản sao] ~110 chương trình THỬ TẤN CÔNG tự viết (audit/probes): tìm âm tính giả
 
-- **Trạng thái:** FAIL (mã thoát 1, 6s, bắt đầu 2026-10-20T11:44:52Z)
-- 162 probe tự viết; FALSE_NEGATIVE=22; KNOWN_GAP=3; OK=137
+- **Trạng thái:** FAIL (mã thoát 1, 4s, bắt đầu 2026-10-20T12:10:15Z)
+- 181 probe tự viết; FALSE_NEGATIVE=23; KNOWN_GAP=3; OK=155
 
 <details><summary>Đuôi log (18 dòng cuối)</summary>
 
@@ -1873,6 +1872,41 @@ SUMMARY: order metamorphic: 429 mẫu (2 hoán vị mỗi mẫu); giống 429; K
 
 ```
 SUMMARY: vi sai [--backend=interpreter --checks=all] ≡ [--backend=interpreter --checks=proven]: programs=2500; rejected=1495; runs=6030; aborts=2481; diffs=0; ice=0; seed=9
+```
+</details>
+
+
+### P01_proposed_fix_f01 — [bản sao 3] ĐỀ XUẤT sửa F-01 (9 dòng ở gt-borrowck/check.rs): 14 probe có bị chặn không, corpus/test có hồi quy không
+
+- **Trạng thái:** PASS (mã thoát 0, 240s, bắt đầu 2026-10-20T12:05:34Z)
+- 181 probe tự viết; FALSE_NEGATIVE=9; KNOWN_GAP=3; OK=169
+- corpus qua dòng lệnh gritc: 855 ca; khớp 855; lệch 0
+- fail:OK = 438
+- fail:OK_EXTRA = 2
+- đề xuất sửa F-01: ĐẠT — 14 probe bị chặn, corpus 855/855, gt-borrowck xanh
+- **cargo test:** 57 đạt / 0 lỗi / 0 ignore trong 11 bộ test
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: 181 probe tự viết; FALSE_NEGATIVE=9; KNOWN_GAP=3; OK=169
+== corpus qua CLI (kỳ vọng 855/855)
+SUMMARY: corpus qua dòng lệnh gritc: 855 ca; khớp 855; lệch 0
+SUMMARY: fail:OK = 438
+SUMMARY: fail:OK_EXTRA = 2
+== cargo test -p gt-borrowck (kỳ vọng không hồi quy)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.98s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.72s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 205.82s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+SUMMARY: đề xuất sửa F-01: ĐẠT — 14 probe bị chặn, corpus 855/855, gt-borrowck xanh
 ```
 </details>
 
