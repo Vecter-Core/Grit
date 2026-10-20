@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: str làm tham số theo giá trị
+ƒ f(x: str) ! ∅ { }
+ƒ main() → i32 ! ∅ { 0 }

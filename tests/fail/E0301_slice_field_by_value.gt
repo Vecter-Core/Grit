@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: [T] làm trường struct theo giá trị
+▢ S { x: [i32] }
+ƒ main() → i32 ! ∅ { 0 }

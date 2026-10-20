@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: enum chứa chính nó theo giá trị
+⊔ T { Leaf, Node(T, T) }
+ƒ main() → i32 ! ∅ { 0 }

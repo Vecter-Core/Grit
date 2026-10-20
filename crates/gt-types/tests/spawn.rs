@@ -120,18 +120,22 @@ fn a_clean_sibling_never_hides_a_dirty_field() {
 
 #[test]
 fn recursive_types_terminate_the_check() {
-    ok("▢ N { v: u32, next: Option<N> }\nƒ w(n: N) ! ∅ { }\nƒ run(n: N) ! ∅ { spawn(w, n); }");
+    // (đệ quy THEO GIÁ TRỊ là kiểu kích thước vô hạn ⇒ E0301 ở M4; chỉ đệ quy qua tham chiếu tới được bộ kiểm Send)
     only(
-        "▢ N<'a> { r: &'a u32, next: Option<N<'a>> }\nƒ w(n: N) ! ∅ { }\nƒ run(n: N) ! ∅ { spawn(w, n); }",
+        "▢ N<'a> { v: u32, next: Option<&'a N<'a>> }\nƒ w(n: N<'static>) ! ∅ { }\nƒ run(n: N<'static>) ! ∅ { spawn(w, n); }",
+        "E0501",
+    );
+    only(
+        "▢ N<'a> { r: &'a u32, next: Option<&'a N<'a>> }\nƒ w(n: N) ! ∅ { }\nƒ run(n: N) ! ∅ { spawn(w, n); }",
         "E0501",
     );
 }
 
 #[test]
 fn polymorphic_recursion_is_cut_off_by_the_depth_guard() {
-    // G<T> chứa G<(T, T)>: kiểu mở rộng vô hạn, `seen` không bao giờ trùng; chốt độ sâu phải dừng và từ chối (fail-closed)
+    // G<T> trỏ tới G<(T, T)>: kiểu mở rộng vô hạn, `seen` không bao giờ trùng; chốt độ sâu phải dừng và từ chối (fail-closed)
     only(
-        "▢ G<T> { v: T, g: Option<G<(T, T)>> }\nƒ w(x: G<u32>) ! ∅ { }\nƒ run(x: G<u32>) ! ∅ { spawn(w, x); }",
+        "▢ G<'a, T> { v: T, g: Option<&'a G<'a, (T, T)>> }\nƒ w(x: G<'static, u32>) ! ∅ { }\nƒ run(x: G<'static, u32>) ! ∅ { spawn(w, x); }",
         "E0501",
     );
 }

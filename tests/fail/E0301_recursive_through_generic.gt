@@ -1,0 +1,5 @@
+// expect: fail E0301
+// note: vòng theo giá trị đi qua một ADT generic (`A<B>` chứa `B`)
+▢ A<T> { x: T }
+▢ B { a: A<B> }
+ƒ main() → i32 ! ∅ { 0 }
