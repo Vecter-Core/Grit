@@ -41,11 +41,11 @@ Chi tiết, tái hiện và hướng sửa ở §2. Phần còn lại: §1 kết
 | C. Test 17 crate thuần | **716 đạt / 0 lỗi / 6 ignore** — gồm gt-fmt 915 s (chèn comment sau mọi token), gt-oblig 275 s (vét cạn, oracle), gt-term 359 s, gt-borrowck 204 s (oracle động 20 000 chương trình). Hai test "ĐỎ có chủ ý" ở commit `f7de5e1` đã **xanh** ở HEAD | CHẠY |
 | D/E. Nguyên trạng gt-driver/rig/gt-llvm/gt-rt | **BLOCKED**: `gt-llvm/build.rs` đòi `LLVM-C.lib`; `native.rs` gọi `link.exe`; `gt-rt` có `compile_error!` cho mọi target ngoài Windows; `--no-default-features` không biên dịch | CHẠY |
 | F. Công cụ Python | `check_expectations.py` **đạt** (881 `.gt`, 72 mã, 246 tham chiếu); 4 bộ unittest công cụ **đạt** (34 test) | CHẠY |
-| G. `gritc` (thông dịch) trên bản sao vá 17 dòng | gate.rs 19/19 (cổng ĐỎ/ICE ⇒ không output, canary E0601/E0307, chèn lỗi), corpus CLI 855/855, `fmt` lũy đẳng trên mọi mẫu pass, tất định, `explain` (6 mã lỗi — xem F-08), 181 probe tự viết (xem §2), 3 kiểm metamorphic (fmt/alias/thứ tự khai báo) | CHẠY·BẢN SAO |
-| G09. Vi sai M7 `--checks=all ≡ proven` | xem RESULTS (bộ sinh độc lập; mỗi chương trình chạy 6 cặp đầu vào) | CHẠY·BẢN SAO |
-| G10. Fuzz đột biến token qua CLI | 24 000 mẫu: 0 crash, 0 treo, **5 ICE** (một nguyên nhân, F-07) | CHẠY·BẢN SAO |
-| L. Backend native trên bản port Linux | gt-driver **135 đạt / 5 lỗi** (cổng Windows), rig **47/0** (kể cả 6 công cụ dogfood so với `hashlib`/`serde_json`/mô hình Rust), gt-guard+codegen+llvm+gt-rt **39/0**; vi sai thông dịch ≡ exe native trên số học ngẫu nhiên: xem RESULTS (L05) | CHẠY·BẢN SAO |
-| I. Fuzz thật (libFuzzer+ASan) | xem RESULTS (I02/I03); tích luỹ của dự án chỉ 1,17 h lexer + 2,00 h parser / 24 h yêu cầu | CHẠY·BẢN SAO |
+| G. `gritc` (thông dịch) trên bản sao vá 17 dòng | gate.rs 19/19 (cổng ĐỎ/ICE ⇒ không output, canary E0601/E0307, chèn lỗi), corpus CLI 855/855, `fmt` lũy đẳng trên mọi mẫu pass, tất định, `explain` (6 mã lỗi — xem F-08), 181 probe tự viết (xem §2), 3 kiểm metamorphic — `fmt` không đổi phán quyết (841 mẫu: 816 giữ nguyên, 25 bị fmt từ chối vì cú pháp hỏng cố ý, **0 đổi**), alias ASCII ≡ canonical (816 mẫu, **0 khác**), xáo thứ tự khai báo (429 mẫu × 2 hoán vị, **0 khác**) | CHẠY·BẢN SAO |
+| G09. Vi sai M7 `--checks=all ≡ proven` | bộ sinh độc lập, 3 000 chương trình số học (1 228 bị từ chối), **10 632 lượt chạy** (4 017 abort có kiểm soát) ⇒ **0 khác biệt, 0 ICE**. Không tìm thấy kiểm tra nào bị `--checks=proven` bỏ sót ở lớp chương trình này | CHẠY·BẢN SAO |
+| G10. Fuzz đột biến token qua CLI | giai đoạn G10 (seed 11): 8 000 mẫu ⇒ 2 068 xanh / 5 931 đỏ / **1 ICE**; cộng các lượt chạy tay trước đó: 24 000 mẫu, 0 crash, 0 treo, **5 ICE** (một nguyên nhân, F-07). Mẫu ICE lưu ở `results/fuzz_artifacts/mutfuzz/ICE_0.gt` | CHẠY·BẢN SAO |
+| L. Backend native trên bản port Linux | gt-driver **135 đạt / 5 lỗi** (cổng Windows), rig **47/0** (kể cả 6 công cụ dogfood so với `hashlib`/`serde_json`/mô hình Rust), gt-guard+codegen+llvm+gt-rt **39/0**; vi sai thông dịch ≡ exe native trên số học ngẫu nhiên (L05): 600 chương trình, 2 088 lượt chạy (767 abort), **0 khác biệt** | CHẠY·BẢN SAO |
+| I. Fuzz thật (libFuzzer+ASan) | lexer 300 s = **2 667 202 lượt**, parser 300 s = **544 794 lượt**, **0 crash/timeout/oom** (nightly + cargo-fuzz). Rất ngắn so với 24 h dự án yêu cầu (tích luỹ của dự án chỉ 1,17 h lexer + 2,00 h parser) — chỉ là kiểm khói | CHẠY·BẢN SAO |
 
 Số liệu so với tài liệu dự án: HANDOFF ghi "902 đạt / 0 lỗi / 174 bộ" (cổng 2026-10-17, Windows). Cộng phần chạy được ở đây: 716 + 135 + 47 + 39 = **937 đạt** (corpus đã lớn hơn: 881 `.gt` so với 866 trong HANDOFF) — **không có test nào đỏ vì lỗi logic**, chỉ 5 đỏ vì khác biệt nền tảng.
 
@@ -123,7 +123,7 @@ Check XANH, M8 chứng minh dừng, nhưng: mảng `[7u8; 20000000]` trên stack
 
 ### Những thứ tôi thử mà dự án CHỐNG ĐƯỢC (để biết vùng nào đáng tin)
 181 probe tự viết, **155 đúng kỳ vọng** (23 lỗ hổng/thiếu sót ở trên, 3 giới hạn đã ghi): D1/D4/D5/D7, match vét cạn (bool, u8, i8, u128 literal cao, enum, tuple, char, Option lồng), E0601–E0604 (literal/tràn/chia 0/biên/ép kiểu/`MIN/-1`), E0307, E0401–E0407 (move, trả tham chiếu local, hai `&!`, move trong vòng lặp, move ra khỏi tham chiếu, Arena), khớp mẫu qua tham chiếu (ADR-040: ghi qua `&`, ghi đè khi đang mượn, move payload), reborrow hai lần, hai `&!` lên khoảng lát chồng nhau, hai phần tử cùng mảng, E0701–E0703 (vòng/đệ quy không biến thể, biến thể không giảm, `⊡` bỏ qua bước tiến, đệ quy tương hỗ), thứ tự khoá E0502 (đảo thứ tự, cùng cấp, tái nhập), E0501 (spawn với tham chiếu/Arena), E0503, E0310 (hàm thường, `main` trong module, phương thức tên `main`, initializer static/const), E1001, E1201–E1204, bộ quét secret (6/8 mẫu; 2 né quét đã được dự án ghi nhận).
-Fuzz đột biến token 24 000 mẫu: **0 crash, 0 treo**. Vi sai thông dịch ≡ native: xem RESULTS L05.
+Fuzz đột biến token 24 000 mẫu: **0 crash, 0 treo** (chỉ ICE F-07). Vi sai `--checks=all ≡ proven` (10 632 lượt) và thông dịch ≡ native (2 088 lượt): **0 khác biệt**. Ba kiểm metamorphic (fmt / alias / thứ tự khai báo): **0 khác biệt**.
 
 ---
 

@@ -1,6 +1,6 @@
 # KẾT QUẢ CHẠY TOÀN BỘ DỰ ÁN GRIT (tự sinh — đừng sửa tay; ghi chú tay đặt ở `audit/results/<ID>.note.md`)
 
-- Mã nguồn được chạy: `024d46d 2026-10-20 audit: điểm lưu 2 — probe thử tấn công (162), fuzz token, vi sai M7/backend, port Linux có backend LLVM, kết quả giai đoạn A–C/G` (nhánh làm việc hiện tại; bộ chạy KHÔNG sửa tệp nào của dự án).
+- Mã nguồn được chạy: `c82abcf 2026-10-20 audit: điểm lưu 3 — phân tích ANALYSIS.md, stage L (backend native trên bản port Linux), metamorphic, vi sai, đề xuất sửa F-01` (nhánh làm việc hiện tại; bộ chạy KHÔNG sửa tệp nào của dự án).
 - Môi trường: Linux container (xem giai đoạn A00). Dự án được thiết kế cho **Windows x86_64 MSVC + LLVM 20.1.8** (docs/ENVIRONMENT.md).
 - Cách chạy/tiếp tục: `bash audit/run_all.sh` (tự bỏ qua giai đoạn đã xong; xem `audit/PLAN.md`).
 
@@ -8,10 +8,9 @@
 
 | Trạng thái | Số giai đoạn |
 |---|---|
-| PASS | 39 |
+| PASS | 41 |
 | FAIL | 12 |
 | BLOCKED | 3 |
-| RUNNING | 1 |
 | PENDING | 2 |
 
 PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · BLOCKED = KHÔNG chạy được trong môi trường này (có bằng chứng) · TIMEOUT = quá hạn · SKIP = bỏ qua có chủ ý · PENDING = chưa tới lượt.
@@ -71,12 +70,13 @@ PASS = chạy xong và đạt · FAIL = chạy được nhưng lỗi/thiếu · 
 | L08_native_compiler_crash | [bản sao 2] đầu vào được M4–M9 cho qua nhưng làm CHÍNH gritc sập (kiểu kích thước vô hạn…) | **FAIL** | 1 | 0 |
 | G11_fmt_meta | [bản sao] metamorphic: gritc fmt không đổi phán quyết (841 mẫu) | **PASS** | 0 | 65 |
 | G12_alias_meta | [bản sao] metamorphic: alias ASCII ≡ canonical không đổi phán quyết (816 mẫu) | **PASS** | 0 | 56 |
-| G13_order_meta | [bản sao] metamorphic: xáo thứ tự khai báo không đổi phán quyết (429 mẫu × 2) | PENDING | | |
+| G13_order_meta | [bản sao] metamorphic: xáo thứ tự khai báo không đổi phán quyết (429 mẫu × 2) | **PASS** | 0 | 47 |
 | G14_diff_arrays | [bản sao] vi sai M7 all≡proven trên chỉ số mảng/lát (nơi M7 xoá kiểm tra biên) | PENDING | | |
+| P01_proposed_fix_f01 | [bản sao 3] ĐỀ XUẤT sửa F-01 (9 dòng ở gt-borrowck/check.rs): 14 probe có bị chặn không, corpus/test có hồi quy không | PENDING | | |
 | H01_llvm_probe | Thử lấy LLVM 20 cho Linux (khả năng port) | **BLOCKED** | 77 | 1 |
 | I01_fuzz_tools | Công cụ fuzz: nightly + cargo-fuzz (cài nếu thiếu, ngoài dự án) | **PASS** | 0 | 29 |
 | I02_fuzz_lex | [bản sao] cargo-fuzz lexer 300s (ASan, libFuzzer) | **PASS** | 0 | 317 |
-| I03_fuzz_parse | [bản sao] cargo-fuzz parser 300s (ASan, libFuzzer) | **RUNNING** | - | 0 |
+| I03_fuzz_parse | [bản sao] cargo-fuzz parser 300s (ASan, libFuzzer) | **PASS** | 0 | 315 |
 
 ## Chi tiết từng giai đoạn
 
@@ -1851,6 +1851,19 @@ SUMMARY: alias ASCII ≡ canonical: 816 mẫu; giống 816; KHÁC 0; bỏ qua 25
 </details>
 
 
+### G13_order_meta — [bản sao] metamorphic: xáo thứ tự khai báo không đổi phán quyết (429 mẫu × 2)
+
+- **Trạng thái:** PASS (mã thoát 0, 47s, bắt đầu 2026-10-20T12:01:20Z)
+- order metamorphic: 429 mẫu (2 hoán vị mỗi mẫu); giống 429; KHÁC 0; bỏ qua 412
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+SUMMARY: order metamorphic: 429 mẫu (2 hoán vị mỗi mẫu); giống 429; KHÁC 0; bỏ qua 412
+```
+</details>
+
+
 ### H01_llvm_probe — Thử lấy LLVM 20 cho Linux (khả năng port)
 
 - **Trạng thái:** BLOCKED (mã thoát 77, 1s, bắt đầu 2026-10-20T11:41:07Z)
@@ -1937,6 +1950,36 @@ SUMMARY: nightly + cargo-fuzz sẵn sàng
 ###### End of recommended dictionary. ######
 Done 2667202 runs in 301 second(s)
 SUMMARY: fuzz lex: 300s, thoát 0, 0 tệp artifact (crash/timeout/oom) — chép vào audit/results/fuzz_artifacts/lex nếu có
+```
+</details>
+
+
+### I03_fuzz_parse — [bản sao] cargo-fuzz parser 300s (ASan, libFuzzer)
+
+- **Trạng thái:** PASS (mã thoát 0, 315s, bắt đầu 2026-10-20T11:56:23Z)
+- fuzz parse: 300s, thoát 0, 0 tệp artifact (crash/timeout/oom) — chép vào audit/results/fuzz_artifacts/parse nếu có
+
+<details><summary>Đuôi log (18 dòng cuối)</summary>
+
+```
+"vo2v" # Uses: 47
+"\020\000\000\000\000\000\000\000" # Uses: 28
+".\022=" # Uses: 43
+"\007\000\000\000\000\000\000\000" # Uses: 33
+"\000\000\000\000\000\000\000\025" # Uses: 43
+"24A" # Uses: 42
+"mo" # Uses: 29
+".1#" # Uses: 31
+"\027\000" # Uses: 28
+".\000\000\000\000\000\000\000" # Uses: 13
+"4\000\000\000\000\000\000\000" # Uses: 13
+"./" # Uses: 20
+"mn" # Uses: 12
+"(\000\000\000" # Uses: 7
+"\010\000\000\000" # Uses: 5
+###### End of recommended dictionary. ######
+Done 544794 runs in 301 second(s)
+SUMMARY: fuzz parse: 300s, thoát 0, 0 tệp artifact (crash/timeout/oom) — chép vào audit/results/fuzz_artifacts/parse nếu có
 ```
 </details>
 
