@@ -398,6 +398,18 @@ impl<'e, 'a> Checker<'e, 'a> {
         let ct = self.expr(callee, None);
         match self.infer.shallow(&ct) {
             Ty::Fn(params, ret, _) => {
+                // gọi QUA GIÁ TRỊ hàm (tham số/biến/biểu thức kiểu `ƒ(…)`): hàm đích không còn thấy được ở đây, nên chữ ký của giá trị là
+                // thứ duy nhất để nhận ra nguồn capability gốc (D28/D29). Đường dẫn tới hàm item/`Kiểu::hàm` đã được ghi ở chỗ phân giải đường dẫn.
+                let named_item = matches!(&callee.kind, ExprKind::Path(p)
+                    if matches!(self.env.res.uses.get(&p.id), Some(Res::Def(_) | Res::Assoc { .. })));
+                if !named_item {
+                    self.cap_uses.push(CapUse {
+                        params: params.clone(),
+                        ret: (*ret).clone(),
+                        node: e.id,
+                        span: e.span,
+                    });
+                }
                 if params.len() != args.len() {
                     self.err(
                         "E0301",

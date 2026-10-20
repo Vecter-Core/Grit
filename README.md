@@ -1,0 +1,50 @@
+# Grit
+
+Grit là ngôn ngữ lập trình an toàn theo thiết kế (Phase 1 — Seed): trình biên dịch **`gritc`** kiểm tra sở hữu/mượn, nghĩa vụ chứng minh (tràn số, chia 0, chỉ số mảng), hiệu ứng, capability, tính dừng của đệ quy/vòng lặp và rò rỉ bí mật **trước khi** sinh mã; trình quản lý gói **`rig`**. Chương trình bị ĐỎ thì không có output.
+
+Mã nguồn Grit là tệp `.gt`. Mỗi ký hiệu Unicode có đúng một bí danh ASCII (`ƒ` = `\fn`, `≔` = `:=`, `→` = `->`, `∅` = `\nil`, …; bảng đầy đủ ở `docs/spec/symbols.md`) — viết bằng bí danh rồi chạy `gritc fmt` để ra dạng chuẩn.
+
+## Dựng
+
+| Nền tảng | Cần | Ghi chú |
+|---|---|---|
+| Windows x86_64 (MSVC) — nền tảng chính | Rust ≥ 1.98, LLVM 20.1.8 bản dựng sẵn (`GRIT_LLVM_DIR`) | xem `docs/ENVIRONMENT.md` |
+| Linux x86_64 | Rust ≥ 1.97, `libLLVM-20.so` (gói `llvm-20-dev`/`libllvm20`), `cc` | `GRIT_LLVM_LIB_DIR` nếu không ở `/usr/lib/x86_64-linux-gnu` |
+
+```sh
+cargo build --release --manifest-path runtime/gt-rt/Cargo.toml   # runtime (staticlib, dựng riêng vì panic = abort)
+cargo build --release -p gt-driver -p rig                        # gritc, rig
+```
+
+Không có LLVM: `cargo build --release -p gt-driver --no-default-features` dựng `gritc` chỉ có backend thông dịch (`--backend=interpreter`).
+
+## Dùng
+
+```sh
+gritc check chuongtrinh.gt        # kiểm tra (0 xanh · 1 đỏ · 2 lỗi nội bộ · 3 sai cách dùng)
+gritc run   chuongtrinh.gt        # kiểm tra + biên dịch native (LLVM) + chạy
+gritc build chuongtrinh.gt -o ra  # sinh tệp thực thi
+gritc fmt   chuongtrinh.gt        # định dạng chuẩn (không đổi ngữ nghĩa)
+gritc explain E0401               # giải thích một mã lỗi
+```
+
+Tên tệp là tên module nên phải là định danh hợp lệ (`main.gt`, không phải `01_add.gt`).
+
+```
+ƒ fib(n: u32) → u32 ! ∅
+  ⊳ n <= 40            // tiền điều kiện (được bộ giải chứng minh ở chỗ gọi)
+  ↓ n                  // biến thể giảm: chứng minh đệ quy dừng
+{ ⎇ n < 2 { n } ⇝ { fib(n - 1) + fib(n - 2) } }
+ƒ main() → u32 ! ∅ { fib(20) }
+```
+
+## Kiểm thử
+
+```sh
+cargo test --workspace -- --test-threads=2     # ~40 phút; test vét cạn/oracle rất nặng, đừng tăng số luồng
+python3 tools/check_expectations.py            # corpus tests/{pass,fail,warn} khớp docs/spec/error_codes.md
+```
+
+## Tài liệu
+
+`GRIT_PLAN.md` (kế hoạch), `docs/spec/` (ngữ pháp, ngữ nghĩa, bảng ký hiệu, mã lỗi), `docs/errors/<mã>.md` (từng mã lỗi), `docs/DECISIONS.md` (ADR), `docs/KNOWN_LIMITATIONS.md`, `docs/READINESS.md`, `examples/` (6 công cụ viết bằng Grit: wc, sha256, sortlines, stats, wordfreq, json).

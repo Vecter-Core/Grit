@@ -1,0 +1,72 @@
+# CI (GRIT_PLAN §0.7). CHƯA được chạy trên GitHub từ môi trường soạn thảo: lần chạy đầu có thể cần chỉnh bước cài LLVM.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Linux liên kết libLLVM-20.so (gói llvm-20-dev của apt.llvm.org); Windows dùng LLVM 20.1.8 bản dựng sẵn (docs/ENVIRONMENT.md)
+  GRIT_LLVM_LIB_DIR: /usr/lib/llvm-20/lib
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: LLVM 20
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update && sudo apt-get install -y llvm-20-dev
+      - run: cargo fmt --all --check
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: python3 tools/check_expectations.py
+
+  deny:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo install cargo-audit --locked
+      - run: cargo audit
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: LLVM 20
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update && sudo apt-get install -y llvm-20-dev
+      - name: runtime gt-rt (staticlib, dựng riêng vì panic = abort)
+        run: cargo build --release --manifest-path runtime/gt-rt/Cargo.toml
+      - run: cargo test --locked --workspace -- --test-threads=2
+      - name: gritc không LLVM (chỉ backend interpreter)
+        run: cargo test --locked -p gt-driver --no-default-features -- --test-threads=2
+
+  determinism:
+    # D9: dựng gritc hai lần từ cùng nguồn (cùng đường dẫn), so sha256
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: LLVM 20
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update && sudo apt-get install -y llvm-20-dev
+      - run: |
+          cargo build --locked --release -p gt-driver
+          a=$(sha256sum target/release/gritc | cut -d' ' -f1)
+          cargo clean
+          cargo build --locked --release -p gt-driver
+          b=$(sha256sum target/release/gritc | cut -d' ' -f1)
+          echo "$a" "$b"
+          test "$a" = "$b"
