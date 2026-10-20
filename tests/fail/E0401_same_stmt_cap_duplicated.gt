@@ -1,0 +1,4 @@
+// expect: fail E0401
+// note: two(o, o) với Cap<Out>: nhân đôi capability
+ƒ two(a: Cap<Out>, b: Cap<Out>) ! {io} { a.write_u64(1); b.write_u64(2); }
+ƒ main() → i32 ! {io} { o ≔ root_out(); two(o, o); 0 }

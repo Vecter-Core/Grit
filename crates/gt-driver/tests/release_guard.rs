@@ -1,4 +1,5 @@
 //! Hồ sơ `release` (ADR-036 §6): Guard-post từ chối từng loại lỗi chèn SAU tối ưu bằng E1101; báo cáo "check còn lại" không đổi; băm IR hai giai đoạn.
+#![cfg(feature = "llvm")]
 use std::path::PathBuf;
 use std::process::{Command, Output};
 

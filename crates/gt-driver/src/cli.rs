@@ -10,6 +10,23 @@ use std::path::{Path, PathBuf};
 
 include!(concat!(env!("OUT_DIR"), "/explain_table.rs"));
 
+/// Khi dựng không có feature `llvm`, crate `gt_codegen_llvm` không được liên kết; CLI vẫn cần kiểu `Opt` để phân tích `--profile=` (và báo
+/// "bản dựng này không có backend llvm" thay vì lỗi biên dịch).
+#[cfg(not(feature = "llvm"))]
+mod gt_codegen_llvm {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Opt {
+        Dev,
+        Release,
+        ReleaseO2,
+    }
+    impl Opt {
+        pub fn is_release(self) -> bool {
+            !matches!(self, Opt::Dev)
+        }
+    }
+}
+
 const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release|release-o2 (mặc định: dev; release và release-o2 đã có bằng chứng thực nghiệm dev≡release, KHÔNG phải chứng minh: ADR-036 §9)] [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release|release-o2 (mặc định: dev; release và release-o2 đã có bằng chứng thực nghiệm dev≡release, KHÔNG phải chứng minh: ADR-036 §9)] [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
 
 #[derive(Debug)]

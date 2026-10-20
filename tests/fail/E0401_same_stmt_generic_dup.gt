@@ -1,0 +1,4 @@
+// expect: fail E0401
+// note: dup<T>(x: T) → (T, T) { (x, x) } — nhân đôi mọi kiểu affine (Cap/Arena/&!)
+ƒ dup<T>(x: T) → (T, T) ! ∅ { (x, x) }
+ƒ main() → i32 ! ∅ { 0 }

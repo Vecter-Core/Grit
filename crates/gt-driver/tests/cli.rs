@@ -449,5 +449,10 @@ fn directory_input_and_version() {
     assert!(out(&o).contains("Int(7"));
     let o = gritc().arg("--version").output().expect("chạy");
     assert_eq!(code(&o), 0);
-    assert!(out(&o).contains("backend mặc định: llvm"), "{}", out(&o));
+    let want = if cfg!(feature = "llvm") {
+        "backend mặc định: llvm"
+    } else {
+        "backend mặc định: interpreter"
+    };
+    assert!(out(&o).contains(want), "{}", out(&o));
 }

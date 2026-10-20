@@ -1,6 +1,7 @@
 //! ADR-036 §6c (Q77): bẫy abort cho MỌI loại abort mà chương trình Grit chạm tới được, và bẫy số thực (FMA, gập hằng, đổi thứ tự cộng, NaN, ±0, dưới chuẩn).
 //! Mỗi chương trình chạy ở dev VÀ release (qua tiến trình `gritc run --profile=…`); đòi cùng mã thoát/loại abort/giá trị, và đúng KỲ VỌNG ĐỘC LẬP
 //! (loại abort cố định; số thực do Rust tính theo IEEE từng phép, KHÔNG hợp nhất).
+#![cfg(feature = "llvm")]
 use std::process::Command;
 
 /// hồ sơ release dưới kiểm: `GT_PROFILE` (`release` hoặc `release-o2`; mặc định `release`)
