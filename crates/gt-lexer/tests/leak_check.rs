@@ -3,6 +3,7 @@
 //! Đo RSS không dùng `unsafe` (crate cấm): Linux đọc `/proc/self/status`, macOS gọi `ps`, Windows gọi PowerShell
 //! (`(Get-Process -Id PID).PrivateMemorySize64` — bộ nhớ riêng đã cấp, không bị OS thu nhỏ như Working Set nên không che rò rỉ). Nếu môi trường không đo được → test FAIL (fail-closed, không âm thầm qua).
 use gt_lexer::lex;
+#[cfg(any(target_os = "macos", windows))]
 use std::process::Command;
 use std::sync::Mutex;
 

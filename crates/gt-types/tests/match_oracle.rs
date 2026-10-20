@@ -2,6 +2,7 @@
 //! so phán quyết E0305 của gt-types với một oracle độc lập:
 //! * `u8`/`i8`: duyệt TOÀN BỘ 256 giá trị ⇒ "vét cạn" phải KHỚP CHÍNH XÁC (hai chiều);
 //! * `u128`/`i128`: không duyệt hết được ⇒ kiểm chiều AN TOÀN: nếu gt-types chấp nhận (không E0305) thì MỌI điểm quan trọng (đầu mút ± 1, 0, MAX…) phải được một nhánh phủ.
+//!
 //! Giá trị luôn xử lý như độ lệch `u128` so với giá trị nhỏ nhất của kiểu (lật bit dấu cho `i128`) nên không dùng số học tràn.
 mod common;
 

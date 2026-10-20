@@ -1,0 +1,4 @@
+// expect: fail E0310
+// note: nguồn capability gán vào biến cục bộ rồi gọi trong hàm không phải main
+ƒ f() ! {io} { mk ≔ root_out; o ≔ mk(); o.write_u64(1); }
+ƒ main() → i32 ! ∅ { 0 }
