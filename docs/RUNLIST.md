@@ -10,7 +10,7 @@ Trước đây tham chiếu "RUNLIST" nằm ở bản Windows chưa lên origin;
 | R4 | `GRITRT_ARENA_CHECK` chỉ bật thêm, không tắt được ở dev | XONG (2026-10-21, Linux) | test đảo `dev_check_cannot_be_switched_off_by_environment` (đỏ trước `963da34`, xanh `53bfb4d`); arena_dynamic 6/6, gt-rt 6/6 |
 | R5 | flake `llvm_sort` ≥ 100 lần; std ở release/release-o2; Ord kiểu ghép; đo sortlines 5 lần | CHƯA | S7.b |
 | R6 | Arena chia sẻ `&'a Arena` (ADR-038 / Q83) | XONG (2026-10-21, Linux) | ADR-C03; oracle `arena_vec`; FB-C9 tìm thấy và sửa |
-| R7 | HashMap | CHƯA | S2 (capstone K3 cần) |
+| R7 | HashMap | XONG (std::HashMap trong lib/std bằng Grit; std2_lib 3 hồ sơ) | S2 |
 | R8 | READINESS: bảng §7 và sáu mục SEED 1.0 | CHƯA | S8.d |
 | R9 | `tools/fuzz_loop.sh` tích luỹ có giới hạn (tối đa 2 giờ tổng; điều kiện #2 ghi "ĐANG TÍCH LUỸ") | CHƯA | S7.d |
 | R10 | 69 đột biến "xoá thêm check" của M7 (`analysis.rs` 62, `driver.rs` 7) | CHƯA | S7.c |

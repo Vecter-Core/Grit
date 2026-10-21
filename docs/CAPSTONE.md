@@ -5,7 +5,7 @@ Mục đích: bằng chứng cho tầm nhìn "AI viết Grit": một subagent M�
 - **Bản tham chiếu Rust**: `capstone/reference/` (Cargo riêng, không phụ thuộc, dựng bằng `cargo build --release` trong thư mục đó) — là NGUỒN SỰ THẬT của hành vi; đề bài dưới đây là bản dịch của nó.
 - **Bộ tệp đầu vào**: `capstone/gen_cases.py <thư-mục>` sinh tất định ~87 ca (+ ca lớn với `--large`): rỗng, biên, lỗi, ngẫu nhiên, lớn. Mỗi ca: `args` (mỗi dòng một đối số; `@DIR@` = thư mục của ca), `stdin` (tuỳ chọn), tệp dữ liệu.
 - **Bộ so sánh**: `capstone/check.py --k <chương-trình> --cand <tệp-thực-thi>` chạy ứng viên và tham chiếu trong hai bản sao thư mục ca, so **mã thoát, stdout, stderr (nguyên văn) và mọi tệp ghi ra**.
-- Mỗi chương trình là một gói Rig (`rig new`) dựa vào gói `std`; tên tệp thực thi: `csvstat`, `calc`, `kvstore`, `grep-lite`.
+- Mỗi chương trình là một gói Rig (`rig new`, tự có phụ thuộc `std`); tên gói Rig phải là định danh nên: `csvstat`, `calc`, `kvstore`, `grep_lite` (thông báo `usage:` vẫn ghi `grep-lite`); `check.py --cand` nhận ĐƯỜNG DẪN tệp thực thi nên tên tệp không quan trọng. Mã thoát chỉ qua `core::exit(code)` (giá trị trả về của `main` KHÔNG thành mã thoát).
 - Quy ước chung: byte (không phải ký tự) là đơn vị; dòng tách bằng `\n` (dòng cuối không có `\n` vẫn là dòng; `\r` là một byte thường); đầu ra ghi bằng byte đúng như đặc tả; lỗi dùng đối số in `usage:` ra stderr, thoát 2.
 
 ## K1 — `csvstat [FILE|-]`
@@ -41,18 +41,18 @@ Tìm chuỗi con (byte) `PATTERN` trong các tệp. Cờ `-c`, `-n` chỉ đư�
 |---|---|---|---|---|
 | G1 | `gritc run/check <tệp>`: tên tệp là tên module (`01_add.gt` bị từ chối) | mọi chương trình | tệp được chỉ định là module gốc bất kể tên (`gt_resolve::module_file_name_for`) | ĐÃ SỬA |
 | G2 | `Vec` giữ `&!Arena` ĐỘC QUYỀN ⇒ mỗi Vec/Text cần Arena riêng; không thể có bảng băm/nhiều Vec trên một Arena | K3 (HashMap), K1/K4 (Vec nhiều) | R6: Arena chia sẻ `&'a Arena` cho `Vec`/`Text` (ADR-C03) | ĐÃ SỬA (+ FB-C9) |
-| G3 | `Vec` chỉ có `new/push/reserve/len/as_slice/as_mut_slice`: thiếu `pop/clear/truncate/insert/remove/get/first/last/extend/contains` | K1–K4 | intrinsic `Vec::truncate` (1 cái), còn lại bằng Grit | `truncate` ĐÃ XONG; còn lại (std) CHƯA |
-| G4 | `str`/`Text`: không có byte của `&str`, `find/split/trim/starts_with/ends_with/parse/join`, số → chữ | K1–K4 | intrinsic `str::as_bytes`, còn lại bằng Grit (không cần tạo `&str` từ byte: K1–K4 làm việc trên byte) | `as_bytes` ĐÃ XONG; còn lại (std) CHƯA |
+| G3 | `Vec` chỉ có `new/push/reserve/len/as_slice/as_mut_slice`: thiếu `pop/clear/truncate/insert/remove/get/first/last/extend/contains` | K1–K4 | intrinsic `Vec::truncate` (1 cái), còn lại bằng Grit | ĐÃ XONG (`truncate` + std: `get/first/last/pop/clear/extend_from_slice/insert/remove/contains/is_empty`; `std2_lib`) |
+| G4 | `str`/`Text`: không có byte của `&str`, `find/split/trim/starts_with/ends_with/parse/join`, số → chữ | K1–K4 | intrinsic `str::as_bytes`, còn lại bằng Grit (không cần tạo `&str` từ byte: K1–K4 làm việc trên byte) | ĐÃ XONG (`as_bytes` + std: `[u8]::starts_with/ends_with/find/find_byte/trim_ascii/equals/parse_*`, `str::*`; `std2_lib`) |
 | G5 | stdin: không có `Cap<In>` | K1 (stdin), K2, K3 | intrinsic `Cap<In>::read_all` (+ `root_in`) | ĐÃ XONG |
 | G6 | ghi tệp: `Cap<Fs>` chỉ có `read/open/sub` | K3 (`save`) | intrinsic `Cap<Fs>::write` | ĐÃ XONG |
-| G7 | I/O lỗi bằng `Result`: có `Cap<Fs>::open → Result<File, IoError>`; `read` vẫn abort | K1, K3, K4 | dùng `open`; `read_all`/`write` trả `Result` | MỘT PHẦN (đã có `open`) |
-| G8 | phân rã tuple `(a, b) ≔ f();` (E0101) | tiện lợi (K1, K2) | desugar ở parser (ADR-C03) | CHƯA |
-| G9 | toán tử `?` | tiện lợi (K1, K3) | desugar ở parser, chỉ `Result` (ADR-C04) | CHƯA |
-| G10 | `HashMap` | K3 | `lib/std` bằng Grit trên Arena chia sẻ + trait `Hash`/`Eq` | CHƯA |
-| G11 | in số có dấu, thập phân cố định, hex; phân tích `u64/i64` (trả `Result`) | K1, K2, K3 | `lib/std` bằng Grit | CHƯA |
-| G12 | `min/max/abs/pow` kiểm tràn, cộng/nhân/trừ kiểm tràn trả `Option` | K1, K2 | `lib/std` bằng Grit (so sánh, không dùng 128 bit) | CHƯA |
-| G13 | sắp xếp (khoá `dump`) | K3 | `lib/std`: sắp xếp trộn ổn định trên `Vec` (đã có mẫu trong `examples/sortlines`) | CHƯA |
-| G14 | `rig new` không tự thêm `std`; sửa mã phải `rig lock` | tiện dụng AI | `rig new` thêm `std`; thông báo nhắc `rig lock` | CHƯA |
+| G7 | I/O lỗi bằng `Result`: có `Cap<Fs>::open → Result<File, IoError>`; `read` vẫn abort | K1, K3, K4 | dùng `open`; `read_all`/`write` trả `Result` | ĐÃ XONG (`Cap<Fs>::open/write`, `Cap<In>::read_all` trả `Result`; `Fs::read` vẫn abort — dùng `open`) |
+| G8 | phân rã tuple `(a, b) ≔ f();` (E0101) | tiện lợi (K1, K2) | desugar ở parser (ADR-C03) | HOÃN (K3, K4 viết được KHÔNG cần; quyết định lại sau nhật ký S4 — docs/CAPSTONE_LOG.md) |
+| G9 | toán tử `?` | tiện lợi (K1, K3) | desugar ở parser, chỉ `Result` (ADR-C04) | HOÃN (như G8) |
+| G10 | `HashMap` | K3 | `lib/std` bằng Grit trên Arena chia sẻ + trait `Hash`/`Eq` | ĐÃ XONG (`std::HashMap<K,V>` + `Hash`/`Bytes`; `std2_lib`: 3 nhóm, ≥ 30 chương trình, 3 hồ sơ) |
+| G11 | in số có dấu, thập phân cố định, hex; phân tích `u64/i64` (trả `Result`) | K1, K2, K3 | `lib/std` bằng Grit | ĐÃ XONG (`fmt_u64/fmt_i64/fmt_hex`, `push_u64/push_i64`, `write_i64/write_hex`, `parse_u64/parse_i64`) |
+| G12 | `min/max/abs/pow` kiểm tràn, cộng/nhân/trừ kiểm tràn trả `Option` | K1, K2 | `lib/std` bằng Grit (so sánh, không dùng 128 bit) | ĐÃ XONG (`abs_i64`, `pow_u64`, `+? -? *?` có sẵn; `min/max`) |
+| G13 | sắp xếp (khoá `dump`) | K3 | `lib/std`: sắp xếp trộn ổn định trên `Vec` (đã có mẫu trong `examples/sortlines`) | ĐÃ XONG (`[T]::sort` — heapsort KHÔNG ổn định; ổn định ⇒ khoá phụ) |
+| G14 | `rig new` không tự thêm `std`; sửa mã phải `rig lock` | tiện dụng AI | `rig new` thêm `std`; thông báo nhắc `rig lock` | ĐÃ XONG (`rig new` thêm `std`; sau mỗi lần sửa mã: `rig lock`) |
 | G15 | stderr: `Cap<ErrOut>` chỉ `write_u64/write_str` | K1/K4 báo lỗi | đủ (thông báo là hằng + số + tên tệp là `&str` từ `arg`) | ĐỦ |
 | G16 | tràn ngăn xếp/đệ quy sâu (K2 ngoặc 40 tầng) | K2 | `main` đã chạy trên ngăn xếp 256 MiB (F-06) | ĐÃ SỬA |
 
