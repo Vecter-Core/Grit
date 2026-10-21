@@ -1,0 +1,21 @@
+# Bản THAM CHIẾU độc lập (Rust thuần, không phụ thuộc) của bốn capstone Seed 1.0 (docs/CAPSTONE.md). KHÔNG thuộc workspace gốc.
+[package]
+name = "capstone-reference"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "csvstat"
+path = "src/bin/csvstat.rs"
+[[bin]]
+name = "calc"
+path = "src/bin/calc.rs"
+[[bin]]
+name = "kvstore"
+path = "src/bin/kvstore.rs"
+[[bin]]
+name = "grep-lite"
+path = "src/bin/grep_lite.rs"
