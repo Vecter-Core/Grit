@@ -393,6 +393,23 @@ pub unsafe extern "C" fn gritrt_utf8_valid(p: *const u8, n: u64) -> i32 {
     i32::from(std::str::from_utf8(bytes).is_ok())
 }
 
+/// Hai dãy byte có bằng nhau không (`==` trên `&str`, Seed 1.0 FB-C13): khác độ dài ⇒ 0; cùng độ dài ⇒ so từng byte. Thuần: chỉ ĐỌC.
+///
+/// # Safety
+/// `a` trỏ tới `an` byte đọc được và `b` trỏ tới `bn` byte đọc được (độ dài 0: con trỏ có thể null, không bao giờ được đọc).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_bytes_eq(a: *const u8, an: u64, b: *const u8, bn: u64) -> i32 {
+    if an != bn {
+        return 0;
+    }
+    if an == 0 {
+        return 1;
+    }
+    let n = usize::try_from(an).unwrap_or(0);
+    let (x, y) = unsafe { (std::slice::from_raw_parts(a, n), std::slice::from_raw_parts(b, n)) };
+    i32::from(x == y)
+}
+
 /// # Safety
 /// `p` trỏ tới `n` byte đọc được (`n = 0`: `p` có thể null).
 #[unsafe(no_mangle)]

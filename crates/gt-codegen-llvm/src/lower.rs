@@ -1616,6 +1616,38 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             };
             return Ok(r);
         }
+        // `&str == &str` / `!=` (FB-C13): độ dài + từng byte, ở runtime (`gritrt_bytes_eq`, thuần, chỉ đọc)
+        if let (BasicValueEnum::StructValue(_), BasicValueEnum::StructValue(_)) = (x, y)
+            && matches!(op, BinOp::Eq | BinOp::Ne)
+            && matches!(ty, Ty::Ref(false, inner) if matches!(**inner, Ty::Str))
+        {
+            let (ap, an) = self.split_fat(x)?;
+            let (bp, bn) = self.split_fat(y)?;
+            let i32t = self.ctx.i32_type();
+            let ft = i32t.fn_type(
+                &[
+                    self.ptr_type().into(),
+                    self.i64t().into(),
+                    self.ptr_type().into(),
+                    self.i64t().into(),
+                ],
+                false,
+            );
+            let f = self.rt_fn("gritrt_bytes_eq", ft);
+            let r = self
+                .call_basic(f, &[ap.into(), an.into(), bp.into(), bn.into()])?
+                .into_int_value();
+            let pred = if op == BinOp::Eq {
+                IntPredicate::NE
+            } else {
+                IntPredicate::EQ
+            };
+            let c = llvm(
+                self.builder
+                    .build_int_compare(pred, r, i32t.const_zero(), "seq"),
+            )?;
+            return Ok(c.into());
+        }
         let (BasicValueEnum::IntValue(a), BasicValueEnum::IntValue(b)) = (x, y) else {
             return unsupported(format!("phép hai ngôi {op:?} trên {ty:?}"));
         };
