@@ -254,6 +254,8 @@
       ok
     }
   }
+  // bằng nhau từng byte (`==` KHÔNG có cho lát; dùng hàm này)
+  ƒ equals(&self, o: &[u8]) → bool ! ∅ { self.len() == o.len() ∧ self.starts_with(o) }
   // vị trí byte đầu tiên bằng `b` tại hoặc sau `from`
   ƒ find_byte(&self, from: usize, b: u8) → Option<usize> ! ∅ {
     n ≔ self.len();
