@@ -390,8 +390,8 @@ impl<'e, 'a> Checker<'e, 'a> {
     fn eq_ok(&self, t: &Ty) -> bool {
         match self.infer.resolve(t) {
             Ty::Int(_) | Ty::Bool | Ty::Char | Ty::Err | Ty::Infer(_) => true,
-            Ty::Tuple(v) => v.iter().all(|x| self.eq_ok(x)),
-            Ty::Ref(_, inner) => matches!(*inner, Ty::Str) || self.eq_ok(&inner),
+            // `&str` so theo BYTE (`gritrt_bytes_eq`). Tuple và `&T` (T ≠ str) CHƯA có: thông dịch từng so địa chỉ còn LLVM từ chối (FB-C13); dùng `*a == *b`
+            Ty::Ref(false, inner) => matches!(*inner, Ty::Str),
             _ => false,
         }
     }

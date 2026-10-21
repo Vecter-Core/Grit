@@ -328,3 +328,10 @@ Kết quả ghi ở `docs/MUTATION_GT_GUARD.jsonl` (các dòng có `batch` bắt
 - **Ngăn xếp**: `main` chạy trên luồng 256 MiB (`gt-rt::gritrt_start`). Chương trình dừng được (M8) nhưng cần ngăn xếp lớn hơn (đệ quy rất sâu, mảng cục bộ ≳ 256 MiB) vẫn bị HĐH giết và `gritc run` báo mã 2; M8 chứng minh *dừng* chứ không chứng minh *cận ngăn xếp* (8.I, Phase 2). Thông dịch giới hạn 200 khung đệ quy (mã 71).
 - **CI** (`.github/workflows/ci.yml`) và `deny.toml` mới được viết, CHƯA chạy trên GitHub.
 - **Arena chia sẻ (R6, Seed 1.0):** `Vec<'a,T>`/`Text<'a>` giữ `&'a Arena` (nhiều Vec/Text một Arena). `Vec<Vec<T>>`, `Vec<Text>` chứa Arena/`Drop`: vẫn E0318. M6 xử lý lời gọi qua GIÁ TRỊ hàm bảo thủ (kết quả mượn từ mọi đối số), có thể từ chối chương trình mà phân tích chính xác hơn sẽ chấp nhận.
+
+
+## Seed 1.0 — giới hạn của bề mặt ngôn ngữ/thư viện (nói thẳng; cách né)
+- `Option::is_some` và `Option::unwrap` chỉ là KHAI BÁO hợp đồng của prelude, không có thân MIR: gọi chúng trong chương trình chạy thật ⇒ backend LLVM từ chối (mã 3, "hàm không có thân MIR"). Né: `⌥ x { Some(v) ↦ …, None ↦ … }`, `unwrap_or`, `is_none` (std).
+- `==`/`≠` chỉ cho số nguyên, `bool`, `char`, `&str` (FB-C13). Tuple, `&T`, `Option`, ADT: E0301. Né: so từng trường, `*a == *b`, `cmp(..).is_eq()` cho kiểu `Ord`.
+- Hàm của prelude KHÔNG có thân (bodiless) nên không thể bổ sung bằng Grit trong `lib/core`; hàm mới đặt trong `lib/std` (gói Rig `std`).
+- Mỗi lần sửa mã của gói Rig phải `rig lock` rồi mới `rig build/run` (khoá nội dung gói; rig từ chối khi lệch).
