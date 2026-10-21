@@ -133,9 +133,9 @@ fn release_profiles_do_not_check_unless_forced() {
     }
 }
 
-/// tắt kiểm bằng `GRITRT_ARENA_CHECK=0` ở dev ⇒ lỗi chèn không bị bắt
+/// R4 (Seed): `GRITRT_ARENA_CHECK` chỉ BẬT THÊM kiểm (ép bật ở release); KHÔNG tắt được kiểm ở dev — kiểm an toàn không có công tắc tắt bằng môi trường.
 #[test]
-fn dev_check_can_be_switched_off_explicitly() {
+fn dev_check_cannot_be_switched_off_by_environment() {
     let o = run(
         PROG,
         "dev",
@@ -144,7 +144,8 @@ fn dev_check_can_be_switched_off_explicitly() {
             ("GRITRT_ARENA_CHECK", "0"),
         ],
     );
-    assert_eq!(o.exit, 0, "{o:?}");
+    assert_eq!(o.exit, 70, "{o:?}");
+    assert_eq!(o.kind, "arena_overlap", "{o:?}");
 }
 
 /// bố cục xác định để cô lập từng nhánh kiểm: `pad1` (u8, ở đầu chunk), `pad2` (u64, căn lề 8 ⇒ chừa KHE 7 byte sau `pad1`), rồi `x` = `[u8; 4]` (căn lề 1):
