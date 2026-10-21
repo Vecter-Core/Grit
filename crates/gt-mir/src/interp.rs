@@ -96,7 +96,10 @@ impl<'a> Interp<'a> {
     pub fn new(mir: &'a MirOutput, fuel: u64) -> Self {
         Interp {
             mir,
-            frames: Vec::new(),
+            frames: vec![Frame {
+                locals: Vec::new(),
+                env: (Vec::new(), Vec::new()),
+            }],
             fuel,
             types: None,
             asserts: Vec::new(),
@@ -122,7 +125,8 @@ impl<'a> Interp<'a> {
     }
 
     fn run_env(&mut self, b: &'a Body, args: Vec<V>, env: (Vec<ParamId>, Vec<Ty>)) -> Outcome {
-        if self.frames.len() > 200 {
+        // khung 0 là KHO tạm (xem `leak`): giới hạn đệ quy tính từ khung 1
+        if self.frames.len() > 201 {
             return Outcome::Bug("đệ quy quá sâu".to_string());
         }
         let mut locals = vec![V::Uninit; b.locals.len()];
@@ -165,6 +169,14 @@ impl<'a> Interp<'a> {
             ),
             None => (Vec::new(), Vec::new()),
         }
+    }
+
+    /// Đặt `v` vào KHO tạm (khung 0, sống suốt lần chạy) và trả tham chiếu tới nó: dùng cho giá trị do intrinsic tạo ra mà không thuộc khung nào
+    /// (`str::as_bytes`). Rò rỉ có chủ đích — thông dịch chỉ để kiểm thử/đối chiếu.
+    fn leak(&mut self, v: V) -> V {
+        let l = self.frames[0].locals.len();
+        self.frames[0].locals.push(v);
+        V::Ref(0, l, Vec::new())
     }
 
     fn top(&self) -> usize {
@@ -683,6 +695,21 @@ impl<'a> Interp<'a> {
                 p.push(Step::Field(1));
                 Ok(V::Ref(*fr, *l, p))
             }
+            ("truncate", [V::Ref(fr, l, path), V::Int(n, _)]) => {
+                // `len ← min(n, len)`; không bao giờ tăng; `Array` giữ đúng `len` phần tử
+                let mut items = path.clone();
+                items.push(Step::Field(1));
+                let V::Array(mut a) = self.get(*fr, *l, &items)? else {
+                    return Err(bug("trường phần tử không phải mảng"));
+                };
+                let keep = usize::try_from(*n).unwrap_or(usize::MAX).min(a.len());
+                a.truncate(keep);
+                self.set_at(*fr, *l, &items, V::Array(a))?;
+                let mut lp = path.clone();
+                lp.push(Step::Field(2));
+                self.set_at(*fr, *l, &lp, V::Int(keep as i128, IntTy::Usize))?;
+                Ok(V::Unit)
+            }
             ("reserve", [V::Ref(fr, l, path), V::Int(n, _)]) => {
                 // chỉ ghi nhận dung lượng (thông dịch không có bố cục/giới hạn bộ nhớ)
                 let mut cp = path.clone();
@@ -778,6 +805,26 @@ impl<'a> Interp<'a> {
         }
         if key == "$prelude::str::len" || key == "$prelude::str::slice" {
             return self.str_op(m, vals).map(Some);
+        }
+        if key == "$prelude::str::as_bytes" {
+            let s = match vals {
+                [V::Str(s)] => s.clone(),
+                [V::Ref(fr, l, p)] => match self.get(*fr, *l, p)? {
+                    V::Str(s) => s,
+                    _ => return Err(Flow::Bug("str::as_bytes: không phải chuỗi".to_string())),
+                },
+                _ => {
+                    return Err(Flow::Bug(
+                        "str::as_bytes: đối số không đúng dạng".to_string(),
+                    ));
+                }
+            };
+            let bytes = V::Array(
+                s.bytes()
+                    .map(|b| V::Int(i128::from(b), IntTy::U8))
+                    .collect(),
+            );
+            return Ok(Some(self.leak(bytes)));
         }
         if key == "$prelude::Arena::new" || key == "$prelude::Arena::reset" {
             // Arena của thông dịch: tay cầm 0, không giới hạn bộ nhớ; `reset` không làm gì (M6 đã bảo đảm không còn tham chiếu vào nội dung)

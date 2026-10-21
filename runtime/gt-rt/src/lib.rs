@@ -291,6 +291,51 @@ pub unsafe extern "C" fn gritrt_fs_open(p: *const u8, n: u64) -> i32 {
     }
 }
 
+/// Mã lỗi âm của I/O không abort: -1 không có, -2 bị từ chối quyền, -3 đường dẫn không hợp lệ (không UTF-8), -4 lỗi khác.
+fn io_code(e: &std::io::Error) -> i32 {
+    match e.kind() {
+        std::io::ErrorKind::NotFound => -1,
+        std::io::ErrorKind::PermissionDenied => -2,
+        _ => -4,
+    }
+}
+
+/// `Cap<In>::read_all`: đọc NGUYÊN stdin tới EOF vào bộ nhớ (rò rỉ có chủ đích, sống tới hết tiến trình, như `gritrt_fs_open`); trả tay cầm (≥ 0)
+/// hoặc mã lỗi âm. Gọi lần thứ hai thấy EOF ngay ⇒ tay cầm tới tệp rỗng.
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_stdin_read() -> i32 {
+    use std::io::Read;
+    let mut v = Vec::new();
+    if let Err(e) = std::io::stdin().lock().read_to_end(&mut v) {
+        return io_code(&e);
+    }
+    let leaked: &'static [u8] = Box::leak(v.into_boxed_slice());
+    let mut g = files().lock().unwrap_or_else(|e| e.into_inner());
+    g.push(leaked);
+    i32::try_from(g.len() - 1).unwrap_or(-4)
+}
+
+/// `Cap<Fs>::write`: ghi NGUYÊN `d[0..dn)` vào tệp `p[0..n)` (tạo mới hoặc cắt cụt); 0 nếu được, ngược lại mã lỗi âm (xem [`io_code`]; -3 đường dẫn không UTF-8).
+///
+/// # Safety
+/// `p` trỏ tới `n` byte đọc được và `d` trỏ tới `dn` byte đọc được (`dn = 0`: `d` có thể null).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_fs_write(p: *const u8, n: u64, d: *const u8, dn: u64) -> i32 {
+    let pb = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let Ok(path) = std::str::from_utf8(pb) else {
+        return -3;
+    };
+    let data: &[u8] = if dn == 0 {
+        &[] // lát rỗng của `Vec` có thể mang con trỏ null: không dựng `&[u8]` từ null (UB)
+    } else {
+        unsafe { std::slice::from_raw_parts(d, usize::try_from(dn).unwrap_or(0)) }
+    };
+    match std::fs::write(path, data) {
+        Ok(()) => 0,
+        Err(e) => io_code(&e),
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_file_len(h: i32) -> u64 {
     file_at(h).len() as u64

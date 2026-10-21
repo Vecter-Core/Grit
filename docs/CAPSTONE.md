@@ -41,10 +41,10 @@ Tìm chuỗi con (byte) `PATTERN` trong các tệp. Cờ `-c`, `-n` chỉ đư�
 |---|---|---|---|---|
 | G1 | `gritc run/check <tệp>`: tên tệp là tên module (`01_add.gt` bị từ chối) | mọi chương trình | tệp được chỉ định là module gốc bất kể tên (`gt_resolve::module_file_name_for`) | ĐÃ SỬA |
 | G2 | `Vec` giữ `&!Arena` ĐỘC QUYỀN ⇒ mỗi Vec/Text cần Arena riêng; không thể có bảng băm/nhiều Vec trên một Arena | K3 (HashMap), K1/K4 (Vec nhiều) | R6: Arena chia sẻ `&'a Arena` cho `Vec`/`Text` (ADR-C03) | ĐÃ SỬA (+ FB-C9) |
-| G3 | `Vec` chỉ có `new/push/reserve/len/as_slice/as_mut_slice`: thiếu `pop/clear/truncate/insert/remove/get/first/last/extend/contains` | K1–K4 | intrinsic `Vec::truncate` (1 cái), còn lại bằng Grit | CHƯA |
-| G4 | `str`/`Text`: không có byte của `&str`, `find/split/trim/starts_with/ends_with/parse/join`, số → chữ | K1–K4 | intrinsic `str::as_bytes` (+ kiểm UTF-8 khi tạo `&str` từ byte), còn lại bằng Grit | CHƯA |
-| G5 | stdin: không có `Cap<In>` | K1 (stdin), K2, K3 | intrinsic `Cap<In>::read_all` | CHƯA |
-| G6 | ghi tệp: `Cap<Fs>` chỉ có `read/open/sub` | K3 (`save`) | intrinsic `Cap<Fs>::write` | CHƯA |
+| G3 | `Vec` chỉ có `new/push/reserve/len/as_slice/as_mut_slice`: thiếu `pop/clear/truncate/insert/remove/get/first/last/extend/contains` | K1–K4 | intrinsic `Vec::truncate` (1 cái), còn lại bằng Grit | `truncate` ĐÃ XONG; còn lại (std) CHƯA |
+| G4 | `str`/`Text`: không có byte của `&str`, `find/split/trim/starts_with/ends_with/parse/join`, số → chữ | K1–K4 | intrinsic `str::as_bytes`, còn lại bằng Grit (không cần tạo `&str` từ byte: K1–K4 làm việc trên byte) | `as_bytes` ĐÃ XONG; còn lại (std) CHƯA |
+| G5 | stdin: không có `Cap<In>` | K1 (stdin), K2, K3 | intrinsic `Cap<In>::read_all` (+ `root_in`) | ĐÃ XONG |
+| G6 | ghi tệp: `Cap<Fs>` chỉ có `read/open/sub` | K3 (`save`) | intrinsic `Cap<Fs>::write` | ĐÃ XONG |
 | G7 | I/O lỗi bằng `Result`: có `Cap<Fs>::open → Result<File, IoError>`; `read` vẫn abort | K1, K3, K4 | dùng `open`; `read_all`/`write` trả `Result` | MỘT PHẦN (đã có `open`) |
 | G8 | phân rã tuple `(a, b) ≔ f();` (E0101) | tiện lợi (K1, K2) | desugar ở parser (ADR-C03) | CHƯA |
 | G9 | toán tử `?` | tiện lợi (K1, K3) | desugar ở parser, chỉ `Result` (ADR-C04) | CHƯA |

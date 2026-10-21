@@ -200,6 +200,14 @@ enum Intr {
     ErrStr,
     Exit,
     FsOpen,
+    /// `Cap<In>::read_all` → `Result<File, IoError>` (Seed 1.0 G5)
+    StdinReadAll,
+    /// `Cap<Fs>::write` → `Result<(), IoError>` (Seed 1.0 G6)
+    FsWrite,
+    /// `str::as_bytes`: cùng biểu diễn con trỏ béo (Seed 1.0 G4)
+    StrAsBytes,
+    /// `Vec::truncate`: `len ← min(n, len)` (Seed 1.0 G3)
+    VecTruncate,
     ArenaNew,
     ArenaAlloc,
     ArenaReset,
@@ -2004,6 +2012,9 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         if key == "$prelude::str::slice" {
             return Some(Intr::StrSlice);
         }
+        if key == "$prelude::str::as_bytes" {
+            return Some(Intr::StrAsBytes);
+        }
         if key.starts_with("$prelude::Vec<") {
             return match m {
                 "new" => Some(Intr::VecNew),
@@ -2012,6 +2023,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 "len" => Some(Intr::VecLen),
                 "as_slice" => Some(Intr::VecAsSlice),
                 "as_mut_slice" => Some(Intr::VecAsMutSlice),
+                "truncate" => Some(Intr::VecTruncate),
                 _ => None,
             };
         }
@@ -2051,6 +2063,12 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         }
         if key.contains("Cap<Fs>") && m == "open" {
             return Some(Intr::FsOpen);
+        }
+        if key.contains("Cap<Fs>") && m == "write" {
+            return Some(Intr::FsWrite);
+        }
+        if key.contains("Cap<In>") && m == "read_all" {
+            return Some(Intr::StdinReadAll);
         }
         if key.contains("Arena") && m == "new" || key.contains("Cap<Alloc>") && m == "arena" {
             return Some(Intr::ArenaNew);
@@ -2522,55 +2540,49 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 let ft = i32t.fn_type(&[self.ptr_type().into(), self.i64t().into()], false);
                 let f = self.rt_fn("gritrt_fs_open", ft);
                 let h = self.call_basic(f, &[p.into(), n.into()])?.into_int_value();
-                // Result<File, IoError>: Ok = biến thể 0 {File}, Err = biến thể 1 {IoError}; mã lỗi âm -(k+1) ↦ IoError thứ k
-                let Ty::Adt(rd, targs) = dest_ty else {
-                    return internal("Cap<Fs>::open không trả Result");
-                };
-                let et = self.lower_ty(dest_ty)?.into_struct_type();
-                let tmp = llvm(self.builder.build_alloca(et, "open.res"))?;
-                let ok = llvm(self.builder.build_int_compare(
-                    IntPredicate::SGE,
-                    h,
-                    i32t.const_zero(),
-                    "isok",
-                ))?;
-                let okb = self.ctx.append_basic_block(fx.f, "open.ok");
-                let errb = self.ctx.append_basic_block(fx.f, "open.err");
-                let end = self.ctx.append_basic_block(fx.f, "open.end");
-                llvm(self.builder.build_conditional_branch(ok, okb, errb))?;
-                // Ok(File { x: h })
-                self.builder.position_at_end(okb);
-                let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
-                llvm(self.builder.build_store(tag, self.i64t().const_zero()))?;
-                let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
-                let v0 = self.variant_struct(*rd, targs, 0)?;
-                let f0 = llvm(self.builder.build_struct_gep(v0, pay, 0, "okf"))?;
-                let file_ty = self.lower_ty(&targs[0])?.into_struct_type();
-                let fx0 = llvm(self.builder.build_struct_gep(file_ty, f0, 0, "fx"))?;
-                llvm(self.builder.build_store(fx0, h))?;
-                llvm(self.builder.build_unconditional_branch(end))?;
-                // Err(IoError)
-                self.builder.position_at_end(errb);
-                let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
-                llvm(
-                    self.builder
-                        .build_store(tag, self.i64t().const_int(1, false)),
-                )?;
-                let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
-                let v1 = self.variant_struct(*rd, targs, 1)?;
-                let f1 = llvm(self.builder.build_struct_gep(v1, pay, 0, "errf"))?;
-                let ioe_ty = self.lower_ty(&targs[1])?.into_struct_type();
-                let etag = llvm(self.builder.build_struct_gep(ioe_ty, f1, 0, "etag"))?;
-                let neg = llvm(self.builder.build_int_neg(h, "neg"))?;
-                let k = llvm(
-                    self.builder
-                        .build_int_sub(neg, i32t.const_int(1, false), "k"),
-                )?;
-                let k64 = llvm(self.builder.build_int_z_extend(k, self.i64t(), "k64"))?;
-                llvm(self.builder.build_store(etag, k64))?;
-                llvm(self.builder.build_unconditional_branch(end))?;
-                self.builder.position_at_end(end);
-                Ok(Some(llvm(self.builder.build_load(et, tmp, "open.v"))?))
+                self.io_result(fx, dest_ty, h, true).map(Some)
+            }
+            Intr::StdinReadAll => {
+                let ft = self.ctx.i32_type().fn_type(&[], false);
+                let f = self.rt_fn("gritrt_stdin_read", ft);
+                let h = self.call_basic(f, &[])?.into_int_value();
+                self.io_result(fx, dest_ty, h, true).map(Some)
+            }
+            Intr::FsWrite => {
+                let (p, n) = self.split_fat(vals[1])?;
+                let (d, dn) = self.split_fat(vals[2])?;
+                let i32t = self.ctx.i32_type();
+                let ft = i32t.fn_type(
+                    &[
+                        self.ptr_type().into(),
+                        self.i64t().into(),
+                        self.ptr_type().into(),
+                        self.i64t().into(),
+                    ],
+                    false,
+                );
+                let f = self.rt_fn("gritrt_fs_write", ft);
+                let h = self
+                    .call_basic(f, &[p.into(), n.into(), d.into(), dn.into()])?
+                    .into_int_value();
+                self.io_result(fx, dest_ty, h, false).map(Some)
+            }
+            Intr::StrAsBytes => Ok(Some(vals[0])),
+            Intr::VecTruncate => {
+                let vt = self.vec_struct(gargs)?;
+                let base = vals[0].into_pointer_value();
+                let n = vals[1].into_int_value();
+                let len_p = llvm(self.builder.build_struct_gep(vt, base, 2, "len.p"))?;
+                let len =
+                    llvm(self.builder.build_load(self.i64t(), len_p, "len"))?.into_int_value();
+                let shorter =
+                    llvm(
+                        self.builder
+                            .build_int_compare(IntPredicate::ULT, n, len, "shorter"),
+                    )?;
+                let nl = llvm(self.builder.build_select(shorter, n, len, "nlen"))?;
+                llvm(self.builder.build_store(len_p, nl))?;
+                Ok(Some(self.unit_type().const_zero()))
             }
             Intr::EnvArg => {
                 let i64t = self.i64t();
@@ -3375,6 +3387,67 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         )?;
         llvm(self.builder.build_store(len_p, nl))?;
         Ok(Some(self.unit_type().const_zero()))
+    }
+
+    /// Dựng `Result<X, IoError>` từ mã trả về `h` của hàm runtime I/O: `h ≥ 0` ⇒ `Ok` (`X` = `File { x: h }` nếu `file_payload`, ngược lại `()`),
+    /// `h < 0` ⇒ `Err(IoError)` với biến thể thứ `-(h+1)` (NotFound, Denied, Invalid, Other).
+    fn io_result(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        dest_ty: &Ty,
+        h: IntValue<'ctx>,
+        file_payload: bool,
+    ) -> R<BasicValueEnum<'ctx>> {
+        let i32t = self.ctx.i32_type();
+        let Ty::Adt(rd, targs) = dest_ty else {
+            return internal("hàm I/O không trả Result");
+        };
+        let et = self.lower_ty(dest_ty)?.into_struct_type();
+        let tmp = llvm(self.builder.build_alloca(et, "io.res"))?;
+        let ok =
+            llvm(
+                self.builder
+                    .build_int_compare(IntPredicate::SGE, h, i32t.const_zero(), "isok"),
+            )?;
+        let okb = self.ctx.append_basic_block(fx.f, "io.ok");
+        let errb = self.ctx.append_basic_block(fx.f, "io.err");
+        let end = self.ctx.append_basic_block(fx.f, "io.end");
+        llvm(self.builder.build_conditional_branch(ok, okb, errb))?;
+        // Ok(..)
+        self.builder.position_at_end(okb);
+        let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
+        llvm(self.builder.build_store(tag, self.i64t().const_zero()))?;
+        if file_payload {
+            let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
+            let v0 = self.variant_struct(*rd, targs, 0)?;
+            let f0 = llvm(self.builder.build_struct_gep(v0, pay, 0, "okf"))?;
+            let file_ty = self.lower_ty(&targs[0])?.into_struct_type();
+            let fx0 = llvm(self.builder.build_struct_gep(file_ty, f0, 0, "fx"))?;
+            llvm(self.builder.build_store(fx0, h))?;
+        }
+        llvm(self.builder.build_unconditional_branch(end))?;
+        // Err(IoError)
+        self.builder.position_at_end(errb);
+        let tag = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
+        llvm(
+            self.builder
+                .build_store(tag, self.i64t().const_int(1, false)),
+        )?;
+        let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
+        let v1 = self.variant_struct(*rd, targs, 1)?;
+        let f1 = llvm(self.builder.build_struct_gep(v1, pay, 0, "errf"))?;
+        let ioe_ty = self.lower_ty(&targs[1])?.into_struct_type();
+        let etag = llvm(self.builder.build_struct_gep(ioe_ty, f1, 0, "etag"))?;
+        let neg = llvm(self.builder.build_int_neg(h, "neg"))?;
+        let k = llvm(
+            self.builder
+                .build_int_sub(neg, i32t.const_int(1, false), "k"),
+        )?;
+        let k64 = llvm(self.builder.build_int_z_extend(k, self.i64t(), "k64"))?;
+        llvm(self.builder.build_store(etag, k64))?;
+        llvm(self.builder.build_unconditional_branch(end))?;
+        self.builder.position_at_end(end);
+        llvm(self.builder.build_load(et, tmp, "io.v"))
     }
 
     fn rt_fn(&mut self, name: &str, ty: FunctionType<'ctx>) -> FunctionValue<'ctx> {

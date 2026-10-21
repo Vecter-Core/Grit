@@ -72,6 +72,8 @@
 ▢ Clock { x: i32 }
 ▢ Alloc { x: i32 }
 ▢ Out { x: i32 }
+// stdin (Seed 1.0 G5): capability đọc đầu vào chuẩn; `Cap<In>::read_all` đọc NGUYÊN stdin tới EOF (lỗi ⇒ `Err`)
+▢ In { x: i32 }
 // stderr riêng. Tên `ErrOut` (không phải `Err`) vì `Err` là biến thể của `Result` và sẽ bị che/che khuất (xem DOGFOOD #11).
 ▢ ErrOut { x: i32 }
 ▢ Host { x: i32 }
@@ -105,6 +107,8 @@
   ƒ read(&self, p: &str) → File ! {io} { }
   ƒ open(&self, p: &str) → Result<File, IoError> ! {io} { }
   ƒ sub(&self, p: &str) → Cap<Fs> ! {io} { }
+  // ghi NGUYÊN tệp (tạo/cắt cụt); lỗi ⇒ `Err` (Seed 1.0 G6)
+  ƒ write(&self, p: &str, b: &[u8]) → Result<(), IoError> ! {io} { }
 }
 ⊐ Cap<Net> { ƒ connect(&self, h: &str) → File ! {io} { } }
 ⊐ Cap<Env> {
@@ -116,6 +120,9 @@
   ƒ write_u64(&self, n: u64) ! {io} { }
   ƒ write_str(&self, s: &str) ! {io} { }
   ƒ write_bytes(&self, b: &[u8]) ! {io} { }
+}
+⊐ Cap<In> {
+  ƒ read_all(&self) → Result<File, IoError> ! {io} { }
 }
 ⊐ Cap<ErrOut> {
   ƒ write_u64(&self, n: u64) ! {io} { }
@@ -132,6 +139,8 @@
   ƒ len(&self) → usize ! ∅ { }
   ƒ as_slice(&self) → &[T] ! ∅ { }
   ƒ as_mut_slice(&!self) → &![T] ! ∅ { }
+  // cắt bớt còn `min(n, len)` phần tử (không bao giờ tăng; T không cần drop nên không chạy destructor) — Seed 1.0 G3
+  ƒ truncate(&!self, n: usize) ! ∅ { }
 }
 // Text<'a> (ADR-035, Q72, TCB): bộ đệm UTF-8 trên MỘT Arena, DỰNG rồi ĐÓNG BĂNG. Bất biến UTF-8 chỉ do các intrinsic dưới đây bảo đảm
 // (đường tạo hợp lệ: `new` rỗng, `push_str` (&str hợp lệ), `push_char` (char hợp lệ), `push_utf8`/`from_utf8` (KIỂM RFC 3629 bằng runtime)).
@@ -158,6 +167,8 @@
   ƒ is_nan(self) → bool ! ∅ { }
 }
 ⊐ str {
+  // khung nhìn byte của chuỗi (cùng bộ nhớ, không sao chép) — Seed 1.0 G4
+  ƒ as_bytes(&self) → &[u8] ! ∅ { }
   ƒ len(&self) → usize ! ∅ { }
   ƒ slice(&self, from: usize, to: usize) → &str ! ∅ { }
 }
@@ -177,5 +188,6 @@
 ƒ root_clock() → Cap<Clock> ! ∅ { }
 ƒ root_alloc() → Cap<Alloc> ! ∅ { }
 ƒ root_out() → Cap<Out> ! ∅ { }
+ƒ root_in() → Cap<In> ! ∅ { }
 ƒ root_err() → Cap<ErrOut> ! ∅ { }
 ƒ raw_read(p: usize) → i32 ! ∅ { }
