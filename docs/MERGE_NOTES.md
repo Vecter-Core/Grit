@@ -12,6 +12,7 @@ Bối cảnh: nhánh `claude/gallant-darwin-m251cq` (origin) được làm từ 
 - `crates/gt-borrowck/src/check.rs` (`check_uses`: bản sao trạng thái + áp move; FB-C1)
 - `crates/gt-types/src/check/call.rs` (`call`: CapUse qua giá trị hàm FB-C3; S1 sẽ sửa effects/⊳ của đường dẫn kết hợp)
 - `crates/gt-types/src/collect.rs` (`sized_ty`, `contains_itself_by_value`, Local ở vị trí kiểu: FB-C2/C4)
+- `crates/gt-types/src/traits.rs` (`Pick.effects`), `crates/gt-oblig/src/driver.rs` (`escaped_sites`, E0901 cho `⊳` qua giá trị: FB-C5/FB-C6), `crates/gt-borrowck/tests/support/progen.rs` (+ `oracle.rs` phân loại): kịch bản `fn_value_ref`, `KINDS` 18→19
 - `crates/gt-llvm/build.rs`, `crates/gt-driver/{build.rs,src/native.rs,src/cli.rs}`, `crates/rig/build.rs`, `runtime/gt-rt/src/lib.rs` (port Linux, ngăn xếp 256 MiB)
 - `tools/gate.sh` (viết lại: đa nền, điểm lưu theo đơn vị, giai đoạn nul/doc), thêm `tools/preflight.sh`, `tools/nul_scan.py`
 - `docs/HANDOFF.md`, `docs/FIELD_BUGS.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/DELETIONS.md` (nối thêm cuối tệp)

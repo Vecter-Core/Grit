@@ -94,3 +94,15 @@ Bảo vệ sẵn có: `defensive_counters()` phải bằng (0,0) trên mọi ch�
 ## 7. CHƯA RÀ (nói thẳng)
 - gt-mir: ~160 hit (`unwrap_or`, `.get(`, `.ok()`) chưa đọc từng dòng; gt-types: ~200 hit chưa đọc từng dòng; gt-oblig/gt-term/gt-effects đã rà ở mục B (FB-7, `FAIL_OPEN` trước); gt-conc, gt-dataflow, gt-resolve, gt-parser, gt-lexer, rig: chưa rà đợt này.
 - Kết quả "AN TOÀN" là kết quả ĐỌC MÃ, không phải chứng minh; chỉ các mục SỬA có test.
+
+## F-01…F-08 của kiểm toán ngoài (2026-10-21; nền tảng Linux) — kiểm "đỏ trước": hoàn nguyên TỪNG bản sửa trong cây làm việc, chạy kiểm chứng riêng, khôi phục bằng `git checkout`
+| Mục | Bản sửa (commit) | Kiểm khi HOÀN NGUYÊN bản sửa | Kết quả đo | Test giữ lại |
+|---|---|---|---|---|
+| F-01 / FB-C1 | `1f0aab0` `gt-borrowck/src/check.rs` | `cargo test -p gt-borrowck --test same_stmt` | ĐỎ: 2 test thất bại, 1 đạt (trước sửa) → XANH 3/3 sau sửa | `same_stmt.rs`, 14 mẫu `E0401_{same_stmt,dup}_*` |
+| F-02 / FB-C7 | `1f0aab0` `gt-driver/src/cli.rs` | `cargo build -p gt-driver --no-default-features` | ĐỎ: `error[E0433]: cannot find module or crate gt_codegen_llvm` | cổng chạy `test -p gt-driver` ở chế độ mặc định; CI có bước `--no-default-features` (chưa chạy trên GitHub) |
+| F-03/F-04/F-07 / FB-C2, FB-C4 | `9af99e9` `gt-types/src/collect.rs` | corpus 904 ca qua `gritc` | ĐỎ: lệch 9 ca (trước sửa) → 0 sau sửa | 10 mẫu `E0301_*` + 1 mẫu pass |
+| F-05 / FB-C3 | `d0a9180` `gt-types/src/check/call.rs` | corpus 904 ca | ĐỎ: lệch 1 (`E0310_call_through_fn_value` XANH) → 0 sau sửa | 2 mẫu fail `E0310_call_through_*`, 1 mẫu pass |
+| F-06 / FB-C8 | `d0a9180` `gt-rt` `gritrt_start` | `cargo test -p gt-driver --test stack_depth` | ĐỎ: 0 đạt / 2 thất bại (bị HĐH giết) → 2/2 sau sửa | `stack_depth.rs` |
+| F-08 | `05b4488` `docs/errors/E12xx,E1301,E9901` | `gritc explain <mã>` | ĐỎ trước sửa (ĐO ở kiểm toán G07: 6 mã báo LỖI) → XANH | `tools/check_expectations.py` + giai đoạn gate |
+| F-09 (vụn vặt) | — | — | clippy 2 lỗi test → 0 | gate `clippy` |
+Ghi chú trung thực: F-02 và F-08 không có test tự động riêng (F-02 do chính cổng/CI ở chế độ `--no-default-features`; F-08 do `check_expectations.py`); bằng chứng đỏ-trước là lệnh nêu ở cột 3 chạy thật.
