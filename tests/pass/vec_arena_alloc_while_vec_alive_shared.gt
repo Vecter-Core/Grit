@@ -1,0 +1,10 @@
+// expect: pass
+// note: R6: `alloc` (&self) trong khi Vec còn sống là hợp lệ (cùng chia sẻ Arena)
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&ar);
+  v.push(1u64);
+  x ≔ ar.alloc(5u64);
+  v.push(*x);
+  v.len() as u64
+}

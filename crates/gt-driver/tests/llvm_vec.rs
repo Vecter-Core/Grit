@@ -83,7 +83,7 @@ fn both(src: &str, expect: &str) {
 
 const SUM_LOOP: &str = "ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   μi ≔ 0u64;
   ⟳ i < 1000u64 ↓ 1000u64 - i { v.push(i *% 3u64); i ← i + 1u64; }
   s ≔ v.as_slice();
@@ -106,7 +106,7 @@ fn struct_elements_with_mixed_alignment() {
     let src = "▢ P { a: u8, b: u64, c: u16 }
 ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   μi ≔ 0u8;
   ⟳ i < 9u8 ↓ 9u8 - i { v.push(P { a: i, b: (i as u64) *% 10u64, c: (i as u16) *% 100u16 }); i ← i + 1u8; }
   s ≔ v.as_slice();
@@ -125,7 +125,7 @@ fn struct_elements_with_mixed_alignment() {
 fn zero_sized_elements_count_correctly() {
     let src = "ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   μi ≔ 0u32;
   ⟳ i < 10u32 ↓ 10u32 - i { v.push(()); i ← i + 1u32; }
   v.len() as u64
@@ -140,7 +140,7 @@ fn vec_of_slice_refs() {
     let src = "ƒ main() → u64 ! {mem} {
   a ≔ [1u8, 2u8, 3u8, 4u8, 5u8];
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.push(&a[0..2]);
   v.push(&a[1..5]);
   v.push(&a[4..5]);
@@ -159,7 +159,7 @@ fn vec_of_slice_refs() {
 fn write_through_mutable_slice() {
     let src = "ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.push(1u64);
   v.push(2u64);
   v.push(3u64);
@@ -176,7 +176,7 @@ fn write_through_mutable_slice() {
 fn index_out_of_bounds_through_the_slice_aborts_on_both() {
     let src = "ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.push(1u64);
   v.as_slice()[1]
 }
@@ -196,7 +196,7 @@ fn index_out_of_bounds_through_the_slice_aborts_on_both() {
 fn growth_to_one_million_elements() {
     let src = "ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   μi ≔ 0u64;
   ⟳ i < 1000000u64 ↓ 1000000u64 - i { v.push(i); i ← i + 1u64; }
   s ≔ v.as_slice();
@@ -218,7 +218,7 @@ fn growth_to_one_million_elements() {
 fn arena_exhaustion_is_its_own_abort_kind() {
     let src = "ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   μi ≔ 0u64;
   ⟳ i < 1000000u64 ↓ 1000000u64 - i { v.push(i); i ← i + 1u64; }
   v.len() as u64
@@ -285,7 +285,7 @@ fn checks_report_lists_arena_exhaustion_sites() {
 fn reserve_preallocates_and_keeps_contents() {
     let src = "ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.push(7u64);
   v.push(8u64);
   v.reserve(1000usize);
@@ -308,7 +308,7 @@ fn reserve_arena_demand_is_exactly_one_block() {
 ƒ main() → u64 ! {mem} {
   e ≔ [0u8];
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.reserve(100000usize);
   μi ≔ 0u64;
   ⟳ i < 100000u64 ↓ 100000u64 - i { v.push(L { b: &e[0..0], n: i }); i ← i + 1u64; }

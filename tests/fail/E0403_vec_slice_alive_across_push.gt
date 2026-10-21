@@ -2,7 +2,7 @@
 // note: Vec trên Arena: as_slice mượn v; push cần &! nên khoản mượn phần tử đang sống bị vô hiệu
 ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.push(1u64);
   s ≔ v.as_slice();
   v.push(2u64);

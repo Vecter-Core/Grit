@@ -72,8 +72,8 @@ fn main_src(keys: &[u64]) -> String {
   n ≔ {n_expr};
   μar1 ≔ Arena::new();
   μar2 ≔ Arena::new();
-  μx ≔ Vec::new(&!ar1);
-  μy ≔ Vec::new(&!ar2);
+  μx ≔ Vec::new(&ar1);
+  μy ≔ Vec::new(&ar2);
   μi ≔ 0usize;
   ⟳ i < n ↓ n - i {{ x.push(K {{ k: keys[i], i: i as u64 }}); y.push(K {{ k: 0u64, i: 0u64 }}); i ← i + 1; }}
   msort::sort(x.as_mut_slice(), y.as_mut_slice());
@@ -301,8 +301,8 @@ fn one_million_elements_never_exhaust_fuel() {
 ƒ main() → u64 ! {{mem}} {{
   μar1 ≔ Arena::new();
   μar2 ≔ Arena::new();
-  μx ≔ Vec::new(&!ar1);
-  μy ≔ Vec::new(&!ar2);
+  μx ≔ Vec::new(&ar1);
+  μy ≔ Vec::new(&ar2);
   μseed ≔ 99u64;
   μi ≔ 0u64;
   ⟳ i < {N}u64 ↓ {N}u64 - i {{
@@ -446,8 +446,8 @@ fn wide_elements_24_and_32_bytes_match_stable_sort_at_scale() {
 ƒ main() → u64 ! {{mem}} {{
   μar1 ≔ Arena::new();
   μar2 ≔ Arena::new();
-  μx ≔ Vec::new(&!ar1);
-  μy ≔ Vec::new(&!ar2);
+  μx ≔ Vec::new(&ar1);
+  μy ≔ Vec::new(&ar2);
   μi ≔ 0u64;
   ⟳ i < {N}u64 ↓ {N}u64 - i {{
     x.push({name} {{ {init} }});

@@ -45,7 +45,7 @@ const BATCH: &str = "ƒ main() ! {io, mem} {
   f ≔ fs.read(env.arg(1usize));
   b ≔ f.bytes();
   μar ≔ alloc.arena();
-  μt ≔ Text::new(&!ar);
+  μt ≔ Text::new(&ar);
   total ≔ b.len();
   μi ≔ 0usize;
   ⟳ i < total ↓ total - i {
@@ -70,7 +70,7 @@ const SLICE: &str = "ƒ main() ! {io, mem} {
   f ≔ fs.read(env.arg(1usize));
   b ≔ f.bytes();
   μar ≔ alloc.arena();
-  μt ≔ Text::new(&!ar);
+  μt ≔ Text::new(&ar);
   ⎇ b.len() >= 2usize {
     ok ≔ t.push_utf8(&b[2usize..b.len()]);
     ⎇ ok {

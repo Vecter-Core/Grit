@@ -1,0 +1,10 @@
+// expect: fail E0405
+// note: R6 — reset khi Text còn sống và còn dùng về sau
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μt ≔ Text::new(&ar);
+  t.push_str("ab");
+  ar.reset();
+  t.push_str("c");
+  t.len() as u64
+}

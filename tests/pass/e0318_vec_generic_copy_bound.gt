@@ -1,4 +1,4 @@
 // expect: pass
 // note: tham số kiểu có ràng buộc Copy không cần drop
-ƒ mk<'a, T: Copy>(a: &!'a Arena, w: T) → Vec<'a, T> ! {mem} { Vec::new(a) }
-ƒ main() → u64 ! {mem} { μar ≔ Arena::new(); μv ≔ mk(&!ar, 1u8); v.len() as u64 }
+ƒ mk<'a, T: Copy>(a: &'a Arena, w: T) → Vec<'a, T> ! {mem} { Vec::new(a) }
+ƒ main() → u64 ! {mem} { μar ≔ Arena::new(); μv ≔ mk(&ar, 1u8); v.len() as u64 }

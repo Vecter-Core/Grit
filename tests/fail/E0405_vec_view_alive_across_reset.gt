@@ -1,0 +1,10 @@
+// expect: fail E0405
+// note: R6 — lát lấy từ Vec còn sống qua reset
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&ar);
+  v.push(1u64);
+  s ≔ v.as_slice();
+  ar.reset();
+  s[0]
+}

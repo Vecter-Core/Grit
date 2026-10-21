@@ -144,7 +144,7 @@ fn abort_cases() -> Vec<Case> {
         ),
         (
             "arena_exhausted",
-            "ƒ main() → u64 ! {mem} {\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&!ar);\n  μi ≔ 0u64;\n  ⟳ i < 1000000u64 ↓ 1000000u64 - i { v.push(i); i ← i + 1u64; }\n  v.len() as u64\n}\n",
+            "ƒ main() → u64 ! {mem} {\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&ar);\n  μi ≔ 0u64;\n  ⟳ i < 1000000u64 ↓ 1000000u64 - i { v.push(i); i ← i + 1u64; }\n  v.len() as u64\n}\n",
             vec![("GRITRT_ARENA_LIMIT", "2097152")],
         ),
     ]

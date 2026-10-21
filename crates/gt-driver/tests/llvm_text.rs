@@ -56,7 +56,7 @@ fn u8_as_char_lowers_and_encodes_latin1_scalars() {
     both(
         "ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μt ≔ Text::new(&!ar);
+  μt ≔ Text::new(&ar);
   t.push_char(65u8 as char);
   t.push_char(127u8 as char);
   t.push_char(233u8 as char);

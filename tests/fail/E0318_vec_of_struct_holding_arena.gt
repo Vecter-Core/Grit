@@ -3,6 +3,6 @@
 ▢ Holder { a: Arena, n: u8 }
 ƒ main() ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.push(Holder { a: Arena::new(), n: 1u8 });
 }

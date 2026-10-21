@@ -77,11 +77,10 @@
 ▢ Host { x: i32 }
 #lang(arena)
 ▢ Arena { x: i32 }
-// Vec<'a, T> (ADR-032 phụ lục A, TCB): mảng tăng trưởng nằm trong MỘT Arena. Giữ `&!Arena` ĐỘC QUYỀN (không mutability bên trong): một Arena
-// chỉ phục vụ một Vec tại một thời điểm và không dùng/reset được khi Vec còn sống (M6). Không Drop (arena giải phóng cả khối); T không được
+// Vec<'a, T> (ADR-032 phụ lục A, TCB): mảng tăng trưởng nằm trong MỘT Arena. Giữ `&'a Arena` CHIA SẺ (ADR-038 hướng (ii), Seed 1.0 R6): nhiều Vec/Text dùng chung một Arena; `reset` (`&!`) bị M6 chặn khi còn Vec sống. Không Drop (arena giải phóng cả khối); T không được
 // cần drop (E0318). Phần tử đọc qua `as_slice` (kiểm biên có sẵn). Trường private + literal ngoài lib/core bị cấm (E0313).
 #lang(vec)
-▢ Vec<'a, T> { arena: &!'a Arena, ptr: *μ T, len: usize, cap: usize }
+▢ Vec<'a, T> { arena: &'a Arena, ptr: *μ T, len: usize, cap: usize }
 ▢ File { x: i32 }
 ⊔ IoError { NotFound, Denied, Invalid, Other }
 ⊐ <T> [T] { ƒ len(&self) → usize ! ∅ { } }
@@ -127,7 +126,7 @@
 ⊐ Host { ƒ fs() → Cap<Fs> ! {io} { } }
 ⊐ Arena { ƒ new() → Arena ! {mem} { } ƒ alloc<T>(&self, v: T) → &T ! {mem} { } ƒ reset(&!self) ! {mem} { } }
 ⊐ <'a, T> Vec<'a, T> {
-  ƒ new(a: &!'a Arena) → Vec<'a, T> ! {mem} { }
+  ƒ new(a: &'a Arena) → Vec<'a, T> ! {mem} { }
   ƒ push(&!self, x: T) ! {mem} { }
   ƒ reserve(&!self, n: usize) ! {mem} { }
   ƒ len(&self) → usize ! ∅ { }
@@ -140,11 +139,11 @@
 #lang(text)
 ▢ Text<'a> { bytes: Vec<'a, u8> }
 ⊐ <'a> Text<'a> {
-  ƒ new(a: &!'a Arena) → Text<'a> ! {mem} { }
+  ƒ new(a: &'a Arena) → Text<'a> ! {mem} { }
   ƒ push_str(&!self, s: &str) ! {mem} { }
   ƒ push_char(&!self, c: char) ! {mem} { }
   ƒ push_utf8(&!self, b: &[u8]) → bool ! {mem} { }
-  ƒ from_utf8(a: &!'a Arena, b: &[u8]) → Option<Text<'a>> ! {mem} { }
+  ƒ from_utf8(a: &'a Arena, b: &[u8]) → Option<Text<'a>> ! {mem} { }
   ƒ len(&self) → usize ! ∅ { }
   ƒ as_str(&self) → &str ! ∅ { }
   ƒ as_bytes(&self) → &[u8] ! ∅ { }
