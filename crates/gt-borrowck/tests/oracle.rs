@@ -378,7 +378,9 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
                 *rej_clean_by.entry(e.bc.join(",")).or_default() += 1;
                 // phân loại theo NGUYÊN NHÂN KHÔNG-ĐẦY-ĐỦ đã biết (ADR-023 §1, §6, §11)
                 let body = src.replace(progen::PRELUDE, "");
-                let cat = if body.contains("pick(")
+                let cat = if prog.tags.contains("fn_value_ref") {
+                    "gọi qua GIÁ TRỊ hàm: kiểu hàm không mang region ⇒ M6 coi kết quả có thể mượn từ MỌI đối số (bảo thủ có chủ đích, S1.i)"
+                } else if body.contains("pick(")
                     || body.contains("pick2(")
                     || body.contains("first(")
                 {

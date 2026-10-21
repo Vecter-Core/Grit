@@ -1,0 +1,5 @@
+// expect: fail E0404
+// note: S1.i — hàm nhận hàm làm tham số (ƒ(&i32) → &i32) rồi trả kết quả mượn từ đối số cục bộ
+ƒ id(a: &i32) → &i32 ! ∅ { a }
+ƒ ap(f: ƒ(&i32) → &i32 ! ∅, x: &i32) → &i32 ! ∅ { f(x) }
+ƒ main() → i32 ! ∅ { μr ≔ &0; ⎇ true { x ≔ 1; r ← ap(id, &x); } *r }

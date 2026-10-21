@@ -1,0 +1,5 @@
+// expect: pass
+// note: S1.i đối chứng — hàm làm tham số, kết quả dùng trong phạm vi nguồn
+ƒ id(a: &i32) → &i32 ! ∅ { a }
+ƒ ap(f: ƒ(&i32) → &i32 ! ∅, x: &i32) → i32 ! ∅ { r ≔ f(x); *r }
+ƒ main() → i32 ! ∅ { x ≔ 5; ap(id, &x) }
