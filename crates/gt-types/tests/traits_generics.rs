@@ -240,3 +240,16 @@ fn e0312_polymorphic_recursion_is_cut_off_at_the_depth_limit() {
     // nở nhưng không có gốc dùng nó: không có instance để cắt (hàm generic không được gọi)
     ok("ƒ f<T>(x: T) ! ∅ { f((x,)); }");
 }
+
+/// FB-C10: `⊐ <K: Copy> Copy for E<K>` phải được thấy khi `K` chỉ là tham số có ràng buộc `K: Copy` trong phạm vi
+/// (trước đây `find_impl` kiểm ràng buộc impl với phạm vi RỖNG ⇒ `E<K>` bị coi là không-Copy ⇒ E0318 trong `Vec<E<K>>`).
+#[test]
+fn generic_copy_adt_is_copy_under_its_scope_bounds_fb_c10() {
+    let defs = "▢ E<K> { k: K } ⊐ <K: Copy> Copy for E<K> { } ";
+    ok(&format!(
+        "{defs}ƒ f<'a, K: Copy>(v: &Vec<'a, E<K>>) → usize ! ∅ {{ v.len() }}"
+    ));
+    ok(&format!(
+        "{defs}ƒ g<K: Copy>(e: E<K>) → (E<K>, E<K>) ! ∅ {{ (e, e) }}"
+    ));
+}
