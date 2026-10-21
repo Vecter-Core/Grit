@@ -284,7 +284,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             node: e.id,
             span: e.span,
         });
-        Ty::Fn(ps, Box::new(pick.ret.clone()), Vec::new())
+        Ty::Fn(ps, Box::new(pick.ret.clone()), pick.effects.clone())
     }
 
     fn record_pick(&mut self, node: NodeId, span: gt_span::Span, pick: &Pick) {
