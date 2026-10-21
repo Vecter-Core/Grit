@@ -62,7 +62,7 @@ pub const PRELUDE: &str = "\
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
-pub const KINDS: [&str; 19] = [
+pub const KINDS: [&str; 20] = [
     "move",
     "reborrow",
     "borrow_in_loop",
@@ -82,6 +82,7 @@ pub const KINDS: [&str; 19] = [
     "ref_pat_disjoint",
     "ref_pat_subfield",
     "fn_value_ref",
+    "arena_vec",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -268,7 +269,7 @@ impl Gen {
     }
 
     fn scenario(&mut self) -> Vec<St> {
-        match self.rng.below(112) {
+        match self.rng.below(124) {
             0..=16 => self.int_borrow(),
             17..=28 => self.reborrow(),
             29..=36 => self.moves(),
@@ -280,7 +281,8 @@ impl Gen {
             80..=85 => self.slot(),
             86..=94 => self.interior_mut(),
             95..=99 => self.flow(),
-            _ => self.ref_pattern(),
+            100..=111 => self.ref_pattern(),
+            _ => self.arena_vec(),
         }
     }
 
@@ -902,6 +904,47 @@ impl Gen {
             } else {
                 out.push(raw(format!("use_i({w}.n);")));
             }
+        }
+        out
+    }
+
+    /// `Vec` trên Arena CHIA SẺ (R6) + lát lấy từ Vec: push/lát/reset/alloc/dùng lát theo thứ tự ngẫu nhiên. Phủ ràng buộc "region BÊN TRONG
+    /// kiểu được mượn sống ít nhất bằng khoản vay" (FB-C9: `s ≔ v.as_slice(); ar.reset(); s[0]` từng được chấp nhận).
+    fn arena_vec(&mut self) -> Vec<St> {
+        self.tags.insert("arena_vec");
+        let a = self.fresh("a");
+        let v = self.fresh("v");
+        let s = self.fresh("s");
+        let q = self.fresh("q");
+        let k0 = self.k();
+        let mut out = vec![
+            raw(format!("μ{a} ≔ Arena::new();")),
+            raw(format!("μ{v} ≔ Vec::new(&{a});")),
+            raw(format!("{v}.push({k0});")),
+        ];
+        let mut has_slice = false;
+        let mut has_q = false;
+        for _ in 0..1 + self.rng.below(5) {
+            let k = self.k();
+            let st = match self.rng.below(8) {
+                0 if !has_slice => {
+                    has_slice = true;
+                    raw(format!("{s} ≔ {v}.as_slice();"))
+                }
+                1 | 2 if has_slice => raw(format!("use_i({s}[0]);")),
+                3 => raw(format!("{v}.push({k});")),
+                4 => {
+                    self.tags.insert("arena_reset");
+                    raw(format!("{a}.reset();"))
+                }
+                5 if !has_q => {
+                    has_q = true;
+                    raw(format!("{q} ≔ {a}.alloc({k});"))
+                }
+                6 if has_q => raw(format!("use_i(*{q});")),
+                _ => raw(format!("use_i({v}.as_slice()[0]);")),
+            };
+            out.push(st);
         }
         out
     }

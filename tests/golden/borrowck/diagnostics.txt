@@ -66,7 +66,6 @@ E0402_reborrow_twice_through_ref | E0402 | `&!*r` | [khoản mượn bắt đầ
 E0402_same_call_two_unique | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
 E0402_same_field_twice | E0402 | `&!w.n` | [khoản mượn bắt đầu ở đây @ `&!w.n`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
 E0402_struct_holding_unique_then_borrow | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
-E0402_text_two_on_one_arena | E0402 | `&!ar` | [khoản mượn bắt đầu ở đây @ `&!ar`] | hai khoản mượn duy nhất `&!` chồng nhau trên `ar`: khoản mượn trước còn được dùng về sau
 E0402_three_unique_borrows | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
 E0402_three_unique_borrows | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
 E0402_three_unique_borrows | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
@@ -76,8 +75,6 @@ E0402_two_unique_param_field | E0402 | `&!w.n` | [khoản mượn bắt đầu �
 E0402_two_unique_same_inner_field | E0402 | `&!w.b.v` | [khoản mượn bắt đầu ở đây @ `&!w.b.v`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
 E0402_two_unique_same_struct_field | E0402 | `&!w.b` | [khoản mượn bắt đầu ở đây @ `&!w.b`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
 E0402_unique_then_unique_via_method | E0402 | `&!b` | [khoản mượn bắt đầu ở đây @ `&!b`] | hai khoản mượn duy nhất `&!` chồng nhau trên `b`: khoản mượn trước còn được dùng về sau
-E0402_vec_reset_while_vec_alive | E0402 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&!ar`] | hai khoản mượn duy nhất `&!` chồng nhau trên `ar`: khoản mượn trước còn được dùng về sau
-E0402_vec_two_on_one_arena | E0402 | `&!ar` | [khoản mượn bắt đầu ở đây @ `&!ar`] | hai khoản mượn duy nhất `&!` chồng nhau trên `ar`: khoản mượn trước còn được dùng về sau
 E0402_whole_then_element | E0402 | `&!a[0]` | [khoản mượn bắt đầu ở đây @ `&!a`] | hai khoản mượn duy nhất `&!` chồng nhau trên `a`: khoản mượn trước còn được dùng về sau
 E0403_array_element_shared_whole_unique | E0403 | `&!a` | [khoản mượn bắt đầu ở đây @ `&a[0]`] | mượn duy nhất `&!` `a` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_array_index_read_while_unique | E0403 | `a[0]` | [khoản mượn bắt đầu ở đây @ `&!a`] | dùng/mượn chung `a` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
@@ -109,7 +106,6 @@ E0403_text_view_alive_across_push_utf8 | E0403 | `t.push_utf8(&b[..])` | [khoả
 E0403_tuple_read_while_unique | E0403 | `t.0` | [khoản mượn bắt đầu ở đây @ `&!t`] | dùng/mượn chung `t` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_unique_live_then_shared | E0403 | `&x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_unique_vs_shared | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
-E0403_vec_arena_used_while_vec_alive | E0403 | `ar.alloc(5u64)` | [khoản mượn bắt đầu ở đây @ `&!ar`] | dùng/mượn chung `ar` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_vec_slice_alive_across_push | E0403 | `v.push(2u64)` | [khoản mượn bắt đầu ở đây @ `v.as_slice()`] | mượn duy nhất `&!` `v` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0404_fn_value_as_parameter | E0404 | `{ x ≔ 1; r ← ap(id, &x); }` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_fn_value_ref_escapes_scope | E0404 | `{ x ≔ 1; r ← f(&x); }` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
@@ -185,7 +181,10 @@ E0405_return_alloc_ref | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt 
 E0405_return_struct_holding_arena_ref | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
 E0405_return_tuple_with_arena_ref | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
 E0405_return_via_let | E0405 | `p ≔ a.alloc(1);` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_text_reset_while_text_alive | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
 E0405_two_allocs_reset_between | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_vec_reset_while_vec_alive | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_vec_view_alive_across_reset | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
 E0406_assign_after_call_result_kept | E0406 | `a[0] ← 9;` | [khoản mượn bắt đầu ở đây @ `&a[..]`] | gán vào `a` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
 E0406_assign_after_idr_kept | E0406 | `x ← 2;` | [khoản mượn bắt đầu ở đây @ `&x`] | gán vào `x` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
 E0406_assign_element_while_other_borrowed | E0406 | `a[1] ← 5;` | [khoản mượn bắt đầu ở đây @ `&a[0]`] | gán vào `a` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau

@@ -39,8 +39,8 @@ Tìm chuỗi con (byte) `PATTERN` trong các tệp. Cờ `-c`, `-n` chỉ đư�
 
 | # | Khoảng trống | Chặn | Cách làm | Trạng thái |
 |---|---|---|---|---|
-| G1 | `gritc run/check <tệp>`: tên tệp là tên module (`01_add.gt` bị từ chối) | mọi chương trình | tệp được chỉ định là module gốc bất kể tên | CHƯA |
-| G2 | `Vec` giữ `&!Arena` ĐỘC QUYỀN ⇒ mỗi Vec/Text cần Arena riêng; không thể có bảng băm/nhiều Vec trên một Arena | K3 (HashMap), K1/K4 (Vec nhiều) | R6: Arena chia sẻ `&'a Arena` cho `Vec`/`Text` (ADR-038 Q83) | CHƯA |
+| G1 | `gritc run/check <tệp>`: tên tệp là tên module (`01_add.gt` bị từ chối) | mọi chương trình | tệp được chỉ định là module gốc bất kể tên (`gt_resolve::module_file_name_for`) | ĐÃ SỬA |
+| G2 | `Vec` giữ `&!Arena` ĐỘC QUYỀN ⇒ mỗi Vec/Text cần Arena riêng; không thể có bảng băm/nhiều Vec trên một Arena | K3 (HashMap), K1/K4 (Vec nhiều) | R6: Arena chia sẻ `&'a Arena` cho `Vec`/`Text` (ADR-C03) | ĐÃ SỬA (+ FB-C9) |
 | G3 | `Vec` chỉ có `new/push/reserve/len/as_slice/as_mut_slice`: thiếu `pop/clear/truncate/insert/remove/get/first/last/extend/contains` | K1–K4 | intrinsic `Vec::truncate` (1 cái), còn lại bằng Grit | CHƯA |
 | G4 | `str`/`Text`: không có byte của `&str`, `find/split/trim/starts_with/ends_with/parse/join`, số → chữ | K1–K4 | intrinsic `str::as_bytes` (+ kiểm UTF-8 khi tạo `&str` từ byte), còn lại bằng Grit | CHƯA |
 | G5 | stdin: không có `Cap<In>` | K1 (stdin), K2, K3 | intrinsic `Cap<In>::read_all` | CHƯA |

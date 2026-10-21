@@ -6,7 +6,7 @@ name = "sortlines"
 version = "0.1.0"
 source = "root"
 deps = ["std"]
-hash = "sha256:8fd6fbabce9cb75d0b320e70039bb0e4e165f6b41a800eec7adca134e3819719"
+hash = "sha256:5574e7ed374ba6efac1be4f0b4901a1ef075e65646a56b75535514d4896041af"
 
 [[package]]
 name = "std"
