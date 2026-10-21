@@ -138,7 +138,12 @@ pub unsafe extern "C" fn gritrt_mutex_unlock(lock: *mut u8) {
 pub unsafe extern "C" fn gritrt_mutex_lock(lock: *mut u8) {
     let a = unsafe { &*lock.cast::<std::sync::atomic::AtomicU64>() };
     while a
-        .compare_exchange_weak(0, 1, std::sync::atomic::Ordering::Acquire, std::sync::atomic::Ordering::Relaxed)
+        .compare_exchange_weak(
+            0,
+            1,
+            std::sync::atomic::Ordering::Acquire,
+            std::sync::atomic::Ordering::Relaxed,
+        )
         .is_err()
     {
         std::thread::yield_now();

@@ -14,6 +14,10 @@ EXEMPT_DIR = "fuzz_regressions"
 
 
 def tracked(root):
+    # `root` phải CHÍNH LÀ gốc một kho git (không phải thư mục con của kho khác: khi TMPDIR nằm trong dự án, thư mục tạm sẽ "thuộc" kho cha)
+    top = subprocess.run(["git", "-C", root, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    if top.returncode != 0 or os.path.realpath(top.stdout.strip()) != os.path.realpath(root):
+        return None
     p = subprocess.run(["git", "-C", root, "ls-files", "-z"], capture_output=True)
     if p.returncode != 0:
         return None
