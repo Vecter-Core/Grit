@@ -1,0 +1,6 @@
+// expect: pass
+// note: đối chứng FB-C6 — cách né: bọc hàm có ⊳ trong hàm không có ⊳ tự kiểm điều kiện rồi dùng hàm bọc làm giá trị
+ƒ pos(n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ pos_or_zero(n: i32) → i32 ! ∅ { ⎇ n > 0 { pos(n) } ⇝ { 0 } }
+ƒ ap(f: ƒ(i32) → i32 ! ∅, x: i32) → i32 ! ∅ { f(x) }
+ƒ main() → i32 ! ∅ { ap(pos_or_zero, 0) }
