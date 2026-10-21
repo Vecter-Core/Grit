@@ -456,3 +456,30 @@ fn directory_input_and_version() {
     };
     assert!(out(&o).contains(want), "{}", out(&o));
 }
+
+/// G1 (Seed 1.0): tệp được chỉ định là module gốc BẤT KỂ tên (trước đây `01_add.gt`, `my-prog.gt`, `in.gt` bị từ chối với `BadModuleName`).
+#[test]
+fn file_with_non_identifier_name_is_accepted_as_the_root_module() {
+    let d = scratch("badname");
+    for (name, ok) in [
+        ("01_add.gt", true),
+        ("my-prog.gt", true),
+        ("in.gt", true),
+        ("tên-chương-trình.gt", true),
+        ("plain.gt", true),
+    ] {
+        write(&d, name, "ƒ main() → u32 ! ∅ { 7u32 }\n");
+        let o = gritc()
+            .args(["run", "--backend=interpreter"])
+            .arg(d.join(name))
+            .output()
+            .expect("chạy");
+        assert_eq!(code(&o) == 0, ok, "{name}: {}{}", out(&o), err(&o));
+        assert!(out(&o).contains("Int(7"), "{name}: {}{}", out(&o), err(&o));
+    }
+    // chẩn đoán vẫn trỏ về tên tệp người dùng nhìn thấy được (đã chuẩn hoá thành định danh hợp lệ)
+    write(&d, "7bad-name.gt", "ƒ main() → u32 ! ∅ { true }\n");
+    let o = gritc().arg("check").arg(d.join("7bad-name.gt")).output().expect("chạy");
+    assert_eq!(code(&o), 1, "{}{}", out(&o), err(&o));
+    assert!(out(&o).contains("E0301") || err(&o).contains("E0301"), "{}{}", out(&o), err(&o));
+}
