@@ -134,9 +134,14 @@ fn load(path: &str) -> Result<Vec<SourceInput>, String> {
         let text = std::fs::read_to_string(q)
             .map_err(|e| format!("không đọc được {}: {e}", q.display()))?
             .replace("\r\n", "\n");
-        let name = q
+        let file = q
             .file_name()
             .map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned());
+        // tên tệp là tên module: tệp có tên không phải định danh (`01_add.gt`, `my-prog.gt`) vẫn dùng được (G1, Seed 1.0)
+        let name = gt_resolve::module_file_name_for(&file);
+        if name != file {
+            eprintln!("gritc: `{file}` không phải tên module hợp lệ; dùng tên module `{name}`");
+        }
         Ok(SourceInput { name, text })
     };
     if p.is_dir() {

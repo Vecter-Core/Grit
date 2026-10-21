@@ -48,6 +48,39 @@ fn module_name(file: &str) -> Result<String, InputError> {
     if ok { Ok(stem.to_string()) } else { Err(bad()) }
 }
 
+/// Tên tệp HỢP LỆ (`<định danh>.gt`) suy từ một tên tệp bất kỳ do người dùng chỉ định (`01_add.gt`, `my-prog.gt`, `in.gt`, `tên.gt`…): ký tự ASCII
+/// ngoài `[A-Za-z0-9_]` ⇒ `_`; bắt đầu bằng chữ số hoặc rỗng ⇒ tiền tố `m_`; trùng từ khoá ⇒ hậu tố `_`; phần mở rộng `.gt` được thêm nếu thiếu.
+/// Tên đã hợp lệ được giữ NGUYÊN (để chẩn đoán trỏ đúng tệp người dùng nhìn thấy). Luôn trả tên mà `resolve_program` chấp nhận.
+#[must_use]
+pub fn module_file_name_for(file: &str) -> String {
+    if module_name(file).is_ok() {
+        return file.to_string();
+    }
+    let stem = file.strip_suffix(".gt").unwrap_or(file);
+    let mut id: String = stem
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if id.is_empty() || id.starts_with(|c: char| c.is_ascii_digit()) {
+        id.insert_str(0, "m_");
+    }
+    let mut cand = format!("{id}.gt");
+    if module_name(&cand).is_err() {
+        // từ khoá (`in`, `for`, `self`, …): thêm hậu tố; nếu vẫn không được thì tên cố định
+        cand = format!("{id}_.gt");
+        if module_name(&cand).is_err() {
+            cand = "main.gt".to_string();
+        }
+    }
+    cand
+}
+
 /// Giải tên cho cả chương trình. Thứ tự `inputs` không ảnh hưởng kết quả.
 pub fn resolve_program(
     inputs: &[SourceInput],

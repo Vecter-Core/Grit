@@ -479,7 +479,16 @@ fn file_with_non_identifier_name_is_accepted_as_the_root_module() {
     }
     // chẩn đoán vẫn trỏ về tên tệp người dùng nhìn thấy được (đã chuẩn hoá thành định danh hợp lệ)
     write(&d, "7bad-name.gt", "ƒ main() → u32 ! ∅ { true }\n");
-    let o = gritc().arg("check").arg(d.join("7bad-name.gt")).output().expect("chạy");
+    let o = gritc()
+        .arg("check")
+        .arg(d.join("7bad-name.gt"))
+        .output()
+        .expect("chạy");
     assert_eq!(code(&o), 1, "{}{}", out(&o), err(&o));
-    assert!(out(&o).contains("E0301") || err(&o).contains("E0301"), "{}{}", out(&o), err(&o));
+    assert!(
+        out(&o).contains("E0301") || err(&o).contains("E0301"),
+        "{}{}",
+        out(&o),
+        err(&o)
+    );
 }
