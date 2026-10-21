@@ -127,3 +127,6 @@ Tồn tại TRƯỚC R6 (ĐO ở bản `53bfb4d`, `Vec::new(&!ar)`): `s ≔ v.as
 
 ### FB-C10 — ADT `Copy` generic không được coi là Copy dưới `K: Copy` trong phạm vi (kiểu (b), từ chối chương trình hợp lệ; chặn HashMap trong std) — ĐÃ SỬA
 `▢ E<K> { k: K } ⊐ <K: Copy> Copy for E<K> { }` + `ƒ f<'a, K: Copy>(v: &Vec<'a, E<K>>)` ⇒ E0318 sai. Gốc: `TypeDb::find_impl` kiểm ràng buộc inline của impl với phạm vi RỖNG. Sửa: truyền `scope` (`db.rs`). Fail-closed giữ nguyên (không có `K: Copy` ⇒ vẫn E0318). Test ĐỎ trước: `traits_generics::generic_copy_adt_is_copy_under_its_scope_bounds_fb_c10` (commit riêng trước bản sửa).
+
+### FB-C12 — thông dịch MIR không ghi được qua lát (`s[i] ← x`, `s = &!a[from..to]`) (kiểu (c), thông dịch ≠ LLVM; ICE fail-closed) — ĐÃ SỬA
+Phát hiện bởi bộ kiểm std2 (`[T]::sort` trên mảng): thông dịch `Bug("ghi vào lát")` ⇒ "MIR không hợp lệ", LLVM đúng. Sửa: `interp.rs::set_at` ghi qua cửa sổ `Step::Sub` (chép cửa sổ, ghi, chép lại; kiểm độ dài). Test ĐỎ trước: `gt-mir/tests/interp_slice_write.rs`. Thông dịch nằm NGOÀI TCB (công cụ test): lỗi này là khoảng trống của công cụ đối chiếu, không phải lỗ hổng an toàn.

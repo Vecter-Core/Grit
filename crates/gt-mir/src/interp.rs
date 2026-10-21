@@ -498,7 +498,21 @@ impl<'a> Interp<'a> {
                     V::Array(x) => set(x.get_mut(*i).ok_or("chỉ số")?, rest, val),
                     _ => Err("ghi chỉ số vào giá trị không phải mảng".to_string()),
                 },
-                Some((Step::Sub(..), _)) => Err("ghi vào lát".to_string()),
+                // ghi qua lát `a[from..to]`: làm việc trên bản sao của cửa sổ rồi chép lại (đường đi còn lại là chỉ số tính theo cửa sổ)
+                Some((Step::Sub(a, b), rest)) => match slot {
+                    V::Array(x) => {
+                        let mut w = V::Array(x.get(*a..*b).ok_or("lát ngoài biên")?.to_vec());
+                        set(&mut w, rest, val)?;
+                        match w {
+                            V::Array(nw) if nw.len() == *b - *a => {
+                                x[*a..*b].clone_from_slice(&nw);
+                                Ok(())
+                            }
+                            _ => Err("ghi vào lát đổi độ dài".to_string()),
+                        }
+                    }
+                    _ => Err("ghi vào lát của giá trị không phải mảng".to_string()),
+                },
             }
         }
         set(&mut self.frames[fr].locals[local], path, val).map_err(Flow::Bug)

@@ -475,7 +475,7 @@
   ƒ get(&self, k: &K) → Option<V> ! ∅ {
     ⌥ self.find(k) { Some(i) ↦ Some(self.ents.as_slice()[i].v), None ↦ None }
   }
-  ƒ contains_key(&self, k: &K) → bool ! ∅ { self.find(k).is_some() }
+  ƒ contains_key(&self, k: &K) → bool ! ∅ { ¬self.find(k).is_none() }
   // đặt `ents[idx0]` vào ô trống đầu tiên của chuỗi dò (bảng luôn còn ô trống: tải < 1/2)
   ƒ place(&!self, idx0: usize) ! ∅ {
     cap ≔ self.slots.len();
