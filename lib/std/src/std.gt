@@ -428,7 +428,18 @@
 
 // ---------------------------------------------------------------- HashMap
 // Bảng băm địa chỉ mở, dò tuyến tính, trên Arena CHIA SẺ (R6): `slots[p]` = 0 (trống) hoặc 1 + chỉ số của entry trong `ents` (append-only; xoá = đánh dấu `live = false`,
-// dọn khi nở bảng). Nở gấp đôi khi (số entry + 1)·2 > số ô. Khoá `Ord` (so bằng `cmp == Equal`) + `Hash`; khoá/giá trị `Copy` (Vec trên Arena không chạy destructor).
+// dọn khi nở bảng). Dựng lại (số ô = luỹ thừa 2 ≥ 4·(số khoá sống + 1), tối thiểu 8) khi (số entry + 1)·2 > số ô. Khoá `Ord` (so bằng `cmp == Equal`) + `Hash`; khoá/giá trị `Copy` (Vec trên Arena không chạy destructor).
+// luỹ thừa 2 nhỏ nhất ≥ max(n, 8): số ô khi dựng lại bảng (theo số entry SỐNG, nên xoá/chèn liên tục không làm bảng phình mãi)
+◈ ƒ next_cap(n: usize) → usize ! ∅ {
+  μc ≔ 8usize;
+  μi ≔ 0u32;
+  ⟳ i < 62u32 ↓ 62u32 - i {
+    ⎇ c < n { c ← c * 2usize; } ⇝ { }
+    i ← i + 1u32;
+  }
+  c
+}
+
 ▢ Ent<K, V> { k: K, v: V, h: u64, live: bool }
 ⊐ <K: Copy, V: Copy> Copy for Ent<K, V> { }
 
@@ -515,7 +526,7 @@
       None ↦ {
         cap ≔ self.slots.len();
         ⎇ (self.ents.len() + 1usize) * 2usize > cap {
-          self.rebuild(⎇ cap < 4usize { 8usize } ⇝ { cap * 2usize });
+          self.rebuild(next_cap((self.live + 1usize) * 4usize));
         } ⇝ { }
         h ≔ k.hash();
         self.ents.push(Ent { k: k, v: v, h: h, live: true });
