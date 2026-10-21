@@ -1012,6 +1012,28 @@ fn mem_map_u64(rng: &mut Rng, churn: bool) -> Mem {
             m.fold("HashMap::len", "(m.len() as u64)", model.len() as u64);
         }
     }
+    // mỗi chương trình có ít nhất một lần của MỖI phép (để mọi hàm xuất hiện ≥ 30 chương trình)
+    let k0 = rng.below(pool);
+    m.fold(
+        "HashMap::get",
+        &format!("ou(m.get(&{k0}u64))"),
+        model.get(&k0).map_or(0, |v| v.wrapping_add(1)),
+    );
+    m.fold(
+        "HashMap::contains_key",
+        &format!("bn(m.contains_key(&{k0}u64))"),
+        model.contains_key(&k0) as u64,
+    );
+    m.fold("HashMap::len", "(m.len() as u64)", model.len() as u64);
+    let had = model.remove(&k0).is_some();
+    m.fold(
+        "HashMap::remove",
+        &format!("bn(m.remove(&{k0}u64))"),
+        had as u64,
+    );
+    m.stmt("m.insert(5u64, 6u64);");
+    model.insert(5, 6);
+    *m.used.entry("HashMap::insert").or_default() += 1;
     // duyệt: tổng không phụ thuộc thứ tự + số entry sống
     let sum = model.iter().fold(0u64, |s, (k, v)| {
         s.wrapping_add(k.wrapping_mul(1000003).wrapping_add(*v))
