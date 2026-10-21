@@ -1,0 +1,3 @@
+// expect: fail E0801
+// note: FB-C5 — Arena::new ({mem}) làm giá trị rồi gọi trong hàm thuần
+ƒ f() ! ∅ { g ≔ Arena::new; a ≔ g(); }

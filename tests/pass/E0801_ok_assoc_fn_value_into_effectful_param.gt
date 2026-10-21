@@ -1,0 +1,4 @@
+// expect: pass
+// note: đối chứng FB-C5 — Arena::new ({mem}) truyền vào tham số ƒ() → Arena ! {mem}
+ƒ ap(g: ƒ() → Arena ! {mem}) ! {mem} { a ≔ g(); }
+ƒ f() ! {mem} { ap(Arena::new); }

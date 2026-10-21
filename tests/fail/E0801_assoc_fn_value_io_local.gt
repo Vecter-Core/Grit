@@ -1,0 +1,5 @@
+// expect: fail E0801
+// note: FB-C5 — hàm kết hợp có {io} đặt vào biến rồi gọi trong hàm thuần (hiệu ứng không được mất khi làm giá trị)
+▢ S { x: i32 }
+⊐ S { ƒ mk() ! {io} { } }
+ƒ f() ! ∅ { g ≔ S::mk; g(); }
