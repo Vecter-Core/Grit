@@ -2,6 +2,14 @@
 
 **Cập nhật tại commit c7de2cc, ngày 2026-10-17.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
+## 0. SỰ THẬT MỚI (2026-10-21; lệnh Seed 1.0 bản sửa — ĐỌC TRƯỚC)
+- Giang KHÔNG có máy tính; làm việc trên điện thoại/trình duyệt qua Claude Code đám mây. **origin là nguồn sự thật DUY NHẤT**; không chờ gì từ máy Windows. Container là TẠM THỜI: mọi thứ chưa push sẽ MẤT. Nhánh làm việc: `claude/gallant-darwin-m251cq` (push sau mỗi mục và ≥ mỗi 45 phút; chỉ nhánh này và tag `seed-*`; không push `main`, không force).
+- Nền chính: **Linux container** (x86_64, LLVM 20.1.2 hệ thống `libLLVM-20.so`). **Windows: chưa kiểm** sau các thay đổi của nhánh này — ghi ở MỌI báo cáo cổng. Các quy tắc riêng Windows (paging file, WinError 1455, TEMP ở D:, thử lại LNK1104) bị bỏ ở nhánh này; giữ: không chạy hai cargo cùng lúc, job theo `nproc` (tối đa 4), lô nặng ≤ 10 phút có `--resume`.
+- Bản Windows của Giang có thể tiến xa hơn origin (báo cáo gần nhất: cổng 943 test, FB-15, E0313, `fn_value_gen`, oracle match 13 kiểu) và CHƯA lên origin: xem `docs/MERGE_NOTES.md` (tiền tố FB-C / ADR-C để không trùng số).
+- Kế hoạch: `docs/SEED_PLAN.md` (mục tiêu SEED 1.0 gồm sáu mục đo được); danh sách việc: `docs/RUNLIST.md`; báo cáo từng mục: `docs/RUN_REPORTS.md`.
+- Quan hệ nhánh: `origin/main` = `86c4955` ("Initial commit: Push full Grit project" — snapshot dở, KHÔNG dùng làm mốc xanh); `claude/gallant-darwin-m251cq` đi từ đó với các commit kiểm toán ngoài + sửa FB-C1…FB-C8. Không có nhánh nào khác trên origin.
+- Bảng CÓ/THIẾU lúc 2026-10-21: có `docs/DELETIONS.md`, `docs/FAIL_OPEN_AUDIT.md`, `tools/track_guard.sh`, `.claude/skills/grit-contract.md`, mã `E0313` (nghĩa trong repo này: "kiểu lang dùng sai" — có thể KHÁC E0313 của bản Windows, xem MERGE_NOTES), ADR-041; THIẾU (đã TẠO MỚI ở S0) `docs/RUNLIST.md`, `docs/INTRINSIC_AS_VALUE.md`, `tools/preflight.sh`.
+
 ## 1. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ (`.gt`) thiết kế cho AI viết code; ký hiệu toán/logic ngắn (có bí danh ASCII). Chủ dự án **Giang** — trả lời bằng TIẾNG VIỆT.
 2. Compiler `gritc` viết bằng **Rust**, workspace `D:\Grit`, các crate `gt-*` + `rig` (trình quản lý gói) + `runtime/gt-rt` (workspace riêng).

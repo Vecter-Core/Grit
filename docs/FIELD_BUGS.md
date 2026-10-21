@@ -102,3 +102,23 @@ Phương pháp: viết test chạm đúng nhánh, hoàn nguyên CHỈ chỗ sử
 - **B2/B3** (`crates/gt-borrowck/tests/fail_open_ice.rs`, 4 test; sửa MỘT thân MIR thật rồi gọi `check_body` công khai; đối chứng: thân nguyên vẹn không báo gì). Hoàn nguyên `regions.rs` về trước bản sửa (4137b75): cả 4 **ĐỎ** — Deref không slot ⇒ `[]` (im lặng chấp nhận); ADT lạ trong phép gán ⇒ `[]`; ADT lạ sau `&!` ⇒ `[]`; phép chiếu `Field` trên số nguyên ⇒ `["E0401"]` (chẩn đoán SAI trên dữ liệu rác, không phải ICE). Bản sửa ⇒ 4/4 XANH, mỗi ca ra E9901.
 - **D1** (`crates/gt-driver/tests/instance_keys.rs`, test `an_instance_without_a_key_changes_the_attestation_hash_instead_of_disappearing`): so `mir_dump` của (a) thiếu khoá hàm của một nút với (b) bảng instance không có nút đó. Hoàn nguyên `mir_dump` về `filter_map` cũ ⇒ **ĐỎ** (hai băm trùng nhau); bản sửa ⇒ XANH.
 - **Giới hạn nói thẳng:** dữ liệu thiếu được DỰNG bằng cách sửa cấu trúc trong bộ nhớ, không phải sinh bởi gritc (Phase 1 không sinh ra). Đây chứng minh nhánh phòng thủ hoạt động, không chứng minh có đường thật dẫn tới nhánh đó.
+
+## Hồ sơ nhánh `claude/gallant-darwin-m251cq` (tiền tố FB-C để merge không trùng số với bản Windows)
+Phát hiện bằng kiểm toán ngoài 2026-10-20/21 (Linux). Mỗi mục: test hồi quy ĐỎ TRƯỚC sửa đã được kiểm bằng cách hoàn nguyên bản sửa (bảng ở `docs/FAIL_OPEN_AUDIT.md` mục "F-01..F-08"). Chi tiết tái hiện: `audit/ANALYSIS.md`.
+
+### FB-C1 — M6 không thấy nhiều toán hạng cùng một câu lệnh (kiểu (a), âm tính giả, NGHIÊM TRỌNG) — ĐÃ SỬA
+`(b, b)`, `two(b, b)`, `[b, b]`, `P { a: b, b: b }`, `g(b, b.v)` với `b` không-Copy được phán XANH ⇒ nhân đôi `&!`/`Cap`/tay cầm Arena; native: dùng-sau-reset đọc 99 thay vì 1234. Gốc: `check_uses` đối chiếu mọi truy cập với trạng thái chưa-khởi-tạo ĐẦU câu lệnh. Sửa: bản sao cục bộ + áp move sau mỗi truy cập `Move`. Test: `gt-borrowck/tests/same_stmt.rs`, 14 mẫu `tests/fail/E0401_{same_stmt,dup}_*`. Chạm điều kiện cứng #9 (mutability bên trong): không. Còn thiếu: kịch bản `dup_operand` trong bộ sinh progen (S1).
+### FB-C2 — kiểu không biết/vô hạn kích thước được chấp nhận (kiểu (a)) — ĐÃ SỬA
+`[T]`/`str` theo giá trị ở tham số/trả về/trường (chỉ `let` bị chặn); kiểu chứa chính nó theo giá trị ⇒ `gritc` tràn ngăn xếp (mã 134) ở codegen. Sửa: `sized_ty` trong `elem_ty`/tham số/trả về; `contains_itself_by_value` (kể cả qua ADT generic, đa hình bung vô hạn) ⇒ E0301. Test: 9 mẫu `tests/fail/E0301_*`, 1 mẫu pass.
+### FB-C3 — nguồn capability gọi qua giá trị hàm (kiểu (a), điều kiện #12) — ĐÃ SỬA
+`helper(mk: ƒ() → Cap<Out>)` + `main` gọi `helper(root_out)` ⇒ `helper` đúc `Cap<Out>` tuỳ ý. Sửa: lời gọi qua giá trị hàm ghi `CapUse` (E0310). ĐO trước/sau: `docs/INTRINSIC_AS_VALUE.md`. Test: `E0310_call_through_fn_value`, `E0310_call_through_local_fn_value`, pass `206_fn_value_with_cap_param`.
+### FB-C4 — tên biến ở vị trí kiểu ⇒ ICE E9901 thay vì chẩn đoán (kiểu (a)/(d), fail-closed) — ĐÃ SỬA
+`ƒ f(b: i32) → b` ⇒ `Ty::Err` không chẩn đoán (`collect.rs`). Sửa: E0301. Test `E0301_local_name_in_type_position`.
+### FB-C5 — hàm kết hợp `Kiểu::hàm` dùng làm giá trị MẤT hiệu ứng (kiểu (a), âm tính giả) — MỞ (S1.iii)
+`Arena::new` (`{mem}`), `S::mk` (`{io}`) truyền vào tham số thuần hoặc gọi qua biến trong hàm thuần: XANH; gọi trực tiếp: E0801. Gốc: `call.rs` nhánh đường dẫn kết hợp dựng `Ty::Fn(ps, ret, Vec::new())`.
+### FB-C6 — tiền điều kiện `⊳` không được kiểm khi gọi qua giá trị hàm (kiểu (a), âm tính giả) — MỞ (S1.ii)
+`f ≔ shl; f(1u32, 40u32)` XANH (trực tiếp: E0901). Cùng `rotr`, hàm người dùng có `⊳`, `Option::unwrap`.
+### FB-C7 — `gritc` hoàn toàn không dựng được ngoài Windows / `--no-default-features` hỏng (kiểu (c)) — ĐÃ SỬA
+Kiểu `Opt` thay thế khi tắt feature `llvm`; test `release_*` gắn cfg; port Linux (LLVM 20 `.so`, `libgt_rt.a`, `cc`). Windows: chưa kiểm sau sửa.
+### FB-C8 — chương trình hợp lệ bị HĐH giết do ngăn xếp (kiểu (b)) — ĐÃ SỬA (giới hạn 256 MiB)
+Đệ quy 2 triệu tầng có `↓`, mảng 20 MB cục bộ ⇒ SIGSEGV, `gritc run` báo mã 2. Sửa: `gritrt_start` chạy `main` trên luồng 256 MiB. Test `gt-driver/tests/stack_depth.rs`. Còn: tràn quá 256 MiB vẫn bị giết (KNOWN_LIMITATIONS).
