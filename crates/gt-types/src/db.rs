@@ -71,12 +71,14 @@ impl TypeDb {
         }
     }
 
-    /// Tìm impl của `trait_def` cho `ty` (đã giải). Trả (chỉ số impl, tham số impl) nếu có đúng một.
+    /// Tìm impl của `trait_def` cho `ty` (đã giải); `scope` là các ràng buộc có hiệu lực cho tham số kiểu trong `ty`
+    /// (FB-C10: ràng buộc inline của impl được kiểm TRONG phạm vi này, không phải phạm vi rỗng). Trả (chỉ số impl, tham số impl) nếu có đúng một.
     pub(crate) fn find_impl(
         &self,
         infer: &mut InferCtx,
         trait_def: DefId,
         ty: &Ty,
+        scope: &[Bound],
         depth: u32,
     ) -> Option<(usize, Vec<Ty>)> {
         if depth > 8 {
@@ -98,7 +100,7 @@ impl TypeDb {
                     let a = inf.resolve(a);
                     g.bounds
                         .iter()
-                        .all(|b| self.satisfies_bound(inf, &a, b.trait_def, &[], depth + 1))
+                        .all(|b| self.satisfies_bound(inf, &a, b.trait_def, scope, depth + 1))
                 })
             });
             if ok {
@@ -134,7 +136,7 @@ impl TypeDb {
             return Some((i, args.iter().map(|a| inf.resolve(a)).collect()));
         }
         let mut inf = InferCtx::new();
-        let (i, args) = self.find_impl(&mut inf, trait_def, ty, 0)?;
+        let (i, args) = self.find_impl(&mut inf, trait_def, ty, &[], 0)?;
         Some((i, args.iter().map(|a| inf.resolve(a)).collect()))
     }
 
@@ -197,7 +199,7 @@ impl TypeDb {
                 if self.lang.get(&Lang::Copy) == Some(&trait_def) {
                     return self.is_copy(infer, &ty, scope, depth);
                 }
-                self.find_impl(infer, trait_def, &ty, depth).is_some()
+                self.find_impl(infer, trait_def, &ty, scope, depth).is_some()
             }
         }
     }
@@ -244,7 +246,7 @@ impl TypeDb {
                 let Some(&copy) = self.lang.get(&Lang::Copy) else {
                     return false;
                 };
-                self.find_impl(infer, copy, &ty, depth + 1).is_some()
+                self.find_impl(infer, copy, &ty, scope, depth + 1).is_some()
             }
         }
     }
@@ -329,7 +331,7 @@ impl TypeDb {
             return false;
         };
         let mut inf = InferCtx::new();
-        self.find_impl(&mut inf, drop, ty, 0).is_some()
+        self.find_impl(&mut inf, drop, ty, &[], 0).is_some()
     }
 
     /// `is_copy` với các ràng buộc `scope` của hàm đang xét (kiểu đã giải hết — dùng sau M4).

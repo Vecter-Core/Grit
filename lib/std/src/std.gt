@@ -43,3 +43,507 @@
 // ---------------------------------------------------------------- min / max theo Ord (bên trái khi bằng ⇒ ổn định, như `std::cmp::min`/`max` của Rust: min lấy a khi bằng, max lấy b khi bằng)
 ◈ ƒ min<T: Ord + Copy>(a: T, b: T) → T ! ∅ { ⌥ b.cmp(&a) { Ordering::Less ↦ b, _ ↦ a } }
 ◈ ƒ max<T: Ord + Copy>(a: T, b: T) → T ! ∅ { ⌥ b.cmp(&a) { Ordering::Less ↦ a, _ ↦ b } }
+
+// ================================================================ Seed 1.0 S2: Vec, byte, số (hợp nhất vào module `std` để người dùng gọi `std::…`)
+// std_vec (Seed 1.0 S2, G3): API của `Vec<'a, T>` viết bằng Grit THƯỜNG trên intrinsic `new/push/reserve/len/as_slice/as_mut_slice/truncate` của prelude.
+// Mọi phần tử phải `Copy` (Vec trên Arena không chạy destructor, E0318). Hàm đòi điều kiện dùng `⊳` (kiểm lúc chạy nếu không chứng minh được: abort
+// `precondition`), KHÔNG trả `Option` giả. Kiểm thử: crates/gt-driver/tests/std2_lib.rs (mô hình Rust độc lập ≡ thông dịch ≡ exe).
+
+⊐ <'a, T: Copy> Vec<'a, T> {
+  ƒ is_empty(&self) → bool ! ∅ { self.len() == 0usize }
+  // phần tử thứ `i` (None nếu ngoài biên)
+  ƒ get(&self, i: usize) → Option<T> ! ∅ {
+    s ≔ self.as_slice();
+    ⎇ i < s.len() { Some(s[i]) } ⇝ { None }
+  }
+  ƒ first(&self) → Option<T> ! ∅ { self.get(0usize) }
+  ƒ last(&self) → Option<T> ! ∅ {
+    n ≔ self.len();
+    ⎇ n == 0usize { None } ⇝ { self.get(n - 1usize) }
+  }
+  // bỏ và trả phần tử cuối
+  ƒ pop(&!self) → Option<T> ! ∅ {
+    n ≔ self.len();
+    ⎇ n == 0usize { None } ⇝ {
+      v ≔ self.as_slice()[n - 1usize];
+      self.truncate(n - 1usize);
+      Some(v)
+    }
+  }
+  ƒ clear(&!self) ! ∅ { self.truncate(0usize); }
+  // thêm mọi phần tử của `s` vào cuối
+  ƒ extend_from_slice(&!self, s: &[T]) ! {mem} {
+    μi ≔ 0usize;
+    ⟳ i < s.len() ↓ s.len() - i {
+      self.push(s[i]);
+      i ← i + 1usize;
+    }
+  }
+  // chèn `x` tại `min(i, len)` (dịch phần sau sang phải). Không dùng `⊳ i ≤ len`: hợp đồng trên `&!self` không kiểm được lúc chạy (E0902) nên sẽ đòi
+  // chứng minh ở MỌI chỗ gọi; kẹp chỉ số làm hàm TOÀN PHẦN, không bao giờ abort
+  ƒ insert(&!self, i: usize, x: T) ! {mem} {
+    n ≔ self.len();
+    at ≔ ⎇ i < n { i } ⇝ { n };
+    self.push(x);
+    μj ≔ n;
+    ⟳ j > at ↓ j {
+      μs ≔ self.as_mut_slice();
+      s[j] ← s[j - 1usize];
+      j ← j - 1usize;
+    }
+    μs2 ≔ self.as_mut_slice();
+    s2[at] ← x;
+  }
+  // bỏ và trả phần tử thứ `i` (dịch phần sau sang trái); None nếu `i ≥ len`
+  ƒ remove(&!self, i: usize) → Option<T> ! ∅ {
+    n ≔ self.len();
+    ⎇ i < n {
+      v ≔ self.as_slice()[i];
+      μj ≔ i;
+      ⟳ j + 1usize < n ↓ n - j {
+        μs ≔ self.as_mut_slice();
+        s[j] ← s[j + 1usize];
+        j ← j + 1usize;
+      }
+      self.truncate(n - 1usize);
+      Some(v)
+    } ⇝ { None }
+  }
+}
+
+⊐ <'a, T: Ord + Copy> Vec<'a, T> {
+  ƒ contains(&self, x: &T) → bool ! ∅ {
+    s ≔ self.as_slice();
+    μi ≔ 0usize;
+    μfound ≔ false;
+    ⟳ i < s.len() ↓ s.len() - i {
+      ⎇ s[i].cmp(x).is_eq() { found ← true; } ⇝ { }
+      i ← i + 1usize;
+    }
+    found
+  }
+}
+
+// std_bytes (Seed 1.0 S2, G4/G11/G12): thao tác trên BYTE — tìm kiếm, cắt khoảng trắng ASCII, phân tích số nguyên (trả `Result`, không abort), in số có dấu/hex,
+// số học kiểm tràn. Viết bằng Grit THƯỜNG trên `str::as_bytes`, lát byte và `Cap<Out>`/`Vec<'a, u8>` của prelude. Quy ước: vị trí là BYTE; mọi hàm TOÀN PHẦN
+// (không abort vì đầu vào; chỉ các kiểm tra tràn/biên mà bộ giải chưa chứng minh được là kiểm lúc chạy và không bao giờ kích hoạt với đầu vào hợp lệ).
+// Vòng lặp luôn có `↓` (M8): "thoát sớm" bằng cách đặt chỉ số về cuối. Kiểm thử: crates/gt-driver/tests/std2_lib.rs (mô hình Rust độc lập ≡ thông dịch ≡ exe).
+
+// lỗi phân tích số nguyên: Empty (không có ký tự), Invalid (có ký tự không phải chữ số), Overflow (ngoài miền kiểu). Ưu tiên: Empty > Invalid > Overflow.
+◈ ⊔ ParseError { Empty, Invalid, Overflow }
+
+// ký tự khoảng trắng ASCII: ` `, `\t`, `\n`, `\r`
+◈ ƒ is_ascii_ws(c: u8) → bool ! ∅ { c == 32u8 ∨ c == 9u8 ∨ c == 10u8 ∨ c == 13u8 }
+
+// các chữ số thập phân của `n` căn PHẢI trong `buf` (24 byte); trả chỉ số bắt đầu (0 ở đầu không in; n = 0 ⇒ một chữ số `0`)
+◈ ƒ fmt_u64(buf: &![u8; 24], n: u64) → usize ! ∅ {
+  μi ≔ 24usize;
+  μm ≔ n;
+  ⟳ i > 4usize ↓ i {
+    i ← i - 1usize;
+    buf[i] ← 48u8 + ((m % 10u64) as u8);
+    m ← m / 10u64;
+  }
+  μstart ≔ 23usize;
+  μj ≔ 23usize;
+  ⟳ j > 4usize ↓ j {
+    j ← j - 1usize;
+    ⎇ buf[j] != 48u8 { start ← j; } ⇝ { }
+  }
+  start
+}
+
+// như `fmt_u64` nhưng có dấu `-` cho số âm (`i64::MIN` đúng)
+◈ ƒ fmt_i64(buf: &![u8; 24], n: i64) → usize ! ∅ {
+  ⎇ n >= 0i64 { fmt_u64(buf, n as u64) } ⇝ {
+    mag ≔ ((0i64 - (n + 1i64)) as u64) + 1u64;
+    s ≔ fmt_u64(buf, mag);
+    ⎇ s > 0usize { buf[s - 1usize] ← 45u8; s - 1usize } ⇝ { s }
+  }
+}
+
+// 16 chữ số hex (chữ thường) của `n` căn phải trong `buf`; trả chỉ số bắt đầu (n = 0 ⇒ một chữ số `0`)
+◈ ƒ fmt_hex(buf: &![u8; 24], n: u64) → usize ! ∅ {
+  μi ≔ 24usize;
+  μm ≔ n;
+  ⟳ i > 8usize ↓ i {
+    i ← i - 1usize;
+    d ≔ (m % 16u64) as u8;
+    ⎇ d < 10u8 { buf[i] ← 48u8 + d; } ⇝ { buf[i] ← 87u8 + d; }
+    m ← m / 16u64;
+  }
+  μstart ≔ 23usize;
+  μj ≔ 23usize;
+  ⟳ j > 8usize ↓ j {
+    j ← j - 1usize;
+    ⎇ buf[j] != 48u8 { start ← j; } ⇝ { }
+  }
+  start
+}
+
+// phân tích chuỗi chữ số thập phân (không dấu) thành u64
+◈ ƒ parse_digits(b: &[u8]) → Result<u64, ParseError> ! ∅ {
+  ⎇ b.len() == 0usize { Err(ParseError::Empty) } ⇝ {
+    μi ≔ 0usize;
+    μbad ≔ false;
+    ⟳ i < b.len() ↓ b.len() - i {
+      c ≔ b[i];
+      ⎇ c < 48u8 ∨ c > 57u8 { bad ← true; } ⇝ { }
+      i ← i + 1usize;
+    }
+    ⎇ bad { Err(ParseError::Invalid) } ⇝ {
+      μk ≔ 0usize;
+      μv ≔ 0u64;
+      μover ≔ false;
+      ⟳ k < b.len() ↓ b.len() - k {
+        d ≔ (b[k] - 48u8) as u64;
+        ⎇ v > 1844674407370955161u64 ∨ (v == 1844674407370955161u64 ∧ d > 5u64) { over ← true; k ← b.len(); } ⇝ {
+          v ← v * 10u64 + d;
+          k ← k + 1usize;
+        }
+      }
+      ⎇ over { Err(ParseError::Overflow) } ⇝ { Ok(v) }
+    }
+  }
+}
+
+// chỉ số của byte không-khoảng-trắng đầu tiên (len nếu không có)
+◈ ƒ first_non_ws(b: &[u8]) → usize ! ∅ {
+  n ≔ b.len();
+  μa ≔ 0usize;
+  μfirst ≔ n;
+  ⟳ a < n ↓ n - a {
+    ⎇ is_ascii_ws(b[a]) { a ← a + 1usize; } ⇝ { first ← a; a ← n; }
+  }
+  first
+}
+
+// chỉ số ngay SAU byte không-khoảng-trắng cuối cùng (0 nếu không có). Luôn giảm `e` mỗi vòng (M8 không chứng minh được gán hằng làm biến thể giảm).
+◈ ƒ end_after_last_non_ws(b: &[u8]) → usize ! ∅ {
+  μe ≔ b.len();
+  μlast ≔ 0usize;
+  μfound ≔ false;
+  ⟳ e > 0usize ↓ e {
+    ⎇ ¬found ∧ ¬is_ascii_ws(b[e - 1usize]) { last ← e; found ← true; } ⇝ { }
+    e ← e - 1usize;
+  }
+  last
+}
+
+⊐ [u8] {
+  ƒ starts_with(&self, p: &[u8]) → bool ! ∅ {
+    ⎇ p.len() > self.len() { false } ⇝ {
+      μi ≔ 0usize;
+      μok ≔ true;
+      ⟳ i < p.len() ↓ p.len() - i {
+        ⎇ self[i] != p[i] { ok ← false; } ⇝ { }
+        i ← i + 1usize;
+      }
+      ok
+    }
+  }
+  ƒ ends_with(&self, p: &[u8]) → bool ! ∅ {
+    ⎇ p.len() > self.len() { false } ⇝ {
+      off ≔ self.len() - p.len();
+      μi ≔ 0usize;
+      μok ≔ true;
+      ⟳ i < p.len() ↓ p.len() - i {
+        ⎇ self[off + i] != p[i] { ok ← false; } ⇝ { }
+        i ← i + 1usize;
+      }
+      ok
+    }
+  }
+  // vị trí byte đầu tiên bằng `b` tại hoặc sau `from`
+  ƒ find_byte(&self, from: usize, b: u8) → Option<usize> ! ∅ {
+    n ≔ self.len();
+    μi ≔ from;
+    μr ≔ None;
+    ⟳ i < n ↓ n - i {
+      ⎇ self[i] == b { r ← Some(i); i ← n; } ⇝ { i ← i + 1usize; }
+    }
+    r
+  }
+  // vị trí đầu tiên của dãy `p` (mẫu rỗng ⇒ Some(0)); tìm ngây thơ O(n·m)
+  ƒ find(&self, p: &[u8]) → Option<usize> ! ∅ {
+    n ≔ self.len();
+    m ≔ p.len();
+    μi ≔ 0usize;
+    μr ≔ None;
+    ⟳ i < n ↓ n - i {
+      ⎇ i + m <= n ∧ self[i..i + m].starts_with(p) { r ← Some(i); i ← n; } ⇝ { i ← i + 1usize; }
+    }
+    ⎇ m == 0usize { Some(0usize) } ⇝ { r }
+  }
+  // bỏ khoảng trắng ASCII ở hai đầu
+  ƒ trim_ascii(&self) → &[u8] ! ∅ {
+    first ≔ first_non_ws(self);
+    last ≔ end_after_last_non_ws(self);
+    ⎇ first < last { &self[first..last] } ⇝ { &self[0usize..0usize] }
+  }
+  // u64 thập phân không dấu
+  ƒ parse_u64(&self) → Result<u64, ParseError> ! ∅ { parse_digits(self) }
+  // i64 thập phân với `-` tuỳ chọn (không có `+`)
+  ƒ parse_i64(&self) → Result<i64, ParseError> ! ∅ {
+    ⎇ self.len() > 0usize ∧ self[0usize] == 45u8 {
+      ⌥ parse_digits(&self[1usize..self.len()]) {
+        Ok(m) ↦ {
+          ⎇ m > 9223372036854775808u64 { Err(ParseError::Overflow) } ⇝ {
+            ⎇ m == 9223372036854775808u64 { Ok(0i64 - 9223372036854775807i64 - 1i64) } ⇝ { Ok(0i64 - (m as i64)) }
+          }
+        },
+        Err(e) ↦ Err(e),
+      }
+    } ⇝ {
+      ⌥ parse_digits(self) {
+        Ok(m) ↦ {
+          ⎇ m > 9223372036854775807u64 { Err(ParseError::Overflow) } ⇝ { Ok(m as i64) }
+        },
+        Err(e) ↦ Err(e),
+      }
+    }
+  }
+}
+
+⊐ str {
+  ƒ starts_with(&self, p: &str) → bool ! ∅ { self.as_bytes().starts_with(p.as_bytes()) }
+  ƒ ends_with(&self, p: &str) → bool ! ∅ { self.as_bytes().ends_with(p.as_bytes()) }
+  ƒ find(&self, p: &str) → Option<usize> ! ∅ { self.as_bytes().find(p.as_bytes()) }
+  ƒ parse_u64(&self) → Result<u64, ParseError> ! ∅ { self.as_bytes().parse_u64() }
+  ƒ parse_i64(&self) → Result<i64, ParseError> ! ∅ { self.as_bytes().parse_i64() }
+}
+
+// ghi số nguyên có dấu/hex/byte ra stdout và stderr
+⊐ Cap<Out> {
+  ƒ write_i64(&self, n: i64) ! {io} {
+    μbuf ≔ [0u8; 24];
+    s ≔ fmt_i64(&!buf, n);
+    self.write_bytes(&buf[s..24usize]);
+  }
+  ƒ write_hex(&self, n: u64) ! {io} {
+    μbuf ≔ [0u8; 24];
+    s ≔ fmt_hex(&!buf, n);
+    self.write_bytes(&buf[s..24usize]);
+  }
+  ƒ write_byte(&self, b: u8) ! {io} {
+    μbuf ≔ [b; 1];
+    self.write_bytes(&buf[0usize..1usize]);
+  }
+}
+
+// thêm văn bản/số vào một `Vec<u8>` (dựng bộ đệm đầu ra)
+⊐ <'a> Vec<'a, u8> {
+  ƒ push_str(&!self, s: &str) ! {mem} { self.extend_from_slice(s.as_bytes()); }
+  ƒ push_u64(&!self, n: u64) ! {mem} {
+    μbuf ≔ [0u8; 24];
+    s ≔ fmt_u64(&!buf, n);
+    self.extend_from_slice(&buf[s..24usize]);
+  }
+  ƒ push_i64(&!self, n: i64) ! {mem} {
+    μbuf ≔ [0u8; 24];
+    s ≔ fmt_i64(&!buf, n);
+    self.extend_from_slice(&buf[s..24usize]);
+  }
+}
+
+// số học kiểm tràn không abort
+◈ ƒ abs_i64(x: i64) → Option<i64> ! ∅ { ⎇ x >= 0i64 { Some(x) } ⇝ { 0i64 -? x } }
+◈ ƒ pow_u64(base: u64, exp: u32) → Option<u64> ! ∅ {
+  μr ≔ Some(1u64);
+  μi ≔ 0u32;
+  ⟳ i < exp ↓ exp - i {
+    ⌥ r { Some(v) ↦ { r ← v *? base; }, None ↦ { } }
+    i ← i + 1u32;
+  }
+  r
+}
+
+// ================================================================ Seed 1.0 S2: sắp xếp, băm, HashMap (G10, G13)
+
+// sắp xếp TẠI CHỖ theo `Ord` (heapsort: O(n log n), KHÔNG ổn định, không cần bộ đệm); phần tử `Copy`
+◈ ƒ swap_at<T: Copy>(s: &![T], i: usize, j: usize) ! ∅ {
+  t ≔ s[i];
+  s[i] ← s[j];
+  s[j] ← t;
+}
+
+// vun đống lớn-nhất con của `root` trong s[0..n]
+◈ ƒ sift_down<T: Ord + Copy>(s: &![T], root: usize, n: usize) ! ∅ {
+  μr ≔ root;
+  μk ≔ 0usize;
+  ⟳ k < n ↓ n - k {
+    child ≔ r * 2usize + 1usize;
+    ⎇ child >= n { k ← n; } ⇝ {
+      μc ≔ child;
+      ⎇ child + 1usize < n ∧ s[child].cmp(&s[child + 1usize]).is_lt() { c ← child + 1usize; } ⇝ { }
+      ⎇ s[r].cmp(&s[c]).is_lt() {
+        swap_at(&!*s, r, c);
+        r ← c;
+        k ← k + 1usize;
+      } ⇝ { k ← n; }
+    }
+  }
+}
+
+⊐ <T: Ord + Copy> [T] {
+  ƒ sort(&!self) ! ∅ {
+    n ≔ self.len();
+    μi ≔ n / 2usize;
+    ⟳ i > 0usize ↓ i {
+      i ← i - 1usize;
+      sift_down(&!*self, i, n);
+    }
+    μe ≔ n;
+    ⟳ e > 1usize ↓ e {
+      e ← e - 1usize;
+      swap_at(&!*self, 0usize, e);
+      sift_down(&!*self, 0usize, e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- băm
+◈ ⊏ Hash { ƒ hash(&self) → u64 ! ∅; }
+
+// băm đa thức cuộn trên byte (không có xor u64 ở Phase 1) + trộn cuối
+◈ ƒ hash_bytes(b: &[u8]) → u64 ! ∅ {
+  n ≔ b.len();
+  μh ≔ 14695981039346656037u64;
+  μi ≔ 0usize;
+  ⟳ i < n ↓ n - i {
+    h ← h *% 1099511628211u64 +% ((b[i] as u64) + 1u64);
+    i ← i + 1usize;
+  }
+  h *% 11400714819323198485u64
+}
+
+⊐ Hash for u64 { ƒ hash(&self) → u64 ! ∅ { (*self) *% 11400714819323198485u64 } }
+⊐ Hash for usize { ƒ hash(&self) → u64 ! ∅ { ((*self) as u64) *% 11400714819323198485u64 } }
+
+// khoá/giá trị là lát byte (vd. nội dung `File::bytes()` hoặc một `&[u8]` nào đó): dùng được làm khoá của HashMap, so theo thứ tự từ điển byte
+◈ ▢ Bytes<'a> { ◈ b: &'a [u8] }
+⊐ <'a> Copy for Bytes<'a> { }
+⊐ <'a> Ord for Bytes<'a> { ƒ cmp(&self, o: &Self) → Ordering ! ∅ { self.b.cmp(o.b) } }
+⊐ <'a> Hash for Bytes<'a> { ƒ hash(&self) → u64 ! ∅ { hash_bytes(self.b) } }
+
+// ---------------------------------------------------------------- HashMap
+// Bảng băm địa chỉ mở, dò tuyến tính, trên Arena CHIA SẺ (R6): `slots[p]` = 0 (trống) hoặc 1 + chỉ số của entry trong `ents` (append-only; xoá = đánh dấu `live = false`,
+// dọn khi nở bảng). Nở gấp đôi khi (số entry + 1)·2 > số ô. Khoá `Ord` (so bằng `cmp == Equal`) + `Hash`; khoá/giá trị `Copy` (Vec trên Arena không chạy destructor).
+▢ Ent<K, V> { k: K, v: V, h: u64, live: bool }
+⊐ <K: Copy, V: Copy> Copy for Ent<K, V> { }
+
+◈ ▢ HashMap<'a, K, V> { slots: Vec<'a, usize>, ents: Vec<'a, Ent<K, V>>, live: usize }
+
+⊐ <'a, K: Copy + Ord + Hash, V: Copy> HashMap<'a, K, V> {
+  ƒ new(a: &'a Arena) → HashMap<'a, K, V> ! {mem} {
+    HashMap { slots: Vec::new(a), ents: Vec::new(a), live: 0usize }
+  }
+  // số khoá đang sống
+  ƒ len(&self) → usize ! ∅ { self.live }
+  // chỉ số trong `ents` của entry sống có khoá `k`
+  ƒ find(&self, k: &K) → Option<usize> ! ∅ {
+    cap ≔ self.slots.len();
+    ⎇ cap == 0usize { None } ⇝ {
+      h ≔ k.hash();
+      μp ≔ (h % (cap as u64)) as usize;
+      μstep ≔ 0usize;
+      μr ≔ None;
+      ⟳ step < cap ↓ cap - step {
+        e ≔ self.slots.as_slice()[p];
+        ⎇ e == 0usize { step ← cap; } ⇝ {
+          ent ≔ self.ents.as_slice()[e - 1usize];
+          ⎇ ent.live ∧ ent.h == h ∧ ent.k.cmp(k).is_eq() { r ← Some(e - 1usize); step ← cap; } ⇝ {
+            p ← (p + 1usize) % cap;
+            step ← step + 1usize;
+          }
+        }
+      }
+      r
+    }
+  }
+  ƒ get(&self, k: &K) → Option<V> ! ∅ {
+    ⌥ self.find(k) { Some(i) ↦ Some(self.ents.as_slice()[i].v), None ↦ None }
+  }
+  ƒ contains_key(&self, k: &K) → bool ! ∅ { self.find(k).is_some() }
+  // đặt `ents[idx0]` vào ô trống đầu tiên của chuỗi dò (bảng luôn còn ô trống: tải < 1/2)
+  ƒ place(&!self, idx0: usize) ! ∅ {
+    cap ≔ self.slots.len();
+    h ≔ self.ents.as_slice()[idx0].h;
+    μp ≔ (h % (cap as u64)) as usize;
+    μstep ≔ 0usize;
+    ⟳ step < cap ↓ cap - step {
+      μs ≔ self.slots.as_mut_slice();
+      ⎇ s[p] == 0usize { s[p] ← idx0 + 1usize; step ← cap; } ⇝ {
+        p ← (p + 1usize) % cap;
+        step ← step + 1usize;
+      }
+    }
+  }
+  // dựng lại với `newcap` ô: bỏ entry đã xoá, rồi đặt lại mọi entry sống
+  ƒ rebuild(&!self, newcap: usize) ! {mem} {
+    n ≔ self.ents.len();
+    μw ≔ 0usize;
+    μi ≔ 0usize;
+    ⟳ i < n ↓ n - i {
+      μes ≔ self.ents.as_mut_slice();
+      e ≔ es[i];
+      ⎇ e.live { es[w] ← e; w ← w + 1usize; } ⇝ { }
+      i ← i + 1usize;
+    }
+    self.ents.truncate(w);
+    self.slots.truncate(0usize);
+    μz ≔ 0usize;
+    ⟳ z < newcap ↓ newcap - z {
+      self.slots.push(0usize);
+      z ← z + 1usize;
+    }
+    μj ≔ 0usize;
+    ⟳ j < w ↓ w - j {
+      self.place(j);
+      j ← j + 1usize;
+    }
+  }
+  // thêm hoặc ghi đè
+  ƒ insert(&!self, k: K, v: V) ! {mem} {
+    ⌥ self.find(&k) {
+      Some(i) ↦ {
+        μes ≔ self.ents.as_mut_slice();
+        μent ≔ es[i];
+        ent.v ← v;
+        es[i] ← ent;
+      },
+      None ↦ {
+        cap ≔ self.slots.len();
+        ⎇ (self.ents.len() + 1usize) * 2usize > cap {
+          self.rebuild(⎇ cap < 4usize { 8usize } ⇝ { cap * 2usize });
+        } ⇝ { }
+        h ≔ k.hash();
+        self.ents.push(Ent { k: k, v: v, h: h, live: true });
+        self.place(self.ents.len() - 1usize);
+        self.live ← self.live + 1usize;
+      },
+    }
+  }
+  // xoá khoá; true nếu có
+  ƒ remove(&!self, k: &K) → bool ! ∅ {
+    ⌥ self.find(k) {
+      Some(i) ↦ {
+        μes ≔ self.ents.as_mut_slice();
+        μent ≔ es[i];
+        ent.live ← false;
+        es[i] ← ent;
+        self.live ← self.live - 1usize;
+        true
+      },
+      None ↦ false,
+    }
+  }
+  // duyệt: số ô entry (kể cả đã xoá) và entry thứ `i` nếu còn sống
+  ƒ entry_count(&self) → usize ! ∅ { self.ents.len() }
+  ƒ entry_at(&self, i: usize) → Option<(K, V)> ! ∅ {
+    ⌥ self.ents.get(i) {
+      Some(e) ↦ { ⎇ e.live { Some((e.k, e.v)) } ⇝ { None } },
+      None ↦ None,
+    }
+  }
+}

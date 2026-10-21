@@ -252,4 +252,10 @@ fn generic_copy_adt_is_copy_under_its_scope_bounds_fb_c10() {
     ok(&format!(
         "{defs}ƒ g<K: Copy>(e: E<K>) → (E<K>, E<K>) ! ∅ {{ (e, e) }}"
     ));
+    // fail-closed: không có `K: Copy` trong phạm vi ⇒ vẫn E0318
+    err(
+        &format!("{defs}ƒ h<'a, K>(v: &Vec<'a, E<K>>) → usize ! ∅ {{ v.len() }}"),
+        "E0318",
+        1,
+    );
 }

@@ -88,7 +88,8 @@
 ⊐ <T> [T] { ƒ len(&self) → usize ! ∅ { } }
 ⊐ File {
   ƒ len(&self) → usize ! ∅ { }
-  ƒ bytes(&self) → &[u8] ! ∅ { }
+  // nội dung tệp: bộ nhớ RÒ RỈ CÓ CHỦ ĐÍCH sống tới hết tiến trình (gt-rt) nên là `'static` — có thể lưu trong cấu trúc dài hơn `File` (Seed 1.0 G10)
+  ƒ bytes(&self) → &'static [u8] ! ∅ { }
 }
 ⊐ <T> Option<T> {
   ƒ is_some(&self) → bool ! ∅ { }
