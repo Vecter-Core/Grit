@@ -259,3 +259,16 @@ fn generic_copy_adt_is_copy_under_its_scope_bounds_fb_c10() {
         1,
     );
 }
+
+/// FB-C13: `==`/`≠` chỉ nhận kiểu mà MỌI backend cài đúng: số nguyên/bool/char và `&str`. Tuple và `&T` (T ≠ str) được M4 chấp nhận trước đây
+/// nhưng backend LLVM từ chối (`Eq trên Ref`) và thông dịch so ĐỊA CHỈ ⇒ hai bên bất đồng; nay là E0301 ngay ở cổng.
+#[test]
+fn equality_is_limited_to_scalars_and_str_fb_c13() {
+    ok("ƒ f(a: &str, b: &str) → bool ! ∅ { a == b }");
+    ok("ƒ f(a: &str, b: &str) → bool ! ∅ { a != b }");
+    ok("ƒ f(a: u8, b: u8) → bool ! ∅ { a == b }");
+    ok("ƒ f(a: char, b: char) → bool ! ∅ { a == b }");
+    err("ƒ f(a: (u32, bool), b: (u32, bool)) → bool ! ∅ { a == b }", "E0301", 1);
+    err("ƒ f(a: &u32, b: &u32) → bool ! ∅ { a == b }", "E0301", 1);
+    ok("ƒ f(a: &u32, b: &u32) → bool ! ∅ { *a == *b }");
+}
