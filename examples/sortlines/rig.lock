@@ -13,4 +13,4 @@ name = "std"
 version = "0.1.0"
 source = "path"
 deps = []
-hash = "sha256:93d342a7b9e1bc4b806fe04c18d7d0e069af91cf1230126d46e6abb76d66e410"
+hash = "sha256:0bb258ba8b8ca3f8cd462ea996916b994c965643dbeb8d9054ce2321b6a18aac"

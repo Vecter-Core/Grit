@@ -335,3 +335,4 @@ Kết quả ghi ở `docs/MUTATION_GT_GUARD.jsonl` (các dòng có `batch` bắt
 - `==`/`≠` chỉ cho số nguyên, `bool`, `char`, `&str` (FB-C13). Tuple, `&T`, `Option`, ADT: E0301. Né: so từng trường, `*a == *b`, `cmp(..).is_eq()` cho kiểu `Ord`.
 - Hàm của prelude KHÔNG có thân (bodiless) nên không thể bổ sung bằng Grit trong `lib/core`; hàm mới đặt trong `lib/std` (gói Rig `std`).
 - Mỗi lần sửa mã của gói Rig phải `rig lock` rồi mới `rig build/run` (khoá nội dung gói; rig từ chối khi lệch).
+- D7 cấm biến/tham số cục bộ trùng TÊN MODULE (tên tệp `.gt`) ở BẤT KỲ gói nào trong đồ thị (không gian tên phẳng; test `a_local_may_not_shadow_a_file_module_name`): nếu bạn đặt tên tệp `base.gt` mà thư viện (`std`) có biến cục bộ `base` ⇒ E0205 chỉ vào `std.gt`. Giảm nhẹ: `lib/std` đặt hậu tố `_` cho các tên cục bộ phổ biến (`base_`, `buf_`, `cap_`, `first_`, `last_`, `exp_`, …); nếu vẫn gặp E0205 trỏ vào `std.gt`, ĐỔI TÊN TỆP của bạn (ví dụ `base.gt` → `base_util.gt`).

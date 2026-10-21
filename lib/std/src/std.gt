@@ -83,16 +83,16 @@
   // chứng minh ở MỌI chỗ gọi; kẹp chỉ số làm hàm TOÀN PHẦN, không bao giờ abort
   ƒ insert(&!self, i: usize, x: T) ! {mem} {
     n ≔ self.len();
-    at ≔ ⎇ i < n { i } ⇝ { n };
+    at_ ≔ ⎇ i < n { i } ⇝ { n };
     self.push(x);
     μj ≔ n;
-    ⟳ j > at ↓ j {
+    ⟳ j > at_ ↓ j {
       μs ≔ self.as_mut_slice();
       s[j] ← s[j - 1usize];
       j ← j - 1usize;
     }
     μs2 ≔ self.as_mut_slice();
-    s2[at] ← x;
+    s2[at_] ← x;
   }
   // bỏ và trả phần tử thứ `i` (dịch phần sau sang trái); None nếu `i ≥ len`
   ƒ remove(&!self, i: usize) → Option<T> ! ∅ {
@@ -135,48 +135,48 @@
 // ký tự khoảng trắng ASCII: ` `, `\t`, `\n`, `\r`
 ◈ ƒ is_ascii_ws(c: u8) → bool ! ∅ { c == 32u8 ∨ c == 9u8 ∨ c == 10u8 ∨ c == 13u8 }
 
-// các chữ số thập phân của `n` căn PHẢI trong `buf` (24 byte); trả chỉ số bắt đầu (0 ở đầu không in; n = 0 ⇒ một chữ số `0`)
-◈ ƒ fmt_u64(buf: &![u8; 24], n: u64) → usize ! ∅ {
+// các chữ số thập phân của `n` căn PHẢI trong `buf_` (24 byte); trả chỉ số bắt đầu (0 ở đầu không in; n = 0 ⇒ một chữ số `0`)
+◈ ƒ fmt_u64(buf_: &![u8; 24], n: u64) → usize ! ∅ {
   μi ≔ 24usize;
   μm ≔ n;
   ⟳ i > 4usize ↓ i {
     i ← i - 1usize;
-    buf[i] ← 48u8 + ((m % 10u64) as u8);
+    buf_[i] ← 48u8 + ((m % 10u64) as u8);
     m ← m / 10u64;
   }
   μstart ≔ 23usize;
   μj ≔ 23usize;
   ⟳ j > 4usize ↓ j {
     j ← j - 1usize;
-    ⎇ buf[j] != 48u8 { start ← j; } ⇝ { }
+    ⎇ buf_[j] != 48u8 { start ← j; } ⇝ { }
   }
   start
 }
 
 // như `fmt_u64` nhưng có dấu `-` cho số âm (`i64::MIN` đúng)
-◈ ƒ fmt_i64(buf: &![u8; 24], n: i64) → usize ! ∅ {
-  ⎇ n >= 0i64 { fmt_u64(buf, n as u64) } ⇝ {
-    mag ≔ ((0i64 - (n + 1i64)) as u64) + 1u64;
-    s ≔ fmt_u64(buf, mag);
-    ⎇ s > 0usize { buf[s - 1usize] ← 45u8; s - 1usize } ⇝ { s }
+◈ ƒ fmt_i64(buf_: &![u8; 24], n: i64) → usize ! ∅ {
+  ⎇ n >= 0i64 { fmt_u64(buf_, n as u64) } ⇝ {
+    mag_ ≔ ((0i64 - (n + 1i64)) as u64) + 1u64;
+    s ≔ fmt_u64(buf_, mag_);
+    ⎇ s > 0usize { buf_[s - 1usize] ← 45u8; s - 1usize } ⇝ { s }
   }
 }
 
-// 16 chữ số hex (chữ thường) của `n` căn phải trong `buf`; trả chỉ số bắt đầu (n = 0 ⇒ một chữ số `0`)
-◈ ƒ fmt_hex(buf: &![u8; 24], n: u64) → usize ! ∅ {
+// 16 chữ số hex (chữ thường) của `n` căn phải trong `buf_`; trả chỉ số bắt đầu (n = 0 ⇒ một chữ số `0`)
+◈ ƒ fmt_hex(buf_: &![u8; 24], n: u64) → usize ! ∅ {
   μi ≔ 24usize;
   μm ≔ n;
   ⟳ i > 8usize ↓ i {
     i ← i - 1usize;
     d ≔ (m % 16u64) as u8;
-    ⎇ d < 10u8 { buf[i] ← 48u8 + d; } ⇝ { buf[i] ← 87u8 + d; }
+    ⎇ d < 10u8 { buf_[i] ← 48u8 + d; } ⇝ { buf_[i] ← 87u8 + d; }
     m ← m / 16u64;
   }
   μstart ≔ 23usize;
   μj ≔ 23usize;
   ⟳ j > 8usize ↓ j {
     j ← j - 1usize;
-    ⎇ buf[j] != 48u8 { start ← j; } ⇝ { }
+    ⎇ buf_[j] != 48u8 { start ← j; } ⇝ { }
   }
   start
 }
@@ -211,23 +211,23 @@
 ◈ ƒ first_non_ws(b: &[u8]) → usize ! ∅ {
   n ≔ b.len();
   μa ≔ 0usize;
-  μfirst ≔ n;
+  μfirst_ ≔ n;
   ⟳ a < n ↓ n - a {
-    ⎇ is_ascii_ws(b[a]) { a ← a + 1usize; } ⇝ { first ← a; a ← n; }
+    ⎇ is_ascii_ws(b[a]) { a ← a + 1usize; } ⇝ { first_ ← a; a ← n; }
   }
-  first
+  first_
 }
 
 // chỉ số ngay SAU byte không-khoảng-trắng cuối cùng (0 nếu không có). Luôn giảm `e` mỗi vòng (M8 không chứng minh được gán hằng làm biến thể giảm).
 ◈ ƒ end_after_last_non_ws(b: &[u8]) → usize ! ∅ {
   μe ≔ b.len();
-  μlast ≔ 0usize;
+  μlast_ ≔ 0usize;
   μfound ≔ false;
   ⟳ e > 0usize ↓ e {
-    ⎇ ¬found ∧ ¬is_ascii_ws(b[e - 1usize]) { last ← e; found ← true; } ⇝ { }
+    ⎇ ¬found ∧ ¬is_ascii_ws(b[e - 1usize]) { last_ ← e; found ← true; } ⇝ { }
     e ← e - 1usize;
   }
-  last
+  last_
 }
 
 ⊐ [u8] {
@@ -244,11 +244,11 @@
   }
   ƒ ends_with(&self, p: &[u8]) → bool ! ∅ {
     ⎇ p.len() > self.len() { false } ⇝ {
-      off ≔ self.len() - p.len();
+      off_ ≔ self.len() - p.len();
       μi ≔ 0usize;
       μok ≔ true;
       ⟳ i < p.len() ↓ p.len() - i {
-        ⎇ self[off + i] != p[i] { ok ← false; } ⇝ { }
+        ⎇ self[off_ + i] != p[i] { ok ← false; } ⇝ { }
         i ← i + 1usize;
       }
       ok
@@ -256,10 +256,10 @@
   }
   // bằng nhau từng byte (`==` KHÔNG có cho lát; dùng hàm này)
   ƒ equals(&self, o: &[u8]) → bool ! ∅ { self.len() == o.len() ∧ self.starts_with(o) }
-  // vị trí byte đầu tiên bằng `b` tại hoặc sau `from`
-  ƒ find_byte(&self, from: usize, b: u8) → Option<usize> ! ∅ {
+  // vị trí byte đầu tiên bằng `b` tại hoặc sau `from_`
+  ƒ find_byte(&self, from_: usize, b: u8) → Option<usize> ! ∅ {
     n ≔ self.len();
-    μi ≔ from;
+    μi ≔ from_;
     μr ≔ None;
     ⟳ i < n ↓ n - i {
       ⎇ self[i] == b { r ← Some(i); i ← n; } ⇝ { i ← i + 1usize; }
@@ -279,9 +279,9 @@
   }
   // bỏ khoảng trắng ASCII ở hai đầu
   ƒ trim_ascii(&self) → &[u8] ! ∅ {
-    first ≔ first_non_ws(self);
-    last ≔ end_after_last_non_ws(self);
-    ⎇ first < last { &self[first..last] } ⇝ { &self[0usize..0usize] }
+    first_ ≔ first_non_ws(self);
+    last_ ≔ end_after_last_non_ws(self);
+    ⎇ first_ < last_ { &self[first_..last_] } ⇝ { &self[0usize..0usize] }
   }
   // u64 thập phân không dấu
   ƒ parse_u64(&self) → Result<u64, ParseError> ! ∅ { parse_digits(self) }
@@ -318,18 +318,18 @@
 // ghi số nguyên có dấu/hex/byte ra stdout và stderr
 ⊐ Cap<Out> {
   ƒ write_i64(&self, n: i64) ! {io} {
-    μbuf ≔ [0u8; 24];
-    s ≔ fmt_i64(&!buf, n);
-    self.write_bytes(&buf[s..24usize]);
+    μbuf_ ≔ [0u8; 24];
+    s ≔ fmt_i64(&!buf_, n);
+    self.write_bytes(&buf_[s..24usize]);
   }
   ƒ write_hex(&self, n: u64) ! {io} {
-    μbuf ≔ [0u8; 24];
-    s ≔ fmt_hex(&!buf, n);
-    self.write_bytes(&buf[s..24usize]);
+    μbuf_ ≔ [0u8; 24];
+    s ≔ fmt_hex(&!buf_, n);
+    self.write_bytes(&buf_[s..24usize]);
   }
   ƒ write_byte(&self, b: u8) ! {io} {
-    μbuf ≔ [b; 1];
-    self.write_bytes(&buf[0usize..1usize]);
+    μbuf_ ≔ [b; 1];
+    self.write_bytes(&buf_[0usize..1usize]);
   }
 }
 
@@ -337,24 +337,24 @@
 ⊐ <'a> Vec<'a, u8> {
   ƒ push_str(&!self, s: &str) ! {mem} { self.extend_from_slice(s.as_bytes()); }
   ƒ push_u64(&!self, n: u64) ! {mem} {
-    μbuf ≔ [0u8; 24];
-    s ≔ fmt_u64(&!buf, n);
-    self.extend_from_slice(&buf[s..24usize]);
+    μbuf_ ≔ [0u8; 24];
+    s ≔ fmt_u64(&!buf_, n);
+    self.extend_from_slice(&buf_[s..24usize]);
   }
   ƒ push_i64(&!self, n: i64) ! {mem} {
-    μbuf ≔ [0u8; 24];
-    s ≔ fmt_i64(&!buf, n);
-    self.extend_from_slice(&buf[s..24usize]);
+    μbuf_ ≔ [0u8; 24];
+    s ≔ fmt_i64(&!buf_, n);
+    self.extend_from_slice(&buf_[s..24usize]);
   }
 }
 
 // số học kiểm tràn không abort
 ◈ ƒ abs_i64(x: i64) → Option<i64> ! ∅ { ⎇ x >= 0i64 { Some(x) } ⇝ { 0i64 -? x } }
-◈ ƒ pow_u64(base: u64, exp: u32) → Option<u64> ! ∅ {
+◈ ƒ pow_u64(base_: u64, exp_: u32) → Option<u64> ! ∅ {
   μr ≔ Some(1u64);
   μi ≔ 0u32;
-  ⟳ i < exp ↓ exp - i {
-    ⌥ r { Some(v) ↦ { r ← v *? base; }, None ↦ { } }
+  ⟳ i < exp_ ↓ exp_ - i {
+    ⌥ r { Some(v) ↦ { r ← v *? base_; }, None ↦ { } }
     i ← i + 1u32;
   }
   r
@@ -369,15 +369,15 @@
   s[j] ← t;
 }
 
-// vun đống lớn-nhất con của `root` trong s[0..n]
-◈ ƒ sift_down<T: Ord + Copy>(s: &![T], root: usize, n: usize) ! ∅ {
-  μr ≔ root;
+// vun đống lớn-nhất con của `root_` trong s[0..n]
+◈ ƒ sift_down<T: Ord + Copy>(s: &![T], root_: usize, n: usize) ! ∅ {
+  μr ≔ root_;
   μk ≔ 0usize;
   ⟳ k < n ↓ n - k {
-    child ≔ r * 2usize + 1usize;
-    ⎇ child >= n { k ← n; } ⇝ {
-      μc ≔ child;
-      ⎇ child + 1usize < n ∧ s[child].cmp(&s[child + 1usize]).is_lt() { c ← child + 1usize; } ⇝ { }
+    child_ ≔ r * 2usize + 1usize;
+    ⎇ child_ >= n { k ← n; } ⇝ {
+      μc ≔ child_;
+      ⎇ child_ + 1usize < n ∧ s[child_].cmp(&s[child_ + 1usize]).is_lt() { c ← child_ + 1usize; } ⇝ { }
       ⎇ s[r].cmp(&s[c]).is_lt() {
         swap_at(&!*s, r, c);
         r ← c;
@@ -455,18 +455,18 @@
   ƒ len(&self) → usize ! ∅ { self.live }
   // chỉ số trong `ents` của entry sống có khoá `k`
   ƒ find(&self, k: &K) → Option<usize> ! ∅ {
-    cap ≔ self.slots.len();
-    ⎇ cap == 0usize { None } ⇝ {
+    cap_ ≔ self.slots.len();
+    ⎇ cap_ == 0usize { None } ⇝ {
       h ≔ k.hash();
-      μp ≔ (h % (cap as u64)) as usize;
+      μp ≔ (h % (cap_ as u64)) as usize;
       μstep ≔ 0usize;
       μr ≔ None;
-      ⟳ step < cap ↓ cap - step {
+      ⟳ step < cap_ ↓ cap_ - step {
         e ≔ self.slots.as_slice()[p];
-        ⎇ e == 0usize { step ← cap; } ⇝ {
-          ent ≔ self.ents.as_slice()[e - 1usize];
-          ⎇ ent.live ∧ ent.h == h ∧ ent.k.cmp(k).is_eq() { r ← Some(e - 1usize); step ← cap; } ⇝ {
-            p ← (p + 1usize) % cap;
+        ⎇ e == 0usize { step ← cap_; } ⇝ {
+          ent_ ≔ self.ents.as_slice()[e - 1usize];
+          ⎇ ent_.live ∧ ent_.h == h ∧ ent_.k.cmp(k).is_eq() { r ← Some(e - 1usize); step ← cap_; } ⇝ {
+            p ← (p + 1usize) % cap_;
             step ← step + 1usize;
           }
         }
@@ -480,20 +480,20 @@
   ƒ contains_key(&self, k: &K) → bool ! ∅ { ¬self.find(k).is_none() }
   // đặt `ents[idx0]` vào ô trống đầu tiên của chuỗi dò (bảng luôn còn ô trống: tải < 1/2)
   ƒ place(&!self, idx0: usize) ! ∅ {
-    cap ≔ self.slots.len();
+    cap_ ≔ self.slots.len();
     h ≔ self.ents.as_slice()[idx0].h;
-    μp ≔ (h % (cap as u64)) as usize;
+    μp ≔ (h % (cap_ as u64)) as usize;
     μstep ≔ 0usize;
-    ⟳ step < cap ↓ cap - step {
+    ⟳ step < cap_ ↓ cap_ - step {
       μs ≔ self.slots.as_mut_slice();
-      ⎇ s[p] == 0usize { s[p] ← idx0 + 1usize; step ← cap; } ⇝ {
-        p ← (p + 1usize) % cap;
+      ⎇ s[p] == 0usize { s[p] ← idx0 + 1usize; step ← cap_; } ⇝ {
+        p ← (p + 1usize) % cap_;
         step ← step + 1usize;
       }
     }
   }
-  // dựng lại với `newcap` ô: bỏ entry đã xoá, rồi đặt lại mọi entry sống
-  ƒ rebuild(&!self, newcap: usize) ! {mem} {
+  // dựng lại với `newcap_` ô: bỏ entry đã xoá, rồi đặt lại mọi entry sống
+  ƒ rebuild(&!self, newcap_: usize) ! {mem} {
     n ≔ self.ents.len();
     μw ≔ 0usize;
     μi ≔ 0usize;
@@ -506,7 +506,7 @@
     self.ents.truncate(w);
     self.slots.truncate(0usize);
     μz ≔ 0usize;
-    ⟳ z < newcap ↓ newcap - z {
+    ⟳ z < newcap_ ↓ newcap_ - z {
       self.slots.push(0usize);
       z ← z + 1usize;
     }
@@ -521,13 +521,13 @@
     ⌥ self.find(&k) {
       Some(i) ↦ {
         μes ≔ self.ents.as_mut_slice();
-        μent ≔ es[i];
-        ent.v ← v;
-        es[i] ← ent;
+        μent_ ≔ es[i];
+        ent_.v ← v;
+        es[i] ← ent_;
       },
       None ↦ {
-        cap ≔ self.slots.len();
-        ⎇ (self.ents.len() + 1usize) * 2usize > cap {
+        cap_ ≔ self.slots.len();
+        ⎇ (self.ents.len() + 1usize) * 2usize > cap_ {
           self.rebuild(next_cap((self.live + 1usize) * 4usize));
         } ⇝ { }
         h ≔ k.hash();
@@ -542,9 +542,9 @@
     ⌥ self.find(k) {
       Some(i) ↦ {
         μes ≔ self.ents.as_mut_slice();
-        μent ≔ es[i];
-        ent.live ← false;
-        es[i] ← ent;
+        μent_ ≔ es[i];
+        ent_.live ← false;
+        es[i] ← ent_;
         self.live ← self.live - 1usize;
         true
       },
