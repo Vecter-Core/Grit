@@ -1,0 +1,85 @@
+// grep-lite [-c] [-n] PATTERN FILE...
+ƒ scan(out: &Cap<Out>, name: &str, data: &[u8], pat: &[u8], count: bool, num: bool) → u64 ! {io} {
+  n ≔ data.len();
+  μpos ≔ 0usize;
+  μlineno ≔ 0u64;
+  μhits ≔ 0u64;
+  ⟳ pos < n ↓ n - pos {
+    end ≔ data.find_byte_or_end(pos, 10u8);
+    line ≔ &data[pos..end];
+    lineno ← lineno + 1u64;
+    ⎇ line.find(pat).is_none() { } ⇝ {
+      hits ← hits + 1u64;
+      ⎇ count { } ⇝ {
+        out.write_str(name);
+        out.write_str(":");
+        ⎇ num {
+          out.write_u64(lineno);
+          out.write_str(":");
+        } ⇝ { }
+        out.write_bytes(line);
+        out.write_str("\n");
+      }
+    }
+    pos ← end + 1usize;
+  }
+  hits
+}
+
+ƒ main() ! {io, div, mem} {
+  out ≔ root_out();
+  err ≔ root_err();
+  env ≔ root_env();
+  fs ≔ root_fs();
+  argc ≔ env.arg_count();
+  μcount ≔ false;
+  μnum ≔ false;
+  μi ≔ 1usize;
+  ⟳ i < argc ↓ argc - i {
+    a ≔ env.arg(i);
+    ⎇ a == "--" {
+      i ← i + 1usize;
+      ⊠;
+    } ⇝ ⎇ a == "-c" {
+      count ← true;
+      i ← i + 1usize;
+    } ⇝ ⎇ a == "-n" {
+      num ← true;
+      i ← i + 1usize;
+    } ⇝ {
+      ⊠;
+    }
+  }
+  ⎇ i + 1usize < argc { } ⇝ {
+    err.write_str("usage: grep-lite [-c] [-n] PATTERN FILE...\n");
+    core::exit(2u32)
+  }
+  pat ≔ env.arg(i).as_bytes();
+  μj ≔ i + 1usize;
+  μtotal ≔ 0u64;
+  μbad ≔ false;
+  ⟳ j < argc ↓ argc - j {
+    name ≔ env.arg(j);
+    ⌥ fs.open(name) {
+      Ok(f) ↦ {
+        h ≔ scan(&out, name, f.bytes(), pat, count, num);
+        ⎇ count {
+          out.write_str(name);
+          out.write_str(":");
+          out.write_u64(h);
+          out.write_str("\n");
+        } ⇝ { }
+        total ← total + h;
+      },
+      Err(_) ↦ {
+        err.write_str("grep-lite: ");
+        err.write_str(name);
+        err.write_str(": cannot open\n");
+        bad ← true;
+      },
+    }
+    j ← j + 1usize;
+  }
+  ⎇ bad { core::exit(2u32) } ⇝ { }
+  ⎇ total == 0u64 { core::exit(1u32) } ⇝ { }
+}

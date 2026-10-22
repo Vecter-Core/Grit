@@ -124,6 +124,26 @@
 - `ƒ get(&self) → T ! ∅`
   - hiệu ứng: `∅`; abort: không
 
+### `⊐ Drop for Buf`
+
+- `ƒ drop(&!self) ! ∅`
+  - hiệu ứng: `∅`; abort: (chưa ghi)
+
+### `⊐ Drop for Guard`
+
+- `ƒ drop(&!self) ! ∅`
+  - hiệu ứng: `∅`; abort: (chưa ghi)
+
+### `⊐ <T> Secret<T>`
+
+- `ƒ declassify(self) → T ! ∅`
+  - hiệu ứng: `∅`; abort: (chưa ghi)
+
+### `⊐ <T> [T]`
+
+- `ƒ len(&self) → usize ! ∅`
+  - hiệu ứng: `∅`; abort: không
+
 ### `⊐ File`
 
 - `ƒ len(&self) → usize ! ∅`
@@ -148,6 +168,11 @@
   - hiệu ứng: `{io}`; abort: không
 - `ƒ write(&self, p: &str, b: &[u8]) → Result<(), IoError> ! {io}` — ghi NGUYÊN tệp (tạo/cắt cụt); lỗi ⇒ `Err` (Seed 1.0 G6)
   - hiệu ứng: `{io}`; abort: không (lỗi I/O trả `Err(IoError)`)
+
+### `⊐ Cap<Net>`
+
+- `ƒ connect(&self, h: &str) → File ! {io}`
+  - hiệu ứng: `{io}`; abort: `io_error` nếu kết nối thất bại
 
 ### `⊐ Cap<Env>`
 
@@ -178,6 +203,30 @@
   - hiệu ứng: `{io}`; abort: không (lỗi ghi stderr bị bỏ qua)
 - `ƒ write_str(&self, s: &str) ! {io}`
   - hiệu ứng: `{io}`; abort: không (lỗi ghi stderr bị bỏ qua)
+
+### `⊐ Cap<Clock>`
+
+- `ƒ now(&self) → u64 ! {io}`
+  - hiệu ứng: `{io}`; abort: không
+
+### `⊐ Cap<Alloc>`
+
+- `ƒ arena(&self) → Arena ! {mem}`
+  - hiệu ứng: `{mem}`; abort: không
+
+### `⊐ Host`
+
+- `ƒ fs() → Cap<Fs> ! {io}`
+  - hiệu ứng: `{io}`; abort: không
+
+### `⊐ Arena`
+
+- `ƒ new() → Arena ! {mem}`
+  - hiệu ứng: `{mem}`; abort: không
+- `ƒ alloc<T>(&self, v: T) → &T ! {mem}`
+  - hiệu ứng: `{mem}`; abort: `arena_exhausted` nếu hết bộ nhớ (hoặc vượt `GRITRT_ARENA_LIMIT`)
+- `ƒ reset(&!self) ! {mem}`
+  - hiệu ứng: `{mem}`; abort: không (vô hiệu hoá MỌI `&T`/`Vec`/`Text` lấy từ arena: M6 chặn tĩnh)
 
 ### `⊐ <'a, T> Vec<'a, T>`
 
@@ -409,6 +458,26 @@ Mặc định cho hàm không có ghi chú riêng: TOÀN PHẦN theo thiết k�
 
 - `ƒ sort(&!self) ! ∅`
   - hiệu ứng: `∅`; abort: không (sắp xếp tại chỗ; heapsort, KHÔNG ổn định)
+
+### `⊐ Hash for u64`
+
+- `ƒ hash(&self) → u64 ! ∅`
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+
+### `⊐ Hash for usize`
+
+- `ƒ hash(&self) → u64 ! ∅`
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+
+### `⊐ <'a> Ord for Bytes<'a>`
+
+- `ƒ cmp(&self, o: &Self) → Ordering ! ∅`
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+
+### `⊐ <'a> Hash for Bytes<'a>`
+
+- `ƒ hash(&self) → u64 ! ∅`
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
 
 ### `⊐ <'a, K: Copy + Ord + Hash, V: Copy> HashMap<'a, K, V>`
 

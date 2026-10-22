@@ -1,4 +1,4 @@
-<!-- TOKEN_PROXY: ~7616 (ước lượng = số byte UTF-8 / 3; giới hạn 12000; kiểm bởi tools/test_ai_guide.py) -->
+<!-- TOKEN_PROXY: ~8761 (ước lượng = số byte UTF-8 / 3; giới hạn 12000; kiểm bởi tools/test_ai_guide.py) -->
 # AI_GUIDE — viết chương trình Grit (gói ngữ cảnh TỰ CHỨA cho AI)
 
 Grit là ngôn ngữ biên dịch (`gritc`, qua LLVM) **fail-closed**: chương trình chỉ chạy khi mọi kiểm tra an toàn đều qua. Mục tiêu của bạn: viết `src/main.gt` sao cho `rig check` XANH rồi `rig run` cho đúng kết quả. **KHÔNG BAO GIỜ nới kiểm tra** (không `--checks=proven`, không `#allow` để lách, không đổi đề bài); lỗi `E…` là thông tin để sửa MÃ của bạn. Danh sách hàm thư viện: `docs/STD_REFERENCE.md`. Nền đã kiểm: Linux x86_64 (Windows: chưa kiểm).
@@ -279,3 +279,32 @@ cannot open
 ```output
 0
 ```
+
+## 12. Công thức hay dùng (rút từ bốn chương trình thật: csvstat, calc, kvstore, grep-lite)
+- **Phân tích cờ đối số — thoát sớm bằng `⊠;`, KHÔNG dùng cờ bool** (cờ bool làm biến thể không giảm ⇒ E0702):
+```grit std
+ƒ main() ! {io, div, mem} {
+  env ≔ root_env();
+  argc ≔ env.arg_count();
+  μcount ≔ false;
+  μfirst ≔ argc;                       // chỉ số đối số vị trí đầu tiên
+  μk ≔ 1usize;
+  ⟳ k < argc ↓ argc - k {
+    a ≔ env.arg(k);
+    ⎇ a == "-c" { count ← true; k ← k + 1usize; } ⇝ {
+      ⎇ a == "--" { first ← k + 1usize; ⊠; } ⇝ { first ← k; ⊠; }
+    }
+  }
+  ⎇ count { root_out().write_str("count\n"); } ⇝ { }
+}
+```
+- **Trạng thái dùng chung qua `&!Struct`**: `▢ St<'a> { b: &'a [u8], pos: usize }`; hàm nhận `st: &!St` ghi `st.pos ← st.pos + 1usize;` và truyền tiếp `st` cho hàm con (tự mượn lại, KHÔNG viết `&!st`). BẪY: `f(st, st.pos)` với `st: &!St` là **E0403** (đối số thứ nhất đã mượn độc quyền `st`, đối số thứ hai lại đọc `st.pos`; không có "mượn hai pha"): đọc trường vào biến trước (`p ≔ st.pos; f(st, p)`) hoặc để hàm con tự đọc `st.pos`.
+- **Ghi vào lát khả biến**: `μsl ≔ v.as_mut_slice(); sl[i] ← x;` (lấy `as_mut_slice` SAU lần `push` cuối).
+- **`i64::MIN`**: `-9223372036854775807i64 - 1i64`. Số học kiểm tràn không abort trả Option, dùng trực tiếp làm đối tượng `⌥`: `⌥ a *? b { Some(x) ↦ …, None ↦ { …overflow… } }`.
+- **`core::exit` ở vị trí biểu thức**: kiểu `!` khớp mọi kiểu nên được dùng làm một nhánh: `data ≔ ⌥ inp.read_all() { Ok(f) ↦ f.bytes(), Err(_) ↦ { err.write_str("lỗi\n"); core::exit(2u32) } };`.
+- **Byte → `&str` (tên tệp đọc từ dữ liệu)**: `⌥ Text::from_utf8(&ar, bytes) { Some(t) ↦ { fs.open(t.as_str()) … }, None ↦ … }` (cần Arena; trả `None` nếu không phải UTF-8 hợp lệ).
+- **Sắp xếp struct**: `⊐ Ord for P { ƒ cmp(&self, o: &Self) → Ordering ! ∅ { self.k.cmp(&o.k) } }` (kèm `⊐ Copy for P { }`) rồi `sl.sort()`; `std::Bytes` đã là `Copy + Ord + Hash` (so theo byte).
+- **Đệ quy tương hỗ (parser)**: mọi hàm trong chu trình có `↓ budget` và mỗi lời gọi truyền `budget - 1`; nhánh `budget == 0` xử lý riêng (báo lỗi). Ngân sách vài nghìn đủ cho đề bài; ngăn xếp 256 MiB.
+- **Vòng lặp mà điều kiện dừng đổi qua hàm con** (`↓ n - pos` không chứng minh được): dùng nhiên liệu `μfuel ≔ len + 2usize; ⟳ fuel > 0usize ↓ fuel { …; fuel ← fuel - 1usize; }` rồi `core::fuel_left(fuel)`… hoặc thoát bằng `⊠;`.
+- **Đầu ra nhiều dòng**: mỗi `write_*` là một lời gọi hệ thống (stdout không đệm). Với đầu ra lớn hãy dựng vào `Vec<u8>` (`push_str/push_u64/push_i64/extend_from_slice`) rồi `out.write_bytes(v.as_slice())` MỘT lần. `Cap<ErrOut>` (stderr) chỉ có `write_str` và `write_u64`.
+- **`main` quá lớn** ⇒ ghi chú N0605 ("quá 24 biến cho miền quan hệ") và nhiều kiểm tra biên giữ lại lúc chạy (đúng nhưng chậm hơn): tách thành các hàm nhỏ. Dòng `backend: interpreter` của `check`/`rig build` chỉ là nhãn của giai đoạn kiểm; exe luôn là mã máy (llvm).

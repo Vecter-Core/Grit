@@ -34,6 +34,9 @@ Tìm chuỗi con (byte) `PATTERN` trong các tệp. Cờ `-c`, `-n` chỉ đư�
 - Mặc định mỗi dòng khớp in `FILE:text`; với `-n`: `FILE:LINENO:text`; với `-c`: mỗi tệp một dòng `FILE:COUNT` và KHÔNG in dòng khớp (`-c` thắng `-n`). `FILE` in đúng như được truyền.
 - Tệp không mở được: stderr `grep-lite: FILE: cannot open`, tiếp tục tệp sau. Thoát: 2 nếu có tệp lỗi, ngược lại 0 nếu có dòng khớp, 1 nếu không khớp dòng nào.
 
+## Làm rõ K3 (2026-10-22, sau S4 — KHÔNG đổi hành vi của bản tham chiếu; đề bài gốc mơ hồ ở các biên này và bản tham chiếu là nguồn sự thật)
+Đối số của lệnh "có mặt" khi và chỉ khi có dấu cách ngay sau tên lệnh: `get ` và `del ` (đối số rỗng) hợp lệ (`(nil)` / `0`); `set KEY` không có dấu cách sau khoá đặt giá trị rỗng; `get a b` tra khoá `a b` (không kiểm khoá) ⇒ `(nil)`; `count ` / `dump ` có dấu cách thừa ⇒ `error: usage`; dòng chỉ gồm một dấu cách ⇒ `error: unknown command`; trong tệp `load`, dòng rỗng là dòng sai (`error: bad line N`); tên tệp không phải UTF-8 được đổi lossy (U+FFFD) như Rust.
+
 ## BẢNG KHOẢNG TRỐNG (lập từ yêu cầu K1–K4 + các thăm dò thật, 2026-10-21; trạng thái được cập nhật ở `docs/RUN_REPORTS.md` sau mỗi bước)
 "Chặn" theo thứ tự làm. Quyết định mặc định theo lệnh Seed 1.0: làm trong `lib/std` bằng Grit; intrinsic mới ≤ 6.
 

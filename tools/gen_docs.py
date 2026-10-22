@@ -232,6 +232,14 @@ def parse(path):
                 hdr = collapse(head.split("{")[0])
                 owner = ("impl", hdr)
                 items.append(Item("impl", hdr, doc, None, hdr))
+                # impl viết gọn trên MỘT dòng: `⊐ Arena { ƒ new() → … { } ƒ reset(&!self) … { } }` — tách từng `ƒ`
+                if code.count("{") == code.count("}") and "ƒ " in code:
+                    body = code[code.index("{") + 1 : code.rindex("}")]
+                    for piece in re.split(r"(?=ƒ\s+[A-Za-z_])", body):
+                        if piece.strip().startswith("ƒ"):
+                            sig = extract_sig(piece)
+                            m = re.match(r"ƒ\s+([A-Za-z_0-9]+)", sig)
+                            items.append(Item("method", sig, [], owner, m.group(1) if m else "?"))
             elif head.startswith("▦ "):
                 hdr = collapse(head.split("{")[0])
                 owner = ("mod", hdr)
