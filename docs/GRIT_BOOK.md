@@ -192,7 +192,7 @@ Và dạng canonical tương đương:
 }
 ```
 
-Hai tệp này cho cùng giá trị, và  biến cả hai thành một tệp giống hệt nhau (đã thử): đó là ý nghĩa của "cùng AST".
+Hai tệp này cho cùng giá trị, và `gritc fmt` biến cả hai thành một tệp giống hệt nhau (đã thử): đó là ý nghĩa của "cùng AST".
 
 Chi tiết lexer đáng nhớ:
 
@@ -644,9 +644,9 @@ da ghi
 xin chao
 ```
 
-Đọc stdin theo cùng kiểu (khối này chỉ được `check`, không chạy trong bộ kiểm tài liệu vì không có stdin):
+Đọc stdin theo cùng kiểu (bộ kiểm tài liệu chạy với stdin rỗng, nên in `0 byte`; chạy thật với `echo abc | ./chuongtrinh` sẽ in số byte đọc được):
 
-```grit
+```grit run
 ƒ main() ! {io} {
   out ≔ root_out();
   inp ≔ root_in();
@@ -658,6 +658,10 @@ xin chao
     Err(_) ↦ { out.write_str("loi doc stdin\n"); },
   }
 }
+```
+
+```output
+0 byte
 ```
 
 **Vì sao thiết kế thế?** Một thư viện bạn gọi mà chữ ký không có `Cap<Fs>` thì không thể đọc tệp của bạn: đó là lỗi kiểu lúc biên dịch, không phải hành vi lúc chạy. Rig (chương 11) dựa vào đây để biết một gói đòi quyền gì. Giới hạn trung thực: `Cap<Fs>::sub` (thu hẹp vào một thư mục con) có trong chữ ký ở prelude nhưng backend LLVM hiện chưa chạy được (đã thử); đừng dựa vào nó.
@@ -1392,7 +1396,7 @@ iv|9
 
 **4. `main` trả giá trị KHÔNG thành mã thoát.** `gritc run` in giá trị `main` trả về, nhưng tiến trình dựng ra (`gritc build`) thoát `0`. Muốn có mã thoát, gọi `core::exit(code)` (kiểu `→ !`, hiệu ứng `div`, mã bị kẹp ở 255).
 
-```grit
+```grit run exit=3
 ƒ main() ! {div} {
   core::exit(3);
 }
