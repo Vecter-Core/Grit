@@ -492,3 +492,27 @@ fn file_with_non_identifier_name_is_accepted_as_the_root_module() {
         err(&o)
     );
 }
+
+/// Seed 1.0 S5a: `gritc doctor` kiểm môi trường bằng lần dựng+chạy THẬT một chương trình nhỏ và báo cách sửa khi hỏng.
+#[cfg(feature = "llvm")]
+#[test]
+fn doctor_passes_on_a_healthy_environment_and_explains_failures() {
+    let o = std::process::Command::new(env!("CARGO_BIN_EXE_gritc"))
+        .arg("doctor")
+        .output()
+        .expect("chạy gritc doctor");
+    let out = String::from_utf8_lossy(&o.stdout).into_owned() + &String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(0), "{out}");
+    for needle in ["gritc doctor", "runtime", "trình liên kết", "thư mục tạm", "dựng và chạy thử", "doctor: XANH"] {
+        assert!(out.contains(needle), "thiếu `{needle}`:\n{out}");
+    }
+    // runtime hỏng ⇒ mã 3, nêu GRIT_RT_LIB và cách sửa
+    let o = std::process::Command::new(env!("CARGO_BIN_EXE_gritc"))
+        .arg("doctor")
+        .env("GRIT_RT_LIB", "/không/tồn/tại/libgt_rt.a")
+        .output()
+        .expect("chạy gritc doctor");
+    let out = String::from_utf8_lossy(&o.stdout).into_owned() + &String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(3), "{out}");
+    assert!(out.contains("GRIT_RT_LIB") && out.contains("doctor: ĐỎ"), "{out}");
+}
