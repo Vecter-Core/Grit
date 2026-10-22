@@ -1,4 +1,4 @@
-<!-- TOKEN_PROXY: ~7414 (ước lượng = số byte UTF-8 / 3; giới hạn 12000; kiểm bởi tools/test_ai_guide.py) -->
+<!-- TOKEN_PROXY: ~7616 (ước lượng = số byte UTF-8 / 3; giới hạn 12000; kiểm bởi tools/test_ai_guide.py) -->
 # AI_GUIDE — viết chương trình Grit (gói ngữ cảnh TỰ CHỨA cho AI)
 
 Grit là ngôn ngữ biên dịch (`gritc`, qua LLVM) **fail-closed**: chương trình chỉ chạy khi mọi kiểm tra an toàn đều qua. Mục tiêu của bạn: viết `src/main.gt` sao cho `rig check` XANH rồi `rig run` cho đúng kết quả. **KHÔNG BAO GIỜ nới kiểm tra** (không `--checks=proven`, không `#allow` để lách, không đổi đề bài); lỗi `E…` là thông tin để sửa MÃ của bạn. Danh sách hàm thư viện: `docs/STD_REFERENCE.md`. Nền đã kiểm: Linux x86_64 (Windows: chưa kiểm).
@@ -79,7 +79,7 @@ cannot open
 - `+ - *` abort `overflow` khi tràn; `/ %` abort khi chia 0 — gritc chứng minh được thì bỏ kiểm, không thì giữ (ghi chú N0601): đó là BÌNH THƯỜNG. Muốn không abort: `a +% b` (quấn vòng), `a +^ b` (bão hoà), `a +? b` → `Option` (None khi tràn); tương tự `-% *% -^ *^ -? *?`.
 - Bool `∧ ∨ ¬` ngắn mạch. `==` CHỈ cho số nguyên, bool, char, **`&str`**; tuple/`&T`/Option/struct/lát: E0301 — dùng `*a == *b`, so từng trường, `cmp(..).is_eq()` (kiểu `Ord`) hoặc `a.equals(b)` cho `&[u8]`. Số thực `f64`: `==` bị cấm (E0303).
 - `&str`: literal `"..."` (escape `\n \t \\ \"`), `s.len()`, `s.as_bytes()`, `s.slice(i, j)` (abort nếu cắt giữa ký tự UTF-8); std thêm `starts_with ends_with find parse_u64 parse_i64`. Xử lý văn bản = xử lý **BYTE** (`&[u8]`): `b[i]` là `u8`, `b'a'` KHÔNG có (dùng `97u8`).
-- Mảng `[0u8; 24]`, `[1u32, 2u32]`; lát `&a[i..j]` / `&!a[i..j]` (độ dài kiểm lúc chạy). Tuple `(1u32, true)`, truy cập `.0 .1`; KHÔNG có phân rã `(a, b) ≔ f();` — viết `t ≔ f(); a ≔ t.0;`.
+- Mảng `[0u8; 24]`, `[1u32, 2u32]`; lát `&a[i..j]` / `&!a[i..j]` (độ dài kiểm lúc chạy). `&[T; N]` KHÔNG tự thành `&[T]` khi truyền vào hàm (E0301): viết `&a[0usize..N]` (N là hằng độ dài); `⟳ x in &a` thì được. Tuple `(1u32, true)`, truy cập `.0 .1`; KHÔNG có phân rã `(a, b) ≔ f();` — viết `t ≔ f(); a ≔ t.0;`.
 - struct / enum / impl / const:
 ```grit run value=130
 □ LIMIT: u32 ≔ 10;
@@ -134,7 +134,7 @@ cannot open
   Đệ quy tương hỗ (`expr→term→primary→expr`): mỗi hàm có `↓ budget` và mỗi lời gọi truyền `budget - 1`. `main` chạy trên ngăn xếp 256 MiB.
 
 ## 6. Arena, Vec, HashMap, sắp xếp (bộ nhớ động)
-- `μar ≔ Arena::new();` (hiệu ứng `{mem}`). `Vec<'a, T>`/`Text<'a>`/`HashMap` đều trỏ vào Arena (CHIA SẺ: một Arena cho nhiều Vec). KHÔNG có free/drop từng phần; Arena sống tới hết hàm. **Phần tử Vec/HashMap phải `Copy`** (E0318 nếu cần drop: số, bool, char, `&T`, struct `Copy`, `std::Bytes`).
+- `μar ≔ Arena::new();` (hiệu ứng `{mem}`). `Vec<'a, T>`/`Text<'a>`/`HashMap` đều trỏ vào Arena (CHIA SẺ: một Arena cho nhiều Vec). KHÔNG có free/drop từng phần; Arena sống tới hết hàm. **Phần tử Vec/HashMap không được cần drop** (E0318); các hàm của std (`get`, `pop`, `contains`, HashMap…) đòi thêm `T: Copy`: dùng số, bool, char, `&T`, struct có `⊐ Copy for T { }`, `std::Bytes`.
 - Khung nhìn lấy từ Vec (`v.as_slice()`) vô hiệu khi `push`/`insert`/`clear`… tiếp theo (E0403) hoặc sau `ar.reset()` (E0405): lấy lại khung nhìn sau mỗi lần sửa.
 ```grit std run
 ƒ main() ! {io, div, mem} {
@@ -249,10 +249,11 @@ cannot open
 4. `as` abort khi mất thông tin; `+ - *` abort khi tràn (nếu không chứng minh được). Dữ liệu từ ngoài (số đọc từ stdin) nên dùng `+?`/so sánh trước.
 5. Hàm tự do của module khác: `◈ ƒ f` và gọi `ten_module::f(…)`; hàm tự do của std: `std::tên`. Phương thức của kiểu (`v.push`, `s.parse_u64()`) không cần tiền tố.
 6. `⌥` trên `u128` luôn cần nhánh `_`. Literal ≥ 2⁶⁴ cần hậu tố `u128`.
-7. Không có: closure, `?`, phân rã tuple, `unwrap()`/`is_some()`, `==` trên kiểu ghép, `f32`, macro, `dyn`, async, `unsafe` cho người dùng, tham số lifetime lồng. Cách né ở các mục trên.
-8. Văn bản là BYTE: tách dòng theo `\n` (10), cắt khoảng trắng 32/9/13. Đầu ra: `write_str` (literal), `write_bytes` (lát), `write_u64`/`write_i64` (số).
-9. `main` không trả mã thoát: dùng `core::exit(2u32)` (hiệu ứng `{div}`) cho lỗi dùng sai; kết thúc bình thường ⇒ mã 0.
-10. Một Arena `Arena::new()` mỗi chương trình là đủ; dữ liệu nhập/tệp (`&'static [u8]`) KHÔNG cần Arena.
+7. `check` XANH nhưng `rig run`/`gritc build` báo `backend llvm chưa hỗ trợ …` (mã 3): bạn dùng thứ chỉ-khai-báo (`Option::unwrap/is_some`, `Cap<Fs>::sub`, `==` trên kiểu ghép đã bị E0301): viết lại bằng cách khác. Bộ giải M8 không chứng minh được `a % b < b` hay `x ← x / 10` giảm: dùng nhiên liệu.
+8. Không có: closure, `?`, phân rã tuple, `unwrap()`/`is_some()`, `==` trên kiểu ghép, `f32`, macro, `dyn`, async, `unsafe` cho người dùng, tham số lifetime lồng. Cách né ở các mục trên.
+9. Văn bản là BYTE: tách dòng theo `\n` (10), cắt khoảng trắng 32/9/13. Đầu ra: `write_str` (literal), `write_bytes` (lát), `write_u64`/`write_i64` (số).
+10. `main` không trả mã thoát: dùng `core::exit(2u32)` (hiệu ứng `{div}`) cho lỗi dùng sai; kết thúc bình thường ⇒ mã 0.
+11. Một Arena `Arena::new()` mỗi chương trình là đủ; dữ liệu nhập/tệp (`&'static [u8]`) KHÔNG cần Arena.
 
 ## 11. Mẫu hoàn chỉnh: đếm dòng chứa mẫu (đọc stdin, tách dòng, tìm chuỗi, thoát có mã)
 ```grit std run exit=1

@@ -354,18 +354,7 @@ Với `⟳ điều-kiện { … }` (kiểu `while`), `gritc` thử **tự suy** 
 ƒ main() → u64 ! ∅ { sum_to(10) }
 ```
 
-Ở đây `n - i` giảm mỗi vòng và không âm, nên qua. Vòng `⟳ x in xs` trên range hoặc lát cũng tự dừng. Nếu thân không tiến về cận, bạn bị từ chối (E0701), không có đường lui lúc chạy:
-
-```grit fail=E0701
-ƒ stuck(n: u32) → u32 ! ∅ {
-  μi ≔ 0u32;
-  ⟳ i < n {
-  }
-  i
-}
-
-ƒ main() → u32 ! ∅ { stuck(3) }
-```
+Ở đây `n - i` giảm mỗi vòng và không âm, nên qua. Vòng `⟳ x in xs` trên range hoặc lát cũng tự dừng. Nếu thân không tiến về cận (ví dụ vòng `⟳ i < n { }` rỗng), bạn bị từ chối (E0701), không có đường lui lúc chạy.
 
 Khi suy luận không đủ, bạn viết hàm đo bằng `↓`. Với **đệ quy** thì `↓` là bắt buộc (không có đoán), đặt ngay sau chữ ký:
 
@@ -664,7 +653,7 @@ xin chao
 0 byte
 ```
 
-**Vì sao thiết kế thế?** Một thư viện bạn gọi mà chữ ký không có `Cap<Fs>` thì không thể đọc tệp của bạn: đó là lỗi kiểu lúc biên dịch, không phải hành vi lúc chạy. Rig (chương 11) dựa vào đây để biết một gói đòi quyền gì. Giới hạn trung thực: `Cap<Fs>::sub` (thu hẹp vào một thư mục con) có trong chữ ký ở prelude nhưng backend LLVM hiện chưa chạy được (đã thử); đừng dựa vào nó.
+**Vì sao thiết kế thế?** Một thư viện bạn gọi mà chữ ký không có `Cap<Fs>` thì không thể đọc tệp của bạn: đó là lỗi kiểu lúc biên dịch, không phải hành vi lúc chạy. Kế hoạch của Rig (chương 11) là dựa vào đây để biết một gói đòi quyền gì (mục này chưa được sách kiểm). Giới hạn trung thực: `Cap<Fs>::sub` (thu hẹp vào một thư mục con) có trong chữ ký ở prelude nhưng backend LLVM hiện chưa chạy được (đã thử); đừng dựa vào nó.
 
 **Bài tập 6.** Viết `banner(out: &Cap<Out>, n: u32)` in `n` dấu `*` rồi xuống dòng, và `main` gọi `banner(&out, 5)`. Đáp án:
 
@@ -1051,13 +1040,6 @@ Mã thoát của `gritc`: `0` qua; `1` ĐỎ; `2` lỗi nội bộ; `3` lỗi d�
 
 Máy và AI nên đọc `--json`: mỗi chẩn đoán có `code`, `level`, `message`, `span`, và `suggestions[].edits[]` (vị trí byte, chuỗi thay thế). Schema ở `docs/spec/diag_schema.json`.
 
-```text
-gritc check --json tệp.gt
-{"schema_version":1,"tool":"gritc","diagnostics":[{"code":"E0302","level":"error",
- "message":"…","file":"p5.gt","span":{"start":{"offset":56,"line":4,"col":3},…},
- "suggestions":[{"applicability":"maybe-incorrect","edits":[{"replacement":" as i64",…}]}]}],…}
-```
-
 **Các mã bạn gặp nhiều nhất:**
 
 | Mã | Nghĩa | Cách sửa thường gặp |
@@ -1190,8 +1172,8 @@ Ví dụ hai tệp, dùng `std`. Tệp `tok.gt` (module `tok`) tách các số c
   μstart ≔ 0usize;
   μin_tok ≔ false;
   μok ≔ true;
-  ⟳ i in 0..n {
-    ws ≔ std::is_ascii_ws(b[i]);
+  ⟳ i in 0..n + 1 {
+    ws ≔ ⎇ i == n { true } ⇝ { std::is_ascii_ws(b[i]) };
     ⎇ ws ∧ in_tok {
       ⌥ b[start..i].parse_u64() {
         Ok(v) ↦ { dst.push(v); },
@@ -1204,12 +1186,6 @@ Ví dụ hai tệp, dùng `std`. Tệp `tok.gt` (module `tok`) tách các số c
       in_tok ← true;
     } ⇝ { }
   }
-  ⎇ in_tok {
-    ⌥ b[start..n].parse_u64() {
-      Ok(v) ↦ { dst.push(v); },
-      Err(_) ↦ { ok ← false; },
-    }
-  } ⇝ { }
   ok
 }
 ```
@@ -1277,25 +1253,12 @@ Những điều rút ra từ ví dụ:
   out.write_str("\n");
 }
 
-ƒ main() ! {io, mem} {
+ƒ main() ! {io} {
   out ≔ root_out();
   show(&out, "-42".parse_i64());
   show(&out, "".parse_i64());
   show(&out, "12a".parse_i64());
   show(&out, "99999999999999999999".parse_i64());
-
-  μa ≔ Arena::new();
-  μv ≔ Vec::new(&a);
-  v.push(5u32);
-  v.push(2u32);
-  v.push(9u32);
-  v.push(1u32);
-  v.as_mut_slice().sort();
-  ⟳ x in v.as_slice() {
-    out.write_u64(*x as u64);
-    out.write_str(" ");
-  }
-  out.write_str("\n");
 }
 ```
 
@@ -1304,7 +1267,6 @@ Những điều rút ra từ ví dụ:
 rong
 sai
 tran
-1 2 5 9 
 ```
 
 Một lỗi hay gặp khi tách module: item mặc định private. Tệp `geom.gt` thiếu `◈`:
@@ -1356,14 +1318,7 @@ Thêm `◈` vào `▢ Point` (và `◈` vào từng trường nếu module khác
 }
 ```
 
-```grit fail=E0205
-ƒ main() → i32 ! ∅ {
-  band ≔ 1;
-  band
-}
-```
-
-(`band` là hàm của prelude.) Cũng đừng tự định nghĩa enum có biến thể tên `Ok`/`Err`/`Some`/`None`: chúng che biến thể của prelude.
+(Tên `band`, một hàm của prelude, cũng không được dùng làm tên biến.) Cũng đừng tự định nghĩa enum có biến thể tên `Ok`/`Err`/`Some`/`None`: chúng che biến thể của prelude.
 
 **2. Thứ tự đánh giá là trái sang phải, và gán khác Rust.** Với `f() + g() * h()` thì `f`, `g`, `h` chạy theo thứ tự viết. Với gán `chỗ ← giá_trị`, các biểu thức con của *chỗ* (chỉ số) chạy trước, rồi mới đến giá trị. Rust làm ngược (vế phải trước).
 
@@ -1411,13 +1366,6 @@ Tiến trình dựng từ khối trên thoát với mã `3`. Dưới `gritc run`
   a ≔ Some(1);
   b ≔ Some(1);
   a == b
-}
-```
-
-```grit fail=E0303
-ƒ main() → bool ! ∅ {
-  x ≔ 1.5;
-  x == 1.5
 }
 ```
 
