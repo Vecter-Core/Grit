@@ -84,6 +84,38 @@ fn check_llvm_dll() -> Result<(), NativeError> {
     }
 }
 
+/// Đường dẫn thư viện runtime đang dùng (cho `gritc doctor`).
+pub fn runtime_lib_path() -> Result<PathBuf, NativeError> {
+    rt_lib()
+}
+
+/// Tên + phiên bản trình liên kết đang dùng (Linux: `cc`; Windows: `link.exe` của MSVC) — cho `gritc doctor`.
+pub fn linker_probe() -> Result<String, NativeError> {
+    let mut c = linker()?;
+    #[cfg(not(windows))]
+    {
+        c.arg("--version");
+        let o = c
+            .output()
+            .map_err(|e| NativeError::Env(format!("không chạy được `cc`: {e}")))?;
+        let first = String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .next()
+            .unwrap_or("")
+            .to_string();
+        if o.status.success() {
+            Ok(first)
+        } else {
+            Err(NativeError::Env("`cc --version` thất bại".to_string()))
+        }
+    }
+    #[cfg(windows)]
+    {
+        let _ = &mut c;
+        Ok("link.exe (MSVC)".to_string())
+    }
+}
+
 /// Thư viện runtime (`gt_rt.lib` ở Windows, `libgt_rt.a` ở Linux): biến `GRIT_RT_LIB`, hoặc bản dựng cạnh mã nguồn (dev: `runtime/gt-rt/target/release/`).
 fn rt_lib() -> Result<PathBuf, NativeError> {
     if let Some(p) = std::env::var_os("GRIT_RT_LIB") {
