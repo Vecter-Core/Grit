@@ -12,7 +12,7 @@ Hoặc `bash tools/install.sh` (như trên rồi liên kết `gritc`, `rig` vào
 ```text
 export GRIT_LLVM_LIB_DIR=/usr/lib/x86_64-linux-gnu         # thư mục chứa libLLVM-20.so (gói libllvm20)
 cargo build --release --manifest-path runtime/gt-rt/Cargo.toml   # runtime (workspace riêng, panic = abort)
-cargo build --release -p gt-driver --bin gritc -p rig
+cargo build --release -p gt-driver -p rig --bin gritc --bin rig
 ```
 - `gritc` NHỚ đường dẫn `runtime/gt-rt/target/release/libgt_rt.a` theo thư mục kho lúc dựng (đặt `GRIT_RT_LIB=<tệp>` để ghi đè): đừng di chuyển kho sau khi dựng.
 - Không có `libllvm20` trong apt? `tools/setup_cloud.sh` thử tải LLVM 20.1.8 dựng sẵn (đường dự phòng CHƯA kiểm); hoặc tự đặt `GRIT_LLVM_LIB_DIR`.

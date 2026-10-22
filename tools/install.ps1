@@ -10,7 +10,7 @@ if (-not (Test-Path (Join-Path $env:GRIT_LLVM_DIR "lib\LLVM-C.lib"))) {
 $env:PATH = "$(Join-Path $env:GRIT_LLVM_DIR 'bin');$env:PATH"
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { throw "Thiếu cargo: cài rustup (https://rustup.rs) rồi chạy lại." }
 cargo build --release --manifest-path runtime/gt-rt/Cargo.toml
-cargo build --release -p gt-driver --bin gritc -p rig
+cargo build --release -p gt-driver -p rig --bin gritc --bin rig
 & .\target\release\gritc.exe doctor
 if ($LASTEXITCODE -ne 0) { throw "gritc doctor ĐỎ: xem các dòng LỖI ở trên." }
 Write-Host "Xong. Thêm vào PATH: `$env:PATH = `"$PWD\target\release;`$env:PATH`""

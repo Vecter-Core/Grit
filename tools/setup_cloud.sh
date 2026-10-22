@@ -61,7 +61,8 @@ tick "LLVM 20: $LLVMDIR"
 # 4. runtime gt-rt (workspace riêng) rồi gritc + rig (release)
 cargo build --release --manifest-path runtime/gt-rt/Cargo.toml 2>&1 | tail -1 | grep -q "Finished" || die "dựng runtime/gt-rt thất bại (chạy lại lệnh cargo để xem lỗi)"
 tick "dựng runtime gt-rt (release)"
-cargo build --release -p gt-driver --bin gritc -p rig 2>&1 | tail -1 | grep -q "Finished" || die "dựng gritc/rig thất bại (chạy: cargo build --release -p gt-driver --bin gritc -p rig)"
+cargo build --release -p gt-driver -p rig --bin gritc --bin rig 2>&1 | tail -1 | grep -q "Finished" || die "dựng gritc/rig thất bại (chạy: cargo build --release -p gt-driver -p rig --bin gritc --bin rig)"
+[ -x target/release/gritc ] && [ -x target/release/rig ] || die "thiếu target/release/gritc hoặc target/release/rig sau khi dựng"
 tick "dựng gritc + rig (release)"
 
 # 5. kiểm môi trường
