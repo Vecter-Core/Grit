@@ -17,3 +17,4 @@ Commit xoá tệp phải cập nhật tệp này CÙNG commit (`tools/commit_che
 
 ## Ghi chú về `lib/core/TASK.md`
 Tệp này biến mất khỏi cây làm việc (không qua commit) ngày 2026-10-16 và đã khôi phục bằng `git checkout`; nguyên nhân chưa rõ (xem KNOWN_LIMITATIONS "Tệp bị xoá không rõ nguyên nhân"). Nó vẫn được theo dõi, nên KHÔNG có dòng ở đây (chưa bị xoá trong lịch sử). Nếu sau này chủ ý xoá (giống các `TASK.md` giữ chỗ khác khi M12 đóng), thêm dòng ở đây trong CÙNG commit.
+| --help/** (176 tệp ca capstone) | 22245c0 | thư mục sinh nhầm khi chạy `gen_cases.py --help` (đối số bị coi là thư mục đích); đã sửa gen_cases.py từ chối đối số bắt đầu bằng '-' |

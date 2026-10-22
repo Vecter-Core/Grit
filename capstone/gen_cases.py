@@ -174,6 +174,9 @@ def main(argv):
         print(__doc__)
         return 3
     base = argv[1]
+    if base.startswith("-"):  # `--help` từng bị coi là THƯ MỤC và sinh ra ./--help/ trong kho (2026-10-22)
+        print(__doc__)
+        return 3
     large = "--large" in argv
     for f in (csvstat, calc, kvstore, grep_lite):
         f(base, large)
