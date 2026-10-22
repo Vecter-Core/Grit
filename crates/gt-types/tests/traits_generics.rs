@@ -272,3 +272,14 @@ fn equality_is_limited_to_scalars_and_str_fb_c13() {
     err("ƒ f(a: &u32, b: &u32) → bool ! ∅ { a == b }", "E0301", 1);
     ok("ƒ f(a: &u32, b: &u32) → bool ! ∅ { *a == *b }");
 }
+
+/// FB-C14: `x ≔ 1.5; x as i32` (biến nhận literal số thực KHÔNG chú thích) lọt qua M4 chỉ với N0604 vì kiểu còn là biến suy diễn số thực
+/// khi kiểm `as`; phải là E0319 như `x: f64`/`1.5f64` (ADR-035 Q70).
+#[test]
+fn float_to_int_cast_through_an_inferred_float_literal_is_e0319_fb_c14() {
+    err("ƒ f() → i32 ! ∅ { x ≔ 1.5; x as i32 }", "E0319", 1);
+    err("ƒ f() → i32 ! ∅ { (2.5) as i32 }", "E0319", 1);
+    err("ƒ f(y: f64) → i32 ! ∅ { y as i32 }", "E0319", 1);
+    ok("ƒ f() → f64 ! ∅ { x ≔ 1.5; x }");
+    ok("ƒ f() → f64 ! ∅ { n ≔ 3; n as f64 }");
+}
