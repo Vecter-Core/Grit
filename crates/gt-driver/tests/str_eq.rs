@@ -14,21 +14,45 @@ fn run_value(src: &str, backend: &str) -> String {
     let f = d.join("prog.gt");
     std::fs::write(&f, src).expect("ghi");
     let o = Command::new(env!("CARGO_BIN_EXE_gritc"))
-        .args(["run", "--json", &format!("--backend={backend}"), &format!("--profile={profile}")])
+        .args([
+            "run",
+            "--json",
+            &format!("--backend={backend}"),
+            &format!("--profile={profile}"),
+        ])
         .arg(&f)
         .output()
         .expect("chạy gritc");
     let text = String::from_utf8_lossy(&o.stdout).into_owned();
     let err = String::from_utf8_lossy(&o.stderr).into_owned();
     assert_eq!(o.status.code(), Some(0), "{backend}: {text}\n{err}\n{src}");
-    let line = text.lines().rev().find(|l| l.starts_with('{')).unwrap_or("");
+    let line = text
+        .lines()
+        .rev()
+        .find(|l| l.starts_with('{'))
+        .unwrap_or("");
     let v: serde_json::Value = serde_json::from_str(line).expect("JSON");
     let raw = v["run"]["value"].as_str().unwrap_or("").to_string();
     let _ = std::fs::remove_dir_all(&d);
-    raw.strip_prefix("Int(").and_then(|s| s.split(',').next()).map_or(raw.clone(), str::to_string)
+    raw.strip_prefix("Int(")
+        .and_then(|s| s.split(',').next())
+        .map_or(raw.clone(), str::to_string)
 }
 
-const POOL: [&str; 12] = ["", "a", "ab", "abc", "abd", "b", "-c", "-n", "--", "é", "aé", "zzzzzzzzzzzzzzzzzzzz"];
+const POOL: [&str; 12] = [
+    "",
+    "a",
+    "ab",
+    "abc",
+    "abd",
+    "b",
+    "-c",
+    "-n",
+    "--",
+    "é",
+    "aé",
+    "zzzzzzzzzzzzzzzzzzzz",
+];
 
 #[test]
 fn str_equality_agrees_with_rust_in_both_backends_fb_c13() {
@@ -40,15 +64,26 @@ fn str_equality_agrees_with_rust_in_both_backends_fb_c13() {
         }
     }
     for (n, chunk) in pairs.chunks(24).enumerate() {
-        let mut src = String::from("ƒ bn(b: bool) → u64 ! ∅ { ⎇ b { 1u64 } ⇝ { 0u64 } }\nƒ main() → u64 ! ∅ {\n  μacc ≔ 0u64;\n");
+        let mut src = String::from(
+            "ƒ bn(b: bool) → u64 ! ∅ { ⎇ b { 1u64 } ⇝ { 0u64 } }\nƒ main() → u64 ! ∅ {\n  μacc ≔ 0u64;\n",
+        );
         let mut want = 0u64;
         for (a, b) in chunk {
-            src.push_str(&format!("  acc ← acc *% 3u64 +% bn(\"{a}\" == \"{b}\") +% 2u64 *% bn(\"{a}\" != \"{b}\");\n"));
-            want = want.wrapping_mul(3).wrapping_add((a == b) as u64).wrapping_add(2 * (a != b) as u64);
+            src.push_str(&format!(
+                "  acc ← acc *% 3u64 +% bn(\"{a}\" == \"{b}\") +% 2u64 *% bn(\"{a}\" != \"{b}\");\n"
+            ));
+            want = want
+                .wrapping_mul(3)
+                .wrapping_add((a == b) as u64)
+                .wrapping_add(2 * (a != b) as u64);
         }
         src.push_str("  acc\n}\n");
         for backend in ["interpreter", "llvm"] {
-            assert_eq!(run_value(&src, backend), want.to_string(), "chunk {n}, {backend}\n{src}");
+            assert_eq!(
+                run_value(&src, backend),
+                want.to_string(),
+                "chunk {n}, {backend}\n{src}"
+            );
         }
     }
 }

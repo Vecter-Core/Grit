@@ -522,6 +522,28 @@ fn pure_cases(rng: &mut Rng, edge: bool) -> Vec<Pure> {
             oi(m),
         );
     });
+    let mut r4b = Rng(rng.next());
+    t(&mut out, reps, "[u8]::find_byte_or_end", &mut |_, p| {
+        let s = wstr(&mut r4b, 8);
+        let from = r4b.below(11) as usize;
+        let b = [b'a', b'b', b'c', b' ', b'\t', b'\n', b'z'][r4b.below(7) as usize];
+        let n = s.len();
+        let m = if from >= n {
+            from.max(n)
+        } else {
+            s.as_bytes()[from..]
+                .iter()
+                .position(|&c| c == b)
+                .map_or(n, |i| i + from)
+        };
+        p.push(
+            &format!(
+                "(({}.as_bytes().find_byte_or_end({from}usize, {b}u8)) as u64)",
+                glit(&s)
+            ),
+            m as u64,
+        );
+    });
     let mut r5 = Rng(rng.next());
     t(&mut out, reps, "[u8]::trim_ascii", &mut |_, p| {
         let s = wstr(&mut r5, 9);

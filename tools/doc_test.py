@@ -8,6 +8,7 @@ Cú pháp dòng mở: ```grit [thuộc-tính ...]
   fail=E0xxx[,E0yyy]   chương trình PHẢI bị từ chối với (mọi) mã đó (ví dụ minh hoạ lỗi)
   run                  sau khi check, `gritc run` phải thoát 0; nếu ngay sau khối là hàng rào ```output thì stdout phải KHỚP đúng từng byte
   value=N              `gritc run` phải cho `main` trả đúng N (số nguyên)
+  exit=N               chương trình phải thoát bằng `core::exit(N)` (gritc run báo mã 100+N); mặc định 0
   stdin=<tệp-tuỳ-chọn> (không dùng)
   file=ten.gt group=G  nhiều khối cùng `group` ghép thành MỘT chương trình nhiều tệp (mỗi khối một tệp `file=`; khối thiếu `file=` là main.gt)
 Dùng: python3 tools/doc_test.py [--list] [đường-dẫn.md ...]   (mặc định: mọi *.md dưới docs/ và README.md)
@@ -102,7 +103,7 @@ def std_sources():
 
 def run_gritc(gritc, args, cwd):
     env = dict(os.environ)
-    return subprocess.run([gritc] + args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", env=env, timeout=300)
+    return subprocess.run([gritc] + args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", env=env, timeout=300, stdin=subprocess.DEVNULL)
 
 
 def diag_codes(stdout):
@@ -141,8 +142,9 @@ def check_program(gritc, files, attrs, expect_out):
             return errs
         if "run" in attrs or "value" in attrs:
             r2 = run_gritc(gritc, ["run", "--json", d], d)
-            if r2.returncode != 0:
-                errs.append(f"gritc run thoát {r2.returncode}: {(r2.stderr or r2.stdout)[-300:]}")
+            want_rc = 0 if str(attrs.get("exit", "0")) == "0" else 100 + int(attrs["exit"])
+            if r2.returncode != want_rc:
+                errs.append(f"gritc run thoát {r2.returncode} (mong đợi {want_rc}): {(r2.stderr or r2.stdout)[-300:]}")
                 return errs
             doc2, _ = diag_codes(r2.stdout)
             if "value" in attrs:

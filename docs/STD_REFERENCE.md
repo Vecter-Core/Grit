@@ -356,17 +356,19 @@ Mặc định cho hàm không có ghi chú riêng: TOÀN PHẦN theo thiết k�
 ### `⊐ [u8]`
 
 - `ƒ starts_with(&self, p: &[u8]) → bool ! ∅`
-  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+  - hiệu ứng: `∅`; abort: không
 - `ƒ ends_with(&self, p: &[u8]) → bool ! ∅`
-  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+  - hiệu ứng: `∅`; abort: không
 - `ƒ equals(&self, o: &[u8]) → bool ! ∅` — bằng nhau từng byte (`==` KHÔNG có cho lát; dùng hàm này)
-  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+  - hiệu ứng: `∅`; abort: không
 - `ƒ find_byte(&self, from_: usize, b: u8) → Option<usize> ! ∅` — vị trí byte đầu tiên bằng `b` tại hoặc sau `from_`
-  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+  - hiệu ứng: `∅`; abort: không (trả `None` nếu không có)
+- `ƒ find_byte_or_end(&self, from_: usize, b: u8) → usize ! ∅ ⊲ result >= from_` — vị trí byte `b` đầu tiên tại hoặc sau `from`, hoặc `max(len, from)` nếu không có. Hậu điều kiện `result >= from` cho phép vòng lặp tách dòng `⟳ pos < n ↓ n - pos { end ≔ b.find_byte_or_end(pos, 10u8); …; pos ← end + 1usize; }` được M8 chứng minh dừng
+  - hiệu ứng: `∅`; abort: không (có hậu điều kiện `result >= from`)
 - `ƒ find(&self, p: &[u8]) → Option<usize> ! ∅` — vị trí đầu tiên của dãy `p` (mẫu rỗng ⇒ Some(0)); tìm ngây thơ O(n·m)
-  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+  - hiệu ứng: `∅`; abort: không (mẫu rỗng ⇒ `Some(0)`)
 - `ƒ trim_ascii(&self) → &[u8] ! ∅` — bỏ khoảng trắng ASCII ở hai đầu
-  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+  - hiệu ứng: `∅`; abort: không
 - `ƒ parse_u64(&self) → Result<u64, ParseError> ! ∅` — u64 thập phân không dấu
   - hiệu ứng: `∅`; abort: không (trả `Err(ParseError)`: Empty > Invalid > Overflow)
 - `ƒ parse_i64(&self) → Result<i64, ParseError> ! ∅` — i64 thập phân với `-` tuỳ chọn (không có `+`)

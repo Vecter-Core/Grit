@@ -266,6 +266,17 @@
     }
     r
   }
+  // vị trí byte `b` đầu tiên tại hoặc sau `from`, hoặc `max(len, from)` nếu không có. Hậu điều kiện `result >= from` cho phép vòng lặp tách dòng
+  // `⟳ pos < n ↓ n - pos { end ≔ b.find_byte_or_end(pos, 10u8); …; pos ← end + 1usize; }` được M8 chứng minh dừng
+  ƒ find_byte_or_end(&self, from_: usize, b: u8) → usize ! ∅ ⊲ result >= from_ {
+    n ≔ self.len();
+    μi ≔ from_;
+    μr ≔ ⎇ from_ > n { from_ } ⇝ { n };
+    ⟳ i < n {
+      ⎇ self[i] == b { r ← i; i ← n; } ⇝ { i ← i + 1usize; }
+    }
+    r
+  }
   // vị trí đầu tiên của dãy `p` (mẫu rỗng ⇒ Some(0)); tìm ngây thơ O(n·m)
   ƒ find(&self, p: &[u8]) → Option<usize> ! ∅ {
     n ≔ self.len();
