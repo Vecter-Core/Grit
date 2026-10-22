@@ -69,26 +69,22 @@ fn lsp_session_diagnostics_formatting_and_exit() {
     std::fs::create_dir_all(&dir).expect("tạo thư mục");
     let uri = format!("file://{}/main.gt", dir.display());
 
-    // chương trình SAI kiểu có ký tự UTF-16 hai đơn vị (😀) ở dòng trước ⇒ cột phải tính theo UTF-16
-    let bad = "// 😀 chú thích\nƒ main() → u32 ! ∅ { true }\n";
+    // chương trình SAI kiểu; ký tự ngoài BMP (😀 = 2 đơn vị UTF-16, 4 byte UTF-8) nằm TRƯỚC lỗi trên CÙNG dòng ⇒ cột phải tính theo UTF-16
+    let bad = "// chú thích\nƒ main() → u32 ! ∅ { s ≔ \"😀\"; true }\n";
     let p = s.open(&uri, bad);
     assert_eq!(p["method"], "textDocument/publishDiagnostics");
     assert_eq!(p["params"]["uri"], uri.as_str());
     let d = p["params"]["diagnostics"].as_array().expect("mảng");
     assert!(!d.is_empty(), "{p}");
-    assert_eq!(d[0]["code"], "E0301", "{p}");
-    assert_eq!(d[0]["severity"], 1);
-    assert_eq!(d[0]["source"], "gritc");
-    assert_eq!(d[0]["range"]["start"]["line"], 1, "{p}");
-    // `{ true }`: `true` bắt đầu ở cột 23 (0-based, ký tự BMP một đơn vị mỗi cái trên dòng này)
-    let line1: Vec<u16> = "ƒ main() → u32 ! ∅ { true }".encode_utf16().collect();
-    let col_true = "ƒ main() → u32 ! ∅ { ".encode_utf16().count();
-    assert_eq!(
-        d[0]["range"]["start"]["character"],
-        col_true,
-        "{p} (dòng có {} đơn vị)",
-        line1.len()
-    );
+    let e = d
+        .iter()
+        .find(|x| x["code"] == "E0301")
+        .unwrap_or_else(|| panic!("thiếu E0301: {p}"));
+    assert_eq!(e["severity"], 1);
+    assert_eq!(e["source"], "gritc");
+    assert_eq!(e["range"]["start"]["line"], 1, "{p}");
+    let col_true = "ƒ main() → u32 ! ∅ { s ≔ \"😀\"; ".encode_utf16().count();
+    assert_eq!(e["range"]["start"]["character"], col_true, "{p}");
 
     // sửa đúng ⇒ chẩn đoán rỗng
     s.send(&json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"text":"ƒ main() → u32 ! ∅ { 1u32 }\n"}]}}));

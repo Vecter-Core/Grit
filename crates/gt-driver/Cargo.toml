@@ -32,6 +32,7 @@ gt-stack = { path = "../gt-stack" }
 gt-codegen-llvm = { path = "../gt-codegen-llvm", optional = true }
 gt-guard = { path = "../gt-guard", optional = true }
 find-msvc-tools = { version = "0.1", optional = true }
+serde_json = "1"
 
 [features]
 # Backend LLVM (ADR-029): mặc định BẬT. `--no-default-features` dựng gritc chỉ có backend `interpreter` (không cần LLVM).
@@ -40,7 +41,6 @@ llvm = ["dep:gt-codegen-llvm", "dep:gt-guard", "dep:find-msvc-tools"]
 
 [dev-dependencies]
 gt-parser = { path = "../gt-parser" }
-serde_json = "1"
 
 [lints]
 workspace = true

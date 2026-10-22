@@ -79,25 +79,25 @@ fn validate(root: &Value, sc: &Value, v: &Value, path: &str, errs: &mut Vec<Stri
             return;
         }
     }
-    if let Some(c) = obj.get("const") {
-        if c != v {
-            errs.push(format!("{path}: mong hằng {c}, có {v}"));
-        }
+    if let Some(c) = obj.get("const")
+        && c != v
+    {
+        errs.push(format!("{path}: mong hằng {c}, có {v}"));
     }
-    if let Some(Value::Array(e)) = obj.get("enum") {
-        if !e.contains(v) {
-            errs.push(format!("{path}: {v} ngoài enum {e:?}"));
-        }
+    if let Some(Value::Array(e)) = obj.get("enum")
+        && !e.contains(v)
+    {
+        errs.push(format!("{path}: {v} ngoài enum {e:?}"));
     }
-    if let (Some(m), Some(n)) = (obj.get("minimum").and_then(Value::as_i64), v.as_i64()) {
-        if n < m {
-            errs.push(format!("{path}: {n} < {m}"));
-        }
+    if let (Some(m), Some(n)) = (obj.get("minimum").and_then(Value::as_i64), v.as_i64())
+        && n < m
+    {
+        errs.push(format!("{path}: {n} < {m}"));
     }
-    if let (Some(p), Some(s)) = (obj.get("pattern").and_then(Value::as_str), v.as_str()) {
-        if !pattern_ok(p, s) {
-            errs.push(format!("{path}: `{s}` không khớp mẫu {p}"));
-        }
+    if let (Some(p), Some(s)) = (obj.get("pattern").and_then(Value::as_str), v.as_str())
+        && !pattern_ok(p, s)
+    {
+        errs.push(format!("{path}: `{s}` không khớp mẫu {p}"));
     }
     if let (Some(Value::Array(req)), Some(o)) = (obj.get("required"), v.as_object()) {
         for r in req.iter().filter_map(Value::as_str) {
