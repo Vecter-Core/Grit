@@ -406,7 +406,7 @@ fn escaped_sites(m: &MirOutput) -> Vec<(gt_ast::NodeId, gt_mir::SourceInfo)> {
             for st in &bb.statements {
                 let mut visit = |o: &Operand| {
                     if let Operand::Const(Const::FnItem { node, .. }) = o {
-                        out.push((*node, st.source.clone()));
+                        out.push((*node, st.source));
                     }
                 };
                 if let StatementKind::Assign(_, rv) = &st.kind {
@@ -428,7 +428,7 @@ fn escaped_sites(m: &MirOutput) -> Vec<(gt_ast::NodeId, gt_mir::SourceInfo)> {
             if let Some(t) = &bb.terminator {
                 let mut visit = |o: &Operand| {
                     if let Operand::Const(Const::FnItem { node, .. }) = o {
-                        out.push((*node, t.source.clone()));
+                        out.push((*node, t.source));
                     }
                 };
                 match &t.kind {

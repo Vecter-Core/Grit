@@ -88,7 +88,7 @@ fn vec_truncate_matches_the_model_on_both_backends() {
                     body.push_str(&format!("  v.truncate({k}usize);\n"));
                 }
                 _ => {
-                    model.truncate(0);
+                    model.clear();
                     body.push_str("  v.truncate(0usize);\n");
                 }
             }

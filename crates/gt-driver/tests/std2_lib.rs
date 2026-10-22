@@ -508,7 +508,7 @@ fn pure_cases(rng: &mut Rng, edge: bool) -> Vec<Pure> {
     t(&mut out, reps, "[u8]::find_byte", &mut |_, p| {
         let s = wstr(&mut r4, 8);
         let from = r4.below(10) as usize;
-        let b = [b'a', b'b', b'c', b' ', b'\t', b'z'][r4.below(6) as usize];
+        let b = b"abc \tz"[r4.below(6) as usize];
         let m = if from >= s.len() {
             None
         } else {
@@ -526,7 +526,7 @@ fn pure_cases(rng: &mut Rng, edge: bool) -> Vec<Pure> {
     t(&mut out, reps, "[u8]::find_byte_or_end", &mut |_, p| {
         let s = wstr(&mut r4b, 8);
         let from = r4b.below(11) as usize;
-        let b = [b'a', b'b', b'c', b' ', b'\t', b'\n', b'z'][r4b.below(7) as usize];
+        let b = b"abc \t\nz"[r4b.below(7) as usize];
         let n = s.len();
         let m = if from >= n {
             from.max(n)
@@ -670,12 +670,14 @@ fn pure_cases(rng: &mut Rng, edge: bool) -> Vec<Pure> {
     // ---- sắp xếp: mỗi mảng một hàm phụ
     let mut r18 = Rng(rng.next());
     let mut sortn = 0usize;
-    let mut idx_base = 0usize;
-    for (name, kind) in [
+    for (idx_base, (name, kind)) in [
         ("[T]::sort (u32)", 0),
         ("[T]::sort (i64)", 1),
         ("[T]::sort (u8)", 2),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let mut p = Pure::new();
         for _ in 0..reps {
             let n = 1 + r18.below(12) as usize;
@@ -739,7 +741,6 @@ fn pure_cases(rng: &mut Rng, edge: bool) -> Vec<Pure> {
             p.push(&format!("{fname}()"), model);
         }
         out.push((name, p));
-        idx_base += 1;
     }
     // ---- băm
     let mut r19 = Rng(rng.next());
