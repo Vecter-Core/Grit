@@ -398,7 +398,9 @@ fn cmd_new(a: &Args) -> i32 {
         std::fs::create_dir_all(dir.join("src"))?;
         std::fs::write(
             dir.join("rig.toml"),
-            format!("[package]\nname = \"{name}\"\nversion = \"0.1.0\"\n\n[dependencies]\n{std_dep}"),
+            format!(
+                "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\n\n[dependencies]\n{std_dep}"
+            ),
         )?;
         std::fs::write(
             dir.join("src").join("main.gt"),

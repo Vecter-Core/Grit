@@ -17,5 +17,8 @@ fn writing_through_a_mutable_array_slice_updates_only_the_window_fb_c12() {
     let src = "ƒ set(s: &![u32], i: usize, x: u32) ! ∅ { s[i] ← x; }
 ƒ f() → u32 ! ∅ { μa ≔ [1u32, 2u32, 3u32, 4u32, 5u32]; set(&!a[1usize..4usize], 1usize, 90u32); a[0usize] + a[1usize] * 10u32 + a[2usize] * 100u32 + a[3usize] * 1000u32 + a[4usize] * 10000u32 }";
     // a = [1,2,90,4,5] ⇒ 1 + 20 + 9000 + 4000 + 50000
-    assert_eq!(run(src), Outcome::Value(V::Int(63021, gt_types::IntTy::U32)));
+    assert_eq!(
+        run(src),
+        Outcome::Value(V::Int(63021, gt_types::IntTy::U32))
+    );
 }

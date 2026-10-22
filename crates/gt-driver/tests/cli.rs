@@ -503,7 +503,14 @@ fn doctor_passes_on_a_healthy_environment_and_explains_failures() {
         .expect("chạy gritc doctor");
     let out = String::from_utf8_lossy(&o.stdout).into_owned() + &String::from_utf8_lossy(&o.stderr);
     assert_eq!(o.status.code(), Some(0), "{out}");
-    for needle in ["gritc doctor", "runtime", "trình liên kết", "thư mục tạm", "dựng và chạy thử", "doctor: XANH"] {
+    for needle in [
+        "gritc doctor",
+        "runtime",
+        "trình liên kết",
+        "thư mục tạm",
+        "dựng và chạy thử",
+        "doctor: XANH",
+    ] {
         assert!(out.contains(needle), "thiếu `{needle}`:\n{out}");
     }
     // runtime hỏng ⇒ mã 3, nêu GRIT_RT_LIB và cách sửa
@@ -514,5 +521,8 @@ fn doctor_passes_on_a_healthy_environment_and_explains_failures() {
         .expect("chạy gritc doctor");
     let out = String::from_utf8_lossy(&o.stdout).into_owned() + &String::from_utf8_lossy(&o.stderr);
     assert_eq!(o.status.code(), Some(3), "{out}");
-    assert!(out.contains("GRIT_RT_LIB") && out.contains("doctor: ĐỎ"), "{out}");
+    assert!(
+        out.contains("GRIT_RT_LIB") && out.contains("doctor: ĐỎ"),
+        "{out}"
+    );
 }

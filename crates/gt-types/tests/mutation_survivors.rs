@@ -81,7 +81,11 @@ fn equality_on_aggregates_containing_floats_is_rejected_d4() {
         1,
     );
     // tuple không float: cũng E0301 từ FB-C13 (tuple chưa hỗ trợ `==` ở mọi backend); số nguyên thì được
-    err("ƒ f(a: (i32, bool), b: (i32, bool)) → bool ! ∅ { a == b }", "E0301", 1);
+    err(
+        "ƒ f(a: (i32, bool), b: (i32, bool)) → bool ! ∅ { a == b }",
+        "E0301",
+        1,
+    );
     ok("ƒ f(a: i32, b: i32) → bool ! ∅ { a == b }");
 }
 

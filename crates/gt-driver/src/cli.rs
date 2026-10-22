@@ -490,7 +490,12 @@ fn cmd_doctor() -> i32 {
         std::env::consts::OS,
         std::env::consts::ARCH
     );
-    line(true, "backend llvm", "có trong bản dựng này".to_string(), "");
+    line(
+        true,
+        "backend llvm",
+        "có trong bản dựng này".to_string(),
+        "",
+    );
     match crate::native::runtime_lib_path() {
         Ok(p) => line(true, "runtime (gt-rt)", p.display().to_string(), ""),
         Err(e) => line(
@@ -512,7 +517,12 @@ fn cmd_doctor() -> i32 {
     let tmp = std::env::temp_dir();
     let probe = tmp.join(format!("gritc-doctor-{}", std::process::id()));
     match std::fs::create_dir_all(&probe) {
-        Ok(()) => line(true, "thư mục tạm", format!("{} ghi được", tmp.display()), ""),
+        Ok(()) => line(
+            true,
+            "thư mục tạm",
+            format!("{} ghi được", tmp.display()),
+            "",
+        ),
         Err(e) => line(
             false,
             "thư mục tạm",
@@ -557,7 +567,9 @@ fn cmd_doctor() -> i32 {
 
 #[cfg(not(feature = "llvm"))]
 fn cmd_doctor() -> i32 {
-    println!("gritc doctor: bản dựng này KHÔNG có backend llvm (--no-default-features): chỉ `check`/`fmt`/`explain` và thông dịch");
+    println!(
+        "gritc doctor: bản dựng này KHÔNG có backend llvm (--no-default-features): chỉ `check`/`fmt`/`explain` và thông dịch"
+    );
     println!("doctor: ĐỎ (không có backend llvm)");
     3
 }

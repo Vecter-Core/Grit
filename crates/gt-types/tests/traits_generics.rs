@@ -268,7 +268,11 @@ fn equality_is_limited_to_scalars_and_str_fb_c13() {
     ok("ƒ f(a: &str, b: &str) → bool ! ∅ { a != b }");
     ok("ƒ f(a: u8, b: u8) → bool ! ∅ { a == b }");
     ok("ƒ f(a: char, b: char) → bool ! ∅ { a == b }");
-    err("ƒ f(a: (u32, bool), b: (u32, bool)) → bool ! ∅ { a == b }", "E0301", 1);
+    err(
+        "ƒ f(a: (u32, bool), b: (u32, bool)) → bool ! ∅ { a == b }",
+        "E0301",
+        1,
+    );
     err("ƒ f(a: &u32, b: &u32) → bool ! ∅ { a == b }", "E0301", 1);
     ok("ƒ f(a: &u32, b: &u32) → bool ! ∅ { *a == *b }");
 }

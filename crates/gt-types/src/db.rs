@@ -199,7 +199,8 @@ impl TypeDb {
                 if self.lang.get(&Lang::Copy) == Some(&trait_def) {
                     return self.is_copy(infer, &ty, scope, depth);
                 }
-                self.find_impl(infer, trait_def, &ty, scope, depth).is_some()
+                self.find_impl(infer, trait_def, &ty, scope, depth)
+                    .is_some()
             }
         }
     }

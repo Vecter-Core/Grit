@@ -406,7 +406,12 @@ pub unsafe extern "C" fn gritrt_bytes_eq(a: *const u8, an: u64, b: *const u8, bn
         return 1;
     }
     let n = usize::try_from(an).unwrap_or(0);
-    let (x, y) = unsafe { (std::slice::from_raw_parts(a, n), std::slice::from_raw_parts(b, n)) };
+    let (x, y) = unsafe {
+        (
+            std::slice::from_raw_parts(a, n),
+            std::slice::from_raw_parts(b, n),
+        )
+    };
     i32::from(x == y)
 }
 
