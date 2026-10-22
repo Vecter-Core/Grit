@@ -1,0 +1,6 @@
+set b 1
+set a 2
+set ab 3
+set B 4
+set a1 5
+dump

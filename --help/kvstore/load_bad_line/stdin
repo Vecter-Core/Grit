@@ -1,0 +1,3 @@
+set a 1
+load @DIR@/bad.db
+dump

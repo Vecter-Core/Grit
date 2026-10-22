@@ -1,0 +1,7 @@
+set b 2
+set a 1
+save @DIR@/db.txt
+set c 3
+load @DIR@/db.txt
+dump
+count

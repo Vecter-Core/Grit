@@ -1,0 +1,2 @@
+load @DIR@/bad.db
+count

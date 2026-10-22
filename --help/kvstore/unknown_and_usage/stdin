@@ -1,0 +1,7 @@
+frob
+get
+del
+set
+count 1
+dump x
+SET a 1

@@ -1,0 +1,2 @@
+set a 1
+save @DIR@/no_such_dir/x.db

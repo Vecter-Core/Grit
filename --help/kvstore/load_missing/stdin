@@ -1,0 +1,2 @@
+load @DIR@/nope.db
+count

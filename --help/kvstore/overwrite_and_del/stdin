@@ -1,0 +1,7 @@
+set a 1
+set a 2
+get a
+del a
+del a
+get a
+count

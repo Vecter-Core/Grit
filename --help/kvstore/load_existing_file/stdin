@@ -1,0 +1,2 @@
+load @DIR@/in.db
+dump

@@ -1,0 +1,4 @@
+set k
+get k
+dump
+count

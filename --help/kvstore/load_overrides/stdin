@@ -1,0 +1,3 @@
+set x old
+load @DIR@/in.db
+get x

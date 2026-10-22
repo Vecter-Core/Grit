@@ -401,7 +401,8 @@ impl<'e, 'a> Checker<'e, 'a> {
         let target = self.env.lower_ty(ty, &cx);
         let from = self.expr(inner, None);
         let (f, t) = (self.infer.shallow(&from), self.infer.shallow(&target));
-        if matches!(f, Ty::Float(_)) && matches!(t, Ty::Int(_) | Ty::Char | Ty::Bool) {
+        // `is_float` thấy cả biến suy diễn số thực (literal `1.5` chưa chú thích): trước đây chỉ `Ty::Float` nên `x ≔ 1.5; x as i32` lọt (FB-C14)
+        if self.is_float(&f) && matches!(t, Ty::Int(_) | Ty::Char | Ty::Bool) {
             self.err(
                 "E0319",
                 e.id,
