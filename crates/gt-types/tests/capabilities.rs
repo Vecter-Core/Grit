@@ -185,5 +185,7 @@ fn a_capability_wrapped_in_a_struct_is_still_a_capability_fb_c18() {
         1,
     );
     // đối chứng: nhận Cap qua tham số thì được
-    ok("▢ W { c: Cap<Fs> } ƒ wrap(c: Cap<Fs>) → W ! ∅ { W { c: c } } ƒ main() ! {io} { w ≔ wrap(root_fs()); }");
+    ok(
+        "▢ W { c: Cap<Fs> } ƒ wrap(c: Cap<Fs>) → W ! ∅ { W { c: c } } ƒ main() ! {io} { w ≔ wrap(root_fs()); }",
+    );
 }
