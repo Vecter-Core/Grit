@@ -423,3 +423,24 @@ mod drop_tests {
         });
     }
 }
+
+#[cfg(test)]
+mod imut_tests {
+    use crate::testkit::with_env;
+    use crate::ty::Ty;
+    use gt_resolve::DefId;
+
+    /// FB-C24 (đọc mã đối kháng nhóm M7/M8): ADT không có trong db KHÔNG được coi là "không có mutability bên trong" (vị từ trên nó sẽ bị coi là sự kiện ổn định).
+    #[test]
+    fn unknown_adt_is_assumed_to_have_interior_mutability_fb_c24() {
+        with_env("ƒ f() → u32 ! ∅ { 1 }", |env| {
+            let unknown = Ty::Adt(DefId::from_index(1_000_000), Vec::new());
+            assert!(env.db.may_have_interior_mut(&unknown, &[]));
+            assert!(
+                env.db
+                    .may_have_interior_mut(&Ty::Tuple(vec![Ty::Bool, unknown.clone()]), &[])
+            );
+            assert!(!env.db.may_have_interior_mut(&Ty::Bool, &[]));
+        });
+    }
+}
