@@ -259,7 +259,12 @@ struct Cg<'ctx, 'a> {
     /// static: node → (global, kiểu)
     statics: BTreeMap<NodeId, (GlobalValue<'ctx>, Ty)>,
     static_order: Vec<NodeId>,
-    static_refs: BTreeMap<NodeId, BTreeSet<NodeId>>,
+    /// instance đang được định nghĩa (để ghi cạnh gọi/giá trị hàm trong `get_fn`)
+    cur: Option<Inst>,
+    /// instance → các instance nó nhắc tới (gọi trực tiếp, giá trị hàm, `spawn`, …): đồ thị cho thứ tự khởi tạo static (FB-C21)
+    inst_edges: BTreeMap<Inst, BTreeSet<Inst>>,
+    /// instance → các static nó đọc/lấy bí danh
+    inst_statics: BTreeMap<Inst, BTreeSet<NodeId>>,
     strings: BTreeMap<String, GlobalValue<'ctx>>,
     inject: Option<Inject>,
     tramps: BTreeMap<Ty, FunctionValue<'ctx>>,
@@ -319,7 +324,9 @@ pub fn compile(
         nfuncs: 0,
         statics: BTreeMap::new(),
         static_order: Vec::new(),
-        static_refs: BTreeMap::new(),
+        cur: None,
+        inst_edges: BTreeMap::new(),
+        inst_statics: BTreeMap::new(),
         strings: BTreeMap::new(),
         inject: opts.inject,
         tramps: BTreeMap::new(),
@@ -556,7 +563,6 @@ struct Fx<'ctx, 'b> {
     ord_consts: BTreeMap<usize, u32>,
     /// local tạm gán MỘT lần từ `Const::Item(static)` ⇒ là BÍ DANH của static (KHÔNG sao chép)
     static_alias: BTreeMap<usize, NodeId>,
-    owner_static: Option<NodeId>,
 }
 
 /// Một chỗ đã tính: con trỏ tới ô nhớ + kiểu + (chỉ khi không kích thước) độ dài + biến thể đang xem.
@@ -731,6 +737,12 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
 
     /// Khai báo (lần đầu) một instance có thân MIR và xếp hàng để định nghĩa.
     fn get_fn(&mut self, inst: &Inst) -> R<FunctionValue<'ctx>> {
+        if let Some(c) = &self.cur {
+            self.inst_edges
+                .entry(c.clone())
+                .or_default()
+                .insert(inst.clone());
+        }
         if let Some(f) = self.funcs.get(inst) {
             return Ok(*f);
         }
@@ -784,7 +796,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             llvm(self.builder.build_call(f, &[], ""))?;
         }
         // khởi tạo static (theo thứ tự phụ thuộc) TRƯỚC main
-        for node in self.static_init_order() {
+        for node in self.static_init_order()? {
             let g = self.statics[&node].0;
             let f = self.funcs[&Inst {
                 node,
@@ -860,30 +872,84 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         Ok(())
     }
 
-    /// Thứ tự khởi tạo static: phụ thuộc TRỰC TIẾP trước (DFS hậu thứ tự, ổn định theo thứ tự phát hiện).
-    fn static_init_order(&self) -> Vec<NodeId> {
+    /// Ghi: instance đang định nghĩa đọc `node` (static).
+    fn note_static_ref(&mut self, node: NodeId) {
+        if let Some(c) = &self.cur {
+            self.inst_statics.entry(c.clone()).or_default().insert(node);
+        }
+    }
+
+    /// Các static mà initializer của `s` đọc, BẮC CẦU qua mọi instance nó (có thể) gọi hoặc dùng làm giá trị hàm (FB-C21).
+    fn static_deps(&self, s: NodeId) -> BTreeSet<NodeId> {
+        let start = Inst {
+            node: s,
+            args: Vec::new(),
+        };
+        let mut seen: BTreeSet<Inst> = BTreeSet::new();
+        let mut stack = vec![start];
+        let mut deps = BTreeSet::new();
+        while let Some(i) = stack.pop() {
+            if !seen.insert(i.clone()) {
+                continue;
+            }
+            if let Some(ds) = self.inst_statics.get(&i) {
+                deps.extend(ds.iter().copied());
+            }
+            if let Some(es) = self.inst_edges.get(&i) {
+                stack.extend(es.iter().cloned());
+            }
+        }
+        deps
+    }
+
+    /// Thứ tự khởi tạo static: phụ thuộc BẮC CẦU trước (DFS hậu thứ tự, ổn định theo thứ tự phát hiện). Vòng ⇒ từ chối.
+    fn static_init_order(&self) -> R<Vec<NodeId>> {
         fn visit(
             n: NodeId,
-            refs: &BTreeMap<NodeId, BTreeSet<NodeId>>,
-            seen: &mut BTreeSet<NodeId>,
+            deps: &BTreeMap<NodeId, BTreeSet<NodeId>>,
+            state: &mut BTreeMap<NodeId, bool>,
             out: &mut Vec<NodeId>,
-        ) {
-            if !seen.insert(n) {
-                return;
+            names: &dyn Fn(NodeId) -> String,
+        ) -> Result<(), String> {
+            match state.get(&n) {
+                Some(true) => return Ok(()),
+                Some(false) => {
+                    return Err(format!(
+                        "vòng phụ thuộc khởi tạo giữa các static (qua lời gọi hàm trong initializer): `{}`",
+                        names(n)
+                    ));
+                }
+                None => {}
             }
-            if let Some(ds) = refs.get(&n) {
+            state.insert(n, false);
+            if let Some(ds) = deps.get(&n) {
                 for d in ds {
-                    visit(*d, refs, seen, out);
+                    visit(*d, deps, state, out, names)?;
                 }
             }
+            state.insert(n, true);
             out.push(n);
+            Ok(())
         }
-        let mut seen = BTreeSet::new();
+        let deps: BTreeMap<NodeId, BTreeSet<NodeId>> = self
+            .static_order
+            .iter()
+            .map(|n| (*n, self.static_deps(*n)))
+            .collect();
+        let names = |n: NodeId| {
+            self.keys
+                .get(&n)
+                .cloned()
+                .unwrap_or_else(|| format!("{n:?}"))
+        };
+        let mut state = BTreeMap::new();
         let mut out = Vec::new();
         for n in &self.static_order {
-            visit(*n, &self.static_refs, &mut seen, &mut out);
+            if let Err(e) = visit(*n, &deps, &mut state, &mut out, &names) {
+                return unsupported(e);
+            }
         }
-        out
+        Ok(out)
     }
 
     /// `!gt.attest` (module) + hằng chuỗi `gt.attestation` trong exe (để đối chiếu sau này).
@@ -940,7 +1006,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             .iter()
             .map(|l| subst_inst(&l.ty, &params, &inst.args))
             .collect();
-        let mut fx = Fx {
+        let fx = Fx {
             f,
             body,
             params,
@@ -951,8 +1017,19 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             traps: 0,
             ord_consts: BTreeMap::new(),
             static_alias: BTreeMap::new(),
-            owner_static: (body.kind == BodyKind::Static).then_some(body.node),
         };
+        self.cur = Some(inst.clone());
+        let r = self.define_body_inner(fx, f, body);
+        self.cur = None;
+        r
+    }
+
+    fn define_body_inner(
+        &mut self,
+        mut fx: Fx<'ctx, 'a>,
+        f: FunctionValue<'ctx>,
+        body: &'a Body,
+    ) -> R<()> {
         self.prescan(&mut fx)?;
         let entry = self.ctx.append_basic_block(f, "alloca");
         self.builder.position_at_end(entry);
@@ -1049,9 +1126,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             if assigns.get(&l) == Some(&1) && is_temp {
                 fx.static_alias.insert(l, node);
                 self.static_global(node)?;
-                if let Some(owner) = fx.owner_static {
-                    self.static_refs.entry(owner).or_default().insert(node);
-                }
+                self.note_static_ref(node);
             }
         }
         Ok(())
@@ -1338,9 +1413,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                             );
                         }
                         let g = self.static_global(*node)?;
-                        if let Some(owner) = fx.owner_static {
-                            self.static_refs.entry(owner).or_default().insert(*node);
-                        }
+                        self.note_static_ref(*node);
                         let lt = self.lower_ty(&ty)?;
                         let v = llvm(self.builder.build_load(lt, g.as_pointer_value(), "sld"))?;
                         (v, ty)
