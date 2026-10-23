@@ -296,21 +296,11 @@ impl<'e, 'a> Checker<'e, 'a> {
                 let r = self.infer.shallow(&lt);
                 let float = self.is_float(&lt);
                 if matches!(op, Eq | Ne) {
-                    if float {
-                        self.err(
-                            "E0303",
-                            e.id,
-                            e.span,
-                            "`==`/`≠` trên số thực bị cấm (D4): so sánh theo ngưỡng (`|a - b| < eps`) hoặc dùng hàm `core` có tên".to_string(),
-                        );
-                    } else if !self.eq_ok(&lt) && r != Ty::Err {
-                        let s = self.show(&lt);
-                        self.err(
-                            "E0301",
-                            e.id,
-                            e.span,
-                            format!("`==`/`≠` chưa hỗ trợ cho kiểu `{s}`"),
-                        );
+                    if matches!(r, Ty::Infer(_)) && !float {
+                        // kiểu chưa biết (vd. `Some(v)` của `None` ban đầu): kiểm lại SAU khi giải (FB-C19)
+                        self.eq_deferred.push((e.id, e.span, lt.clone()));
+                    } else {
+                        self.check_eq_operand(e.id, e.span, &lt);
                     }
                 } else {
                     let ok = self.is_numeric(&lt) || matches!(r, Ty::Char | Ty::Err);
@@ -384,6 +374,27 @@ impl<'e, 'a> Checker<'e, 'a> {
         if !self.infer.unify(&a, &b) {
             // báo ở vế phải: cần kiểu của vế trái
             self.mismatch(&b, &a, rhs.id, rhs.span, rhs.span.end);
+        }
+    }
+
+    /// cấm D4 (`E0303`) và tập kiểu so bằng được (`E0301`) cho `==`/`≠`
+    pub(crate) fn check_eq_operand(&mut self, node: NodeId, span: Span, lt: &Ty) {
+        let r = self.infer.shallow(lt);
+        if self.is_float(lt) {
+            self.err(
+                "E0303",
+                node,
+                span,
+                "`==`/`≠` trên số thực bị cấm (D4): so sánh theo ngưỡng (`|a - b| < eps`) hoặc dùng hàm `core` có tên".to_string(),
+            );
+        } else if !self.eq_ok(lt) && r != Ty::Err {
+            let s = self.show(lt);
+            self.err(
+                "E0301",
+                node,
+                span,
+                format!("`==`/`≠` chưa hỗ trợ cho kiểu `{s}`"),
+            );
         }
     }
 

@@ -101,6 +101,8 @@ pub(crate) struct Checker<'e, 'a> {
     pub scope: Vec<Bound>,
     /// đã báo E0318 trong hàm này
     pub vec_drop_reported: bool,
+    /// `==`/`≠` có toán hạng là biến suy diễn CHƯA giải lúc gặp toán tử: kiểm lại ở `finish` (FB-C19)
+    pub eq_deferred: Vec<(NodeId, Span, Ty)>,
     pub oblig: Vec<Oblig>,
     pub types: BTreeMap<NodeId, Ty>,
     pub methods: Vec<(NodeId, MethodRes)>,
@@ -141,6 +143,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             loops: Vec::new(),
             scope: Vec::new(),
             vec_drop_reported: false,
+            eq_deferred: Vec::new(),
             oblig: Vec::new(),
             types: BTreeMap::new(),
             methods: Vec::new(),
@@ -576,6 +579,9 @@ impl<'e, 'a> Checker<'e, 'a> {
     fn finish(&mut self, _sig: &FnSigInfo) {
         // nghĩa vụ trait lần 1 (trước khi mặc định hoá), rồi mặc định hoá literal, rồi lần cuối
         self.infer.default_literals();
+        for (node, span, t) in std::mem::take(&mut self.eq_deferred) {
+            self.check_eq_operand(node, span, &t);
+        }
         let obligs = std::mem::take(&mut self.oblig);
         for o in obligs {
             let ty = self.infer.resolve(&o.ty);
