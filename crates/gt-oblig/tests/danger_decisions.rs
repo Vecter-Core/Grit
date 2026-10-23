@@ -220,3 +220,53 @@ fn contract_extraction_decisions() {
         ],
     );
 }
+
+/// Vòng 2 (sau vòng 1 còn 39 sống sót): các ca bổ sung cho đúng điều kiện còn chưa bị chạm.
+#[test]
+fn round_two_decisions() {
+    let group = format!(
+        "({})",
+        (0..200).map(|_| "n >= 0").collect::<Vec<_>>().join(" ∧ ")
+    );
+    let many = format!("{group} ∧ {group} ∧ {group}");
+    check(
+        "round2",
+        &[
+            // `&s.x` / `&s.y` (có phép chiếu) KHÔNG cùng khoá vị từ `s`: `pos(&s.x)` đúng không suy ra `pos(&s.y)`
+            (
+                "▢ S { x: i32, y: i32 }\nƒ pos(n: &i32) → bool ! ∅ { *n > 0 }\nƒ chk(n: &i32) → i32 ! ∅ ⊳ pos(n) { *n }\nƒ f(s: S) → i32 ! ∅ { ⎇ pos(&s.x) { chk(&s.y) } ⇝ { 0 } }",
+                "pre:g",
+            ),
+            // gán lại lát `s` quên độ dài của CHÍNH `s` (nguyên tử riêng): `s[5]` thứ hai không được coi là đã kiểm
+            (
+                "ƒ f(a: &[u8], b: &[u8]) → u8 ! ∅ { μs ≔ a; x ≔ s[5usize]; s ← b; s[5usize] }",
+                "index:g,index:g",
+            ),
+            // đích của lời gọi bị `&!` (không theo dõi): ⊲ không được ghi thành sự kiện về nó (nó đổi qua tham chiếu sau đó)
+            (
+                "ƒ one() → u8 ! ∅ ⊲ result > 0 { 1 }\nƒ zero(p: &!u8) ! ∅ { *p ← 0; }\nƒ f() → u8 ! ∅ { μy ≔ one(); zero(&!y); 255 / y }",
+                "div_zero:g",
+            ),
+            // hợp đồng có nguyên tử opaque (n % 2 == 0): ⊳ đã qua vẫn là sự kiện `n > 0` sau lời gọi
+            (
+                "ƒ chk(n: u8) → u8 ! ∅ ⊳ n > 0 ∧ n % 2 == 0 { n }\nƒ f(x: u8) → u8 ! ∅ { y ≔ chk(x); x - 1 }",
+                "pre:g,overflow:x",
+            ),
+            // 600 nhánh chết (`n >= 0` với u8) không được ăn ngân sách đường đi (512)
+            (
+                &format!("ƒ f(n: u8) → u8 ! ∅ ⊳ {many} ∧ n < 10 {{ n + 245 }}"),
+                "overflow:x",
+            ),
+            // hợp đồng có vòng lặp ⇒ không biểu diễn được (KHÔNG trải vòng): không có giả thiết `n > 3`
+            (
+                "ƒ f(n: u8) → u8 ! ∅ ⊳ { μi ≔ 0u8; ⟳ i < 3 ↓ 3 - i { i ← i + 1; } n > i } { n - 3 }",
+                "overflow:g",
+            ),
+            // đường kết thúc bằng Unreachable (nhánh `otherwise` của `⌥` trên enum Copy)
+            (
+                "⊔ E { A, B }\n⊐ Copy for E { }\nƒ f(e: E, n: u8) → u8 ! ∅ ⊳ ⌥ e { E::A ↦ n > 3, E::B ↦ n > 4 } { n - 3 }",
+                "overflow:g",
+            ),
+        ],
+    );
+}
