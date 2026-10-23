@@ -136,3 +136,18 @@ Phát hiện khi viết K4 (`a == "-c"` trên `&str`): cổng XANH, `rig build` 
 
 ### FB-C14 — `as` từ số thực suy diễn sang số nguyên lọt qua M4 (kiểu (a), cấm D1/Q70 bị lách; fail-closed ở backend) — ĐÃ SỬA
 Phát hiện bởi người viết LANGUAGE_REFERENCE khi thử: `x ≔ 1.5; x as i32` ⇒ gritc check XANH (chỉ N0604), `gritc run` thoát 3 "backend llvm chưa hỗ trợ: kiểm ép kiểu Float → Int". `x: f64`/`1.5f64` thì E0319 đúng. Gốc: `cast()` so `Ty::Float(_)` sau `shallow`, bỏ sót biến suy diễn số thực. Sửa: dùng `is_float`. Test ĐỎ trước: `traits_generics::float_to_int_cast_through_an_inferred_float_literal_is_e0319_fb_c14`.
+
+### FB-C15 — đệ quy qua `[f; N]` (`Rvalue::Repeat`) không bị E0703 (kiểu (a), âm tính giả; gt-term) — ĐÃ SỬA
+Phát hiện bởi đọc mã đối kháng nhóm gt-term (S7). Gốc: tập toán hạng "hàm thoát làm giá trị" (đồ thị instance và tập escaped) bỏ sót `Rvalue::Repeat`. Sửa: `gt-term/src/lib.rs` thêm `Repeat(o,_)` ở cả hai chỗ. Test ĐỎ trước: `gt-term/tests/instance_graph.rs` (commit `7312474`), xanh `de29fc8`.
+
+### FB-C16 — `⊐ <T> Copy for W<T>` không đòi `T: Copy` (kiểu (a), âm tính giả; chạm bất biến Copy ⇒ nhân đôi tài nguyên) — ĐÃ SỬA
+`validate_copy_impl` kiểm trường với tham số kiểu chưa thế và phạm vi rỗng. Sửa: thế đối số của `imp.self_ty`, dựng `scope` từ ràng buộc của impl, kiểm từng trường (E0311). Test ĐỎ trước: `traits_generics.rs` (commit `fec1768`), xanh `8ba2da0`.
+
+### FB-C17 — `Copy` cho `Arena/Mutex/Atomic/Cell`, và `Cell::get` không đòi `T: Copy` (kiểu (a)) — ĐÃ SỬA
+Cùng commit với FB-C16: `validate_copy_impl` cấm Copy cho `Lang::{Secret,Cap,Vec,Text,Arena,Mutex,Atomic,Cell}` (E0313); prelude tách `Cell::get` sang `impl<T: Copy>`. Hệ quả: băm attestation của prelude đổi (golden `tests/golden_ll` phải bless lại ở lần chốt).
+
+### FB-C18 — `main` có tham số ở tệp khác được miễn E0310; `Cap` bọc trong struct không bị coi là capability (kiểu (a), điều kiện #12) — ĐÃ SỬA
+Sửa: `entry` đòi `params.is_empty()` (như `find_main`); `has_cap` đệ quy vào trường struct/enum (có tập `seen` chống vòng). Test ĐỎ trước commit `9711062`, xanh `0b7e60e`.
+
+### FB-C19 — `==` trên biến suy diễn CHƯA giải lúc gặp toán tử lọt qua cấm float (D4, E0303) và cấm tuple (kiểu (a)) — ĐÃ SỬA
+`x ≔ None; … v == v …; x ← Some(1.5)` XANH (`eq_ok(Infer) = true`, `is_float` thấy biến chung). Sửa: `Checker.eq_deferred` ghi (node, span, kiểu) khi toán hạng là biến suy diễn chưa biết; `finish` kiểm lại bằng `check_eq_operand` sau `default_literals`. Test ĐỎ trước `1a5d2ae`, xanh `f0188d2`.
