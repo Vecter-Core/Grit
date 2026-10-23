@@ -6,8 +6,8 @@ use crate::{CodegenError, abort_kind};
 use gt_ast::NodeId;
 use gt_llvm::inkwell;
 use gt_mir::{
-    AggregateKind, AssertKind, BinOp, Body, BodyKind, Callee, Const, Local, Operand, Place,
-    PlaceElem, Rvalue, StatementKind, TerminatorKind, UnOp,
+    AggregateKind, AssertKind, BinOp, Body, BodyKind, BorrowKind, Callee, Const, Local, Operand,
+    Place, PlaceElem, Rvalue, StatementKind, TerminatorKind, UnOp,
 };
 use gt_types::{AdtDef, AdtKind, IntTy, Lang, ParamId, Ty, TypesOutput};
 use inkwell::AddressSpace;
@@ -1087,6 +1087,10 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 let StatementKind::Assign(p, rv) = &s.kind else {
                     continue;
                 };
+                if let Rvalue::Ref(_, BorrowKind::Unique, bp) = rv {
+                    // mượn `&!` một local (hay thành phần của nó): có thể bị ghi qua tham chiếu ⇒ KHÔNG còn là hằng/bí danh (FB-C22)
+                    *assigns.entry(bp.local.index()).or_insert(0) += 2;
+                }
                 if p.projection.is_empty() {
                     *assigns.entry(p.local.index()).or_insert(0) += 1;
                     match rv {
