@@ -51,6 +51,9 @@
 ⊐ <T> Cell<T> {
   ƒ new(v: T) → Cell<T> ! ∅ { }
   ƒ set(&self, x: T) ! ∅ { }
+}
+// `get` sao chép giá trị ra ngoài: chỉ cho `T: Copy` (FB-C17b; nếu không, `Cell<Arena>::get` nhân đôi Arena/Vec/Cap mà không cần `⊐ Copy`)
+⊐ <T: Copy> Cell<T> {
   ƒ get(&self) → T ! ∅ { }
 }
 #lang(drop)

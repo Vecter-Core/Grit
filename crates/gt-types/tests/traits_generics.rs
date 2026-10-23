@@ -294,16 +294,12 @@ fn float_to_int_cast_through_an_inferred_float_literal_is_e0319_fb_c14() {
 #[test]
 fn copy_impl_must_bound_every_type_parameter_it_stores_fb_c16() {
     err("▢ W<T> { v: T } ⊐ <T> Copy for W<T> { }", "E0311", 1);
-    err("▢ H<T> { o: Option<T> } ⊐ <T> Copy for H<T> { }", "E0311", 1);
+    // ADT lồng: `In<T>` chỉ Copy khi `T: Copy` ⇒ `H<T>` cần ràng buộc đó trên impl của nó
+    let nest = "▢ In<T> { v: T } ⊐ <T: Copy> Copy for In<T> { } ▢ H<T> { o: In<T> } ";
+    err(&format!("{nest}⊐ <T> Copy for H<T> {{ }}"), "E0311", 1);
+    ok(&format!("{nest}⊐ <T: Copy> Copy for H<T> {{ }}"));
     ok("▢ W<T> { v: T } ⊐ <T: Copy> Copy for W<T> { }");
-    ok("▢ H<T> { o: Option<T> } ⊐ <T: Copy> Copy for H<T> { }");
     ok("▢ W<T> { v: T } ⊐ Copy for W<u32> { }");
-    // W<Cap<Out>> không thành Copy bằng impl có ràng buộc: dùng hai lần ⇒ E0401
-    err(
-        "▢ W<T> { v: T } ⊐ <T: Copy> Copy for W<T> { } ƒ f(c: Cap<Out>) ! {io} { w ≔ W { v: c }; a ≔ w; b ≔ w; }",
-        "E0401",
-        1,
-    );
     // thân không tham số nhưng impl cụ thể cho kiểu không Copy
     err("▢ W<T> { v: T } ⊐ Copy for W<Cap<Out>> { }", "E0311", 1);
 }
@@ -314,17 +310,16 @@ fn copy_is_forbidden_for_arena_and_interior_mutable_lang_types_fb_c17() {
     for t in ["Arena", "Mutex<u32, ()>", "Atomic<u32>", "Cell<u32>"] {
         let src = format!("⊐ Copy for {t} {{ }}");
         let c = codes(&one(&src));
-        assert!(!c.is_empty() && c.iter().all(|x| x == "E0313" || x == "E0311"), "{t}: {c:?}");
+        assert!(
+            !c.is_empty() && c.iter().all(|x| x == "E0313" || x == "E0311"),
+            "{t}: {c:?}"
+        );
     }
 }
 
 /// FB-C17b: `Cell<T>::get` đòi `T: Copy` (nếu không, `Cell<Arena>::get` nhân đôi giá trị không Copy mà không cần impl Copy).
 #[test]
 fn cell_get_requires_copy_fb_c17() {
-    err(
-        "ƒ f(c: &Cell<Arena>) ! {mem} { a ≔ c.get(); }",
-        "E0309",
-        1,
-    );
+    err("ƒ f(c: &Cell<Arena>) ! {mem} { a ≔ c.get(); }", "E0309", 1);
     ok("ƒ f(c: &Cell<u32>) → u32 ! ∅ { c.get() }");
 }

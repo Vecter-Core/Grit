@@ -206,7 +206,16 @@ impl Env<'_> {
         };
         if matches!(
             adt.lang,
-            Some(Lang::Secret | Lang::Cap | Lang::Vec | Lang::Text)
+            Some(
+                Lang::Secret
+                    | Lang::Cap
+                    | Lang::Vec
+                    | Lang::Text
+                    | Lang::Arena
+                    | Lang::Mutex
+                    | Lang::Atomic
+                    | Lang::Cell
+            )
         ) {
             let name = self.defs()[d.index()].path.clone();
             self.err(
@@ -221,21 +230,31 @@ impl Env<'_> {
             AdtKind::Struct(fs) => fs.iter().map(|f| f.ty.clone()).collect(),
             AdtKind::Enum(vs) => vs.iter().flat_map(|v| v.fields.clone()).collect(),
         };
+        // FB-C16: thay tham số của ADT bằng ĐỐI SỐ của `self_ty` của impl (tham số của impl hoặc kiểu cụ thể) và kiểm mỗi trường là Copy DƯỚI các ràng buộc
+        // của CHÍNH impl (`⊐ <T: Copy> Copy for W<T>`); trước đây trường kiểu tham số bị bỏ qua và ADT lồng nhận biến suy diễn (luôn "Copy").
+        let Ty::Adt(_, args) = &imp.self_ty else {
+            return;
+        };
+        let scope: Vec<crate::traits::Bound> = imp
+            .generics
+            .iter()
+            .flat_map(|g| {
+                g.bounds.iter().map(|b| crate::traits::Bound {
+                    ty: Ty::Param(g.id),
+                    trait_def: b.trait_def,
+                })
+            })
+            .collect();
         let mut infer = InferCtx::new();
-        let gens: Vec<Ty> = fresh_args(&mut infer, &adt.generics);
         for t in tys {
-            let ft = subst_with(&t, &adt.generics, &gens);
-            let ft = match &ft {
-                Ty::Param(_) => continue, // trường kiểu tham số: ràng buộc `T: Copy` do impl tự khai báo
-                _ => ft,
-            };
-            if !self.is_copy_ignoring_self(&mut infer, &ft, *d) {
+            let ft = subst_with(&t, &adt.generics, args);
+            if !self.is_copy_ignoring_self(&mut infer, &ft, *d, &scope) {
                 let s = ft.render(self.defs());
                 self.err(
                     "E0311",
                     node,
                     imp.span,
-                    format!("`⊐ Copy` không hợp lệ: trường kiểu `{s}` không phải Copy"),
+                    format!("`⊐ Copy` không hợp lệ: trường kiểu `{s}` không phải Copy (tham số kiểu cần ràng buộc `T: Copy` trên impl)"),
                 );
                 return;
             }
@@ -243,11 +262,17 @@ impl Env<'_> {
     }
 
     /// `is_copy` nhưng coi chính ADT đang xét là Copy (tránh vòng tự tham chiếu).
-    fn is_copy_ignoring_self(&self, infer: &mut InferCtx, ty: &Ty, own: gt_resolve::DefId) -> bool {
+    fn is_copy_ignoring_self(
+        &self,
+        infer: &mut InferCtx,
+        ty: &Ty,
+        own: gt_resolve::DefId,
+        scope: &[crate::traits::Bound],
+    ) -> bool {
         if matches!(ty, Ty::Adt(d, _) if *d == own) {
             return true;
         }
-        self.db.is_copy(infer, ty, &[], 0)
+        self.db.is_copy(infer, ty, scope, 0)
     }
 
     /// Hai impl chồng lấn: cùng trait mà đầu đề hợp nhất được; hoặc cùng kiểu (inherent) và trùng tên thành viên.
