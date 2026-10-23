@@ -323,3 +323,20 @@ fn cell_get_requires_copy_fb_c17() {
     err("ƒ f(c: &Cell<Arena>) ! {mem} { a ≔ c.get(); }", "E0309", 1);
     ok("ƒ f(c: &Cell<u32>) → u32 ! ∅ { c.get() }");
 }
+
+/// FB-C19 (kiểu (a)): `==` trên biến suy diễn TỔNG QUÁT (chưa biết kiểu lúc gặp `==`) lọt qua `eq_ok(Infer) = true`; sau đó biến được hợp nhất với `f64`/tuple ⇒ bỏ qua cấm D4 (E0303)
+/// và cấm tuple (FB-C13). Phải kiểm lại SAU khi kiểu đã giải.
+#[test]
+fn equality_on_a_later_resolved_inference_variable_is_rechecked_fb_c19() {
+    err(
+        "ƒ f() → bool ! ∅ { μx ≔ None; μr ≔ ⌥ x { Some(v) ↦ v == v, None ↦ false }; x ← Some(1.5); r }",
+        "E0303",
+        1,
+    );
+    err(
+        "ƒ f() → bool ! ∅ { μx ≔ None; μr ≔ ⌥ x { Some(v) ↦ v == v, None ↦ false }; x ← Some((1, 2)); r }",
+        "E0301",
+        1,
+    );
+    ok("ƒ f() → bool ! ∅ { μx ≔ None; μr ≔ ⌥ x { Some(v) ↦ v == v, None ↦ false }; x ← Some(3); r }");
+}
