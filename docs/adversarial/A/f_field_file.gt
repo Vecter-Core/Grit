@@ -1,0 +1,6 @@
+ƒ main() ! {io, div, mem} {
+  out ≔ root_out();
+  fs ≔ root_fs();
+  f ≔ fs.read("/etc/hostname");
+  out.write_u64(f.x as u64);
+}

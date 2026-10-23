@@ -1,0 +1,7 @@
+ƒ main() ! {io} {
+  i ≔ root_in(); o ≔ root_out();
+  ⌥ i.read_all() { Ok(f) ↦ { o.write_u64(f.len() as u64); }, Err(_) ↦ { o.write_str("ERR"); } }
+  o.write_str(",");
+  ⌥ i.read_all() { Ok(f) ↦ { o.write_u64(f.len() as u64); }, Err(_) ↦ { o.write_str("ERR"); } }
+  o.write_str("\n");
+}

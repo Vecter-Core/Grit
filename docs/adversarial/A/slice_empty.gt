@@ -1,0 +1,6 @@
+ƒ main() → u64 ! {mem} {
+  μa ≔ Arena::new();
+  μt ≔ Text::new(&a);
+  s ≔ t.as_str().slice(0usize, 0usize);
+  s.len() as u64
+}

@@ -1,0 +1,2 @@
+◈ ▢ W { ◈ c: Cap<Fs> }
+◈ ƒ main(x: u64) → W ! {io} { W { c: root_fs() } }

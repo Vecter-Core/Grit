@@ -1,0 +1,6 @@
+#level("1")
+▢ Lo { }
+■ M: Mutex<u64, Lo> ≔ Mutex::new(5u64);
+ƒ main() → u64 ! ∅ {
+  M.v
+}

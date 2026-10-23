@@ -1,0 +1,5 @@
+◈ ƒ main() → u64 ! {io} {
+  out ≔ root_out();
+  out.write_str("util main used root_out\n");
+  7u64
+}

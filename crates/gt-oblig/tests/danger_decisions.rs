@@ -320,8 +320,9 @@ fn round_three_decisions() {
     );
 }
 
-/// Thân hợp đồng dùng CHUNG `node` với hàm của nó, nên bộ phân tích phải tự lọc theo `BodyKind`: nghĩa vụ `Post` của hàm chỉ được đánh giá ở các điểm thoát
-/// của CHÍNH hàm, không phải ở thân `⊳`/`⊲` (nếu không sẽ chèn kiểm `⊲` vào thân hợp đồng).
+/// Thân hợp đồng KHÔNG được đánh giá nghĩa vụ `Post` của hàm (chèn kiểm `⊲` vào thân hợp đồng là sai). Hiện được đảm bảo bởi HAI lớp độc lập: `node` của thân
+/// hợp đồng là id của chính hợp đồng (≠ node hàm nên `info.post` không có), và chốt `BodyKind::Fn` ở đầu `judge_posts`; test ghi lại TÍNH CHẤT (đột biến bỏ MỘT lớp
+/// không đổi kết quả — xem `docs/M7_DANGER_MUTANTS.md`, dòng 1313).
 #[test]
 fn contract_bodies_never_judge_the_functions_postconditions() {
     let all = run_all("ƒ f(n: u8) → u8 ! ∅ ⊲ result > 0 ⊳ n > 0 { n }");

@@ -1,0 +1,18 @@
+■ DONE: Atomic<u32> ≔ Atomic::new(0u32);
+■ SUM: Atomic<u64> ≔ Atomic::new(0u64);
+ƒ big(n: u32) ! ∅ {
+  μa ≔ [0u8; 4000000];
+  μi ≔ 0usize;
+  ⟳ i < 4000000usize ↓ 4000000usize - i { a[i] ← 1u8; i ← i + 1usize; }
+  μs ≔ 0u64;
+  μj ≔ 0usize;
+  ⟳ j < 4000000usize ↓ 4000000usize - j { s ← s + (a[j] as u64); j ← j + 1usize; }
+  SUM.fetch_add(s, AtomicOrdering::SeqCst);
+  DONE.fetch_add(1u32, AtomicOrdering::SeqCst);
+}
+ƒ main() → u64 ! ∅ {
+  spawn(big, 0u32);
+  μspin ≔ 0u64;
+  ⟳ spin < 3000000000u64 ∧ DONE.load(AtomicOrdering::SeqCst) < 1u32 ↓ 3000000000u64 - spin { spin ← spin + 1u64; }
+  SUM.load(AtomicOrdering::SeqCst)
+}

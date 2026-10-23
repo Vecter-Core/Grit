@@ -1,0 +1,7 @@
+ƒ main() → u64 ! {mem} {
+  μa ≔ Arena::new();
+  μt ≔ Text::new(&a);
+  c ≔ 55296u32 as char;
+  t.push_char(c);
+  t.len() as u64
+}

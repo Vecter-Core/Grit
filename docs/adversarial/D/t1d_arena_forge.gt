@@ -1,0 +1,5 @@
+ƒ main() → u32 ! {mem} {
+  a ≔ Arena { x: 99 };
+  r ≔ a.alloc(5u32);
+  *r
+}

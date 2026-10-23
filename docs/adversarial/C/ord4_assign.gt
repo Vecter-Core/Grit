@@ -1,0 +1,7 @@
+ƒ main() → u64 ! ∅ {
+  μbig ≔ [7u8; 64];
+  μsmall ≔ [1u8, 2u8];
+  μs ≔ &!big[0usize..64usize];
+  s[50usize] ← { s ← &!small[0usize..2usize]; 9u8 };
+  small[0usize] as u64
+}

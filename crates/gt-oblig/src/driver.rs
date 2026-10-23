@@ -461,7 +461,8 @@ fn escaped_sites(m: &MirOutput) -> Vec<(gt_ast::NodeId, gt_mir::SourceInfo)> {
                             visit(c);
                         }
                         Rvalue::Aggregate(_, v) => v.iter().for_each(&mut visit),
-                        _ => {}
+                        // liệt kê TƯỜNG MINH: thêm biến thể `Rvalue` có toán hạng mới mà quên ở đây sẽ là lỗi biên dịch (không im lặng bỏ sót hàm thoát qua `FnItem`)
+                        Rvalue::Ref(..) | Rvalue::Len(_) | Rvalue::Discriminant(_) => {}
                     }
                 }
             }
@@ -480,7 +481,10 @@ fn escaped_sites(m: &MirOutput) -> Vec<(gt_ast::NodeId, gt_mir::SourceInfo)> {
                     }
                     TerminatorKind::SwitchInt { discr, .. } => visit(discr),
                     TerminatorKind::Assert { cond, .. } => visit(cond),
-                    _ => {}
+                    TerminatorKind::Goto(_)
+                    | TerminatorKind::Return
+                    | TerminatorKind::Unreachable
+                    | TerminatorKind::Drop { .. } => {}
                 }
             }
         }

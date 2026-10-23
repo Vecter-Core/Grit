@@ -1,5 +1,5 @@
 #!/bin/bash
-# Cổng đầy đủ: gtrt, fmt, clippy -D warnings, audit, test --workspace, check_expectations (+ unittest công cụ), nul, doc, deletions, track.
+# Cổng đầy đủ: gtrt, fmt, clippy -D warnings, audit, test --workspace, check_expectations (+ unittest công cụ), nul, doc, deletions, failopen, track.
 # Dùng: bash tools/gate.sh <thư-mục-dự-án> [thư-mục-target]
 # Mã thoát: 0 = XANH (mọi giai đoạn hợp lệ và đạt TRÊN CÙNG MỘT MÃ); 1 = ĐỎ (một giai đoạn đỏ HOẶC không hợp lệ: vd giai đoạn test không biên dịch được ⇒
 # không có dòng `test result` ⇒ TEST_STAGE_INVALID, KHÔNG được coi là xanh); 3 = CHƯA ĐỦ (hết ngân sách thời gian GATE_BUDGET_SEC; chạy lại cùng lệnh để tiếp).
@@ -33,7 +33,7 @@ bash "$(dirname "$0")/handoff_check.sh" "$1" || true   # chỉ cảnh báo, KHÔ
 if [ -f tools/pre-commit.hook ] && ! cmp -s tools/pre-commit.hook .git/hooks/pre-commit 2>/dev/null; then
   echo "HOOK_WARN: .git/hooks/pre-commit chưa cài hoặc khác tools/pre-commit.hook — chạy: bash tools/install_hooks.sh"
 fi
-STAGES="${GATE_STAGES:-gtrt fmt clippy audit test expect nul doc deletions track}"
+STAGES="${GATE_STAGES:-gtrt fmt clippy audit test expect nul doc deletions failopen track}"
 rc=0
 START=$(date +%s)
 BUDGET="${GATE_BUDGET_SEC:-0}"
@@ -95,6 +95,8 @@ stage_nul() { $PY tools/nul_scan.py . ; }
 # Giai đoạn `doc` (S3): mọi khối ```grit trong docs/ phải biên dịch/bị từ chối đúng như chú thích.
 stage_doc() { if [ -f tools/doc_test.py ]; then $PY tools/doc_test.py; else echo "doc_test.py chưa có (bỏ qua)"; fi; }
 stage_deletions() { bash "$(dirname "$0")/deletions_check.sh" .; }
+# Giai đoạn `failopen` (Seed 1.0 S7): mọi mẫu "im lặng chấp nhận" MỚI ở 11 crate quyết định phán quyết phải được đọc + phân loại (docs/FAIL_OPEN_AUDIT.md mục 8) rồi vào baseline
+stage_failopen() { $PY tools/fail_open_scan.py --baseline docs/fail_open_baseline.json && $PY tools/fail_open_sync.py; }
 
 if has gtrt;       then unit gtrt stage_gtrt; fi
 if has fmt;        then unit fmt stage_fmt; fi
@@ -141,6 +143,7 @@ if has expect;    then unit expect stage_expect; fi
 if has nul;       then unit nul stage_nul; fi
 if has doc;       then unit doc stage_doc; fi
 if has deletions; then unit deletions stage_deletions; fi
+if has failopen;  then unit failopen stage_failopen; fi
 if has track; then
   echo "== track (tệp đã theo dõi không bị đổi)"
   if bash "$GUARD" verify "$TRACK_SNAP" .; then :; else red "tệp đã theo dõi bị đổi trong lúc cổng chạy"; fi

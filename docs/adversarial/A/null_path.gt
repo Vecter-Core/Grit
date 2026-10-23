@@ -1,0 +1,15 @@
+ƒ main() ! {io, div, mem} {
+  out ≔ root_out();
+  fs ≔ root_fs();
+  μa ≔ Arena::new();
+  μt ≔ Text::new(&a);
+  ⌥ fs.open(t.as_str()) {
+    Ok(f) ↦ { out.write_str("ok\n"); },
+    Err(_) ↦ { out.write_str("err\n"); },
+  }
+  ⌥ fs.write(t.as_str(), "x".as_bytes()) {
+    Ok(_) ↦ { out.write_str("wok\n"); },
+    Err(_) ↦ { out.write_str("werr\n"); },
+  }
+  fs.read(t.as_str());
+}

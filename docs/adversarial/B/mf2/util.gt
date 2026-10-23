@@ -1,0 +1,8 @@
+◈ ƒ main(x: u64) → u64 ! {io} {
+  out ≔ root_out();
+  fs ≔ root_fs();
+  out.write_str("util::main(x) used root_out+root_fs outside entry; x=");
+  out.write_u64(x);
+  out.write_str("\n");
+  fs.read("/etc/hostname").len() as u64
+}

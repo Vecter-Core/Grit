@@ -1,0 +1,13 @@
+ƒ main() → u64 ! {mem} {
+  μa ≔ Arena::new();
+  μv0 ≔ Vec::new(&a);
+  v0.push(10u64); v0.push(20u64);
+  c ≔ Cell::new(v0);
+  μv1 ≔ c.get();
+  μv2 ≔ c.get();
+  sl ≔ v1.as_slice();
+  before ≔ sl[0usize];
+  v2.truncate(0usize);
+  v2.push(99u64);
+  sl[0usize] * 1000u64 + before
+}
