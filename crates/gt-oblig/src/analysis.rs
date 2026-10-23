@@ -2324,7 +2324,18 @@ mod unrep_tests {
     #[test]
     fn unrep_atoms_are_injective_and_below_the_predicate_range() {
         let mut seen = std::collections::BTreeSet::new();
-        for bb in [0usize, 1, 2, 1023, 1024, 1025, 2047, 2048, 20_000, UNREP_MAX_BLOCKS - 1] {
+        for bb in [
+            0usize,
+            1,
+            2,
+            1023,
+            1024,
+            1025,
+            2047,
+            2048,
+            20_000,
+            UNREP_MAX_BLOCKS - 1,
+        ] {
             for idx in 0..UNREP_SLOTS {
                 let a = unrep_atom_id(bb, idx).expect("trong miền");
                 assert!((UNREP_BASE..PRED_BASE).contains(&a), "bb={bb} idx={idx}");
