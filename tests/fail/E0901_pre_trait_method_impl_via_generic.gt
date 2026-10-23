@@ -1,0 +1,7 @@
+// expect: fail E0901
+// note: FB-C25: ⊳ chỉ ở thành viên impl (trait không khai) cũng không được kiểm khi gọi qua tham số kiểu
+⊏ Tr { ƒ f(&self, n: i32) → i32 ! ∅; }
+▢ S { a: i32 }
+⊐ Tr for S { ƒ f(&self, n: i32) → i32 ! ∅ ⊳ n > 0 { n } }
+ƒ g<T: Tr>(t: &T) → i32 ! ∅ { t.f(0) }
+ƒ main() → i32 ! ∅ { s ≔ S { a: 1 }; g(&s) }

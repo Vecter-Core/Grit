@@ -1,0 +1,7 @@
+// expect: fail E0901
+// note: FB-C25: `⊳` của thành viên trait không được kiểm khi gọi qua tham số kiểu (`t.f(0)` với `T: Tr`): trước đây XANH và chạy ra 0 thay vì abort/E0901
+⊏ Tr { ƒ f(&self, n: i32) → i32 ! ∅ ⊳ n > 0; }
+▢ S { a: i32 }
+⊐ Tr for S { ƒ f(&self, n: i32) → i32 ! ∅ { n } }
+ƒ g<T: Tr>(t: &T) → i32 ! ∅ { t.f(0) }
+ƒ main() → i32 ! ∅ { s ≔ S { a: 1 }; g(&s) }
