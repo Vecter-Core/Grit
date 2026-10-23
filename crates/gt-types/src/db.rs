@@ -49,7 +49,8 @@ impl TypeDb {
             }
             Ty::Adt(d, args) => {
                 let Some(adt) = self.adts.get(d) else {
-                    return false;
+                    // ADT lạ (db không nhất quán): KHÔNG được coi là "không có mutability bên trong" (fail-closed, FB-C24)
+                    return true;
                 };
                 if adt.lang.is_some_and(Lang::interior_mutable) {
                     return true;
