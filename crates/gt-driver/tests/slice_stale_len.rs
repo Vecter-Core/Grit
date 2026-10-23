@@ -13,7 +13,11 @@ fn exit_of(name: &str, src: &str, backend: &str, profile: &str) -> (Option<i32>,
     let f = d.join(format!("{name}.gt"));
     std::fs::write(&f, src).expect("ghi");
     let o = Command::new(env!("CARGO_BIN_EXE_gritc"))
-        .args(["run", &format!("--backend={backend}"), &format!("--profile={profile}")])
+        .args([
+            "run",
+            &format!("--backend={backend}"),
+            &format!("--profile={profile}"),
+        ])
         .arg(&f)
         .output()
         .expect("chạy gritc");

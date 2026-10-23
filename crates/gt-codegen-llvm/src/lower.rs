@@ -1553,7 +1553,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         let at = self.lower_ty(dty)?;
         let (v, _) = self.operand(fx, op)?;
         let i64t = self.i64t();
-        let counter = llvm(self.builder.build_alloca(i64t, "rep.i"))?;
+        let counter = self.entry_alloca(fx, i64t.into(), "rep.i")?;
         llvm(self.builder.build_store(counter, i64t.const_zero()))?;
         let cond = self.ctx.append_basic_block(fx.f, "rep.cond");
         let body = self.ctx.append_basic_block(fx.f, "rep.body");
@@ -2893,7 +2893,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 let targs = vec![ty.clone(), ty.clone()];
                 let rty = Ty::Adt(rd, targs.clone());
                 let et = self.lower_ty(&rty)?.into_struct_type();
-                let tmp = llvm(self.builder.build_alloca(et, "cas.res"))?;
+                let tmp = self.entry_alloca(fx, et.into(), "cas.res")?;
                 let tp = llvm(self.builder.build_struct_gep(et, tmp, 0, "tag"))?;
                 llvm(self.builder.build_store(tp, tag))?;
                 let pay = llvm(self.builder.build_struct_gep(et, tmp, 1, "pay"))?;
@@ -3512,7 +3512,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             return internal("hàm I/O không trả Result");
         };
         let et = self.lower_ty(dest_ty)?.into_struct_type();
-        let tmp = llvm(self.builder.build_alloca(et, "io.res"))?;
+        let tmp = self.entry_alloca(fx, et.into(), "io.res")?;
         let ok =
             llvm(
                 self.builder

@@ -59,7 +59,8 @@ fn a_transitive_chain_through_two_functions_is_ordered_fb_c21() {
 
 #[test]
 fn a_dependency_cycle_between_initialisers_is_rejected_not_run_fb_c21() {
-    let src = "■ A: u32 ≔ f();\n■ B: u32 ≔ 1u32 + A;\nƒ f() → u32 ! ∅ { B }\nƒ main() → u32 ! ∅ { A }\n";
+    let src =
+        "■ A: u32 ≔ f();\n■ B: u32 ≔ 1u32 + A;\nƒ f() → u32 ! ∅ { B }\nƒ main() → u32 ! ∅ { A }\n";
     for p in PROFILES {
         let (code, out) = run("cycle", src, p);
         assert_eq!(code, Some(3), "[{p}] phải bị từ chối (mã 3)\n{out}");
