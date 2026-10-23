@@ -158,3 +158,32 @@ fn arena_is_a_lang_item_that_is_not_copy_and_cannot_be_forged_by_attribute() {
     // `#lang(arena)` ngoài prelude là E1002
     err("#lang(arena) ▢ MyArena { x: i32 }", "E1002", 1);
 }
+
+/// FB-C18 (kiểu (a), NGHIÊM TRỌNG, điều kiện cứng #12): `main` có THAM SỐ ở tệp khác được miễn E0310 như "entry" nhưng KHÔNG phải entry thật (`find_main` chỉ nhận `main` không
+/// tham số) ⇒ hàm đó đúc `Cap` tuỳ ý, và hàm bất kỳ gọi nó. Entry phải không tham số.
+#[test]
+fn a_file_level_main_with_parameters_is_not_an_entry_fb_c18() {
+    let out = run(&[
+        (
+            "main.gt",
+            "ƒ helper() → u64 ! {io} { util::main(5u64) } ƒ main() ! {io} { }",
+        ),
+        (
+            "util.gt",
+            "◈ ƒ main(x: u64) → u64 ! {io} { fs ≔ root_fs(); x }",
+        ),
+    ]);
+    assert_eq!(codes(&out), ["E0310"], "{:?}", show(&out));
+}
+
+/// FB-C18b: `Cap` bọc trong struct người dùng vẫn là capability: gọi hàm trả `W { c: Cap<…> }` mà không nhận Cap nào cũng là đúc từ hư không (`has_cap` phải đi vào trường).
+#[test]
+fn a_capability_wrapped_in_a_struct_is_still_a_capability_fb_c18() {
+    err(
+        "▢ W { c: Cap<Fs> } ƒ main() → W ! {io} { W { c: root_fs() } } ƒ helper() ! {io} { w ≔ main(); }",
+        "E0310",
+        1,
+    );
+    // đối chứng: nhận Cap qua tham số thì được
+    ok("▢ W { c: Cap<Fs> } ƒ wrap(c: Cap<Fs>) → W ! ∅ { W { c: c } } ƒ main() ! {io} { w ≔ wrap(root_fs()); }");
+}
