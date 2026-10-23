@@ -121,6 +121,9 @@
   - hiệu ứng: `∅`; abort: không
 - `ƒ set(&self, x: T) ! ∅`
   - hiệu ứng: `∅`; abort: không
+
+### `⊐ <T: Copy> Cell<T>`
+
 - `ƒ get(&self) → T ! ∅`
   - hiệu ứng: `∅`; abort: không
 
