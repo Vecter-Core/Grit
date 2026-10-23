@@ -505,6 +505,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             ret: ty,
             effects: Vec::new(),
             span: value.span,
+            has_contracts: false,
         });
     }
 

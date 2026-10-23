@@ -130,6 +130,8 @@ pub struct FnSigInfo {
     pub ret: Ty,
     pub effects: Vec<String>,
     pub span: Span,
+    /// có `⊳`/`⊲` (không tính biến thể `↓`) trong chữ ký: thành viên trait/impl được gọi qua tham số kiểu không có điểm gọi cụ thể để kiểm (FB-C25)
+    pub has_contracts: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -1156,6 +1158,10 @@ impl<'a> Env<'a> {
             ret,
             effects: effect_names(&sig.effects),
             span: sig.name.span,
+            has_contracts: sig
+                .contracts
+                .iter()
+                .any(|c| c.kind != gt_ast::ContractKind::Variant),
         }
     }
 

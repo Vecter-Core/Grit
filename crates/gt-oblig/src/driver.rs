@@ -172,6 +172,46 @@ pub fn analyze_program_with(
             ));
         }
     }
+    // FB-C25: lời gọi qua tham số kiểu (`Callee::TraitMethod`) không có điểm gọi cụ thể ⇒ `⊳` của thành viên trait (hay của BẤT KỲ impl nào của nó) không
+    // được chứng minh/kiểm ⇒ từ chối (fail-closed; cách né: gọi trên kiểu cụ thể, hoặc để thân tự kiểm điều kiện)
+    for b in &m.bodies {
+        for bb in &b.blocks {
+            let Some(term) = &bb.terminator else { continue };
+            let TerminatorKind::Call {
+                callee:
+                    Callee::TraitMethod {
+                        trait_def, member, ..
+                    },
+                ..
+            } = &term.kind
+            else {
+                continue;
+            };
+            let Some(sig) =
+                t.db.traits
+                    .get(trait_def)
+                    .and_then(|tr| tr.members.get(*member))
+            else {
+                continue;
+            };
+            let in_impls = t.db.impls.iter().any(|i| {
+                i.trait_ref.as_ref().map(|r| r.trait_def) == Some(*trait_def)
+                    && i.members
+                        .iter()
+                        .any(|mm| mm.name == sig.name && info.pre.contains_key(&mm.node))
+            });
+            if sig.has_contracts || info.pre.contains_key(&sig.node) || in_impls {
+                stats.rejected += 1;
+                bag.push(mk(
+                    t,
+                    "E0901",
+                    term.source.node,
+                    term.source.span,
+                    format!("`{}` có tiền điều kiện `⊳` (ở trait hoặc ở một impl) nhưng được gọi qua tham số kiểu: không có điểm gọi cụ thể để chứng minh hay kiểm `⊳`; gọi trên kiểu cụ thể, hoặc để thân tự kiểm điều kiện", sig.name),
+                ));
+            }
+        }
+    }
     let mut bodies = Vec::with_capacity(m.bodies.len());
     let mut per_body = Vec::with_capacity(m.bodies.len());
     for b in &m.bodies {

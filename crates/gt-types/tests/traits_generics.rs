@@ -338,5 +338,7 @@ fn equality_on_a_later_resolved_inference_variable_is_rechecked_fb_c19() {
         "E0301",
         1,
     );
-    ok("ƒ f() → bool ! ∅ { μx ≔ None; μr ≔ ⌥ x { Some(v) ↦ v == v, None ↦ false }; x ← Some(3); r }");
+    ok(
+        "ƒ f() → bool ! ∅ { μx ≔ None; μr ≔ ⌥ x { Some(v) ↦ v == v, None ↦ false }; x ← Some(3); r }",
+    );
 }
