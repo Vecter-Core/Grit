@@ -134,14 +134,15 @@ fn inst_of<'c>(v: AnyValueEnum<'c>) -> Option<InstructionValue<'c>> {
     }
 }
 
-/// FAIL_OPEN_AUDIT G1: `callee_name` chỉ nhận lời gọi TRỰC TIẾP, nên gọi `gritrt_*` qua con trỏ (hoặc `invoke`/`callbr`) tránh được luật "lớp nghĩa vụ" và luật "đích
+/// FAIL_OPEN_AUDIT G1 (+ FB-C27: áp cho MỌI khai báo ngoài, không chỉ `gritrt_*`): `callee_name` chỉ nhận lời gọi TRỰC TIẾP, nên gọi `gritrt_*` qua con trỏ (hoặc `invoke`/`callbr`) tránh được luật "lớp nghĩa vụ" và luật "đích
 /// mọi lời gọi". Quy tắc đóng lỗ: (a) địa chỉ của hàm `gritrt_*` chỉ được dùng làm ĐÍCH của một `call` TRỰC TIẾP (không lưu, không truyền làm đối số, không nằm trong
 /// hằng/khởi tạo); (b) không có `invoke`/`callbr` (codegen không bao giờ phát; Phase 1 không có unwind).
 fn runtime_address_violations(m: &Module<'_>) -> Vec<String> {
     let mut v = Vec::new();
     for f in m.get_functions() {
         let name = f.get_name().to_string_lossy().into_owned();
-        if !name.starts_with("gritrt_") {
+        // MỌI hàm chỉ khai báo (không thân) trừ intrinsic `llvm.*` — không chỉ `gritrt_*` (FB-C27: `declare @system` + lời gọi gián tiếp lách luật đích mọi lời gọi)
+        if f.count_basic_blocks() > 0 || name.starts_with("llvm.") {
             continue;
         }
         let fptr = f.as_global_value().as_pointer_value();

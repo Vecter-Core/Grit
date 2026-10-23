@@ -1188,8 +1188,9 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         ptr: PointerValue<'ctx>,
         idx: &[IntValue<'ctx>],
     ) -> R<PointerValue<'ctx>> {
-        // SAFETY: mọi chỉ số đi vào đây đã được MIR kiểm bằng `Assert` ngay trước (`Index`/`Subslice`), hoặc là hằng của bố cục;
-        // IR Guard (bước 7) kiểm các `Assert` biên còn nguyên.
+        // SAFETY: mọi chỉ số đi vào đây đã được MIR kiểm bằng `Assert` (`Index`/`Subslice`; FB-C20: kiểm lại ngay trước chỗ dùng hoãn), hoặc là hằng của bố cục.
+        // LƯU Ý: IR Guard KHÔNG đối chiếu số `Assert` biên của MIR với `gritrt_abort` trong IR (docs/KNOWN_LIMITATIONS "Ghi nhận từ đọc mã đối kháng");
+        // bằng chứng kiểm biên còn nguyên ở dev đến từ đối chiếu dev≡thông dịch (test llvm_diff*), không từ Guard.
         llvm(unsafe { self.builder.build_in_bounds_gep(elem, ptr, idx, "gep") })
     }
 
