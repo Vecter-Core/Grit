@@ -270,3 +270,68 @@ fn round_two_decisions() {
         ],
     );
 }
+
+fn run_all(src: &str) -> Vec<(String, String)> {
+    let (t, m) = common::mir(src);
+    assert!(
+        m.report.diagnostics.is_empty(),
+        "{:?}",
+        common::mir_codes(&m)
+    );
+    let o = analyze_program(&t, &m, &mut ZoneProver::new(24));
+    o.per_body
+        .iter()
+        .map(|r| {
+            (
+                r.key.clone(),
+                r.judged
+                    .iter()
+                    .map(|j| j.ob.kind.name().to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn round_three_decisions() {
+    let g = format!(
+        "({})",
+        (0..200)
+            .map(|_| "n % 2 == 1")
+            .collect::<Vec<_>>()
+            .join(" ∨ ")
+    );
+    check(
+        "round3",
+        &[
+            // đích bị `&!` (không theo dõi), ghi trực tiếp qua tham chiếu: ⊲ không được thành sự kiện về nó
+            (
+                "ƒ one() → u8 ! ∅ ⊲ result > 0 { 1 }\nƒ f() → u8 ! ∅ { μy ≔ one(); r ≔ &!y; *r ← 0; 255 / y }",
+                "div_zero:g",
+            ),
+            // 600 đường SỐNG (mỗi `n % 2 == 1` là một nguyên tử không diễn giải): vượt ngân sách 512 ⇒ hợp đồng không biểu diễn được ⇒ không có giả thiết `n > 0`
+            (
+                &format!("ƒ f(n: u8) → u8 ! ∅ ⊳ n > 0 ∧ ({g} ∨ {g} ∨ {g}) {{ n - 1 }}"),
+                "overflow:g",
+            ),
+        ],
+    );
+}
+
+/// Thân hợp đồng dùng CHUNG `node` với hàm của nó, nên bộ phân tích phải tự lọc theo `BodyKind`: nghĩa vụ `Post` của hàm chỉ được đánh giá ở các điểm thoát
+/// của CHÍNH hàm, không phải ở thân `⊳`/`⊲` (nếu không sẽ chèn kiểm `⊲` vào thân hợp đồng).
+#[test]
+fn contract_bodies_never_judge_the_functions_postconditions() {
+    let all = run_all("ƒ f(n: u8) → u8 ! ∅ ⊲ result > 0 ⊳ n > 0 { n }");
+    let mut seen = 0;
+    for (key, kinds) in &all {
+        if key.starts_with("main::f⊲") || key.starts_with("main::f⊳") {
+            seen += 1;
+            assert!(!kinds.contains("post"), "{key}: [{kinds}]");
+        }
+    }
+    assert_eq!(seen, 2, "{all:?}");
+    assert!(all.iter().any(|(k, v)| k == "main::f" && v == "post"));
+}
