@@ -197,6 +197,6 @@ Tệp này biến mất khỏi cây làm việc (không qua commit) ngày 2026-1
 | tests/fail/E0402_vec_reset_while_vec_alive.gt | 3b5989e | R6 (Vec/Text giữ `&'a Arena` chia sẻ): mẫu fail này hết đúng (hai Vec/Text trên một Arena nay HỢP LỆ); chuyển/thay bằng mẫu pass hoặc mẫu fail mới của R6 (ADR-C03) |
 | tests/fail/E0402_vec_two_on_one_arena.gt | 3b5989e | R6 (Vec/Text giữ `&'a Arena` chia sẻ): mẫu fail này hết đúng (hai Vec/Text trên một Arena nay HỢP LỆ); chuyển/thay bằng mẫu pass hoặc mẫu fail mới của R6 (ADR-C03) |
 | tests/fail/E0403_vec_arena_used_while_vec_alive.gt | 3b5989e | R6 (Vec/Text giữ `&'a Arena` chia sẻ): mẫu fail này hết đúng (hai Vec/Text trên một Arena nay HỢP LỆ); chuyển/thay bằng mẫu pass hoặc mẫu fail mới của R6 (ADR-C03) |
-| tests/fail/E0310_call_through_fn_value.gt | pending | đổi mã kỳ vọng sang E0313 vì quy tắc intrinsic không làm giá trị chặn root_out trước khi kiểm tra E0310 |
-| tests/fail/E0901_pre_fn_value_intrinsic_shl.gt | pending | đổi mã kỳ vọng sang E0313 vì intrinsic không làm giá trị; giữ E0901 cho lời gọi trực tiếp |
-| tests/fail/E0901_pre_fn_value_option_unwrap.gt | pending | đổi mã kỳ vọng sang E0313 vì intrinsic không làm giá trị; giữ E0901 cho lời gọi trực tiếp |
+| tests/fail/E0310_call_through_fn_value.gt | cc51dea | đổi mã kỳ vọng sang E0313 vì quy tắc intrinsic không làm giá trị chặn root_out trước khi kiểm tra E0310 |
+| tests/fail/E0901_pre_fn_value_intrinsic_shl.gt | cc51dea | đổi mã kỳ vọng sang E0313 vì intrinsic không làm giá trị; giữ E0901 cho lời gọi trực tiếp |
+| tests/fail/E0901_pre_fn_value_option_unwrap.gt | cc51dea | đổi mã kỳ vọng sang E0313 vì intrinsic không làm giá trị; giữ E0901 cho lời gọi trực tiếp |
