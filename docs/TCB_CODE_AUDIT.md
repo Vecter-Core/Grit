@@ -4,8 +4,9 @@
 
 Đọc đối kháng các đường mã H1–H10 trong `docs/TCB_REVIEW_GUIDE.md`, IR Guard (`crates/gt-guard`), phần hạ LLVM liên quan và runtime `runtime/gt-rt`. Mục tiêu là tìm đường chấp nhận sai hoặc hành vi runtime không đúng hợp đồng; đây là đọc mã và thí nghiệm có mục tiêu, không phải chứng minh hình thức hay chứng nhận an toàn.
 
-- Người viết/đọc chính: GPT-6/Codex. Người đọc tách lượt: GPT-6, subagent chỉ đọc. Hai lượt cùng họ model; không phải đánh giá độc lập khác họ model.
+- Codebase trước đó chủ yếu do Claude Sonnet/Opus các đời viết (Git không lưu model theo từng commit); các sửa FB-C28/C29/C30 trong lượt này do Codex GPT-6 viết. Người đọc chính: GPT-6/Codex; reader tách lượt GPT-6 chỉ đọc, cùng họ model. Vì vậy **đã có lượt đọc mã, nhưng chưa đáp ứng yêu cầu G1.5 về reader khác họ model**.
 - Reader đã xem mã H1–H10, Guard và runtime; không chạy test/build, không sửa tệp. Phát hiện được kiểm lại tại chỗ bằng test trước/sau. Phần thảo luận “không tìm thấy” chỉ có nghĩa trong phạm vi mã đã đọc.
+- **Đếm phát hiện:** H1–H10 đều có hàng trong bảng (10/10 đã đọc); ba giả thuyết được chuyển thành hồi quy đỏ-trước (FB-C28/C29/C30) đều xác nhận, 0 bác bỏ trong nhóm ba này. Tài liệu chưa có sổ đếm toàn bộ nghi vấn/bác bỏ, nên tổng chính thức **CHƯA KIỂM**. H10 chưa có thí nghiệm riêng; không xem các dòng không có phát hiện mới là đã chứng minh an toàn.
 - Nền kiểm tra: Windows x86_64, LLVM 20.1.8, Rust 1.98.1. Cổng G1.6 là điều kiện riêng để cập nhật READINESS cuối cùng.
 
 ## Kết quả H1–H10

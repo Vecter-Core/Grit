@@ -17,7 +17,7 @@
 | R8 | Hai intrinsic I/O (Q86 iv): `Cap<In>::read_all`, `Cap<Fs>::write` | CHƯA | | |
 | R9 | `tools/fuzz_loop.sh` + tích luỹ ≤ 2 giờ | CHƯA | | |
 | R10 | 69 đột biến nguy hiểm của M7 (điều kiện #10) | CHƯA | | |
-| R11 | Mục E: đọc mã H1–H10, IR Guard, `gt-rt`; ghi thí nghiệm và giới hạn ở `docs/TCB_CODE_AUDIT.md` | XONG, G1.5 | FB-C28/C29/C30; Guard 35/35; reader GPT-6 cùng họ với writer nên không phải đánh giá khác họ model |  |
+| R11 | Mục E: đọc mã H1–H10, IR Guard, `gt-rt`; ghi thí nghiệm và giới hạn ở `docs/TCB_CODE_AUDIT.md` | CHƯA ĐẠT, G1.5 | Đọc mã/thí nghiệm và FB-C28/C29/C30 đã ghi; reader GPT-6 cùng họ với Codex, nên điều kiện model khác chưa đạt. Cần review khác họ; H10 không có thí nghiệm riêng |  |
 | R12 | Kết thúc: cổng cuối liền mạch, READINESS bảng §7 từng điều kiện, HANDOFF, bundle, push, báo cáo cuối | ĐANG, G1.6 | Gate GREEN (1.017/0/202), READINESS cập nhật, push `windows-work` thành công; bundle bị ACL `D:\Grit_backup` chặn, còn mở tới khi cấp quyền ghi và verify bundle |  |
 
 ---
