@@ -172,6 +172,8 @@ Xem `docs/CAPSTONE_LOG.md`: bốn chương trình do subagent MỚI viết chỉ
 - Codegen G2.1.c: CHƯA KIỂM lại đủ theo đầu hiện tại và sáu bộ yêu cầu. Các JSONL lịch sử có sẵn, nhưng chưa dùng làm bằng chứng G2.1 vì chưa xác minh cùng HEAD/profile/tập yêu cầu.
 - Đột biến có mục tiêu G2.1.d: CHƯA KIỂM; chưa kết luận về độ nhạy mã Codex/giải xung đột.
 - Việc kế: G2.1.c/d, sau đó G2.2 R11. Không có bất đồng thật mới trong các lượt đã chạy.
+- G2.1.c tiếp tục: `fn_value_gen` nay nhận `GT_PROFILE` (mặc định dev, thêm release/release-o2) thay vì hardcode dev; đây chỉ đổi profile được đo, không đổi generator/oracle/điều kiện. Dev mặc định: 256 chương trình, 139 so khớp mô hình=MIR=LLVM, 117 ĐỎ đúng mã, bất đồng 0. Release-o2 `GT_FNGEN_N=16`: 128 chương trình, 82 so khớp, 46 ĐỎ đúng mã, bất đồng 0. Mã test hiện tại được ghi cùng commit ở `docs/G2_CODEGEN_DIFF_RESULTS.jsonl`.
+- Hai lần chạy thử lỗi môi trường không tính: PATH thiếu LLVM-C.dll (139 ca bị báo codegen error), sau đặt PATH một lượt link.exe LNK1104 khi tạo test exe; lần retry có PATH đầy đủ chạy xanh. Release-o2 cũng dùng `GRIT_RT_LIB` và PATH LLVM, xanh 84,39s.
 
 ## G2.2 — R11 đọc mã đối kháng (đang làm, 2026-11-12)
 - Thí nghiệm H10 trên Windows: thêm helper tách `OsString`→UTF-8 lossy và test `arguments_are_utf8_and_preserve_count_for_empty_long_and_multiple_values` (argv rỗng, 32.000 ký tự, Unicode, nhiều phần tử, count/pointer/length khớp, UTF-8 hợp lệ); thêm test surrogate lẻ Windows, xác nhận U+FFFD. Hai test xanh 1/1; `cargo fmt --manifest-path runtime/gt-rt/Cargo.toml --check` xanh. Lệnh thử ban đầu có `--exact` nhưng thiếu tiền tố `tests::`, chạy 0 test nên KHÔNG tính; hai lệnh lọc sau chạy test thật.

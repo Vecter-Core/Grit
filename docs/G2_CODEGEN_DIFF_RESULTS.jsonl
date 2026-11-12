@@ -1,0 +1,2 @@
+{"suite":"fn_value","head":"a4982fa","profile":"dev","seed_policy":"fixed per Kind, GT_FNGEN_N=32","programs":256,"green_three_way":139,"expected_red":117,"mismatch":0,"exit":0}
+{"suite":"fn_value","head":"a4982fa","profile":"release-o2","seed_policy":"fixed per Kind, GT_FNGEN_N=16","programs":128,"green_three_way":82,"expected_red":46,"mismatch":0,"exit":0}

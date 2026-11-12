@@ -9,7 +9,7 @@
 | Giai đoạn | Trạng thái | Bằng chứng / việc mở |
 |---|---|---|
 | G2.0 | XONG | Không đụng `main`; bundle `grit-9359db8.bundle` và sau gate `grit-ed529c6.bundle` verify ở `.backup`; hai test G1.6 ghi trong PROGRESS; fallback `gritrt_start` fail-closed, runtime 8/8; authorship report có; gate đúng HEAD `ed529c6` GREEN 1017/0/202. |
-| G2.1 | ĐANG LÀM | `probe_diff` 20k/5 lô xanh; `GT_FULL8=1` bốn test xanh; codegen đủ sáu bộ và đột biến mục tiêu CHƯA KIỂM. |
+| G2.1 | ĐANG LÀM | `probe_diff` 20k/5 lô và `GT_FULL8=1` bốn test xanh; fn_value 256 dev + 128 release-o2 xanh; các bộ còn lại và mutation CHƯA KIỂM. |
 | G2.2 | ĐANG LÀM | H10 thí nghiệm trên Windows xanh; sổ 13 nghi vấn đã lập; audit còn năm mục giới hạn và cần hoàn tất review độc lập + prompt Claude. |
 | G2.3 | XONG | Grit dev/release-o2 và Rust O0/-O đo trên cùng input; 2 run và scaling raw được ghi ở `docs/SORTLINES_BENCHMARK_G2.jsonl`; không thấy O(n) lần cấp Arena. |
 | G2.4 | XONG | Kiểm kê đủ 11 mục; tất cả CÓ, xem `docs/INVENTORY.md`. |

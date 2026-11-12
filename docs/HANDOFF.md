@@ -8,6 +8,7 @@
 - G2.2 H10 trên Windows: helper `encode_args`; test rỗng/32k/Unicode/nhiều phần tử + `arg_count/arg_ptr/arg_len` và surrogate lẻ lossy UTF-8 đã xanh. Xem `docs/TCB_CODE_AUDIT.md`; sổ ghi 13 nghi vấn, năm giới hạn cần tiếp tục xác minh. R11 CHƯA ĐẠT.
 - G2.4 kiểm kê đã XONG; đủ 11/11 mục, `docs/INVENTORY.md`. Tiếp tục G2.1.c/d, G2.2, G2.3, rồi G2.5–G2.7.
 - G2.3 benchmark sortlines đã XONG: hai bộ số Grit dev/release-o2 và Rust O0/-O trên cùng input; raw/harness tại `docs/SORTLINES_BENCHMARK_G2.jsonl` / `tools/bench_sortlines_g2.py`. Đọc phân tích và giới hạn trong `docs/BENCHMARK.md`.
+- G2.1.c: `fn_value_gen` profile được qua `GT_PROFILE`; dev 256 (139 khớp, 117 ĐỎ kỳ vọng), release-o2 128 (82 khớp, 46 ĐỎ kỳ vọng), mismatch 0. Ghi tại `docs/G2_CODEGEN_DIFF_RESULTS.jsonl`; tiếp tục đủ các bộ còn lại/mutation.
 
 **Cập nhật tại commit faddecc, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 

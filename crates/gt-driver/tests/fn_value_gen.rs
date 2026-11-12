@@ -13,6 +13,14 @@ use gt_resolve::SourceInput;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+fn profile() -> (gt_codegen_llvm::Opt, &'static str) {
+    match std::env::var("GT_PROFILE").as_deref() {
+        Ok("release") => (gt_codegen_llvm::Opt::Release, "release"),
+        Ok("release-o2") => (gt_codegen_llvm::Opt::ReleaseO2, "release-o2"),
+        _ => (gt_codegen_llvm::Opt::Dev, "dev"),
+    }
+}
+
 struct Rng(u64);
 impl Rng {
     fn next(&mut self) -> u64 {
@@ -171,6 +179,7 @@ fn function_values_agree_with_the_independent_model() {
         .and_then(|v| v.parse().ok())
         .unwrap_or(32);
     let dir = std::env::temp_dir().join(format!("gt-fngen-{}", std::process::id()));
+    let (opt, profile_name) = profile();
     std::fs::create_dir_all(&dir).expect("tạo");
     let mut cov: BTreeMap<Kind, Cov> = BTreeMap::new();
     let mut bad: Vec<String> = Vec::new();
@@ -217,9 +226,7 @@ fn function_values_agree_with_the_independent_model() {
                     {
                         let art = res.open_gate().expect("cổng");
                         let att = attestation(&res, &mir_dump(art));
-                        if let Err(e) =
-                            build_exe_profile(art, &exe, true, &att, gt_codegen_llvm::Opt::Dev)
-                        {
+                        if let Err(e) = build_exe_profile(art, &exe, true, &att, opt) {
                             bad.push(format!("{kind:?}#{i}: LLVM từ chối: {e}\n{src}"));
                             continue;
                         }
@@ -245,7 +252,7 @@ fn function_values_agree_with_the_independent_model() {
         }
     }
     let _ = std::fs::remove_dir_all(&dir);
-    println!("fn_value_gen: n/loại={n}");
+    println!("fn_value_gen: profile={profile_name} n/loại={n}");
     for (k, c) in &cov {
         println!(
             "  {k:?}: {} chương trình = {} xanh (mô hình==thông dịch==LLVM) + {} đỏ kỳ vọng (mã đúng)",
