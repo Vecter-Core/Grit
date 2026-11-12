@@ -99,18 +99,19 @@ crates/gt-effects/src/lib.rs	361	_ =>	AN TOÀN		không xác định hàm đối 
 crates/gt-guard/src/lib.rs	48	is_some_and	AN TOÀN		tên không khớp ba dạng hỗ trợ ⇒ không phải hàm hỗ trợ ⇒ phải thuộc bảng instance, nếu không bị từ chối	.is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 crates/gt-guard/src/lib.rs	57	ok()?	SỬA	FB-C27	callee_name trả None cho lời gọi gián tiếp; luật địa chỉ G1 chỉ cấm lấy địa chỉ hàm gritrt_*, nên khai báo ngoài khác (vd declare @system) có địa chỉ được lưu rồi call gián tiếp thì không bị luật 3b (đích mọi lời gọi) hay luật lớp nghĩa vụ kiểm; cần codegen lỗi mới phát ra, không tái hiện được từ nguồn Grit (nên mở rộng luật địa chỉ cho mọi hàm chỉ khai báo không phải llvm.*)	let call = CallSiteValue::try_from(*inst).ok()?;
 crates/gt-guard/src/lib.rs	78	_ =>	GHI NHẬN		is_atomic chỉ gồm load/store atomic, atomicrmw, cmpxchg; lệnh fence không thuộc lớp E0503; fence không sinh UB/race dữ liệu và codegen không phát	_ => false,
-crates/gt-guard/src/lib.rs	133	_ =>	AN TOÀN		loại giá trị lạ ⇒ None ⇒ user_inst None ⇒ direct=false ⇒ báo vi phạm (đóng)	_ => None,
-crates/gt-guard/src/lib.rs	167	_ =>	AN TOÀN		người dùng không phải lệnh call ⇒ direct=false ⇒ vi phạm (đóng)	_ => false,
-crates/gt-guard/src/lib.rs	205	unwrap_or_default	AN TOÀN		thiếu metadata !gt.instances ⇒ tập rỗng ⇒ lệch tập hàm đã định nghĩa ⇒ vi phạm	.flat_map(|md| md.get_node_values().unwrap_or_default())
-crates/gt-guard/src/lib.rs	210	unwrap_or	AN TOÀN		split().next() không bao giờ None; chuỗi rỗng ⇒ lệch tập ⇒ vi phạm	t.split('=').next().unwrap_or("").to_string()
-crates/gt-guard/src/lib.rs	271	_ =>	AN TOÀN		toán hạng không phải hằng ⇒ khoá '?' riêng; hằng bị tối ưu thành không hằng làm số lần loại gốc giảm ⇒ R1 báo	_ => None,
-crates/gt-guard/src/lib.rs	312	unwrap_or	AN TOÀN		thiếu mục sau tối ưu ⇒ 0 < n ⇒ vi phạm (đóng)	let now = post.get(&(f.clone(), k.clone())).copied().unwrap_or(0);
-crates/gt-guard/src/lib.rs	334	is_some_and	GHI NHẬN		cấm FMA theo tiền tố tên llvm.fmuladd/llvm.fma nên sót biến thể như llvm.experimental.constrained.fma hay llvm.vp.fma, và 3b cho phép mọi llvm.*; chỉ ảnh hưởng bit số thực, codegen không phát	if callee_name(&inst).is_some_and(|c| fused_intrinsic(&c)) {
-crates/gt-guard/src/lib.rs	361	unwrap_or_default	AN TOÀN		thiếu !gt.attest ⇒ got rỗng ⇒ vi phạm 'thiếu metadata'	.flat_map(|md| md.get_node_values().unwrap_or_default())
-crates/gt-guard/src/lib.rs	407	is_some_and	AN TOÀN		không thấy hàm hoặc không có thân ⇒ defined=false ⇒ từ chối trừ llvm.*	.is_some_and(|c| c.count_basic_blocks() > 0);
-crates/gt-guard/src/lib.rs	432	is_some_and	AN TOÀN		unreachable không có lệnh liền trước ⇒ ok=false ⇒ vi phạm	&& prev.as_ref().is_some_and(|p| {
-crates/gt-guard/src/lib.rs	434	is_some_and	AN TOÀN		không có gritrt_abort hoặc thiếu noreturn ⇒ ok=false ⇒ vi phạm	&& m.get_function("gritrt_abort").is_some_and(|a| {
-crates/gt-guard/src/lib.rs	450	unwrap_or	AN TOÀN		split().next() không bao giờ None; cờ UB đứng ngay sau opcode nên đứng trước mọi ', !'; tên local có ', !' không sinh từ định danh Grit	let body = text.split(", !").next().unwrap_or(&text);
+crates/gt-guard/src/lib.rs	149	is_some_and	AN TOÀN	FB-C30	Chỉ khớp hậu tố độ rộng nguyên nằm trong allowlist; hậu tố lạ làm predicate false và Guard từ chối intrinsic, không thể nới chấp nhận.	.is_some_and(|width| WIDTHS.contains(&width))
+crates/gt-guard/src/lib.rs	164	_ =>	AN TOÀN		loại giá trị lạ ⇒ None ⇒ user_inst None ⇒ direct=false ⇒ báo vi phạm (đóng)	_ => None,
+crates/gt-guard/src/lib.rs	201	_ =>	AN TOÀN		người dùng không phải lệnh call ⇒ direct=false ⇒ vi phạm (đóng)	_ => false,
+crates/gt-guard/src/lib.rs	239	unwrap_or_default	AN TOÀN		thiếu metadata !gt.instances ⇒ tập rỗng ⇒ lệch tập hàm đã định nghĩa ⇒ vi phạm	.flat_map(|md| md.get_node_values().unwrap_or_default())
+crates/gt-guard/src/lib.rs	244	unwrap_or	AN TOÀN		split().next() không bao giờ None; chuỗi rỗng ⇒ lệch tập ⇒ vi phạm	t.split('=').next().unwrap_or("").to_string()
+crates/gt-guard/src/lib.rs	305	_ =>	AN TOÀN		toán hạng không phải hằng ⇒ khoá '?' riêng; hằng bị tối ưu thành không hằng làm số lần loại gốc giảm ⇒ R1 báo	_ => None,
+crates/gt-guard/src/lib.rs	346	unwrap_or	AN TOÀN		thiếu mục sau tối ưu ⇒ 0 < n ⇒ vi phạm (đóng)	let now = post.get(&(f.clone(), k.clone())).copied().unwrap_or(0);
+crates/gt-guard/src/lib.rs	368	is_some_and	GHI NHẬN		cấm FMA theo tiền tố tên llvm.fmuladd/llvm.fma nên sót biến thể như llvm.experimental.constrained.fma hay llvm.vp.fma, và 3b cho phép mọi llvm.*; chỉ ảnh hưởng bit số thực, codegen không phát	if callee_name(&inst).is_some_and(|c| fused_intrinsic(&c)) {
+crates/gt-guard/src/lib.rs	395	unwrap_or_default	AN TOÀN		thiếu !gt.attest ⇒ got rỗng ⇒ vi phạm 'thiếu metadata'	.flat_map(|md| md.get_node_values().unwrap_or_default())
+crates/gt-guard/src/lib.rs	441	is_some_and	AN TOÀN		không thấy hàm hoặc không có thân ⇒ defined=false ⇒ từ chối trừ llvm.*	.is_some_and(|c| c.count_basic_blocks() > 0);
+crates/gt-guard/src/lib.rs	470	is_some_and	AN TOÀN		unreachable không có lệnh liền trước ⇒ ok=false ⇒ vi phạm	&& prev.as_ref().is_some_and(|p| {
+crates/gt-guard/src/lib.rs	472	is_some_and	AN TOÀN		không có gritrt_abort hoặc thiếu noreturn ⇒ ok=false ⇒ vi phạm	&& m.get_function("gritrt_abort").is_some_and(|a| {
+crates/gt-guard/src/lib.rs	488	unwrap_or	AN TOÀN		split().next() không bao giờ None; cờ UB đứng ngay sau opcode nên đứng trước mọi ', !'; tên local có ', !' không sinh từ định danh Grit	let body = text.split(", !").next().unwrap_or(&text);
 crates/gt-mir/src/build/expr.rs	18	unwrap_or	AN TOÀN		không bóc được cặp nháy thì giữ nguyên chuỗi (AST không chứa nháy); chỉ là cách giải escape, không ảnh hưởng phán quyết an toàn	.unwrap_or(s);
 crates/gt-mir/src/build/expr.rs	46	ok()?	AN TOÀN		hex/codepoint hỏng ⇒ None ⇒ người gọi lit_const trả ICE 'literal chuỗi hỏng' (từ chối)	out.push(char::from_u32(u32::from_str_radix(&hex, 16).ok()?)?);
 crates/gt-mir/src/build/expr.rs	48	_ =>	AN TOÀN		escape lạ ⇒ None ⇒ lit_const ICE (từ chối)	_ => return None,
@@ -355,12 +356,13 @@ crates/gt-types/src/check/call.rs	112	unwrap_or	GHI NHẬN		const/static thiếu
 crates/gt-types/src/check/call.rs	138	_ =>	AN TOÀN		nhánh mặc định phát E0301 'không phải giá trị' rồi mới trả Err	_ => {
 crates/gt-types/src/check/call.rs	244	unwrap_or	GHI NHẬN		`Self` không có self_ty ⇒ Err im lặng; resolver chặn `Self` ngoài impl và gt-mir validate chặn Err trong MIR; chưa tái hiện	Res::SelfType => self.cx.self_ty.clone().unwrap_or(Ty::Err),
 crates/gt-types/src/check/call.rs	245	_ =>	AN TOÀN		nhánh mặc định phát E0309 rồi trả Err	_ => {
-crates/gt-types/src/check/call.rs	502	let _ =	AN TOÀN		đã phát E0301 (sai số đối số) trước; chỉ kiểm kiểu đối số để bắt thêm lỗi	let _ = self.expr(a, None);
-crates/gt-types/src/check/call.rs	521	let _ =	GHI NHẬN		callee có kiểu Err ⇒ không phát lỗi ở đây (lỗi gốc đã báo nơi sinh Err); nếu Err sinh im lặng thì chặn cuối là gt-mir validate unresolved_types	let _ = self.expr(a, None);
-crates/gt-types/src/check/call.rs	534	let _ =	AN TOÀN		đã phát E0309 trước; chỉ duyệt đối số	let _ = self.expr(a, None);
-crates/gt-types/src/check/call.rs	557	let _ =	AN TOÀN		đã phát E0301 (sai số đối số) trước	let _ = self.expr(a, None);
-crates/gt-types/src/check/call.rs	567	_ =>	AN TOÀN		người nhận không phải tham chiếu: nếu là chỗ (place) thì bắt buộc place_mutable; chỉ rvalue tạm mới được mượn `&!`	_ => !Self::is_place(base) || self.place_mutable(base),
-crates/gt-types/src/check/call.rs	605	let _ =	AN TOÀN		đã phát E0301 trước; chỉ duyệt đối số	let _ = self.expr(a, None);
+crates/gt-types/src/check/call.rs	368	_ =>	AN TOÀN		Nếu không tra được member hoặc snapshot hiệu ứng lệch DB, `?unknown` được đưa vào tập hiệu ứng suy ra; khai báo không phủ sẽ bị E0801, không bị coi là `∅`.	_ => vec!["?unknown".to_string()],
+crates/gt-types/src/check/call.rs	505	let _ =	AN TOÀN		đã phát E0301 (sai số đối số) trước; chỉ kiểm kiểu đối số để bắt thêm lỗi	let _ = self.expr(a, None);
+crates/gt-types/src/check/call.rs	524	let _ =	GHI NHẬN		callee có kiểu Err ⇒ không phát lỗi ở đây (lỗi gốc đã báo nơi sinh Err); nếu Err sinh im lặng thì chặn cuối là gt-mir validate unresolved_types	let _ = self.expr(a, None);
+crates/gt-types/src/check/call.rs	537	let _ =	AN TOÀN		đã phát E0309 trước; chỉ duyệt đối số	let _ = self.expr(a, None);
+crates/gt-types/src/check/call.rs	560	let _ =	AN TOÀN		đã phát E0301 (sai số đối số) trước	let _ = self.expr(a, None);
+crates/gt-types/src/check/call.rs	570	_ =>	AN TOÀN		người nhận không phải tham chiếu: nếu là chỗ (place) thì bắt buộc place_mutable; chỉ rvalue tạm mới được mượn `&!`	_ => !Self::is_place(base) || self.place_mutable(base),
+crates/gt-types/src/check/call.rs	608	let _ =	AN TOÀN		đã phát E0301 trước; chỉ duyệt đối số	let _ = self.expr(a, None);
 crates/gt-types/src/check/expr.rs	25	_ =>	AN TOÀN		Predicate thiếu/không khớp trả false ⇒ nơi gọi báo lỗi 'cần kiểu số/số nguyên/số thực' (từ chối).	_ => false,
 crates/gt-types/src/check/expr.rs	33	_ =>	AN TOÀN		Predicate thiếu/không khớp trả false ⇒ nơi gọi báo lỗi 'cần kiểu số/số nguyên/số thực' (từ chối).	_ => false,
 crates/gt-types/src/check/expr.rs	41	_ =>	AN TOÀN		Predicate thiếu/không khớp trả false ⇒ nơi gọi báo lỗi 'cần kiểu số/số nguyên/số thực' (từ chối).	_ => false,

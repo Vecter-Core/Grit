@@ -4,6 +4,8 @@
 
 **Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
+**G1.5/G1.6 hiện hành (2026-11-12):** audit H1–H10/Guard/gt-rt đã ghi ở `docs/TCB_CODE_AUDIT.md`; FB-C28/C29/C30 có hồi quy đỏ→xanh. Gate cuối lần 1 **RED**: 1.014 pass/2 fail; lỗi test cũ (i) giả định ghi vào thư mục luôn là Unix `Other`, (ii) cho phép hàm có `⊳` thoát qua giá trị trái FB-C6; đã sửa oracle theo `ErrorKind` và cập nhật test theo chính sách E0901 đã có. Scanner cũng phát hiện hai mục mới; đã đọc, phân loại và cập nhật baseline/TSV. Test mục tiêu sau sửa: I/O 6/6, function-value 3/3. **Cần chạy lại toàn bộ gate trước khi gọi G1.6 XONG; bundle/push chưa làm.** Chi tiết gate lần 1 ở `docs/RUN_REPORTS.md`.
+
 **G1.4 / R5 (2026-11-12, Windows):**
 - Flake `llvm_sort::random_arrays_with_duplicates_match_stable_sort`: 100 dòng cũ không hợp lệ làm mẫu độc lập (2 tiến trình song song, 50 timestamp, seed cố định `20261014`). Lượt mới chạy tuần tự `GT_SORT_SEED=1..100`: 100 seed duy nhất, 100 xanh, `parallel=1`, log từng lượt ở `docs/FLAKE_LLVM_SORT.jsonl`. Kết quả 0/100 tương ứng giới hạn trên xấp xỉ 3% ở mức tin cậy 95% trong mô hình nhị thức, chỉ cho tập seed đã thử; KHÔNG kết luận đã sửa/hết flake. Lỗi cổng lịch sử 1/2 chưa tái hiện.
 - `std_lib` so mô hình Rust/MIR/LLVM xanh ở `dev`, `release`, `release-o2`; mỗi dòng kiểm 35 chương trình. Bốn tính chất Ord kiểu ghép có 35 chương trình và 346 phép kiểm mỗi kiểu/profile; log `docs/STD_TEST_RESULTS.jsonl`. Thêm tính chất phản xạ, đối xứng ngược, bắc cầu; không kiểm tương quan `==` vì kiểu ghép chưa hỗ trợ `==`.

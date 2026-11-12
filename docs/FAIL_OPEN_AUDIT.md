@@ -31,7 +31,7 @@ Phương pháp: `grep` mẫu `unwrap_or(`, `unwrap_or_default`, `.ok()`, `let _ 
 | 248 | `post.get(..).unwrap_or(0)` | AN TOÀN | thiếu ⇒ 0 < n ⇒ vi phạm |
 | 270 | `callee_name().is_some_and(fused)` | GHI NHẬN | FMA gọi gián tiếp không phát hiện — nhưng gián tiếp `llvm.*` không tồn tại (intrinsic không lấy địa chỉ được); xem G1 |
 | 342 | `get_function(..).is_some_and(body>0)` | AN TOÀN | không thấy hàm ⇒ "chưa định nghĩa" ⇒ từ chối trừ `llvm.*` |
-| 349 | mọi `llvm.*` được phép | GHI NHẬN | verifier LLVM từ chối tên intrinsic không tồn tại; `llvm.assume` bị cấm riêng; không dùng danh sách trắng intrinsic (nới sau nếu cần) |
+| 349 | mọi `llvm.*` được phép | ĐÃ SỬA (FB-C30) | verifier không đủ để giới hạn intrinsic có tham số tức thời tạo poison; Guard dùng allowlist đóng và test `llvm.abs.i32(..., true)` đỏ trước/xanh sau |
 | 358–363 | `prev.is_some_and`, `get_function(..).is_some_and(noreturn)` | AN TOÀN | thiếu ⇒ `ok = false` ⇒ từ chối `unreachable` |
 | 372–386 | miễn cờ trên LỆNH GEP (+ biểu thức hằng GEP sau FB-9) | GHI NHẬN | cờ GEP (`inbounds`, `nuw`) KHÔNG phải số học chương trình; sửa FB-9 ghi ở FIELD_BUGS |
 | 376 | `split(", !").next().unwrap_or(&text)` | AN TOÀN | |
@@ -263,8 +263,8 @@ Năm nhóm TCB, mỗi nhóm một subagent MỚI (cùng họ model với tác gi
 | A | `⊐ Copy for Arena {}` sao chép tay cầm Arena ⇒ dùng-sau-reset; `Cell::get` không đòi `T: Copy` nhân bản giá trị không-Copy | FB-C17 (cấm Copy cho Arena/Mutex/Atomic/Cell/Vec/Text/Secret/Cap; `Cell::get` đòi `T: Copy`); `⊐ <T> Copy for W<T>` thiếu `T: Copy` ⇒ FB-C16 |
 | B | `main` có tham số ở tệp khác được miễn E0310 (điều kiện cứng #12); `has_cap` không đi vào trường struct/enum; `io_result` đặt `alloca` tại chỗ gọi (SIGSEGV sau ~10^7 vòng); ghi vào stdout đã đóng thành công im lặng; `check` xanh nhưng build đỏ cho vài hàm prelude | FB-C18 (hai lỗi đầu); FB-C23; còn lại ghi KNOWN_LIMITATIONS |
 | C | kiểm biên lát/chỉ số dùng độ dài CŨ khi `s` bị gán lại trước lúc dùng (đọc/ghi ngoài mảng ở LLVM); thông dịch sai với 128 bit; `unrep_atom` có thể trùng nguyên tử vị từ khi hàm ≥ 1024 khối | FB-C20; ghi KNOWN_LIMITATIONS (thông dịch ngoài TCB; nhân/chia 128 bit chưa hạ ⇒ Unsupported); FB-C26 |
-| D | thứ tự khởi tạo `■` chỉ theo phụ thuộc trực tiếp (gọi con trỏ hàm NULL từ chương trình xanh); ordering của Atomic là local bị `&!`; luồng `spawn` chỉ có ngăn xếp 2 MiB | FB-C21; FB-C22; ghi KNOWN_LIMITATIONS |
-| E | Guard không đối chiếu số `Assert` biên MIR↔IR (chú thích `lower.rs` nói sai); attestation không phủ hồ sơ/runtime/LLVM; tên tệp `gritrt_*.gt` bị E1101; tài liệu `TCB_INTRINSICS §C` thiếu 5 hàm runtime; địa chỉ khai báo ngoài ≠ `gritrt_*` | chú thích sửa + KNOWN_LIMITATIONS; `TCB_INTRINSICS §C` liệt kê đủ 27; FB-C27 (luật địa chỉ cho mọi khai báo ngoài) |
+| D | thứ tự khởi tạo `■` chỉ theo phụ thuộc trực tiếp (gọi con trỏ hàm NULL từ chương trình xanh); ordering của Atomic là local bị `&!`; worker `spawn` dùng stack mặc định quá nhỏ (đã bổ sung hồi quy G1.5) | FB-C21; FB-C22; FB-C29 |
+| E | Guard không đối chiếu số `Assert` biên MIR↔IR; attestation không phủ hồ sơ/runtime/LLVM; tên tệp `gritrt_*.gt` bị E1101; tài liệu `TCB_INTRINSICS §C` thiếu 5 hàm runtime; địa chỉ khai báo ngoài ≠ `gritrt_*`; mọi `llvm.*` được phép | KNOWN_LIMITATIONS; `TCB_INTRINSICS §C` liệt kê đủ 27; FB-C27 (địa chỉ khai báo ngoài); FB-C30 (intrinsic allowlist); các ràng buộc attestation/abort vẫn còn mở |
 
 Kết hợp với mục 8 (quét fail-open), đợt này tìm thêm FB-C15 (đệ quy qua `[f; N]`), FB-C19 (`==` trên biến suy diễn chưa giải), FB-C24 (`imut` ADT lạ), FB-C25 (`⊳` của thành viên trait qua tham số kiểu). **Hệ quả cho độ tin cậy:** 14 lỗ hổng/khoảng trống thật (FB-C15…C27, trừ phần ghi nhận) mà bộ test/oracle/đột biến trước đó KHÔNG bắt — đọc đối kháng có giá trị riêng và phải lặp lại sau thay đổi lớn; kết luận "không tìm thấy thêm" của một nhóm chỉ có nghĩa trong phạm vi nhóm đã đọc.
 
@@ -279,3 +279,8 @@ Bộ quét Seed 1.0 tìm thấy ba khóa mới so với baseline nhánh Claude; 
 | `gt-driver/src/cli.rs:155` | AN TOÀN | từng mục `read_dir` được `map_err` thành lỗi trước khi chỉ lọc phần mở rộng `.gt`; không có `filter_map(Result::ok)` bị bỏ im lặng ở đường hiện hành. |
 
 Đây là rà mã theo luồng lỗi cụ thể; không thêm test hồi quy riêng cho bốn mẫu scanner này. Bộ test/gate hậu merge vẫn phải chạy; kết luận trên không thay thế cho kiểm thử đường lỗi đọc thư mục.
+
+## G1.5/G1.6 — rà hai mục scanner mới sau merge (2026-11-12, Windows)
+- `gt-types/src/check/call.rs` fallback `?unknown`: không tra được snapshot hiệu ứng thì phát marker chưa biết; hiệu ứng suy ra không thể khớp khai báo `∅`, nên fail-closed qua E0801. Phân loại AN TOÀN.
+- `gt-guard/src/lib.rs` allowlist FB-C30: hậu tố độ rộng chỉ được nhận nếu khớp allowlist; không khớp trả `false` và intrinsic bị Guard từ chối. Phân loại AN TOÀN; regression `rejects_non_allowlisted_llvm_intrinsic_with_poison_flag`.
+- Đã thêm cả hai mục vào `docs/fail_open_classification.tsv` và baseline; tổng 470 vị trí, không còn mục mới chưa đọc. Gate thứ nhất phát hiện 2 mục này và đỏ đúng theo baseline cũ.

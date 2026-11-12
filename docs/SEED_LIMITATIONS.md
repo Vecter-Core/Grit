@@ -28,7 +28,7 @@ Tài liệu cho NGƯỜI DÙNG (và AI viết Grit). Chi tiết kỹ thuật, b�
 - Âm tính giả của các bộ kiểm có thể còn: đợt đọc mã đối kháng + quét fail-open của S7 vẫn tìm thêm 13 lỗ hổng thật (FB-C15…C27) mà corpus/oracle/đột biến trước đó KHÔNG bắt — ngưỡng tin cậy là "đã qua đọc mã đối kháng bằng subagent cùng họ model", KHÔNG phải "đã duyệt" hay chứng minh; fuzz (lexer/parser/chuỗi kiểm) mới ở mức "đang tích luỹ" (≪ 24 giờ); đột biến M7 nhóm nguy hiểm: 30/60 giết bằng test + 30 tương đương theo lập luận đọc mã (`docs/M7_DANGER_MUTANTS.md`). CHƯA có người thứ hai là con người.
 - Abort có kiểm soát (mã 70) là dừng chương trình: an toàn bộ nhớ nhưng có thể là từ chối dịch vụ.
 - Data race: không có oracle động đầy đủ; chỉ corpus + lặp.
-- Luồng `spawn` có ngăn xếp mặc định 2 MiB (`main` có 256 MiB): mảng cục bộ vài MB trong worker ⇒ SIGSEGV (trúng trang bảo vệ, không hỏng bộ nhớ âm thầm). Giữ mảng lớn ở `Arena`/`Vec`.
+- `spawn` và `main` đều dùng ngăn xếp 256 MiB (G1.5, FB-C29). Mảng cục bộ/đệ quy vượt cỡ này vẫn có thể bị HĐH giết; 256 MiB được reserve cho mỗi worker nên tạo nhiều luồng có thể cạn tài nguyên. Dùng `Arena`/`Vec` cho vùng lớn.
 - Ghi vào stdout đã đóng (`>&-`) thành công im lặng; tên tệp nguồn `gritrt_*.gt` bị IR Guard từ chối (E1101): đổi tên tệp.
 - `check` xanh nhưng `build/run` đỏ (mã 3) cho vài hàm prelude chưa có lowering (`Host::fs`, `Cap<Fs>::sub`, `Cap<Net>::connect`, `Cap<Env>::var`, `Cap<Clock>::now`) và cho chương trình có hai `main`.
 - Hợp đồng `⊳`/`⊲` ở thành viên trait/impl được gọi qua tham số kiểu (`t.f(x)` với `T: Tr`) bị E0901 (không có điểm gọi cụ thể để kiểm): gọi trên kiểu cụ thể hoặc để thân tự kiểm. Vòng phụ thuộc khởi tạo giữa các `■` (kể cả qua hàm) bị từ chối (mã 3).
