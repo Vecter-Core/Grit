@@ -10,16 +10,19 @@
 |---|---|---|
 | G2.0 | XONG | Không đụng `main`; bundle `grit-9359db8.bundle` và sau gate `grit-ed529c6.bundle` verify ở `.backup`; hai test G1.6 ghi trong PROGRESS; fallback `gritrt_start` fail-closed, runtime 8/8; authorship report có; gate đúng HEAD `ed529c6` GREEN 1017/0/202. |
 | G2.1 | ĐANG LÀM | Probe 20k và GT_FULL8 xanh; sáu bộ codegen dev/release-o2 đã chạy, mismatch 0; 8 mutation mục tiêu, 7 killed và 1 survivor gt-term; E04xx/A.1 scan còn CHƯA RÀ 95. |
-| G2.2 | ĐANG LÀM | H10 thí nghiệm trên Windows xanh; sổ 13 nghi vấn đã lập; audit còn năm mục giới hạn và cần hoàn tất review độc lập + prompt Claude. |
+| G2.2 | ĐANG LÀM | H10 tests và sổ 13 nghi vấn có; authorship cập nhật tại HEAD 9e9b54c; prompt Claude đã tạo ở `docs/E_PROMPT_CLAUDE.md`; R11b CHỜ Claude/model khác họ, năm giới hạn còn mở. |
 | G2.3 | XONG | Grit dev/release-o2 và Rust O0/-O đo trên cùng input; 2 run và scaling raw được ghi ở `docs/SORTLINES_BENCHMARK_G2.jsonl`; không thấy O(n) lần cấp Arena. |
 | G2.4 | XONG | Kiểm kê đủ 11 mục; tất cả CÓ, xem `docs/INVENTORY.md`. |
-| G2.5–G2.7 | CHƯA KIỂM | Chưa bắt đầu. |
+| G2.5 | XONG CÓ GIỚI HẠN | ADR-C06: K3 234 dòng, một Arena caller; giữ HashMap hiện hành, không cần dừng. 1.500 input HashMap riêng vẫn chưa đạt. |
+| G2.6 | XONG | Inventory đủ 11/11; doc-test sau cập nhật 207 khối/0 sai; sửa glossary stale và tạo prompt Claude/ADR cần thiết. |
+| G2.7 | XONG PHẦN CHUẨN BỊ | `docs/G2_CLEAN_SESSION.md` có handoff; chưa author capstone; G2.1/G2.2 còn mở để phiên hiện hành tiếp tục. |
 
 ### G2 checkpoint (2026-11-12)
 - G2.1.a: probe_diff 20.000 seed/5 lô; GT_FULL8 bốn test; sáu suite codegen dev/release-o2 có log tại `docs/*CODEGEN*RESULTS.jsonl`, 0 mismatch (xem RUN_REPORTS để biết số chương trình và nhóm đỏ kỳ vọng).
 - G2.1.d: 8 mutation records; 7 killed, một survivor `gt-term/src/lib.rs:361` chưa giải thích; đột biến đối ứng ở dòng 685 bị bắt. Rà E04xx/A.1 CHƯA RÀ 95; G2.1 chưa hoàn tất.
 - Tiếp tục G2.1 với survivor và scan; sau đó G2.2/G2.5–G2.7. JSONL lịch sử cũ không dùng làm bằng chứng mới.
-- G2.2 H10: hai test Windows mới xanh; tiếp tục hoàn thiện audit/R11 prompt Claude; Codex-authored TCB vẫn phải để trạng thái MỘT PHẦN.
+- G2.2 H10: hai test Windows mới xanh; sổ 13 nghi vấn, authorship tại 9e9b54c (503/64.768 TCB, 0,78%), prompt `docs/E_PROMPT_CLAUDE.md` sẵn sàng. R11b CHỜ Claude; Codex-authored TCB chưa được tính review độc lập.
+- G2.5: K3 capstone có 234 dòng, một Arena caller; ADR-C06 giữ HashMap địa chỉ mở hiện hành. Điều kiện 1.500 seed HashMap riêng còn thiếu.
 
 | ID | Việc | Trạng thái | Lệnh chạy lại / bằng chứng | Commit |
 |---|---|---|---|---|

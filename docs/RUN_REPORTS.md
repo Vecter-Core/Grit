@@ -195,3 +195,18 @@ Xem `docs/CAPSTONE_LOG.md`: bốn chương trình do subagent MỚI viết chỉ
 - G2.1.c: tại source commit `a58a141`, chạy tuần tự đủ sáu suite ở dev và release-o2: fn_value 256/128 chương trình; obgen 91/54 lần sinh để đạt 25 chương trình xanh mỗi profile (66/29 đỏ tại gate, không so); abort-targeted 25 chương trình/profile, 150 lượt so mỗi profile; refpat 25/profile (21 xanh, 4 đỏ kỳ vọng); GTV 25/profile, 7 kinds; std random 40 + edge 3, 43 chương trình × 2 chế độ nhớ, mọi hàng std ghi 43 ca. Tất cả so sánh có mismatch 0. Chi tiết mới tại `docs/G2_CODEGEN_DIFF_RESULTS.jsonl`, `docs/CODEGEN_DIFF_RESULTS.jsonl`, `docs/RELEASE_O2_DIFF_RESULTS.jsonl`.
 - G2.1.d: `docs/G2_MUTATION_RESULTS.jsonl` ghi 8 mutation records: 7 killed, một survivor `gt-term/src/lib.rs:361` chưa giải thích; mutation cùng dòng lệnh tại 685 bị test bắt. Follow-up gt-types của mutation sống trước đó bị `capabilities` bắt (`docs/G2_MUTATION_FOLLOWUP.jsonl`). Không kết luận G2.1 hoàn thành khi survivor chưa được lý giải.
 - `tools/fail_open_scan.py check`: `CHƯA RÀ 95; nghi vấn chưa xử lý 0`; chưa thể coi rà E04xx/A.1 hoàn tất. `tools/preflight.sh D:/Grit` qua Git Bash chỉ định đạt `PREFLIGHT_OK`. G2.1 còn mở.
+
+## G2.2 — audit cập nhật / R11b (ĐANG, 2026-11-12)
+- `tools/authorship_report.py` chạy tại HEAD `9e9b54c`: 503/64.768 dòng TCB được blame vào commit ngoài ancestry Claude (0,78%). Đây là phân loại commit/ancestry, không phải nhãn model từng dòng. `docs/E_PROMPT_CLAUDE.md` tạo thành gói tự chứa để reviewer khác họ đọc H1–H10, Guard, runtime, 13 nghi vấn và phần Codex-authored; không có công cụ gọi Claude/session trong môi trường này nên R11b vẫn CHỜ, chưa coi review xong.
+- H10 tests/report và sổ 13 mục giữ nguyên ở `docs/TCB_CODE_AUDIT.md`; còn năm hạng mục kiểm chứng hữu hạn/thiếu công cụ. Không đổi trạng thái duyệt trong `TCB_INTRINSICS.md`.
+
+## G2.5 — đánh giá capstone kéo theo thư viện/HashMap (XONG CÓ GIỚI HẠN, 2026-11-12)
+- Đọc K3 và mã HashMap: lời giải kvstore 234 dòng, một Arena do caller tạo, HashMap và ba Vec tạm cùng dùng arena; không chạm ngưỡng dừng >3 Arena caller, K3 viết được gọn. HashMap thực tế là open addressing + linear probing, không phải chaining trong draft ADR-038; hash cố định, xóa tombstone và rebuild loại entry chết. Thêm ADR-C06: giữ thiết kế hiện tại, không thêm TCB/semantics.
+- Bằng chứng có sẵn: K3 khớp Rust 20/20 ca và ca lớn 99.000 lệnh; capstone 8/8 dev/release-o2 trên Linux. `std2` 35 seeds/profile cho các hàng HashMap và G2.1 43 seeds/profile cho std, mismatch 0; chưa đạt ngưỡng ≥1.500 test riêng HashMap của ADR-038, chưa benchmark cải thiện wordfreq, và Windows capstone chưa chạy. Không nâng tuyên bố vượt quá các bằng chứng này.
+- Sửa glossary stale: Arena chia sẻ đã triển khai theo ADR-C03; không thể ghi là hoãn sang Phase 2 khi mã hiện tại dùng `&'a Arena`.
+
+## G2.6 — tài liệu còn thiếu (XONG, 2026-11-12)
+- Rà inventory 11 mục: không thiếu tệp/nội dung mục tiêu G2.4. Không tạo bản trùng. Tạo `docs/E_PROMPT_CLAUDE.md`, ADR-C06 và sửa hai dòng glossary đã sai so với ADR-C03/mã. Chạy lại `tools/doc_test.py` với LLVM/runtime đúng: `DOC_TEST: 207 khối grit, 0 sai`; preflight trước đó `PREFLIGHT_OK`.
+
+## G2.7 — chuẩn bị phiên sạch (XONG PHẦN CHUẨN BỊ, 2026-11-12)
+- Tạo `docs/G2_CLEAN_SESSION.md` với thứ tự mở, môi trường Windows, giới hạn không đụng `main`, không author capstone, và bằng chứng mới nhất. Đây là handoff thực hiện được; không tạo phiên Codex mới và không viết lời giải capstone. Các mục G2.1 và G2.2 đang mở nên Gói 2 tổng thể chưa xong.
