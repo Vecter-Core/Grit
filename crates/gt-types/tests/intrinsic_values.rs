@@ -150,7 +150,7 @@ fn intrinsics_used_as_function_values_are_rejected() {
         "vec_len",
         r#"ƒ main() → usize ! {mem} {
   μa ≔ Arena::new();
-  μv: Vec<u32> ≔ Vec::new(&!a);
+  μv: Vec<u32> ≔ Vec::new(&a);
   f: ƒ(&Vec<u32>) → usize ! ∅ ≔ Vec::len;
   f(&v)
 }
@@ -161,7 +161,7 @@ fn intrinsics_used_as_function_values_are_rejected() {
         "vec_as_slice",
         r#"ƒ main() → usize ! {mem} {
   μa ≔ Arena::new();
-  μv ≔ Vec::new(&!a);
+  μv ≔ Vec::new(&a);
   v.push(1u32);
   s: ƒ(&Vec<u32>) → &[u32] ! ∅ ≔ Vec::as_slice;
   x ≔ s(&v);
@@ -253,7 +253,7 @@ fn intrinsics_used_as_function_values_are_rejected() {
         "text_push_char",
         r#"ƒ main() ! {mem} {
   μa ≔ Arena::new();
-  μt ≔ Text::new(&!a);
+  μt ≔ Text::new(&a);
   p: ƒ(&!Text, char) ! {mem} ≔ Text::push_char;
   p(&!t, 'x');
 }
@@ -264,7 +264,7 @@ fn intrinsics_used_as_function_values_are_rejected() {
         "vec_reserve_huge",
         r#"ƒ main() ! {mem} {
   μa ≔ Arena::new();
-  μv ≔ Vec::new(&!a);
+  μv ≔ Vec::new(&a);
   r: ƒ(&!Vec<u64>, usize) ! {mem} ≔ Vec::reserve;
   r(&!v, 1152921504606846976usize);
 }

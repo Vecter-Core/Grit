@@ -1,4 +1,6 @@
 // expect: pass
-// note: đối chứng FB-C5 — Arena::new ({mem}) truyền vào tham số ƒ() → Arena ! {mem}
+// note: đối chứng FB-C5 — hàm Grit bọc Arena::new truyền vào tham số có hiệu ứng
+▢ S { x: i32 }
+⊐ S { ƒ mk() → Arena ! {mem} { Arena::new() } }
 ƒ ap(g: ƒ() → Arena ! {mem}) ! {mem} { a ≔ g(); }
-ƒ f() ! {mem} { ap(Arena::new); }
+ƒ f() ! {mem} { ap(S::mk); }

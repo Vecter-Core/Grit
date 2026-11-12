@@ -14,6 +14,8 @@
 
 **G1.3c gate (2026-11-12):** lần đầu bắt thiếu `); }` trong test capability, sửa `587d9be`; lần kế fmt xanh nhưng clippy bắt `Pick.effects` dead code và doc-list formatting. Sửa fail-closed snapshot check + ngắt đoạn doc list ở `83a3e0e`; `cargo fmt --all --check`, gt-rt fmt check, `cargo clippy --workspace --all-targets -- -D warnings` đều exit 0. Hai lượt gate bị dừng trước kết quả cuối; chạy lại toàn bộ gate sau preflight.
 
+**G1.3d policy/test (2026-11-12):** giữ E0313 nghiêm hơn của Windows cho intrinsic lib/core làm giá trị; chuyển các ca hiệu ứng về hàm Grit `S::mk`, intrinsic precondition sang E0313, cập nhật Vec/Text dùng `&Arena`. F-05 được cô lập bằng test chỉ bật `allow-intrinsic-values`: 13/13 xanh và nhận E0310. Kiểm mục tiêu default: gt-types capabilities 14/14, corpus 3/3, intrinsic 2/2; gt-mir corpus 3/3; expectations 969 fixtures/72 mã/245 refs; deletions 188. Cổng full và F-01..F-08 đỏ-khi-hoàn-nguyên vẫn CHƯA KIỂM.
+
 
 ## 0. SỰ THẬT MỚI (2026-10-21; lệnh Seed 1.0 bản sửa — ĐỌC TRƯỚC)
 - Giang KHÔNG có máy tính; làm việc trên điện thoại/trình duyệt qua Claude Code đám mây. **origin là nguồn sự thật DUY NHẤT**; không chờ gì từ máy Windows. Container là TẠM THỜI: mọi thứ chưa push sẽ MẤT. Nhánh làm việc: `claude/gallant-darwin-m251cq` (push sau mỗi mục và ≥ mỗi 45 phút; chỉ nhánh này và tag `seed-*`; không push `main`, không force).

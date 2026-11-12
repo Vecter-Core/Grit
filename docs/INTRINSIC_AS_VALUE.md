@@ -106,6 +106,10 @@ Cách đo: `python3 tools/intrinsic_value_probe.py "<nhãn>=<gritc>" ...` (mỗi
 - Hiệu ứng là bất biến (không có subtyping): hàm thuần KHÔNG truyền được vào tham số `ƒ(…) ! {io}` (E0301) — bảo thủ, an toàn, hơi bất tiện; ghi vào SEED_LIMITATIONS.
 - `spawn` làm giá trị: bị E1002 (đúng — chưa hỗ trợ).
 
+## Chính sách Windows sau hợp nhất (2026-11-12)
+
+Nhánh Windows có quy tắc E0313 riêng: intrinsic của lib/core không được làm giá trị hàm, để không phải chứng minh riêng mọi nghĩa vụ gắn với lời gọi gián tiếp. Vì vậy probe truyền `root_out` trực tiếp vào helper mặc định bị chặn bằng E0313 trước; đây không phải phép đo độc lập cho FB-C3. Phép đo riêng F-05 chạy `cargo test -p gt-types --features allow-intrinsic-values --test capabilities -- --test-threads=2`: 13/13 xanh, trong đó test `calling_a_root_source_through_a_function_value_is_e0310` nhận đúng E0310 khi chỉ tắt lớp chặn giá trị intrinsic. Default corpus giữ E0313 cho ca truyền trực tiếp, E0310 cho nguồn được gán rồi gọi ngoài `main`, và hàm Grit người dùng vẫn dùng được làm giá trị. Ca intrinsic `shl`/`Option::unwrap` cũng thuộc E0313; E0901 kiểm lời gọi trực tiếp hoặc hàm Grit có hợp đồng. Phép đo này trên mã sau hợp nhất; kiểm đỏ-khi-hoàn-nguyên F-05 vẫn được theo dõi riêng trong G1.3.
+
 ## Sau S1 (ĐO trên HEAD, Linux)
 Cột dưới là kết quả của CÙNG bộ probe sau khi sửa FB-C5 (hiệu ứng hàm kết hợp làm giá trị: `Pick.effects` → `Ty::Fn`) và FB-C6 (`⊳` + giá trị hàm ⇒ E0901 ở `gt-oblig/src/driver.rs`):
 

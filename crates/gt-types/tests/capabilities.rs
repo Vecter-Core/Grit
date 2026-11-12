@@ -91,11 +91,25 @@ fn a_generic_that_conjures_a_capability_from_nothing_is_a_root_source() {
 }
 
 #[test]
+#[cfg(not(feature = "allow-intrinsic-values"))]
 fn referencing_a_root_source_as_a_value_is_also_rejected() {
     // ngoài `main`: chỉ E0310 (nguồn capability chỉ ở `main`; E0313 không báo trùng)
     err("ƒ f() ! {io} { g ≔ root_fs; }", "E0310", 1);
     // ngay trong `main` cũng bị E0313: truyền `root_fs` làm giá trị sẽ trao quyền ĐÚC capability cho hàm khác (điều kiện cứng #12)
     err("ƒ main() ! {io} { g ≔ root_fs; }", "E0313", 1);
+}
+
+/// F-05 regression: when the stricter E0313 intrinsic-value guard is disabled for measurement,
+/// the indirect call must still be rejected as E0310 by CapUse propagation.
+#[test]
+#[cfg(feature = "allow-intrinsic-values")]
+fn calling_a_root_source_through_a_function_value_is_e0310() {
+    err(
+        "ƒ helper(mk: ƒ() → Cap<Fs> ! ∅) ! {io} { c ≔ mk(); x ≔ c.read(\"/etc/hostname\"); }
+ƒ main() ! {io} { helper(root_fs); }",
+        "E0310",
+        1,
+    );
 }
 
 #[test]
@@ -161,11 +175,12 @@ fn arena_is_a_lang_item_that_is_not_copy_and_cannot_be_forged_by_attribute() {
     err("#lang(arena) ▢ MyArena { x: i32 }", "E1002", 1);
 }
 
-/// FB-16 (ĐO bằng feature `allow-intrinsic-values`: XANH khi tắt E0313): hàm KHÁC `main` đúc capability qua tham số kiểu hàm nhận `root_fs` — phải bị chặn tại chỗ truyền.
+/// E0313 chặn `root_fs` làm giá trị trước khi có thể chuyển nguồn capability qua tham số hàm.
 #[test]
+#[cfg(not(feature = "allow-intrinsic-values"))]
 fn passing_a_capability_source_as_a_value_to_mint_capabilities_elsewhere_is_rejected() {
     err(
-        "ƒ h(g: ƒ() → Cap<Fs> ! ∅) ! {io} { c ≔ g(); }
+        "ƒ h(g: ƒ() → Cap<Fs> ! ∅) ! ∅ { }
 ƒ main() ! {io} { h(root_fs); }",
         "E0313",
         1,

@@ -154,11 +154,13 @@ Mọi chỗ khớp (1292) đều có dòng trong `docs/FAIL_OPEN_LEDGER.jsonl` v
 | F-01 / FB-C1 | `1f0aab0` `gt-borrowck/src/check.rs` | `cargo test -p gt-borrowck --test same_stmt` | ĐỎ: 2 test thất bại, 1 đạt (trước sửa) → XANH 3/3 sau sửa | `same_stmt.rs`, 14 mẫu `E0401_{same_stmt,dup}_*` |
 | F-02 / FB-C7 | `1f0aab0` `gt-driver/src/cli.rs` | `cargo build -p gt-driver --no-default-features` | ĐỎ: `error[E0433]: cannot find module or crate gt_codegen_llvm` | cổng chạy `test -p gt-driver` ở chế độ mặc định; CI có bước `--no-default-features` (chưa chạy trên GitHub) |
 | F-03/F-04/F-07 / FB-C2, FB-C4 | `9af99e9` `gt-types/src/collect.rs` | corpus 904 ca qua `gritc` | ĐỎ: lệch 9 ca (trước sửa) → 0 sau sửa | 10 mẫu `E0301_*` + 1 mẫu pass |
-| F-05 / FB-C3 | `d0a9180` `gt-types/src/check/call.rs` | corpus 904 ca | ĐỎ: lệch 1 (`E0310_call_through_fn_value` XANH) → 0 sau sửa | 2 mẫu fail `E0310_call_through_*`, 1 mẫu pass |
+| F-05 / FB-C3 | `d0a9180` `gt-types/src/check/call.rs` | corpus 904 ca trên Linux; sau hợp nhất đo riêng với `allow-intrinsic-values` | lịch sử: lệch 1 → 0; sau hợp nhất feature test phát E0310 (1/1) | default E0313 chặn intrinsic làm giá trị; local non-main vẫn E0310; pass `206_fn_value_with_cap_param` |
 | F-06 / FB-C8 | `d0a9180` `gt-rt` `gritrt_start` | `cargo test -p gt-driver --test stack_depth` | ĐỎ: 0 đạt / 2 thất bại (bị HĐH giết) → 2/2 sau sửa | `stack_depth.rs` |
 | F-08 | `05b4488` `docs/errors/E12xx,E1301,E9901` | `gritc explain <mã>` | ĐỎ trước sửa (ĐO ở kiểm toán G07: 6 mã báo LỖI) → XANH | `tools/check_expectations.py` + giai đoạn gate |
 | F-09 (vụn vặt) | — | — | clippy 2 lỗi test → 0 | gate `clippy` |
 Ghi chú trung thực: F-02 và F-08 không có test tự động riêng (F-02 do chính cổng/CI ở chế độ `--no-default-features`; F-08 do `check_expectations.py`); bằng chứng đỏ-trước là lệnh nêu ở cột 3 chạy thật.
+
+**G1.3c bổ sung (Windows, 2026-11-12):** nhánh Windows có hợp đồng E0313 nghiêm hơn: intrinsic lib/core không được làm giá trị. Do đó `helper(root_out)` bị E0313 ở ranh giới truyền, trước khi đường gọi qua giá trị có thể kiểm độc lập F-05. Để giữ phép thử riêng, `capabilities.rs::calling_a_root_source_through_a_function_value_is_e0310` chỉ bật với feature đo `allow-intrinsic-values`; lệnh `cargo test -p gt-types --features allow-intrinsic-values --test capabilities -- --test-threads=2` xanh 13/13, gồm test đó. Đây là kiểm định trên mã hiện tại, chưa phải đỏ-khi-hoàn-nguyên (mục G1.3c). Ca `E0310_call_through_local_fn_value` giữ E0310; ca truyền trực tiếp chuyển sang E0313.
 
 ## 8. Rà soát toàn bộ Seed 1.0 S7 — 469 vị trí, mỗi vị trí ĐỌC và phân loại (2026-10-23; Linux)
 

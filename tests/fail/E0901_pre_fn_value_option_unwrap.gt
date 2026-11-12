@@ -1,3 +1,0 @@
-// expect: fail E0901
-// note: FB-C6 — Option::unwrap (⊳ self.is_some()) dùng làm giá trị
-ƒ main() → u32 ! ∅ { f ≔ Option::unwrap; f(Option::None) }

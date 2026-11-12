@@ -1,3 +1,0 @@
-// expect: fail E0901
-// note: FB-C6 — intrinsic có ⊳ n < 32 dùng làm giá trị (native: UB nếu n ≥ 32)
-ƒ main() → u32 ! ∅ { f ≔ shl; f(1u32, 40u32) }

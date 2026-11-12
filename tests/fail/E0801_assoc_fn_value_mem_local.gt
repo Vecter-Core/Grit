@@ -1,3 +1,5 @@
 // expect: fail E0801
-// note: FB-C5 — Arena::new ({mem}) làm giá trị rồi gọi trong hàm thuần
-ƒ f() ! ∅ { g ≔ Arena::new; a ≔ g(); }
+// note: FB-C5 — hàm Grit bọc Arena::new làm giá trị rồi gọi trong hàm thuần
+▢ S { x: i32 }
+⊐ S { ƒ mk() → Arena ! {mem} { Arena::new() } }
+ƒ f() ! ∅ { g ≔ S::mk; a ≔ g(); }

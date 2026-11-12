@@ -1,9 +1,4 @@
 // expect: fail E0313
-// note: FB-16 / điều kiện #12: hàm khác main đúc Cap<Fs> qua tham số kiểu hàm nhận root_fs; đo bằng feature allow-intrinsic-values: XANH khi tắt E0313
-ƒ h(g: ƒ() → Cap<Fs> ! ∅) ! {io} {
-  c ≔ g();
-  x ≔ c.read("/etc/hostname");
-}
-ƒ main() ! {io} {
-  h(root_fs);
-}
+// note: chính sách E0313 từ chối chuyển nguồn capability intrinsic làm giá trị trước khi có thể đúc Cap qua tham số hàm
+ƒ h(g: ƒ() → Cap<Fs> ! ∅) ! ∅ { }
+ƒ main() ! {io} { h(root_fs); }

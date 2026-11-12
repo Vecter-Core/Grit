@@ -1,0 +1,3 @@
+// expect: fail E0313
+// note: intrinsic có precondition không được dùng làm giá trị; kiểm E0901 chỉ áp dụng lời gọi trực tiếp
+ƒ main() → u32 ! ∅ { f ≔ shl; f(1u32, 40u32) }

@@ -1,0 +1,3 @@
+// expect: fail E0313
+// note: Option::unwrap có precondition nhưng intrinsic không được dùng làm giá trị hàm
+ƒ main() → u32 ! ∅ { f ≔ Option::unwrap; f(Option::None) }

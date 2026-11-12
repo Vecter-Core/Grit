@@ -1,0 +1,4 @@
+// expect: fail E0313
+// note: chính sách intrinsic không làm giá trị chặn truyền root_out vào hàm khác
+ƒ accept(mk: ƒ() → Cap<Out> ! ∅) ! ∅ { }
+ƒ main() ! {io} { accept(root_out); }

@@ -154,13 +154,15 @@ Phát hiện bằng kiểm toán ngoài 2026-10-20/21 (Linux). Mỗi mục: test
 ### FB-C2 — kiểu không biết/vô hạn kích thước được chấp nhận (kiểu (a)) — ĐÃ SỬA
 `[T]`/`str` theo giá trị ở tham số/trả về/trường (chỉ `let` bị chặn); kiểu chứa chính nó theo giá trị ⇒ `gritc` tràn ngăn xếp (mã 134) ở codegen. Sửa: `sized_ty` trong `elem_ty`/tham số/trả về; `contains_itself_by_value` (kể cả qua ADT generic, đa hình bung vô hạn) ⇒ E0301. Test: 9 mẫu `tests/fail/E0301_*`, 1 mẫu pass.
 ### FB-C3 — nguồn capability gọi qua giá trị hàm (kiểu (a), điều kiện #12) — ĐÃ SỬA
-`helper(mk: ƒ() → Cap<Out>)` + `main` gọi `helper(root_out)` ⇒ `helper` đúc `Cap<Out>` tuỳ ý. Sửa: lời gọi qua giá trị hàm ghi `CapUse` (E0310). ĐO trước/sau: `docs/INTRINSIC_AS_VALUE.md`. Test: `E0310_call_through_fn_value`, `E0310_call_through_local_fn_value`, pass `206_fn_value_with_cap_param`.
+`helper(mk: ƒ() → Cap<Out>)` + `main` gọi `helper(root_out)` ⇒ `helper` đúc `Cap<Out>` tuỳ ý. Sửa gốc: lời gọi qua giá trị hàm ghi `CapUse` (E0310), có test đo riêng khi bật feature `allow-intrinsic-values` để không bị E0313 che. Bản Windows sau hợp nhất mặc định từ chối mọi intrinsic lib/core làm giá trị với E0313; test corpus chuyển ca truyền trực tiếp sang E0313, còn ca gọi nguồn qua biến cục bộ ngoài `main` giữ E0310. Đo mới và giới hạn: `docs/INTRINSIC_AS_VALUE.md`. Test: `capabilities.rs::calling_a_root_source_through_a_function_value_is_e0310`, `E0313_intrinsic_root_out_fn_value`, `E0310_call_through_local_fn_value`, pass `206_fn_value_with_cap_param`.
 ### FB-C4 — tên biến ở vị trí kiểu ⇒ ICE E9901 thay vì chẩn đoán (kiểu (a)/(d), fail-closed) — ĐÃ SỬA
 `ƒ f(b: i32) → b` ⇒ `Ty::Err` không chẩn đoán (`collect.rs`). Sửa: E0301. Test `E0301_local_name_in_type_position`.
 ### FB-C5 — hàm kết hợp `Kiểu::hàm` dùng làm giá trị MẤT hiệu ứng (kiểu (a), âm tính giả) — ĐÃ SỬA (S1.iii)
 `Arena::new` (`{mem}`), `S::mk` (`{io}`) truyền vào tham số thuần hoặc gọi qua biến trong hàm thuần: XANH; gọi trực tiếp: E0801. Gốc: `call.rs` nhánh đường dẫn kết hợp dựng `Ty::Fn(ps, ret, Vec::new())`. Sửa: `Pick.effects` (traits.rs) → `Ty::Fn`. Test: 4 mẫu fail (`E0801_assoc_fn_value_*`, `E0301_assoc_fn_value_*`) + 3 mẫu pass; đỏ trước ở commit `a5da840` (corpus lệch 5), xanh ở `fdce836`.
 ### FB-C6 — tiền điều kiện `⊳` không được kiểm khi gọi qua giá trị hàm (kiểu (a), âm tính giả) — ĐÃ SỬA (S1.ii)
 `f ≔ shl; f(1u32, 40u32)` XANH (trực tiếp: E0901); native: `shl` với n ≥ 32 là poison/UB của LLVM; thông dịch: ICE "MIR không hợp lệ". Cùng `rotr`, hàm người dùng có `⊳` (chạy ra 0, ⊳ bị bỏ qua), `Option::unwrap`. Sửa (`gt-oblig/src/driver.rs`): hàm có `⊳` dùng làm giá trị ⇒ E0901 (fail-closed; cách né: bọc trong hàm không có `⊳` tự kiểm). ADR-C02. Test: 4 mẫu fail `E0901_pre_fn_value_*` + 3 pass; đỏ trước `a5c4295`, xanh `f000546`.
+
+**Ghi chú hợp nhất Windows (2026-11-12):** do E0313 chặn intrinsic lib/core làm giá trị sớm hơn, hai mẫu intrinsic `shl` và `Option::unwrap` nay khóa E0313; E0901 giữ cho lời gọi trực tiếp và hàm Grit có hợp đồng.
 ### FB-C7 — `gritc` hoàn toàn không dựng được ngoài Windows / `--no-default-features` hỏng (kiểu (c)) — ĐÃ SỬA
 Kiểu `Opt` thay thế khi tắt feature `llvm`; test `release_*` gắn cfg; port Linux (LLVM 20 `.so`, `libgt_rt.a`, `cc`). Windows: chưa kiểm sau sửa.
 ### FB-C8 — chương trình hợp lệ bị HĐH giết do ngăn xếp (kiểu (b)) — ĐÃ SỬA (giới hạn 256 MiB)
