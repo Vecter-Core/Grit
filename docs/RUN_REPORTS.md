@@ -43,3 +43,8 @@ Quy ước: mỗi mục một tiểu mục `## R<n> — <trạng thái> (ngày)`
 - `llvm_sort::random_arrays_with_duplicates_match_stable_sort` đạt ở gate trong 92.18 giây. Đây chỉ là lần chạy seed mặc định, không thay thế R5 thử seed độc lập.
 - Bundle hậu gate CHƯA TẠO: ACL của `D:\Grit_backup` từ chối tạo `.bundle.lock`. Gate xanh không được hiểu là bundle đã xong.
 - CHƯA KIỂM: nhánh Claude/merge và các F-01..F-08; flake tuần tự ≥100 seed; audit G1.5; cổng cuối G1.6.
+
+## G1.3a — FETCH VÀ PHÂN TÍCH NHÁNH (2026-11-12)
+- `git fetch origin` thành công: cập nhật `origin/main` lên `9b37373` và lấy nhánh `origin/claude/gallant-darwin-m251cq` ở `cbe4dd2`. Nhánh Claude có 93 commit từ merge-base `86c4955`; `git diff --stat` cho 630 file, 23,618 thêm / 497 xóa. Local `main` so với `origin/main`: ahead 62, behind 8.
+- Tạo `docs/MERGE_NOTES.md` gồm một dòng cho từng commit, mục đích theo subject, danh sách file, phân loại rủi ro và trạng thái test-trước theo bằng chứng trong subject/chuỗi FB; ghi rõ mục nào chưa xác minh. Xung đột đặc biệt: `crates/gt-borrowck/src/check.rs` và `crates/gt-types/src/check/call.rs`; còn rủi ro cao ở gt-oblig, gt-types, gt-conc, gt-guard, LLVM codegen, runtime, prelude và docs trạng thái.
+- CHƯA MERGE: chưa tạo integration, chưa resolve xung đột, chưa kiểm F-01..F-08 hoặc chạy cổng hậu merge.
