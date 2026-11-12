@@ -48,12 +48,12 @@ def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def make_input(path: Path) -> None:
+def write_input(path: Path, n_lines: int, extra_long_lines: int) -> None:
     state = 20261112
     with path.open("wb") as f:
-        for i in range(N_LINES):
+        for i in range(n_lines):
             state = (state * 6364136223846793005 + 1442695040888963407) & ((1 << 48) - 1)
-            line = f"{state:012x}{i:07d}" + ("x" if i < EXTRA_LONG_LINES else "")
+            line = f"{state:012x}{i:07d}" + ("x" if i < extra_long_lines else "")
             f.write(line.encode("ascii") + b"\n")
 
 
@@ -64,7 +64,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="grit-sortlines-g2-") as td:
         tmp = Path(td)
         inp = tmp / "lines.txt"
-        make_input(inp)
+        write_input(inp, N_LINES, EXTRA_LONG_LINES)
         data = inp.read_bytes()
         if len(data) != EXPECTED_BYTES or data.count(b"\n") != N_LINES:
             raise AssertionError("input shape changed")
@@ -128,6 +128,31 @@ def main() -> None:
                 "output_sha256": output_hash,
             }
             print(label, result["profiles"][label], flush=True)
+
+        # Scaling probe for dev Arena checks: same deterministic line family,
+        # increasing n; this is a measurement, while reserve/allocator source
+        # inspection determines how many Arena allocations occur.
+        scale = []
+        dev_exe = tmp / "grit-dev.exe"
+        for n in (100_000, 400_000, N_LINES):
+            extra = round(n * EXTRA_LONG_LINES / N_LINES)
+            scale_in = tmp / f"scale-{n}.txt"
+            write_input(scale_in, n, extra)
+            samples = []
+            for _ in range(3):
+                start = time.perf_counter()
+                p = run([str(dev_exe), str(scale_in)])
+                samples.append(round(time.perf_counter() - start, 4))
+            scale.append({
+                "lines": n,
+                "input_bytes": scale_in.stat().st_size,
+                "input_sha256": sha(scale_in.read_bytes()),
+                "runs_s": samples,
+                "median_s": round(statistics.median(samples), 4),
+                "exit": 0,
+            })
+            print("arena_scaling", scale[-1], flush=True)
+        result["arena_scaling_dev"] = scale
 
         line = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
         out = ROOT / "docs/SORTLINES_BENCHMARK_G2.jsonl"
