@@ -1,6 +1,6 @@
 # HANDOFF — TRẠNG THÁI HIỆN TẠI (đọc tệp này đầu tiên; lịch sử ở `docs/HANDOFF_ARCHIVE.md`)
 
-**Cập nhật tại commit c3ba7de, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit 83a3e0e, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
@@ -12,7 +12,7 @@
 
 **G1.3b merge (2026-11-12):** `integration` tạo từ local `main`; nhánh Claude merge `--no-ff` thành commit `c3ba7de`; resolve 26 xung đột và giữ cả hai phía; preflight + 30 kiểm công cụ xanh; fail-open 468 vị trí / 0 mới. F-01..F-08 kiểm đỏ-khi-hoàn-nguyên và cổng hậu merge CHƯA KIỂM.
 
-**G1.3c gate lần 1 (2026-11-12):** preflight xanh; gt-rt fmt/clippy/build/test xanh 6/6; fmt/clippy workspace bắt lỗi cú pháp thật (thiếu `); }` trong test capability sau resolve). Đã sửa bằng commit `587d9be`; `cargo fmt --all --check` và gt-rt fmt check xanh. Lần chạy gate bị dừng ngay khi phát hiện lỗi; không có kết quả gate cuối. Phải chạy lại từ đầu sau preflight.
+**G1.3c gate (2026-11-12):** lần đầu bắt thiếu `); }` trong test capability, sửa `587d9be`; lần kế fmt xanh nhưng clippy bắt `Pick.effects` dead code và doc-list formatting. Sửa fail-closed snapshot check + ngắt đoạn doc list ở `83a3e0e`; `cargo fmt --all --check`, gt-rt fmt check, `cargo clippy --workspace --all-targets -- -D warnings` đều exit 0. Hai lượt gate bị dừng trước kết quả cuối; chạy lại toàn bộ gate sau preflight.
 
 
 ## 0. SỰ THẬT MỚI (2026-10-21; lệnh Seed 1.0 bản sửa — ĐỌC TRƯỚC)

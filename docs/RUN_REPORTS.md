@@ -106,4 +106,5 @@ Xem `docs/CAPSTONE_LOG.md`: bốn chương trình do subagent MỚI viết chỉ
 ## G1.3c — CỔNG HẬU MERGE, LẦN 1 ĐỎ (2026-11-12)
 - Preflight `PREFLIGHT_OK`. Gate bắt đầu trên integration sau merge: gt-rt fmt/clippy/release build/test **6/6 OK**; fmt và clippy workspace ĐỎ do `crates/gt-types/tests/capabilities.rs` thiếu `); }` đóng test FB-16 sau khi resolve hai phía.
 - Dừng gate ngay khi phát hiện lỗi; gate chưa phát kết quả cuối và các package test workspace chưa hoàn tất. Sửa đúng lỗi cú pháp trong commit `587d9be`; kiểm lại `cargo fmt --all --check` và `cargo fmt --manifest-path runtime/gt-rt/Cargo.toml --check` đều exit 0.
+- Gate kế fmt xanh; clippy lộ thêm `Pick.effects` chưa đọc và hai doc-list continuation sai định dạng. Giữ so khớp snapshot effects với DB (không tra được/lệch ⇒ `?unknown`) và tách đoạn docs; commit `83a3e0e`. Kiểm trực tiếp fmt, gt-rt fmt và `cargo clippy --workspace --all-targets -- -D warnings` exit 0.
 - Cổng hậu-merge phải chạy lại đầy đủ trên mã ổn định; kết quả lần 1 không được tính là GREEN.
