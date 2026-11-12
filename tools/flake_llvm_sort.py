@@ -111,6 +111,8 @@ def main():
         with open(LEDGER, "a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         done += 1
+        if not ok:
+            break
     print(f"đã chạy {done} lần, đỏ {red}, {round(time.time() - start)} s")
     sys.exit(0 if red == 0 else 1)
 
