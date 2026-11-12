@@ -172,3 +172,8 @@ Xem `docs/CAPSTONE_LOG.md`: bốn chương trình do subagent MỚI viết chỉ
 - Codegen G2.1.c: CHƯA KIỂM lại đủ theo đầu hiện tại và sáu bộ yêu cầu. Các JSONL lịch sử có sẵn, nhưng chưa dùng làm bằng chứng G2.1 vì chưa xác minh cùng HEAD/profile/tập yêu cầu.
 - Đột biến có mục tiêu G2.1.d: CHƯA KIỂM; chưa kết luận về độ nhạy mã Codex/giải xung đột.
 - Việc kế: G2.1.c/d, sau đó G2.2 R11. Không có bất đồng thật mới trong các lượt đã chạy.
+
+## G2.2 — R11 đọc mã đối kháng (đang làm, 2026-11-12)
+- Thí nghiệm H10 trên Windows: thêm helper tách `OsString`→UTF-8 lossy và test `arguments_are_utf8_and_preserve_count_for_empty_long_and_multiple_values` (argv rỗng, 32.000 ký tự, Unicode, nhiều phần tử, count/pointer/length khớp, UTF-8 hợp lệ); thêm test surrogate lẻ Windows, xác nhận U+FFFD. Hai test xanh 1/1; `cargo fmt --manifest-path runtime/gt-rt/Cargo.toml --check` xanh. Lệnh thử ban đầu có `--exact` nhưng thiếu tiền tố `tests::`, chạy 0 test nên KHÔNG tính; hai lệnh lọc sau chạy test thật.
+- `docs/TCB_CODE_AUDIT.md` có sổ 13 nghi vấn từ H1–H10 và các giới hạn nêu ở audit G1.5. Năm mục còn giới hạn chưa được thí nghiệm quyết định (arena tổng quát, tràn Vec chưa đạt, đếm Assert theo vị trí/late target, ràng buộc attestation, kiểm kê unsafe tự động). R11 chưa đạt cho tới khi xong các thực nghiệm khả thi và đọc Claude.
+- Chưa tạo prompt Claude và chưa đo lại authorship theo HEAD mới; các dòng TCB có thay đổi Codex phải chờ Claude. Tiếp tục H10 tích hợp nếu cần, kiểm tra từng nghi vấn, prompt và cập nhật trạng thái theo từng crate.

@@ -180,13 +180,15 @@ unsafe impl Send for Arg {}
 
 // ---- I/O tối thiểu cho dogfood (docs/DOGFOOD.md): đối số dòng lệnh, đọc nguyên tệp, ghi stdout. Mọi lỗi ⇒ abort (chưa có Result/IoError).
 
+fn encode_args(args: impl IntoIterator<Item = std::ffi::OsString>) -> Vec<Vec<u8>> {
+    args.into_iter()
+        .map(|a| a.to_string_lossy().into_owned().into_bytes())
+        .collect()
+}
+
 fn cmdline() -> &'static Vec<Vec<u8>> {
     static ARGS: std::sync::OnceLock<Vec<Vec<u8>>> = std::sync::OnceLock::new();
-    ARGS.get_or_init(|| {
-        std::env::args_os()
-            .map(|a| a.to_string_lossy().into_owned().into_bytes())
-            .collect()
-    })
+    ARGS.get_or_init(|| encode_args(std::env::args_os()))
 }
 
 fn arg_at(i: u64) -> &'static [u8] {
@@ -717,6 +719,58 @@ pub unsafe extern "C" fn gritrt_spawn(f: extern "C" fn(*mut u8), arg: *mut u8) {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
+
+    #[test]
+    fn arguments_are_utf8_and_preserve_count_for_empty_long_and_multiple_values() {
+        let args = vec![
+            std::ffi::OsString::from("grit-program"),
+            std::ffi::OsString::from(""),
+            std::ffi::OsString::from("a".repeat(32_000)),
+            std::ffi::OsString::from("hé🙂"),
+            std::ffi::OsString::from("last"),
+        ];
+        let encoded = encode_args(args);
+        assert_eq!(encoded.len(), 5, "arg_count phải gồm argv[0]");
+        assert_eq!(encoded[1], b"");
+        assert_eq!(encoded[2].len(), 32_000);
+        assert_eq!(encoded[3], "hé🙂".as_bytes());
+        assert_eq!(encoded[4], b"last");
+        for (i, arg) in encoded.iter().enumerate() {
+            assert!(
+                std::str::from_utf8(arg).is_ok(),
+                "arg #{i} không phải UTF-8"
+            );
+        }
+        let actual = cmdline();
+        assert_eq!(gritrt_arg_count(), actual.len() as u64);
+        for (i, arg) in actual.iter().enumerate() {
+            assert_eq!(gritrt_arg_len(i as u64), arg.len() as u64);
+            assert_eq!(
+                unsafe { std::slice::from_raw_parts(gritrt_arg_ptr(i as u64), arg.len()) },
+                arg
+            );
+            assert!(std::str::from_utf8(arg).is_ok());
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn lone_surrogate_argument_is_lossily_replaced_with_valid_utf8() {
+        use std::os::windows::ffi::OsStringExt;
+        let arg = std::ffi::OsString::from_wide(&[b'a' as u16, 0xD800, b'b' as u16]);
+        let encoded = encode_args([arg]);
+        assert_eq!(encoded.len(), 1);
+        assert_eq!(std::str::from_utf8(&encoded[0]).unwrap(), "a�b");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn invalid_unix_argument_bytes_are_lossily_replaced_with_valid_utf8() {
+        use std::os::unix::ffi::OsStringExt;
+        let arg = std::ffi::OsString::from_vec(vec![b'a', 0xff, b'b']);
+        let encoded = encode_args([arg]);
+        assert_eq!(std::str::from_utf8(&encoded[0]).unwrap(), "a�b");
+    }
 
     /// A Grit empty string may cross the ABI as null + zero. Rust slices still
     /// require a non-null pointer at length zero, so these entry points must

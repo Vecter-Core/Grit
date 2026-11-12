@@ -10,12 +10,14 @@
 |---|---|---|
 | G2.0 | XONG | Không đụng `main`; bundle `grit-9359db8.bundle` và sau gate `grit-ed529c6.bundle` verify ở `.backup`; hai test G1.6 ghi trong PROGRESS; fallback `gritrt_start` fail-closed, runtime 8/8; authorship report có; gate đúng HEAD `ed529c6` GREEN 1017/0/202. |
 | G2.1 | ĐANG LÀM | `probe_diff` 20k/5 lô xanh; `GT_FULL8=1` bốn test xanh; codegen đủ sáu bộ và đột biến mục tiêu CHƯA KIỂM. |
-| G2.2–G2.7 | CHƯA KIỂM | Chưa bắt đầu. |
+| G2.2 | ĐANG LÀM | H10 thí nghiệm trên Windows xanh; sổ 13 nghi vấn đã lập; audit còn năm mục giới hạn và cần hoàn tất review độc lập + prompt Claude. |
+| G2.3–G2.7 | CHƯA KIỂM | Chưa bắt đầu. |
 
 ### G2 checkpoint (2026-11-12)
 - G2.1.a: probe_diff 20.000 seed hoàn tất; xem `docs/PROBE_DIFF_RESULTS.jsonl`; rà E04xx/A.1 CHƯA KIỂM.
 - G2.1.b: GT_FULL8 bốn test xanh; G2.1.c codegen và G2.1.d đột biến có mục tiêu CHƯA KIỂM.
 - Tiếp tục tại G2.1.c. JSONL lịch sử chưa được tính làm bằng chứng mới khi HEAD/profile/tập chưa xác minh.
+- G2.2 H10: hai test Windows mới xanh; tiếp tục hoàn thiện audit/R11 prompt Claude; Codex-authored TCB vẫn phải để trạng thái MỘT PHẦN.
 
 | ID | Việc | Trạng thái | Lệnh chạy lại / bằng chứng | Commit |
 |---|---|---|---|---|
