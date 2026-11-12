@@ -38,6 +38,10 @@ fn rk(o: Ordering) -> u64 {
     }
 }
 
+fn imp3(ab: bool, bc: bool, ac: bool) -> bool {
+    !ab || !bc || ac
+}
+
 struct B {
     body: String,
     acc: u64,
@@ -193,9 +197,11 @@ pub const HELPERS: &str = "ƒ rk(o: Ordering) → u64 ! ∅ { ⌥ o { Ordering::
 ƒ le(o: Ordering) → bool ! ∅ { ⌥ o { Ordering::Greater ↦ false, _ ↦ true } }
 ƒ imp3(ab: bool, bc: bool, ac: bool) → bool ! ∅ { ⎇ ab { ⎇ bc { ac } ⇝ { true } } ⇝ { true } }
 ƒ ou(k: u32, present: bool) → Option<u32> ! ∅ { ⎇ present { Some(k) } ⇝ { None } }
+ƒ op8(k: u8, present: bool) → Option<u8> ! ∅ { ⎇ present { Some(k) } ⇝ { None } }
 ƒ oo(k: u8, lvl: u8) → Option<Option<u8>> ! ∅ { ⎇ lvl == 0u8 { None } ⇝ { ⎇ lvl == 1u8 { Some(None) } ⇝ { Some(Some(k)) } } }
 ƒ rv(k: u32, e: u8, ok: bool) → Result<u32, u8> ! ∅ { ⎇ ok { Ok(k) } ⇝ { Err(e) } }
 ƒ rs(k: u8, e: i16, ok: bool) → Result<u8, i16> ! ∅ { ⎇ ok { Ok(k) } ⇝ { Err(e) } }
+ƒ r8(k: u8, e: u8, ok: bool) → Result<u8, u8> ! ∅ { ⎇ ok { Ok(k) } ⇝ { Err(e) } }
 ƒ dbl(x: u32) → u32 ! ∅ { x *% 2u32 }
 ƒ half(x: u32) → Option<u32> ! ∅ { ⎇ x % 2u32 == 0u32 { Some(x / 2u32) } ⇝ { None } }
 ƒ rhalf(x: u32) → Result<u32, u8> ! ∅ { ⎇ x % 2u32 == 0u32 { Ok(x / 2u32) } ⇝ { Err(7u8) } }
@@ -209,6 +215,9 @@ pub const HELPERS: &str = "ƒ rk(o: Ordering) → u64 ! ∅ { ⌥ o { Ordering::
 fn ou(k: u32, p: bool) -> Option<u32> {
     if p { Some(k) } else { None }
 }
+fn op8(k: u8, p: bool) -> Option<u8> {
+    if p { Some(k) } else { None }
+}
 fn oo(k: u8, lvl: u8) -> Option<Option<u8>> {
     match lvl {
         0 => None,
@@ -220,6 +229,9 @@ fn rv(k: u32, e: u8, ok: bool) -> Result<u32, u8> {
     if ok { Ok(k) } else { Err(e) }
 }
 fn rs(k: u8, e: i16, ok: bool) -> Result<u8, i16> {
+    if ok { Ok(k) } else { Err(e) }
+}
+fn r8(k: u8, e: u8, ok: bool) -> Result<u8, u8> {
     if ok { Ok(k) } else { Err(e) }
 }
 fn on(o: Option<u32>) -> u64 {
@@ -777,6 +789,129 @@ pub fn program(seed: u64, edge: bool, mem_only: bool) -> Prog {
             cases.len(),
             false,
         ));
+    }
+    // -------- tính chất đại số của Ord cho kiểu ghép. `==` chưa được hỗ trợ
+    // cho Option/Result/tuple; Text được cấp phát Arena nên chỉ so model ≡ LLVM.
+    // Kiểm phản xạ, đối xứng ngược và bắc cầu cho từng loại.
+    {
+        let mut b = B::new();
+        for _ in 0..(if edge { 30 } else { REPS }) {
+            let (a, ea, c, ec, d, ed) = (
+                rng.below(8) as u8,
+                rng.chance(55),
+                rng.below(8) as u8,
+                rng.chance(55),
+                rng.below(8) as u8,
+                rng.chance(55),
+            );
+            let (x, y, z) = (op8(a, ea), op8(c, ec), op8(d, ed));
+            let (gx, gy, gz) = (
+                format!("op8({a}u8, {ea})"),
+                format!("op8({c}u8, {ec})"),
+                format!("op8({d}u8, {ed})"),
+            );
+            let expr = format!(
+                "bn({gx}.cmp(&{gx}).is_eq()) + bn(rk({gx}.cmp(&{gy})) + rk({gy}.cmp(&{gx})) == 4u64) + bn(imp3(le({gx}.cmp(&{gy})), le({gy}.cmp(&{gz})), le({gx}.cmp(&{gz}))))"
+            );
+            let model = (x.cmp(&x).is_eq() as u64)
+                + ((rk(x.cmp(&y)) + rk(y.cmp(&x)) == 4) as u64)
+                + (imp3(
+                    x.cmp(&y) != Ordering::Greater,
+                    y.cmp(&z) != Ordering::Greater,
+                    x.cmp(&z) != Ordering::Greater,
+                ) as u64);
+            b.push(&expr, model, true);
+        }
+        cases.push(b.finish("Ord properties (Option<u8>)", cases.len(), false));
+    }
+    {
+        let mut b = B::new();
+        for _ in 0..(if edge { 30 } else { REPS }) {
+            let (a, c, d, e, f, g) = (
+                rng.below(8) as u8,
+                rng.below(8) as u8,
+                rng.below(8) as u8,
+                rng.below(8) as u8,
+                rng.below(8) as u8,
+                rng.below(8) as u8,
+            );
+            let (x, y, z) = ((a, c), (d, e), (f, g));
+            let (gx, gy, gz) = (
+                format!("({a}u8, {c}u8)"),
+                format!("({d}u8, {e}u8)"),
+                format!("({f}u8, {g}u8)"),
+            );
+            let expr = format!(
+                "bn({gx}.cmp(&{gx}).is_eq()) + bn(rk({gx}.cmp(&{gy})) + rk({gy}.cmp(&{gx})) == 4u64) + bn(imp3(le({gx}.cmp(&{gy})), le({gy}.cmp(&{gz})), le({gx}.cmp(&{gz}))))"
+            );
+            let model = (x.cmp(&x).is_eq() as u64)
+                + ((rk(x.cmp(&y)) + rk(y.cmp(&x)) == 4) as u64)
+                + (imp3(
+                    x.cmp(&y) != Ordering::Greater,
+                    y.cmp(&z) != Ordering::Greater,
+                    x.cmp(&z) != Ordering::Greater,
+                ) as u64);
+            b.push(&expr, model, true);
+        }
+        cases.push(b.finish("Ord properties ((u8, u8))", cases.len(), false));
+    }
+    {
+        let mut b = B::new();
+        for _ in 0..(if edge { 30 } else { REPS }) {
+            let (a, ae, ao, c, ce, co, d, de, do_) = (
+                rng.below(8) as u8,
+                rng.below(8) as u8,
+                rng.chance(50),
+                rng.below(8) as u8,
+                rng.below(8) as u8,
+                rng.chance(50),
+                rng.below(8) as u8,
+                rng.below(8) as u8,
+                rng.chance(50),
+            );
+            let (x, y, z) = (r8(a, ae, ao), r8(c, ce, co), r8(d, de, do_));
+            let (gx, gy, gz) = (
+                format!("r8({a}u8, {ae}u8, {ao})"),
+                format!("r8({c}u8, {ce}u8, {co})"),
+                format!("r8({d}u8, {de}u8, {do_})"),
+            );
+            let expr = format!(
+                "bn({gx}.cmp(&{gx}).is_eq()) + bn(rk({gx}.cmp(&{gy})) + rk({gy}.cmp(&{gx})) == 4u64) + bn(imp3(le({gx}.cmp(&{gy})), le({gy}.cmp(&{gz})), le({gx}.cmp(&{gz}))))"
+            );
+            let model = (x.cmp(&x).is_eq() as u64)
+                + ((rk(x.cmp(&y)) + rk(y.cmp(&x)) == 4) as u64)
+                + (imp3(
+                    x.cmp(&y) != Ordering::Greater,
+                    y.cmp(&z) != Ordering::Greater,
+                    x.cmp(&z) != Ordering::Greater,
+                ) as u64);
+            b.push(&expr, model, true);
+        }
+        cases.push(b.finish("Ord properties (Result<u8, u8>)", cases.len(), false));
+    }
+    {
+        let mut b = B::new();
+        for _ in 0..(if edge { 30 } else { REPS }) {
+            let (x, y, z) = (
+                STRS[rng.below(STRS.len() as u64) as usize],
+                STRS[rng.below(STRS.len() as u64) as usize],
+                STRS[rng.below(STRS.len() as u64) as usize],
+            );
+            let id = b.calls;
+            let expr = format!(
+                "{{ μpa{id} ≔ alloc.arena(); μpb{id} ≔ alloc.arena(); μpc{id} ≔ alloc.arena(); μta{id} ≔ Text::new(&pa{id}); μtb{id} ≔ Text::new(&pb{id}); μtc{id} ≔ Text::new(&pc{id}); ta{id}.push_str(\"{x}\"); tb{id}.push_str(\"{y}\"); tc{id}.push_str(\"{z}\"); bn(ta{id}.cmp(&ta{id}).is_eq()) + bn(rk(ta{id}.cmp(&tb{id})) + rk(tb{id}.cmp(&ta{id})) == 4u64) + bn(imp3(le(ta{id}.cmp(&tb{id})), le(tb{id}.cmp(&tc{id})), le(ta{id}.cmp(&tc{id})))) }}"
+            );
+            let model = (x.as_bytes().cmp(x.as_bytes()).is_eq() as u64)
+                + ((rk(x.as_bytes().cmp(y.as_bytes())) + rk(y.as_bytes().cmp(x.as_bytes())) == 4)
+                    as u64)
+                + (imp3(
+                    x.as_bytes().cmp(y.as_bytes()) != Ordering::Greater,
+                    y.as_bytes().cmp(z.as_bytes()) != Ordering::Greater,
+                    x.as_bytes().cmp(z.as_bytes()) != Ordering::Greater,
+                ) as u64);
+            b.push(&expr, model, true);
+        }
+        cases.push(b.finish("Ord properties (Text)", cases.len(), true));
     }
     cases.retain(|c| c.func.contains("alloc: &Cap<Alloc>") == mem_only);
     // đánh số lại sau khi lọc (tên hàm Grit `cN` theo vị trí mới)

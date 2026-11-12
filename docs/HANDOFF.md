@@ -1,10 +1,13 @@
 # HANDOFF — TRẠNG THÁI HIỆN TẠI (đọc tệp này đầu tiên; lịch sử ở `docs/HANDOFF_ARCHIVE.md`)
 
-**Cập nhật tại commit c200051, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit 005608c, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
-**WIP R5 (2026-11-12):** `docs/FLAKE_LLVM_SORT.jsonl` ghi 100 lần xanh cũ nhưng chạy song song 2 tiến trình, chỉ có 50 timestamp khác nhau, cùng executable và test dùng seed cố định `20261014`; các dòng này không phải 100 mẫu độc lập và không dùng làm kết luận thống kê. Chưa có lần chạy tuần tự với seed thay đổi.
+**G1.4 / R5 (2026-11-12, Windows):**
+- Flake `llvm_sort::random_arrays_with_duplicates_match_stable_sort`: 100 dòng cũ không hợp lệ làm mẫu độc lập (2 tiến trình song song, 50 timestamp, seed cố định `20261014`). Lượt mới chạy tuần tự `GT_SORT_SEED=1..100`: 100 seed duy nhất, 100 xanh, `parallel=1`, log từng lượt ở `docs/FLAKE_LLVM_SORT.jsonl`. Kết quả 0/100 tương ứng giới hạn trên xấp xỉ 3% ở mức tin cậy 95% trong mô hình nhị thức, chỉ cho tập seed đã thử; KHÔNG kết luận đã sửa/hết flake. Lỗi cổng lịch sử 1/2 chưa tái hiện.
+- `std_lib` so mô hình Rust/MIR/LLVM xanh ở `dev`, `release`, `release-o2`; mỗi dòng kiểm 35 chương trình. Bốn tính chất Ord kiểu ghép có 35 chương trình và 346 phép kiểm mỗi kiểu/profile; log `docs/STD_TEST_RESULTS.jsonl`. Thêm tính chất phản xạ, đối xứng ngược, bắc cầu; không kiểm tương quan `==` vì kiểu ghép chưa hỗ trợ `==`.
+- Đo `sortlines` và Rust `sort_by` 5 lần mỗi bản trên cùng đầu vào 33,554,438 byte (SHA-256 `0d812e95ae6f947092debce332ad8d7a1041e9715f55a398b7ad9f3cfb2cac38`); đầu ra khớp byte. Median/min: Grit 3.0055/2.8734 s; Rust 0.7741/0.7690 s. Raw log: `docs/SORTLINES_BENCHMARK.jsonl`; đây là một đầu vào/một máy, không phải benchmark tổng quát.
 
 **G1.1 bảo toàn (2026-11-12; HEAD 53e9e55):** G1.0 commit `3a94c5e`, WIP hai tệp flake commit `53e9e55`; `git push origin HEAD:refs/heads/windows-work` THÀNH CÔNG, `origin/windows-work` trỏ tới `53e9e55`, không push `main`. `git bundle create D:/Grit_backup/grit-53e9e55.bundle --all` CHƯA THÀNH CÔNG: Windows trả `Permission denied` khi tạo `.bundle.lock`; ACL `D:\Grit_backup` chỉ cho `Users`/`Authenticated Users` đọc. Ba bundle cũ còn nguyên; retention chưa chạy. Đã hết rủi ro 58 commit chỉ có trên máy đối với HEAD 53e9e55 nhờ nhánh remote; vẫn cần bundle local sau khi cấp quyền thư mục backup.
 
@@ -16,7 +19,7 @@
 
 **G1.3d policy/test (2026-11-12; commit `cc51dea`):** giữ E0313 nghiêm hơn của Windows cho intrinsic lib/core làm giá trị; chuyển các ca hiệu ứng về hàm Grit `S::mk`, intrinsic precondition sang E0313, cập nhật Vec/Text dùng `&Arena`. F-05 được cô lập bằng test chỉ bật `allow-intrinsic-values`: 13/13 xanh và nhận E0310. Kiểm mục tiêu default: gt-types capabilities 14/14, corpus 3/3, intrinsic 2/2; gt-mir corpus 3/3; expectations 969 fixtures/72 mã/245 refs; deletions 188. Cổng full và F-01..F-08 đỏ-khi-hoàn-nguyên vẫn CHƯA KIỂM.
 
-**G1.3e F-01..F-08 (2026-11-12):** đã bỏ từng sửa trong worktree tạm tại `c200051` rồi chạy hồi quy: F-01 `same_stmt` đỏ 2/3; F-02 no-default build báo E0433; F-03/F-04/F-07 corpus mất E0301 ở 9 fixture; F-05 feature test không còn E0310 (1/13 đỏ); F-06 stack depth đỏ 0/2 (exe thoát 101), đối chứng sau khôi phục 2/2; F-08 `gritc explain` cho 6 mã thoát 3 khi bỏ tài liệu và 0 khi khôi phục. Cây chính sạch sau thử. Cổng hậu merge liền mạch, R5, G1.5/G1.6 còn mở.
+**G1.3e F-01..F-08 (2026-11-12):** đã bỏ từng sửa trong worktree tạm tại `c200051` rồi chạy hồi quy: F-01 `same_stmt` đỏ 2/3; F-02 no-default build báo E0433; F-03/F-04/F-07 corpus mất E0301 ở 9 fixture; F-05 feature test không còn E0310 (1/13 đỏ); F-06 stack depth đỏ 0/2 (exe thoát 101), đối chứng sau khôi phục 2/2; F-08 `gritc explain` cho 6 mã thoát 3 khi bỏ tài liệu và 0 khi khôi phục. Cây chính sạch sau thử. R5 đã hoàn tất; cổng hậu merge liền mạch, G1.5 và G1.6 còn mở.
 
 
 ## 0. SỰ THẬT MỚI (2026-10-21; lệnh Seed 1.0 bản sửa — ĐỌC TRƯỚC)
@@ -75,7 +78,7 @@ Crate: gt-span, gt-lexer, gt-diag, gt-ast, gt-parser, gt-stack, gt-fmt, gt-resol
 
 ## 4. Điều kiện cứng còn mở / vấn đề đã biết (KHÔNG được quên)
 - GRIT_PLAN §7: #10 (69 đột biến M7), #2 (fuzz typechecker chưa có; lexer/parser 6×10 phút), #6, #8; #9 đạt có điều kiện (mục 3).
-- **Flake chưa điều tra:** `crates/gt-driver/tests/llvm_sort.rs::random_arrays_with_duplicates_match_stable_sort` đỏ 1/2 lần chạy cổng 2026-10-15, 0/2 chạy riêng, xanh ở cổng 2026-10-16 ⇒ KHÔNG phải bằng chứng; phải điều tra (việc 6.2). `tools/gate.sh` đã giữ bản sao ở `target/tmp/gate_test_last.txt`.
+- **Flake `llvm_sort`:** lỗi cổng lịch sử đỏ 1/2 lần (2026-10-15), 0/2 chạy riêng và xanh ở cổng 2026-10-16; chưa tái hiện bằng lượt R5 tuần tự 0/100 seed khác nhau. Xem mẫu giới hạn và caveat ở mục G1.4 trên; không kết luận đã sửa. `tools/gate.sh` giữ đầu ra cổng ở `target/tmp/gate_test_last.txt`.
 - **FB-3** (E0311 oan với `o: &X<'a>` trong `⊐ <'a> Tr for X<'a>`; né `&Self`): fail-closed, ưu tiên thấp. **FB-6** (`Option::unwrap` E0902 khi chưa chứng minh `is_some` với đối số không Copy): fail-closed, KHÔNG nới E0902 (dùng khớp mẫu qua tham chiếu). **FB-7** (gt-term fail-open) đã sửa.
 - KNOWN_LIMITATIONS: `Atomic<bool>`, 128-bit nhân/chia ở codegen, `Drop` người dùng chưa hạ, `spawn` thông dịch tuần tự, E1001 từ chối mọi `⚠`, lô refgen mới 62 chương trình/hồ sơ.
 - Trạng thái B: sửa fail-open gt-term/gt-effects/gt-oblig ĐÃ nằm trong git (ed3fa11, 80a949d, aa4dc20). `git stash list` rỗng (kiểm 2026-10-16): không còn stash nào, không có gì để pop.
@@ -86,7 +89,7 @@ ADR-036 hồ sơ release; ADR-037 nới điều kiện fuzz #2; ADR-038 (Arena c
 ## 6. VIỆC TIẾP THEO
 
 **▶ CHẾ ĐỘ CHẠY LIÊN TỤC (lệnh Giang 2026-10-17): ĐỌC `docs/RUNLIST.md` (R1–R12) rồi làm mục CHƯA/ĐANG đầu tiên; báo cáo từng mục ở `docs/RUN_REPORTS.md`; không dừng báo giữa chừng.**
-**▶ TRẠNG THÁI RUNLIST (2026-10-18): R1–R4 XONG; cổng liền mạch sau R3 XANH 961/0/189, bundle `grit-b97338d`. Việc kế: R5 (chạy nặng theo lô: flake llvm_sort ≥100, std release/release-o2, Ord kiểu ghép, sortlines) → R6 …R12. R3 tìm 3 lỗi thật FB-17/18/19; R4: `GRITRT_ARENA_CHECK=0` không còn tắt kiểm ở dev. Môi trường: shell Bash cần `export PATH=/d/Tools/llvm-20.1.8/bin:$PATH` để chạy exe LLVM/rig test; sau thay `runtime/gt-rt` phải `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml`; cổng khởi chạy tách bằng WMI với `C:/Program Files/Git/bin/bash.exe` (KHÔNG dùng bash.exe của WindowsApps).**
+**▶ TRẠNG THÁI RUNLIST (2026-11-12): R1–R5 XONG; R5 có 100 seed tuần tự, std dev/release/release-o2, Ord kiểu ghép và phép đo sortlines (bằng chứng ở mục G1.4). Việc của gói hiện tại: G1.5 audit mã đối kháng độc lập → G1.6 READINESS, HANDOFF/RUNLIST, cổng cuối và bundle. Các mục R6–R12 khác trong RUNLIST vẫn theo thứ tự sau gói này. R3 tìm 3 lỗi thật FB-17/18/19; R4: `GRITRT_ARENA_CHECK=0` không còn tắt kiểm ở dev. Môi trường Windows: dùng `C:\Program Files\Git\bin\bash.exe`; LLVM `D:\Tools\llvm-20.1.8\bin` trong PATH; sau thay `runtime/gt-rt` phải dựng release runtime.**
 **Kho git (R1d, đo 2026-10-17):** nhánh làm việc chuẩn là `main` (đã đổi tên từ `master` bởi commit của Giang), `origin = https://github.com/Vecter-Core/Grit.git`, `origin/main` = commit `86c4955` "Initial commit: Push full Grit project" và NẰM TRONG lịch sử `main` (tuyến tính; `main` đi trước 18+ commit). Commit `86c4955` là SNAPSHOT DỞ (chứa `needs_drop` chưa xong lúc đó) — KHÔNG dùng làm mốc xanh. Agent KHÔNG push, KHÔNG force, KHÔNG reset, KHÔNG đổi tên nhánh.
 **Sao lưu (R1e):** sau mỗi cổng xanh chạy `bash tools/backup_bundle.sh D:/Grit` (giữ 3 bản `D:/Grit_backup/grit-<hash>.bundle`, có `git bundle verify`). Sao lưu cùng ổ KHÔNG bảo vệ khỏi hỏng ổ; việc đẩy lên remote do Giang quyết.
 **Lưới toàn vẹn (R1):** `bash tools/preflight.sh D:/Grit` trước MỖI lô nặng; giai đoạn `nul` của cổng (`tools/nul_check.sh`) quét tệp văn bản được theo dõi tìm byte NUL.

@@ -170,7 +170,10 @@ fn boundary_shapes_match_stable_sort() {
 #[test]
 fn random_arrays_with_duplicates_match_stable_sort() {
     let mut seed = std::env::var("GT_SORT_SEED")
-        .map(|s| s.parse::<u64>().expect("GT_SORT_SEED must be an unsigned integer"))
+        .map(|s| {
+            s.parse::<u64>()
+                .expect("GT_SORT_SEED must be an unsigned integer")
+        })
         .unwrap_or(20261014u64);
     for case in 0..60 {
         let n = (lcg(&mut seed) % 201) as usize;
