@@ -226,3 +226,6 @@ Luật "địa chỉ chỉ làm đích gọi trực tiếp" chỉ áp cho `gritr
 
 ### FB-C29 — worker `spawn` dùng stack mặc định quá nhỏ cho chương trình hợp lệ — ĐÃ SỬA
 `gritrt_spawn` trước đây dùng `std::thread::Builder::spawn` không đặt stack; chương trình D14 có mảng cục bộ 3 MB trong worker bị kết thúc bất thường trên Windows (trả 101 qua `gritc run`). Sửa: `main` và mọi worker dùng chung `GRIT_THREAD_STACK_BYTES = 256 MiB`. Test `gt-driver/tests/stack_depth.rs::spawned_worker_large_local_array_runs_natively` đỏ trước sửa (101), xanh sau sửa (main trả 1). Giới hạn còn lại: 256 MiB mỗi thread được reserve; quá nhiều worker có thể làm cạn tài nguyên, và một worker cần hơn 256 MiB vẫn có thể bị HĐH giết.
+
+### FB-C30 — IR Guard cho phép mọi `llvm.*`, gồm intrinsic có thể phát poison — ĐÃ SỬA
+Guard coi mọi tên `llvm.*` là hợp lệ nếu LLVM verifier nhận lời gọi. `llvm.abs.i32(x, true)` là lời gọi verifier chấp nhận nhưng cờ `is_int_min_poison` có thể tạo poison. **Đo đỏ trước sửa:** `rejects_non_allowlisted_llvm_intrinsic_with_poison_flag` nhận danh sách vi phạm rỗng `[]`. Sửa: allowlist đóng chỉ gồm các intrinsic/họ độ rộng codegen hiện phát; `llvm.assume` và FMA vẫn bị luật chuyên biệt từ chối. Test đỏ→xanh; `cargo test -p gt-guard --test guard -- --test-threads=2` xanh 35/35. Đây là hardening của lớp Guard; không tìm thấy chương trình Grit hiện hành phát `llvm.abs`.

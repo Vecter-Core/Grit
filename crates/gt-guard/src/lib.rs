@@ -8,7 +8,7 @@
 //!    `gritrt_mutex_lock/unlock` ⇒ `E0502`; lời gọi runtime I/O qua `Cap` (`gritrt_arg_*`, `gritrt_fs_read`, `gritrt_file_*`, `gritrt_write_*`) ⇒ `E0310`
 //!    (nghĩa vụ capability: nguồn gốc chỉ ở `main`, hiệu ứng `io` đã kiểm). (Mức hạt: THEO LỚP nghĩa vụ, chưa theo từng điểm — KNOWN_LIMITATIONS.)
 //! 3. (b) MỌI lời gọi tới hàm `gritrt_*` phải nằm trong BẢNG [`RUNTIME`] (lớp hoặc "không cần lớp"); `gritrt_*` lạ ⇒ từ chối. Mọi lời gọi tới một hàm
-//!    chỉ khai báo (không có thân) phải là `llvm.*` hoặc nằm trong bảng; hàm ngoài khác ⇒ từ chối (không có FFI ngoài runtime).
+//!    chỉ khai báo (không có thân) phải là intrinsic LLVM trong allowlist đóng hoặc nằm trong bảng; hàm ngoài khác ⇒ từ chối (không có FFI ngoài runtime).
 //! 4. `unreachable` chỉ đúng mẫu abort: khối tên `trap.*`, lệnh ngay trước là `call @gritrt_abort` có `noreturn`.
 //! 5. Không có cờ sinh poison/UB trên số học (`nsw`/`nuw`/`exact`/fast-math/`disjoint`/`nneg`/`samesign`) và không `llvm.assume`.
 use gt_llvm::inkwell::AtomicOrdering;
@@ -119,6 +119,37 @@ fn ascii_symbol(name: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'.')
 }
 
+/// Intrinsic LLVM duy nhất mà codegen hiện được phép phát. Không dùng tiền tố `llvm.` chung:
+/// một intrinsic mới có thể mang cờ tức thời tạo poison (ví dụ `llvm.abs(..., is_int_min_poison)`;
+/// FB-C30). FMA và `llvm.assume` cố ý không nằm trong danh sách; các luật riêng tiếp tục báo
+/// lỗi cụ thể cho chúng.
+fn allowed_llvm_intrinsic(name: &str) -> bool {
+    if matches!(
+        name,
+        "llvm.sqrt.f64" | "llvm.fshl.i32" | "llvm.fshr.i32" | "llvm.memcpy.p0.p0.i64"
+    ) {
+        return true;
+    }
+
+    const WIDTHS: [&str; 6] = ["1", "8", "16", "32", "64", "128"];
+    const INTEGER_FAMILIES: [&str; 10] = [
+        "llvm.sadd.sat.i",
+        "llvm.usub.sat.i",
+        "llvm.uadd.sat.i",
+        "llvm.ssub.sat.i",
+        "llvm.sadd.with.overflow.i",
+        "llvm.uadd.with.overflow.i",
+        "llvm.ssub.with.overflow.i",
+        "llvm.usub.with.overflow.i",
+        "llvm.smul.with.overflow.i",
+        "llvm.umul.with.overflow.i",
+    ];
+    INTEGER_FAMILIES.iter().any(|prefix| {
+        name.strip_prefix(prefix)
+            .is_some_and(|width| WIDTHS.contains(&width))
+    })
+}
+
 /// Lệnh tạo ra một giá trị (inkwell phân loại người dùng theo KIỂU kết quả: `call` trả con trỏ ⇒ `PointerValue`, trả số ⇒ `IntValue`, `void` ⇒ `InstructionValue`).
 fn inst_of<'c>(v: AnyValueEnum<'c>) -> Option<InstructionValue<'c>> {
     match v {
@@ -141,8 +172,11 @@ fn runtime_address_violations(m: &Module<'_>) -> Vec<String> {
     let mut v = Vec::new();
     for f in m.get_functions() {
         let name = f.get_name().to_string_lossy().into_owned();
-        // MỌI hàm chỉ khai báo (không thân) trừ intrinsic `llvm.*` — không chỉ `gritrt_*` (FB-C27: `declare @system` + lời gọi gián tiếp lách luật đích mọi lời gọi)
-        if f.count_basic_blocks() > 0 || name.starts_with("llvm.") {
+        // MỌI hàm chỉ khai báo, trừ intrinsic LLVM trong allowlist — không chỉ `gritrt_*`
+        // (FB-C27: `declare @system` + lời gọi gián tiếp lách luật đích mọi lời gọi).
+        if f.count_basic_blocks() > 0
+            || (name.starts_with("llvm.") && allowed_llvm_intrinsic(&name))
+        {
             continue;
         }
         let fptr = f.as_global_value().as_pointer_value();
@@ -399,7 +433,7 @@ pub fn check_module(m: &Module<'_>, input: &GuardInput<'_>) -> Vec<String> {
                         )),
                     }
                 }
-                // 3b. đích của mọi lời gọi: hàm trong module (có thân), `llvm.*`, hoặc bảng RUNTIME
+                // 3b. đích của mọi lời gọi: hàm có thân, intrinsic LLVM trong allowlist, hoặc bảng RUNTIME.
                 if let Some(callee) = callee_name(&inst) {
                     let known = RUNTIME.iter().any(|(n, _)| *n == callee);
                     let defined = m
@@ -411,6 +445,10 @@ pub fn check_module(m: &Module<'_>, input: &GuardInput<'_>) -> Vec<String> {
                                 "{fname}/{bname}: lời gọi runtime `{callee}` không thuộc lớp nào (không có trong bảng RUNTIME)"
                             ));
                         }
+                    } else if callee.starts_with("llvm.") && !allowed_llvm_intrinsic(&callee) {
+                        v.push(format!(
+                            "{fname}/{bname}: LLVM intrinsic ngoài danh sách cho phép `{callee}`"
+                        ));
                     } else if !defined && !callee.starts_with("llvm.") {
                         v.push(format!(
                             "{fname}/{bname}: lời gọi hàm ngoài `{callee}` (chỉ khai báo, không phải `llvm.*` hay runtime)"

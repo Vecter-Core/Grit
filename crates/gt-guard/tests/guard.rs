@@ -407,6 +407,32 @@ fn rejects_llvm_assume() {
     assert!(has(&v, "`llvm.assume` bị cấm"), "{v:?}");
 }
 
+/// FAIL_OPEN_AUDIT G1.5: an arbitrary LLVM intrinsic can encode poison via an
+/// immediate flag. The Guard must accept only the intrinsic families emitted
+/// by this code generator, even when the LLVM verifier accepts the call.
+#[test]
+fn rejects_non_allowlisted_llvm_intrinsic_with_poison_flag() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let abs = gt_llvm::inkwell::intrinsics::Intrinsic::find("llvm.abs")
+        .expect("intrinsic")
+        .get_declaration(&w.m, &[ctx.i32_type().into()])
+        .expect("decl");
+    w.b.build_call(
+        abs,
+        &[
+            ctx.i32_type().const_int(1, false).into(),
+            ctx.bool_type().const_int(1, false).into(),
+        ],
+        "abs",
+    )
+    .expect("call");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(has(&v, "LLVM intrinsic ngoài danh sách cho phép"), "{v:?}");
+}
+
 fn declare<'c>(w: &W<'c>, name: &str, params: usize) -> FunctionValue<'c> {
     let ptr = w.ctx.ptr_type(Default::default());
     let ps: Vec<_> = (0..params).map(|_| ptr.into()).collect();
