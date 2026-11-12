@@ -1,11 +1,11 @@
 # MERGE_NOTES — claude/gallant-darwin-m251cq
 
-Cập nhật 2026-11-12: ghi nhận phân tích trước merge và trạng thái resolve. Fetch thành công; HEAD nhánh nguồn `cbe4dd2`; local main `a53f7ff`; merge-base `86c49553dcf08bb8ef301da57771bce5815ee521`; 93 commit phía nguồn. Diff tổng: 630 files changed, 23618 insertions(+), 497 deletions(-). Sau fetch: main so với origin/main ahead 62, behind 8; lệnh này merge nhánh Claude vào local main theo gói, không nhập origin/main.
+Cập nhật 2026-11-12: phân tích trước merge và resolve đã ghi. Fetch thành công; HEAD nhánh nguồn `cbe4dd2`; local main `a53f7ff`; merge-base `86c49553dcf08bb8ef301da57771bce5815ee521`; 93 commit phía nguồn. Diff tổng: 630 files changed, 23618 insertions(+), 497 deletions(-). Merge commit `c3ba7de` nằm trên `integration`; không nhập `origin/main`.
 
 ## Phạm vi và xung đột dự kiến
 - Nhánh chứa audit G1/S0, các sửa FB-C1..C27, S1–S8, std2/HashMap, Arena chia sẻ, I/O, LSP/VS Code, Linux port/CI và tài liệu.
 - Rủi ro cao: `crates/gt-borrowck/src/check.rs` (F-01 chồng vùng fn-value R2); `crates/gt-types/src/check/call.rs` (FB-C5/C6 và kiểm hiệu ứng/precondition chồng code local). Rủi ro cao tiếp: M7 `gt-oblig`, các pass/check `gt-types`, `gt-conc`, `gt-guard`, `gt-codegen-llvm`, `runtime/gt-rt`, `lib/core/prelude.gt`; docs tiến độ/ADR cũng dễ xung đột.
-- Merge `--no-ff --no-commit` trên `integration` phát sinh 26 xung đột; tất cả đã resolve/stage, không còn unmerged path hay marker. Không bỏ kiểm tra của bên nào; mã lỗi/FB/ADR trùng giữ hậu tố `-C` theo lệnh.
+- Merge `--no-ff` trên `integration` phát sinh 26 xung đột và được commit tại `c3ba7de`; không bỏ kiểm tra của bên nào; mã lỗi/FB/ADR trùng giữ hậu tố `-C` theo lệnh. Cổng hậu merge chưa chạy.
 
 ## Danh sách từng commit
 Cột test-trước chỉ ghi “có” khi subject chỉ rõ test ĐỎ trước hoặc commit đối ứng được subject nêu rõ; “chưa xác minh” không được coi là không có test. Tệp là danh sách `git diff-tree` của đúng commit.

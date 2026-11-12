@@ -102,4 +102,4 @@ Xem `docs/CAPSTONE_LOG.md`: bốn chương trình do subagent MỚI viết chỉ
 - Giữ cả hai phía trong ADR/FB/tài liệu và test. Hợp nhất `gate.sh` giữ stage NUL/gt-rt/fmt/clippy/audit/test/expect/deletions/track của Windows, thêm doc/fail-open và checkpoint từng package; `preflight.sh` giữ D≥10 GB/C≥3 GB/virtual memory≥4 GB trên Windows và thêm Linux disk/RAM; scanner giữ ledger CLI cũ và thêm baseline Seed 1.0.
 - Preflight lần đầu lỗi mã hóa CP1252 ở Python con; sau đặt `PYTHONIOENCODING=utf-8`: `PREFLIGHT_OK`, `PREFLIGHT=OK`. Kiểm công cụ: `python -m unittest tools.test_preflight tools.test_nul_scan tools.test_gate` — **30/30 OK**.
 - Bộ fail-open Seed: 468 vị trí, 0 mới; bảng phân loại đồng bộ 468 dòng. Bốn vị trí local được đọc, căn cứ/mức chứng cứ ghi tại `docs/FAIL_OPEN_AUDIT.md`.
-- Merge commit, F-01..F-08 kiểm đỏ-khi-hoàn-nguyên, cổng hậu merge, R5, G1.5 và G1.6: CHƯA XONG.
+- Merge commit `c3ba7de` đã tạo. F-01..F-08 kiểm đỏ-khi-hoàn-nguyên, cổng hậu merge, R5, G1.5 và G1.6: CHƯA XONG.
