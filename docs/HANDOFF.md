@@ -6,6 +6,7 @@
 - GT_FULL8=1: 4/4 tests xanh; hai phép nặng lần lượt 599.26s/6,929,600,568 cặp hộp và 690.44s/4,619,733,712 cặp. Memory free CHƯA KIỂM.
 - Tiếp tục: rà E04xx/A.1; G2.1.c so codegen đúng HEAD; G2.1.d mutation có mục tiêu. Mỗi commit G2 phải có `Author-Model: GPT-6` và push `HEAD:refs/heads/windows-work`.
 - G2.2 H10 trên Windows: helper `encode_args`; test rỗng/32k/Unicode/nhiều phần tử + `arg_count/arg_ptr/arg_len` và surrogate lẻ lossy UTF-8 đã xanh. Xem `docs/TCB_CODE_AUDIT.md`; sổ ghi 13 nghi vấn, năm giới hạn cần tiếp tục xác minh. R11 CHƯA ĐẠT.
+- G2.4 kiểm kê đã XONG; đủ 11/11 mục, `docs/INVENTORY.md`. Tiếp tục G2.1.c/d, G2.2, G2.3, rồi G2.5–G2.7.
 
 **Cập nhật tại commit faddecc, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 

@@ -11,7 +11,9 @@
 | G2.0 | XONG | Không đụng `main`; bundle `grit-9359db8.bundle` và sau gate `grit-ed529c6.bundle` verify ở `.backup`; hai test G1.6 ghi trong PROGRESS; fallback `gritrt_start` fail-closed, runtime 8/8; authorship report có; gate đúng HEAD `ed529c6` GREEN 1017/0/202. |
 | G2.1 | ĐANG LÀM | `probe_diff` 20k/5 lô xanh; `GT_FULL8=1` bốn test xanh; codegen đủ sáu bộ và đột biến mục tiêu CHƯA KIỂM. |
 | G2.2 | ĐANG LÀM | H10 thí nghiệm trên Windows xanh; sổ 13 nghi vấn đã lập; audit còn năm mục giới hạn và cần hoàn tất review độc lập + prompt Claude. |
-| G2.3–G2.7 | CHƯA KIỂM | Chưa bắt đầu. |
+| G2.3 | CHƯA KIỂM | Benchmark cũ cần tái tạo ở hai đường Rust và kiểm arena_overlap. |
+| G2.4 | XONG | Kiểm kê đủ 11 mục; tất cả CÓ, xem `docs/INVENTORY.md`. |
+| G2.5–G2.7 | CHƯA KIỂM | Chưa bắt đầu. |
 
 ### G2 checkpoint (2026-11-12)
 - G2.1.a: probe_diff 20.000 seed hoàn tất; xem `docs/PROBE_DIFF_RESULTS.jsonl`; rà E04xx/A.1 CHƯA KIỂM.
