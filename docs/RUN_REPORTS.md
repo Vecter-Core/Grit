@@ -8,6 +8,11 @@
 - **G2.0.e:** `tools/authorship_report.py` dùng `git blame` và phân lớp commit theo ancestry `origin/claude/gallant-darwin-m251cq` so với `0a93310..HEAD`; ghi kết quả vào `docs/AUTHORSHIP.md`. Theo phép đo trên HEAD `7080925`: 64.705 dòng TCB, 429 Codex (0,66%), 64.276 Claude; `gt-rt` 105/891 (11,78%), `gt-guard` 68/1.593 (4,27%), `gt-driver` 220/16.147 (1,36%), các nhóm khác theo bảng. Đây là phân loại commit, không suy ra model cụ thể từng dòng. Lượt đầu không có `PYTHONIOENCODING` nên lỗi console; chạy lại UTF-8 thành công.
 - **G2.0:** hoàn tất các mục áp dụng; `main` không đổi theo lệnh mới. G2.1–G2.7 tiếp tục ngay; yêu cầu gate xanh tại đúng HEAD sau G2.0 vẫn phải chạy.
 
+## G2.0 gate trên đúng đầu sau G2.0 — GREEN (2026-11-12)
+- Preflight `PREFLIGHT_OK`; gate liền mạch chạy trên HEAD `ed529c6` với Git Bash chỉ định, LLVM 20.1.8, `CARGO_BUILD_JOBS=2`. `GATE_PLATFORM=windows`, `GATE_RESULT=GREEN`.
+- Workspace `TEST_PASSED=1017 FAILED=0 SUITES=202`; gt-rt 8/8, gt-driver 174/0/42, rig 48/0/10; fmt/clippy/audit xanh (50 dependencies); 969 fixture; NUL 0/1.928; doc-test 207/0; deletions 191; fail-open 470/0 mới; track OK.
+- Bundle sau gate xanh: `D:/Grit/.backup/grit-ed529c6.bundle`, verify OK. G2.1 chưa chạy tại thời điểm ghi mục này.
+
 Quy ước: mỗi mục một tiểu mục `## R<n> — <trạng thái> (ngày)`; nêu việc đã làm, số liệu thật, lỗi thật tìm được (FB-n), cái KHÔNG làm/chưa kiểm, chỗ lệnh sai kỹ thuật + phương án fail-closed đã chọn.
 
 ## Ghi chú kỹ thuật về lệnh (không phải mục)

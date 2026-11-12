@@ -8,8 +8,9 @@
 ## Gói 2
 | Giai đoạn | Trạng thái | Bằng chứng / việc mở |
 |---|---|---|
-| G2.0 | XONG | Không đụng `main`; bundle `grit-9359db8.bundle` verify ở `.backup`; thay đổi hai test G1.6 ghi trong PROGRESS; fallback `gritrt_start` fail-closed, runtime 8/8; authorship script/report có ở `tools/authorship_report.py` và `docs/AUTHORSHIP.md`. |
-| G2.1–G2.7 | CHƯA KIỂM | Chưa bắt đầu; G2.1 trước tiên cần gate xanh trên đầu G2.0 rồi chạy lô nặng tuần tự. |
+| G2.0 | XONG | Không đụng `main`; bundle `grit-9359db8.bundle` và sau gate `grit-ed529c6.bundle` verify ở `.backup`; hai test G1.6 ghi trong PROGRESS; fallback `gritrt_start` fail-closed, runtime 8/8; authorship report có; gate đúng HEAD `ed529c6` GREEN 1017/0/202. |
+| G2.1 | ĐANG LÀM | Gate trên `ed529c6` đã xanh; bắt đầu probe_diff bản đủ, các lô tiếp theo chưa chạy. |
+| G2.2–G2.7 | CHƯA KIỂM | Chưa bắt đầu. |
 
 | ID | Việc | Trạng thái | Lệnh chạy lại / bằng chứng | Commit |
 |---|---|---|---|---|
