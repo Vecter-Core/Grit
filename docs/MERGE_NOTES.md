@@ -5,7 +5,7 @@ Cập nhật 2026-11-12: phân tích trước merge và resolve đã ghi. Fetch 
 ## Phạm vi và xung đột dự kiến
 - Nhánh chứa audit G1/S0, các sửa FB-C1..C27, S1–S8, std2/HashMap, Arena chia sẻ, I/O, LSP/VS Code, Linux port/CI và tài liệu.
 - Rủi ro cao: `crates/gt-borrowck/src/check.rs` (F-01 chồng vùng fn-value R2); `crates/gt-types/src/check/call.rs` (FB-C5/C6 và kiểm hiệu ứng/precondition chồng code local). Rủi ro cao tiếp: M7 `gt-oblig`, các pass/check `gt-types`, `gt-conc`, `gt-guard`, `gt-codegen-llvm`, `runtime/gt-rt`, `lib/core/prelude.gt`; docs tiến độ/ADR cũng dễ xung đột.
-- Merge `--no-ff` trên `integration` phát sinh 26 xung đột và được commit tại `c3ba7de`; không bỏ kiểm tra của bên nào; mã lỗi/FB/ADR trùng giữ hậu tố `-C` theo lệnh. Cổng hậu merge chưa chạy.
+- Merge `--no-ff` trên `integration` phát sinh 26 xung đột và được commit tại `c3ba7de`; không bỏ kiểm tra của bên nào; mã lỗi/FB/ADR trùng giữ hậu tố `-C` theo lệnh. Lần gate đầu bắt delimiter thiếu ở test capability (sửa `587d9be`); gate đầy đủ sau sửa đang chờ.
 
 ## Danh sách từng commit
 Cột test-trước chỉ ghi “có” khi subject chỉ rõ test ĐỎ trước hoặc commit đối ứng được subject nêu rõ; “chưa xác minh” không được coi là không có test. Tệp là danh sách `git diff-tree` của đúng commit.

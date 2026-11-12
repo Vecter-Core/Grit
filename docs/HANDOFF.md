@@ -12,6 +12,8 @@
 
 **G1.3b merge (2026-11-12):** `integration` tạo từ local `main`; nhánh Claude merge `--no-ff` thành commit `c3ba7de`; resolve 26 xung đột và giữ cả hai phía; preflight + 30 kiểm công cụ xanh; fail-open 468 vị trí / 0 mới. F-01..F-08 kiểm đỏ-khi-hoàn-nguyên và cổng hậu merge CHƯA KIỂM.
 
+**G1.3c gate lần 1 (2026-11-12):** preflight xanh; gt-rt fmt/clippy/build/test xanh 6/6; fmt/clippy workspace bắt lỗi cú pháp thật (thiếu `); }` trong test capability sau resolve). Đã sửa bằng commit `587d9be`; `cargo fmt --all --check` và gt-rt fmt check xanh. Lần chạy gate bị dừng ngay khi phát hiện lỗi; không có kết quả gate cuối. Phải chạy lại từ đầu sau preflight.
+
 
 ## 0. SỰ THẬT MỚI (2026-10-21; lệnh Seed 1.0 bản sửa — ĐỌC TRƯỚC)
 - Giang KHÔNG có máy tính; làm việc trên điện thoại/trình duyệt qua Claude Code đám mây. **origin là nguồn sự thật DUY NHẤT**; không chờ gì từ máy Windows. Container là TẠM THỜI: mọi thứ chưa push sẽ MẤT. Nhánh làm việc: `claude/gallant-darwin-m251cq` (push sau mỗi mục và ≥ mỗi 45 phút; chỉ nhánh này và tag `seed-*`; không push `main`, không force).

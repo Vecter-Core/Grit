@@ -103,3 +103,7 @@ Xem `docs/CAPSTONE_LOG.md`: bốn chương trình do subagent MỚI viết chỉ
 - Preflight lần đầu lỗi mã hóa CP1252 ở Python con; sau đặt `PYTHONIOENCODING=utf-8`: `PREFLIGHT_OK`, `PREFLIGHT=OK`. Kiểm công cụ: `python -m unittest tools.test_preflight tools.test_nul_scan tools.test_gate` — **30/30 OK**.
 - Bộ fail-open Seed: 468 vị trí, 0 mới; bảng phân loại đồng bộ 468 dòng. Bốn vị trí local được đọc, căn cứ/mức chứng cứ ghi tại `docs/FAIL_OPEN_AUDIT.md`.
 - Merge commit `c3ba7de` đã tạo. F-01..F-08 kiểm đỏ-khi-hoàn-nguyên, cổng hậu merge, R5, G1.5 và G1.6: CHƯA XONG.
+## G1.3c — CỔNG HẬU MERGE, LẦN 1 ĐỎ (2026-11-12)
+- Preflight `PREFLIGHT_OK`. Gate bắt đầu trên integration sau merge: gt-rt fmt/clippy/release build/test **6/6 OK**; fmt và clippy workspace ĐỎ do `crates/gt-types/tests/capabilities.rs` thiếu `); }` đóng test FB-16 sau khi resolve hai phía.
+- Dừng gate ngay khi phát hiện lỗi; gate chưa phát kết quả cuối và các package test workspace chưa hoàn tất. Sửa đúng lỗi cú pháp trong commit `587d9be`; kiểm lại `cargo fmt --all --check` và `cargo fmt --manifest-path runtime/gt-rt/Cargo.toml --check` đều exit 0.
+- Cổng hậu-merge phải chạy lại đầy đủ trên mã ổn định; kết quả lần 1 không được tính là GREEN.
