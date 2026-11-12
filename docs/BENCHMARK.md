@@ -46,6 +46,29 @@
 Bằng chứng an toàn của thí nghiệm B (mẫu nhỏ): `release_traps` (14 loại abort + số thực từng bit IEEE gồm bẫy FMA) 4/4, `release_guard` 4/4, `tiny_*` 3/3 + 4/4, 60 chương trình f64 và 30 chương trình abort-index đều 0 bất đồng. CHƯA chạy 1820 chương trình ở cấu hình B.
 **Vì sao KHÔNG tự bật:** backend O2 đưa TỐI ƯU MÁY (DAG-combine, cấp phát thanh ghi greedy, gộp nhánh) vào TCB ở tầng SAU Guard-post — Guard-post chỉ nhìn IR nên không thấy tầng này; chỉ còn bằng chứng hành vi dev≡release. ADR-036 chỉ duyệt danh sách pass IR. Đã ghi Q82 chờ Giang.
 
+## G2.3 — tái đo sortlines với Rust O0 và Rust `-O` (2026-11-12)
+
+Lịch sử trong `git log -- docs/BENCHMARK.md` cho thấy harness M10 đã biên dịch Rust ở cả `opt-level=0` và `-O`; hai mức phải được báo riêng. Harness tái lập mới là `tools/bench_sortlines_g2.py` (commit `5256a75`), dùng `gritc 1.0.0-rc1`, Rust 1.98.1, LLVM 20.1.8, sort ổn định `sort_by`, input tuần tự một lượt làm nóng rồi năm lượt đo. Raw có lệnh/profile, hash input/output ở `docs/SORTLINES_BENCHMARK_G2.jsonl`.
+
+| Cấu hình | G2 run A median / min | G2 run B median / min | So khớp output |
+|---|---:|---:|---|
+| Grit dev (`-O0`, Arena check động bật) | 2,8402 / 2,6747 s | 3,6890 / 3,3729 s | SHA-256 `45459d…cef51` |
+| Grit release-o2 | 1,2007 / 1,1386 s | 1,4924 / 1,2580 s | cùng SHA-256 |
+| Rust `-C opt-level=0` | 1,9651 / 1,9495 s | 2,1585 / 1,9668 s | cùng SHA-256 |
+| Rust `-O` (`opt-level=3`, cột chính) | 0,8834 / 0,8297 s | 0,8017 / 0,7773 s | cùng SHA-256 |
+
+Input là 1.636.921 dòng, 33.554.438 byte, SHA-256 `562030eb…c093aa77`; so sánh byte đầy đủ qua hash đầu ra và độ dài. Run A dùng harness commit `5256a75`, run B và probe scaling dùng `ef17563`; raw của cả hai ở `docs/SORTLINES_BENCHMARK_G2.jsonl`.
+
+Đối chiếu với G1.4: input khi đó khác (hash `0d812e…cac38`), Grit 3,0055 s median và Rust `sort_by` 0,7741 s; G2.3 đo lại 2,8402 s và 0,8834 s trên input mới. Tái dựng đúng số `~2,05 s` lịch sử không thể xác nhận vì không còn hash/input/harness cũ trong Git. Dữ liệu phù hợp với giả thuyết thay baseline từ Rust debug/O0 (~2 s) sang Rust `-O` (~0,8 s), chứ không cho thấy Grit tăng 12% ổn định; Grit dev trên hai phép đo median là 3,0055 và 2,8402 s, trong khi input và harness khác. Không lấy hai tập đó để tính một benchmark paired.
+
+### `arena_overlap` và độ phức tạp theo số dòng
+
+Đọc `examples/sortlines/src/main.gt`: Vec dòng và Vec scratch đều `reserve(nl)` một lần; Vec đầu ra `reserve(total)` một lần. Mỗi `reserve` cần một lần cấp Arena, nên số lời gọi Arena của ứng dụng gần như cố định ở ba, không một lần mỗi dòng. Trong `runtime/gt-rt/src/lib.rs`, `arena_verify` kiểm chunk và tra hai láng giềng trong `BTreeMap` (`O(log a)` theo số vùng đã cấp); với ba lần cấp, nó không tạo vòng lặp O(n) trên số dòng.
+
+Đo Grit dev ba lượt/input tăng dần (run B): 100.000 dòng (2.049.851 byte) median 0,1255 s; 400.000 (8.199.403 byte) 0,5323 s; 1.636.921 (33.554.438 byte) 2,6790 s. Thời gian mỗi dòng lần lượt 1,255 / 1,331 / 1,636 µs. Tăng nhanh hơn tuyến tính, phù hợp với sort O(n log n) cộng chi phí cấp phát/copy; không có bằng chứng Arena overlap đang cấp phát O(n) lần. Không sửa runtime vì giả thuyết O(n) allocation không được xác nhận.
+
+Giới hạn: chỉ một máy Windows, một họ dữ liệu ASCII, không có profiler tách chi phí sort/đọc/ghi. Hai run G2 khá nhiễu (Grit dev median 2,84–3,69 s); không ghép input khác nhau giữa G1.4/G2 và không dùng một lần đo để khẳng định tăng tốc tổng quát.
+
 
 ### C. CẤU HÌNH ỨNG VIÊN ĐÃ CÓ BẰNG CHỨNG: `--profile=release-o2` (đo sạch 2026-10-15, 9 lần xen kẽ, không dính hiệu ứng quét tệp)
 Cùng đầu vào như mục A/B; `BENCH_PROFILE=release-o2 python tools/bench_profile.py 9`.

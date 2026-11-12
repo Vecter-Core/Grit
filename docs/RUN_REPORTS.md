@@ -181,3 +181,10 @@ Xem `docs/CAPSTONE_LOG.md`: bốn chương trình do subagent MỚI viết chỉ
 ## G2.4 — kiểm kê (XONG, 2026-11-12)
 - Kiểm tra tệp/mã hiện hữu và ghi `docs/INVENTORY.md`: đủ 11 mục (QUICKSTART thường/cloud, sách, tham chiếu ngôn ngữ/std, AI guide, safety claims, doc_test, setup_cloud, doctor, LSP). `STD_REFERENCE` được sinh từ `tools/gen_docs.py`, có test khóa byte.
 - Không có mục THIẾU; không tạo nội dung trùng. Đây là kiểm kê tồn tại, không phải đánh giá chất lượng từng tài liệu.
+
+## G2.3 — benchmark sortlines (XONG, 2026-11-12)
+- Xem `docs/BENCHMARK.md`, harness `tools/bench_sortlines_g2.py` (commit `ef17563`) và raw `docs/SORTLINES_BENCHMARK_G2.jsonl`. Rust tham chiếu ổn định `sort_by`; Rust `-O` là opt-level 3, O0 phụ. Cùng input 1.636.921 dòng / 33.554.438 byte / SHA-256 `562030eb4062315f213557f00d3410aef4d324f0519d334f49611924c093aa77`; đầu ra 33.554.438 byte, SHA-256 giống giữa Grit dev, release-o2, Rust O0/-O.
+- Hai run, mỗi cấu hình 5 lượt sau warmup: Grit dev median 2,8402 s rồi 3,6890 s; release-o2 1,2007 rồi 1,4924 s; Rust O0 1,9651 rồi 2,1585 s; Rust -O 0,8834 rồi 0,8017 s. Dao động cho thấy nhiễu máy; không gộp run khác input/harness.
+- Xem lịch sử `git log -- docs/BENCHMARK.md`: script M10 vốn có cả Rust O0 và `-O`. Chênh lệch tỷ lệ x1,3→x3,9 phù hợp giả thuyết baseline bị đổi từ Rust debug/O0 (~2 s) sang `-O` (~0,8 s), không phải kết luận Grit chậm thêm; không thể xác nhận chính xác con số cũ ~2,05 s vì thiếu input hash/script cũ.
+- Kiểm tra source: sortlines reserve Vec dòng, scratch, output trước; khoảng ba lần gọi cấp phát Arena, không mỗi dòng. `arena_verify` tìm neighbor trong BTreeMap. Scaling dev trên 100k/400k/1.636921 dòng: median 0,1255/0,5323/2,6790 s; raw có hash và runs. Hành vi phù hợp n log n sorting, không có bằng chứng O(n) Arena allocations; không sửa runtime.
+- Hai lần dựng đo đầu không tính: binary `gritc` cũ thiếu hỗ trợ std API hiện tại; lần sau thiếu LLVM-C.dll trên PATH. Đã rebuild `gritc`, đưa mọi `.gt` của sortlines và std vào cùng đồ thị phẳng, đặt PATH LLVM, chạy lại thành công; lỗi ban đầu là cấu hình harness, không phải Grit source.
