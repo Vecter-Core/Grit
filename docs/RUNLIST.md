@@ -9,16 +9,16 @@
 | Giai đoạn | Trạng thái | Bằng chứng / việc mở |
 |---|---|---|
 | G2.0 | XONG | Không đụng `main`; bundle `grit-9359db8.bundle` và sau gate `grit-ed529c6.bundle` verify ở `.backup`; hai test G1.6 ghi trong PROGRESS; fallback `gritrt_start` fail-closed, runtime 8/8; authorship report có; gate đúng HEAD `ed529c6` GREEN 1017/0/202. |
-| G2.1 | ĐANG LÀM | `probe_diff` 20k/5 lô và `GT_FULL8=1` bốn test xanh; fn_value 256 dev + 128 release-o2 xanh; các bộ còn lại và mutation CHƯA KIỂM. |
+| G2.1 | ĐANG LÀM | Probe 20k và GT_FULL8 xanh; sáu bộ codegen dev/release-o2 đã chạy, mismatch 0; 8 mutation mục tiêu, 7 killed và 1 survivor gt-term; E04xx/A.1 scan còn CHƯA RÀ 95. |
 | G2.2 | ĐANG LÀM | H10 thí nghiệm trên Windows xanh; sổ 13 nghi vấn đã lập; audit còn năm mục giới hạn và cần hoàn tất review độc lập + prompt Claude. |
 | G2.3 | XONG | Grit dev/release-o2 và Rust O0/-O đo trên cùng input; 2 run và scaling raw được ghi ở `docs/SORTLINES_BENCHMARK_G2.jsonl`; không thấy O(n) lần cấp Arena. |
 | G2.4 | XONG | Kiểm kê đủ 11 mục; tất cả CÓ, xem `docs/INVENTORY.md`. |
 | G2.5–G2.7 | CHƯA KIỂM | Chưa bắt đầu. |
 
 ### G2 checkpoint (2026-11-12)
-- G2.1.a: probe_diff 20.000 seed hoàn tất; xem `docs/PROBE_DIFF_RESULTS.jsonl`; rà E04xx/A.1 CHƯA KIỂM.
-- G2.1.b: GT_FULL8 bốn test xanh; G2.1.c codegen và G2.1.d đột biến có mục tiêu CHƯA KIỂM.
-- Tiếp tục tại G2.1.c. JSONL lịch sử chưa được tính làm bằng chứng mới khi HEAD/profile/tập chưa xác minh.
+- G2.1.a: probe_diff 20.000 seed/5 lô; GT_FULL8 bốn test; sáu suite codegen dev/release-o2 có log tại `docs/*CODEGEN*RESULTS.jsonl`, 0 mismatch (xem RUN_REPORTS để biết số chương trình và nhóm đỏ kỳ vọng).
+- G2.1.d: 8 mutation records; 7 killed, một survivor `gt-term/src/lib.rs:361` chưa giải thích; đột biến đối ứng ở dòng 685 bị bắt. Rà E04xx/A.1 CHƯA RÀ 95; G2.1 chưa hoàn tất.
+- Tiếp tục G2.1 với survivor và scan; sau đó G2.2/G2.5–G2.7. JSONL lịch sử cũ không dùng làm bằng chứng mới.
 - G2.2 H10: hai test Windows mới xanh; tiếp tục hoàn thiện audit/R11 prompt Claude; Codex-authored TCB vẫn phải để trạng thái MỘT PHẦN.
 
 | ID | Việc | Trạng thái | Lệnh chạy lại / bằng chứng | Commit |

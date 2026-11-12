@@ -4,11 +4,11 @@
 - Nhánh `integration`; `main` chưa đụng. `windows-work` đã push tới `6bfc40c`; log G2.1 đang ghi, chưa commit/push.
 - probe_diff: 20.000 seed độc lập theo range 0..19999, 5 lô tuần tự; edge violations=0; mutant 361/591/554 mỗi mutant `i=0`; đối chứng 238 `i=277`; xem `docs/PROBE_DIFF_RESULTS.jsonl`.
 - GT_FULL8=1: 4/4 tests xanh; hai phép nặng lần lượt 599.26s/6,929,600,568 cặp hộp và 690.44s/4,619,733,712 cặp. Memory free CHƯA KIỂM.
-- Tiếp tục: rà E04xx/A.1; G2.1.c so codegen đúng HEAD; G2.1.d mutation có mục tiêu. Mỗi commit G2 phải có `Author-Model: GPT-6` và push `HEAD:refs/heads/windows-work`.
+- Tiếp tục: sáu suite codegen đã chạy ở dev/release-o2 trên `a58a141`: fn_value 256/128, obgen 91/54 (25 green wanted mỗi profile; red gate 66/29), abort-targeted 25×150/25×150, refpat 25/25, GTV 25/25, std 43 seed ×2 mode; mismatch 0. Mutation: 8 records, 7 killed, còn survivor `gt-term/src/lib.rs:361` chưa giải thích; dòng 685 bị bắt. `fail_open_scan.py check` hiện báo 95 mục CHƯA RÀ, dù 0 nghi vấn pending. G2.1 chưa hoàn tất. Mỗi commit G2 phải có `Author-Model: GPT-6` và push `HEAD:refs/heads/windows-work`.
 - G2.2 H10 trên Windows: helper `encode_args`; test rỗng/32k/Unicode/nhiều phần tử + `arg_count/arg_ptr/arg_len` và surrogate lẻ lossy UTF-8 đã xanh. Xem `docs/TCB_CODE_AUDIT.md`; sổ ghi 13 nghi vấn, năm giới hạn cần tiếp tục xác minh. R11 CHƯA ĐẠT.
 - G2.4 kiểm kê đã XONG; đủ 11/11 mục, `docs/INVENTORY.md`. Tiếp tục G2.1.c/d, G2.2, G2.3, rồi G2.5–G2.7.
 - G2.3 benchmark sortlines đã XONG: hai bộ số Grit dev/release-o2 và Rust O0/-O trên cùng input; raw/harness tại `docs/SORTLINES_BENCHMARK_G2.jsonl` / `tools/bench_sortlines_g2.py`. Đọc phân tích và giới hạn trong `docs/BENCHMARK.md`.
-- G2.1.c: `fn_value_gen` profile được qua `GT_PROFILE`; dev 256 (139 khớp, 117 ĐỎ kỳ vọng), release-o2 128 (82 khớp, 46 ĐỎ kỳ vọng), mismatch 0. Ghi tại `docs/G2_CODEGEN_DIFF_RESULTS.jsonl`; tiếp tục đủ các bộ còn lại/mutation.
+- G2.1.c: sáu bộ ở dev/release-o2 có mismatch 0; chi tiết mới ở `docs/G2_CODEGEN_DIFF_RESULTS.jsonl`, `docs/CODEGEN_DIFF_RESULTS.jsonl`, `docs/RELEASE_O2_DIFF_RESULTS.jsonl`. G2.1.d còn survivor mutation và E04xx/A.1 scan.
 
 **Cập nhật tại commit faddecc, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 

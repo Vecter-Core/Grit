@@ -1,0 +1,1 @@
+{"id": "29ca1b4c8221", "file": "crates/gt-types/src/check/call.rs", "line": 489, "rule": "bỏ phủ định", "old": "if !named_item {", "new": "if named_item {", "status": "killed", "note": "", "source": "tự động"}

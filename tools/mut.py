@@ -74,7 +74,7 @@ IF_RE = re.compile(r"^(\s*(?:\} else )?)if (?!let )(.+?) \{\s*$")
 
 # xoá nguyên một câu lệnh (một dòng) có tác dụng phụ lên bảng/tập
 DELETE_RE = re.compile(
-    r"^(\s*)((self|out|v|acc|res|work|ls|us|stack)\b[\w\.\[\]]*\.(push|insert|remove|extend|union_with|subtract|clear|add_region|constrain|relate)\(.*\)\??;)\s*$"
+    r"^(\s*)((self|out|v|acc|res|work|ls|us|stack|ops)\b[\w\.\[\]]*\.(push|insert|remove|extend|union_with|subtract|clear|add_region|constrain|relate)\(.*\)\??;)\s*$"
 )
 
 
@@ -106,7 +106,17 @@ def gen_file(path):
     in_test = False
     for ln, line in enumerate(lines):
         if "#[cfg(test)]" in line:
-            in_test = True
+            # `#[cfg(test)]` may guard a statement inside production code as
+            # well as a test item. Only enter test-skip mode for a following
+            # item; otherwise a local fault-injection branch would hide every
+            # production line later in the file from mutation generation.
+            for candidate in lines[ln + 1 :]:
+                t = candidate.strip()
+                if not t or t.startswith("#["):
+                    continue
+                if t.startswith(("fn ", "pub fn ", "async fn ", "mod ", "pub mod ")):
+                    in_test = True
+                break
         if skip_line(line, in_test):
             continue
         code = code_part(line)
@@ -162,7 +172,7 @@ class Worker:
         os.makedirs(self.dir, exist_ok=True)
         for item in ("Cargo.toml", "Cargo.lock"):
             shutil.copy(os.path.join(ROOT, item), self.dir)
-        for d in ("crates", "tests", "lib", "docs", "examples"):
+        for d in ("crates", "tests", "lib", "docs", "examples", "runtime"):
             src, dst = os.path.join(ROOT, d), os.path.join(self.dir, d)
             if os.path.isdir(src):
                 shutil.rmtree(dst, ignore_errors=True)
