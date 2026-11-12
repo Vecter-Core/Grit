@@ -1,5 +1,9 @@
 * text=auto eol=lf
 *.gt text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
 *.tokens text eol=lf
 *.ebnf text eol=lf
 *.md text eol=lf

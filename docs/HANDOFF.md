@@ -2,6 +2,10 @@
 
 **Cập nhật tại commit bcec465, ngày 2026-10-18.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
+**Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
+
+**WIP R5 (2026-11-12):** `docs/FLAKE_LLVM_SORT.jsonl` ghi 100 lần xanh cũ nhưng chạy song song 2 tiến trình, chỉ có 50 timestamp khác nhau, cùng executable và test dùng seed cố định `20261014`; các dòng này không phải 100 mẫu độc lập và không dùng làm kết luận thống kê. Chưa có lần chạy tuần tự với seed thay đổi.
+
 ## 1. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ (`.gt`) thiết kế cho AI viết code; ký hiệu toán/logic ngắn (có bí danh ASCII). Chủ dự án **Giang** — trả lời bằng TIẾNG VIỆT.
 2. Compiler `gritc` viết bằng **Rust**, workspace `D:\Grit`, các crate `gt-*` + `rig` (trình quản lý gói) + `runtime/gt-rt` (workspace riêng).
