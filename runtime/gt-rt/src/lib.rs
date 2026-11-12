@@ -60,16 +60,16 @@ pub extern "C" fn gritrt_exit(code: u32) -> ! {
     std::process::exit(i32::try_from(code.min(255)).unwrap_or(255))
 }
 
-/// Ngăn xếp của luồng chạy `main`: 256 MiB (chỉ giữ chỗ địa chỉ; trang được cấp khi chạm tới). Ngăn xếp mặc định của tiến trình (1 MiB ở Windows,
-/// 8 MiB ở Linux) quá nhỏ cho chương trình HỢP LỆ và đã được M8 chứng minh dừng (đệ quy sâu có `↓`, mảng lớn cục bộ) — chúng bị HĐH giết và
-/// bị báo như lỗi nội bộ (F-06 của bộ kiểm toán). Tràn quá 256 MiB vẫn là giới hạn tài nguyên của chương trình (docs/KNOWN_LIMITATIONS.md).
-const MAIN_STACK_BYTES: usize = 256 << 20;
+/// Ngăn xếp cho `main` và mỗi worker `spawn`: 256 MiB (chỉ giữ chỗ địa chỉ; trang được cấp khi chạm tới). Ngăn xếp mặc định của HĐH
+/// quá nhỏ cho chương trình HỢP LỆ và đã được M8 chứng minh dừng (đệ quy sâu có `↓`, mảng lớn cục bộ) — chúng bị HĐH giết và
+/// bị báo như lỗi nội bộ. Tràn quá 256 MiB vẫn là giới hạn tài nguyên của chương trình (docs/KNOWN_LIMITATIONS.md).
+const GRIT_THREAD_STACK_BYTES: usize = 256 << 20;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_start(main: extern "C" fn()) -> i32 {
     match std::thread::Builder::new()
         .name("grit-main".to_string())
-        .stack_size(MAIN_STACK_BYTES)
+        .stack_size(GRIT_THREAD_STACK_BYTES)
         .spawn(move || main())
     {
         // `panic = "abort"` nên `join` chỉ Err khi luồng chết bất thường; không để lỗi đó thành "thành công"
@@ -687,10 +687,12 @@ pub extern "C" fn gritrt_alloc(size: u64) -> *mut u8 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gritrt_spawn(f: extern "C" fn(*mut u8), arg: *mut u8) {
     let a = Arg(arg);
-    let r = std::thread::Builder::new().spawn(move || {
-        let a = a;
-        f(a.0);
-    });
+    let r = std::thread::Builder::new()
+        .stack_size(GRIT_THREAD_STACK_BYTES)
+        .spawn(move || {
+            let a = a;
+            f(a.0);
+        });
     if r.is_err() {
         gritrt_abort(0);
     }

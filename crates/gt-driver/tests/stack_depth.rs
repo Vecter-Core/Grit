@@ -1,5 +1,5 @@
 //! Chương trình HỢP LỆ và đã được M8 chứng minh dừng không được chết vì ngăn xếp mặc định của tiến trình (1 MiB Windows / 8 MiB Linux):
-//! `gt-rt` chạy `main` trên luồng 256 MiB (F-06). Trước đó đệ quy sâu có `↓` và mảng lớn cục bộ bị HĐH giết và bị báo là lỗi nội bộ (mã 2).
+//! `gt-rt` chạy `main` và worker trên luồng 256 MiB. Trước đó đệ quy sâu có `↓` và mảng lớn cục bộ bị HĐH giết và bị báo là lỗi nội bộ (mã 2).
 #![cfg(feature = "llvm")]
 use std::process::Command;
 
@@ -41,4 +41,25 @@ fn large_local_array_runs_natively() {
     );
     assert_eq!(code, Some(0), "{out}");
     assert!(out.contains("main trả về 7"), "{out}");
+}
+
+#[test]
+fn spawned_worker_large_local_array_runs_natively() {
+    let (code, out) = run(
+        "spawn-arr",
+        "■ DONE: Atomic<u32> ≔ Atomic::new(0u32);\n\
+         ƒ big(n: u32) ! ∅ {\n\
+           μa ≔ [0u8; 3000000];\n\
+           a[2999999usize] ← 1u8;\n\
+           DONE.fetch_add(a[2999999usize] as u32, AtomicOrdering::SeqCst);\n\
+         }\n\
+         ƒ main() → u32 ! ∅ {\n\
+           spawn(big, 0u32);\n\
+           μspin ≔ 0u64;\n\
+           ⟳ spin < 3000000000u64 ∧ DONE.load(AtomicOrdering::SeqCst) < 1u32 ↓ 3000000000u64 - spin { spin ← spin + 1u64; }\n\
+           DONE.load(AtomicOrdering::SeqCst)\n\
+         }\n",
+    );
+    assert_eq!(code, Some(0), "{out}");
+    assert!(out.contains("main trả về 1"), "{out}");
 }
