@@ -1,0 +1,179 @@
+// csvstat [FILE|-] : thống kê từng cột CSV
+
+ƒ count_commas(line: &[u8]) → u64 ! ∅ {
+  n ≔ line.len();
+  μi ≔ 0usize;
+  μc ≔ 0u64;
+  ⟳ i < n {
+    ⎇ line[i] == 44u8 { c ← c + 1u64; } ⇝ { }
+    i ← i + 1usize;
+  }
+  c
+}
+
+// i64 hợp lệ: tuỳ chọn '-', 1..19 chữ số, vừa i64
+ƒ parse_field(f: &[u8]) → Option<i64> ! ∅ {
+  n ≔ f.len();
+  neg_len ≔ ⎇ n > 0usize ∧ f[0usize] == 45u8 { 1usize } ⇝ { 0usize };
+  ⎇ n < neg_len + 1usize ∨ n > neg_len + 19usize {
+    None
+  } ⇝ {
+    ⌥ f.parse_i64() { Ok(v) ↦ Some(v), Err(_) ↦ None, }
+  }
+}
+
+ƒ main() ! {io, div, mem} {
+  out ≔ root_out();
+  err ≔ root_err();
+  env ≔ root_env();
+  fs ≔ root_fs();
+  inp ≔ root_in();
+  argc ≔ env.arg_count();
+  ⎇ argc > 2usize {
+    err.write_str("usage: csvstat [FILE|-]\n");
+    core::exit(2u32)
+  } ⇝ { }
+  use_stdin ≔ argc < 2usize ∨ env.arg(1usize) == "-";
+  data ≔ ⎇ use_stdin {
+    ⌥ inp.read_all() { Ok(f) ↦ f.bytes(), Err(_) ↦ "".as_bytes(), }
+  } ⇝ {
+    ⌥ fs.open(env.arg(1usize)) {
+      Ok(f) ↦ f.bytes(),
+      Err(_) ↦ {
+        err.write_str("csvstat: cannot read ");
+        err.write_str(env.arg(1usize));
+        err.write_str("\n");
+        core::exit(2u32)
+      },
+    }
+  };
+  n ≔ data.len();
+  ⎇ n == 0usize { core::exit(0u32) } ⇝ { }
+  hend ≔ data.find_byte_or_end(0usize, 10u8);
+  hdr ≔ &data[0usize..hend];
+  kk ≔ count_commas(hdr) + 1u64;
+  k ≔ kk as usize;
+
+  μar ≔ Arena::new();
+  μisnumv ≔ Vec::new(&ar);
+  μcntv ≔ Vec::new(&ar);
+  μsumv ≔ Vec::new(&ar);
+  μminv ≔ Vec::new(&ar);
+  μmaxv ≔ Vec::new(&ar);
+  μq ≔ 0usize;
+  ⟳ q < k {
+    isnumv.push(1u8);
+    cntv.push(0u64);
+    sumv.push(0i64);
+    minv.push(0i64);
+    maxv.push(0i64);
+    q ← q + 1usize;
+  }
+  μisnum ≔ isnumv.as_mut_slice();
+  μcnt ≔ cntv.as_mut_slice();
+  μsum ≔ sumv.as_mut_slice();
+  μmin ≔ minv.as_mut_slice();
+  μmax ≔ maxv.as_mut_slice();
+
+  μpos ≔ hend + 1usize;
+  μlineno ≔ 1u64;
+  ⟳ pos < n ↓ n - pos {
+    end ≔ data.find_byte_or_end(pos, 10u8);
+    line ≔ &data[pos..end];
+    lineno ← lineno + 1u64;
+    pos ← end + 1usize;
+    ll ≔ line.len();
+    ⎇ ll > 0usize {
+      fc ≔ count_commas(line) + 1u64;
+      ⎇ fc != kk {
+        err.write_str("csvstat: line ");
+        err.write_u64(lineno);
+        err.write_str(": expected ");
+        err.write_u64(kk);
+        err.write_str(" fields, found ");
+        err.write_u64(fc);
+        err.write_str("\n");
+        core::exit(1u32)
+      } ⇝ { }
+      μfp ≔ 0usize;
+      μc ≔ 0usize;
+      ⟳ fp <= ll ↓ ll + 1usize - fp {
+        fe ≔ line.find_byte_or_end(fp, 44u8);
+        field ≔ &line[fp..fe];
+        ⎇ isnum[c] == 1u8 {
+          ⌥ parse_field(field) {
+            Some(v) ↦ {
+              ⌥ sum[c] +? v {
+                Some(s) ↦ {
+                  ⎇ cnt[c] == 0u64 {
+                    min[c] ← v;
+                    max[c] ← v;
+                  } ⇝ {
+                    ⎇ v < min[c] { min[c] ← v; } ⇝ { }
+                    ⎇ v > max[c] { max[c] ← v; } ⇝ { }
+                  }
+                  sum[c] ← s;
+                  cnt[c] ← cnt[c] + 1u64;
+                },
+                None ↦ {
+                  err.write_str("csvstat: line ");
+                  err.write_u64(lineno);
+                  err.write_str(": overflow\n");
+                  core::exit(1u32)
+                },
+              }
+            },
+            None ↦ { isnum[c] ← 0u8; },
+          }
+        } ⇝ { }
+        c ← c + 1usize;
+        fp ← fe + 1usize;
+      }
+    } ⇝ { }
+  }
+
+  μov ≔ Vec::new(&ar);
+  μnp ≔ 0usize;
+  μcol ≔ 0usize;
+  hl ≔ hdr.len();
+  ⟳ np <= hl ↓ hl + 1usize - np {
+    ne ≔ hdr.find_byte_or_end(np, 44u8);
+    ov.extend_from_slice(&hdr[np..ne]);
+    ov.push_str(": ");
+    ⎇ isnum[col] == 0u8 {
+      ov.push_str("non-numeric");
+    } ⇝ {
+      ⎇ cnt[col] == 0u64 {
+        ov.push_str("count=0");
+      } ⇝ {
+        cn ≔ cnt[col];
+        s ≔ sum[col];
+        neg ≔ s < 0i64;
+        mag ≔ ⎇ neg { ((0i64 - (s + 1i64)) as u64) + 1u64 } ⇝ { s as u64 };
+        mq ≔ mag / cn;
+        mr ≔ mag % cn;
+        frac ≔ mr * 10000u64 / cn;
+        ov.push_str("count=");
+        ov.push_u64(cn);
+        ov.push_str(" sum=");
+        ov.push_i64(s);
+        ov.push_str(" min=");
+        ov.push_i64(min[col]);
+        ov.push_str(" max=");
+        ov.push_i64(max[col]);
+        ov.push_str(" mean=");
+        ⎇ neg { ov.push_str("-"); } ⇝ { }
+        ov.push_u64(mq);
+        ov.push_str(".");
+        ov.push_u64(frac / 1000u64);
+        ov.push_u64(frac / 100u64 % 10u64);
+        ov.push_u64(frac / 10u64 % 10u64);
+        ov.push_u64(frac % 10u64);
+      }
+    }
+    ov.push_str("\n");
+    col ← col + 1usize;
+    np ← ne + 1usize;
+  }
+  out.write_bytes(ov.as_slice());
+}

@@ -1,0 +1,14 @@
+// Static init chạy một hàm tạo luồng; luồng đọc static Z (chưa khởi tạo) và ghi vào RES.
+■ RES: Atomic<u32> ≔ Atomic::new(0u32);
+■ Z: u32 ≔ 9u32;
+ƒ worker(n: u32) ! ∅ { RES.store(Z + 100u32, AtomicOrdering::SeqCst); }
+ƒ mk() → u32 ! ∅ {
+  spawn(worker, 1u32);
+  μspin ≔ 0u64;
+  ⟳ spin < 2000000000u64 ∧ RES.load(AtomicOrdering::SeqCst) == 0u32 ↓ 2000000000u64 - spin {
+    spin ← spin + 1u64;
+  }
+  RES.load(AtomicOrdering::SeqCst)
+}
+■ A: u32 ≔ mk();
+ƒ main() → u32 ! ∅ { A }

@@ -1,0 +1,4 @@
+// expect: fail E0404
+// note: S1.i — hàm hai tham chiếu trả một trong hai, gọi qua giá trị: kết quả coi như mượn từ MỌI đối số
+ƒ pick<'a>(a: &'a i32, b: &'a i32) → &'a i32 ! ∅ { a }
+ƒ main() → i32 ! ∅ { f ≔ pick; x ≔ 1; μr ≔ &x; ⎇ true { y ≔ 2; r ← f(&x, &y); } *r }

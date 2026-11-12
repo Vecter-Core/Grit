@@ -1,0 +1,4 @@
+// probe: accept
+// why: đối chứng dương: main nhận capability gốc và truyền xuống
+ƒ w(o: &Cap<Out>) ! {io} { o.write_u64(7); }
+ƒ main() → i32 ! {io} { o ≔ root_out(); w(&o); 0 }

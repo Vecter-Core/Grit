@@ -10,7 +10,14 @@
 
 **G1.2 baseline (2026-11-12, trên HEAD fbeb861):** gate liền mạch `bash tools/gate.sh D:/Grit` ⇒ `GATE_RESULT=GREEN`, `TEST_PASSED=961 FAILED=0 SUITES=189`; NUL `1431` tệp; gt-rt fmt/clippy/release build/tests xanh (6/6); fmt `FMT_OK`; clippy `CLIPPY_EXIT=0`; audit `AUDIT_EXIT=0` (50 dependency); expectations 913 `.gt` (463 fail, 13 warn, 411 pass, 8 lexer), 72 mã/246 tham chiếu; các unittest expectations/mut_guard/preflight/nul/gate xanh; `DELETIONS_OK` (6), `TRACK_OK`. Test `random_arrays_with_duplicates_match_stable_sort` xanh trong 92.18 giây ở baseline. Sau cổng, bundle chưa thể tạo do ACL `D:\Grit_backup`; không gọi cổng này là đã bundle.
 
-**G1.3a fetch (2026-11-12):** `git fetch origin` thành công; `origin/claude/gallant-darwin-m251cq` = `cbe4dd2`, 93 commit từ merge-base `86c4955`, diff 630 file (+23,618/−497). Sau fetch local `main` là ahead 62 / behind 8 so với `origin/main`; gói chỉ yêu cầu merge nhánh Claude vào local main. Per-commit map mục đích/tệp/rủi ro/test-trước nằm ở `docs/MERGE_NOTES.md`. Chưa tạo nhánh integration/chưa merge.
+
+## 0. SỰ THẬT MỚI (2026-10-21; lệnh Seed 1.0 bản sửa — ĐỌC TRƯỚC)
+- Giang KHÔNG có máy tính; làm việc trên điện thoại/trình duyệt qua Claude Code đám mây. **origin là nguồn sự thật DUY NHẤT**; không chờ gì từ máy Windows. Container là TẠM THỜI: mọi thứ chưa push sẽ MẤT. Nhánh làm việc: `claude/gallant-darwin-m251cq` (push sau mỗi mục và ≥ mỗi 45 phút; chỉ nhánh này và tag `seed-*`; không push `main`, không force).
+- Nền chính: **Linux container** (x86_64, LLVM 20.1.2 hệ thống `libLLVM-20.so`). **Windows: chưa kiểm** sau các thay đổi của nhánh này — ghi ở MỌI báo cáo cổng. Các quy tắc riêng Windows (paging file, WinError 1455, TEMP ở D:, thử lại LNK1104) bị bỏ ở nhánh này; giữ: không chạy hai cargo cùng lúc, job theo `nproc` (tối đa 4), lô nặng ≤ 10 phút có `--resume`.
+- Bản Windows của Giang có thể tiến xa hơn origin (báo cáo gần nhất: cổng 943 test, FB-15, E0313, `fn_value_gen`, oracle match 13 kiểu) và CHƯA lên origin: xem `docs/MERGE_NOTES.md` (tiền tố FB-C / ADR-C để không trùng số).
+- Kế hoạch: `docs/SEED_PLAN.md` (mục tiêu SEED 1.0 gồm sáu mục đo được); danh sách việc: `docs/RUNLIST.md`; báo cáo từng mục: `docs/RUN_REPORTS.md`.
+- Quan hệ nhánh: `origin/main` = `86c4955` ("Initial commit: Push full Grit project" — snapshot dở, KHÔNG dùng làm mốc xanh); `claude/gallant-darwin-m251cq` đi từ đó với các commit kiểm toán ngoài + sửa FB-C1…FB-C8. Không có nhánh nào khác trên origin.
+- Bảng CÓ/THIẾU lúc 2026-10-21: có `docs/DELETIONS.md`, `docs/FAIL_OPEN_AUDIT.md`, `tools/track_guard.sh`, `.claude/skills/grit-contract.md`, mã `E0313` (nghĩa trong repo này: "kiểu lang dùng sai" — có thể KHÁC E0313 của bản Windows, xem MERGE_NOTES), ADR-041; THIẾU (đã TẠO MỚI ở S0) `docs/RUNLIST.md`, `docs/INTRINSIC_AS_VALUE.md`, `tools/preflight.sh`.
 
 ## 1. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ (`.gt`) thiết kế cho AI viết code; ký hiệu toán/logic ngắn (có bí danh ASCII). Chủ dự án **Giang** — trả lời bằng TIẾNG VIỆT.
@@ -100,3 +107,10 @@ ADR-036 hồ sơ release; ADR-037 nới điều kiện fuzz #2; ADR-038 (Arena c
 - **Kiểm corpus:** `PYTHONIOENCODING=utf-8 python tools/check_expectations.py`.
 - **Chèn lỗi:** `GRITC_FAULT=panic:<pass>|skip:<pass>|types:select-impl|ir:*|post:*|mir:pat-*`.
 - **LNK1104** thoáng qua (quét exe của Windows Defender) ⇒ chạy lại; **WinError 1455** = thiếu bộ nhớ ảo. Công cụ: rustc/cargo 1.98.1, MSVC VS 2022, Python 3.12, git-bash + PowerShell.
+
+## 7. Kiểm toán ngoài 2026-10-20 và các sửa đã làm (Giang ủy quyền tự duyệt; KHÔNG đổi READINESS/TCB — chờ cổng liền mạch xanh trên Windows)
+Kiểm toán chạy từ container Linux (kết quả đầy đủ: `audit/RESULTS.md`, `audit/ANALYSIS.md` trên nhánh làm việc). Đã sửa (mỗi mục có mẫu corpus/test khoá lại):
+- **F-01 (nghiêm trọng)**: M6 không thấy nhiều toán hạng cùng một câu lệnh (`(b, b)`, `two(b, b)`…) ⇒ `check_uses` áp move ngay sau mỗi truy cập; `tests/same_stmt.rs`, 14 mẫu `E0401_{same_stmt,dup}_*`. **Chưa làm**: kịch bản `dup_operand` cho `progen` của oracle động (oracle hiện chưa tự phát hiện lớp lỗi này) + kiểm bằng đột biến vùng `check_uses`.
+- F-02 `gritc --no-default-features` dựng được; F-03 kiểu chứa chính nó theo giá trị ⇒ E0301; F-04 `[T]`/`str` theo giá trị ⇒ E0301; F-05 gọi nguồn capability qua giá trị hàm ⇒ E0310; F-06 `main` chạy trên luồng 256 MiB; F-07 tên biến ở vị trí kiểu ⇒ E0301 (không còn ICE); F-08 tài liệu E1201–E1204/E1301/E9901.
+- Port **Linux x86_64** (LLVM thật, `libgt_rt.a`, `cc`), `ci.yml` + `deny.toml` (CHƯA chạy trên GitHub).
+**Còn mở / cần Giang quyết**: D4 vòng qua `⌥ a { 1.5 ↦ … }` (so sánh số thực ngầm; ADR-018 cho phép với `_`); alias vòng không dùng không bị báo (vô hại); các mục "rủi ro đọc mã" ở `audit/ANALYSIS.md` §4; chạy `bash tools/gate.sh` đầy đủ + đột biến + fuzz 24 h trên máy Windows.

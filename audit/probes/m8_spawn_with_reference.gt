@@ -1,0 +1,4 @@
+// probe: reject E0501
+// why: E0501: spawn truyền tham chiếu
+ƒ worker(r: &i32) ! ∅ { }
+ƒ main() → i32 ! {detach} { x ≔ 1; spawn(worker, &x); 0 }

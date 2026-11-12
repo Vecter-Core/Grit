@@ -10,7 +10,24 @@ use std::path::{Path, PathBuf};
 
 include!(concat!(env!("OUT_DIR"), "/explain_table.rs"));
 
-const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release|release-o2 (mặc định: dev; release và release-o2 đã có bằng chứng thực nghiệm dev≡release, KHÔNG phải chứng minh: ADR-036 §9)] [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release|release-o2 (mặc định: dev; release và release-o2 đã có bằng chứng thực nghiệm dev≡release, KHÔNG phải chứng minh: ADR-036 §9)] [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
+/// Khi dựng không có feature `llvm`, crate `gt_codegen_llvm` không được liên kết; CLI vẫn cần kiểu `Opt` để phân tích `--profile=` (và báo
+/// "bản dựng này không có backend llvm" thay vì lỗi biên dịch).
+#[cfg(not(feature = "llvm"))]
+mod gt_codegen_llvm {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Opt {
+        Dev,
+        Release,
+        ReleaseO2,
+    }
+    impl Opt {
+        pub fn is_release(self) -> bool {
+            !matches!(self, Opt::Dev)
+        }
+    }
+}
+
+const USAGE: &str = "dùng: gritc <lệnh> …\n  gritc check <tệp|thư mục> [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc build <tệp|thư mục> [-o ra.exe|ra.gtmir] [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release|release-o2 (mặc định: dev; release và release-o2 đã có bằng chứng thực nghiệm dev≡release, KHÔNG phải chứng minh: ADR-036 §9)] [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc run   <tệp|thư mục> [--backend=llvm|interpreter (mặc định: llvm nếu bản dựng có)] [--profile=dev|release|release-o2 (mặc định: dev; release và release-o2 đã có bằng chứng thực nghiệm dev≡release, KHÔNG phải chứng minh: ADR-036 §9)] [--json] [--deny-yellow] [--checks=all|proven (mặc định: all; proven là THỬ NGHIỆM: xoá check đã chứng minh, in ghi chú N0606, không dùng với release)]\n  gritc explain <mã>\n  gritc fmt <tệp> [--check]\n  gritc lsp      (máy chủ LSP qua stdio: chẩn đoán + định dạng; xem editors/vscode)\n  gritc doctor   (kiểm môi trường: LLVM, runtime, trình liên kết, thư mục tạm; dựng và chạy thử một chương trình)\n  gritc --version\nMã thoát: 0 qua | 1 ĐỎ (hoặc VÀNG khi --deny-yellow) | 2 ICE | 3 lỗi dùng/IO | run: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình\n";
 
 #[derive(Debug)]
 struct Cli {
@@ -117,9 +134,14 @@ fn load(path: &str) -> Result<Vec<SourceInput>, String> {
         let text = std::fs::read_to_string(q)
             .map_err(|e| format!("không đọc được {}: {e}", q.display()))?
             .replace("\r\n", "\n");
-        let name = q
+        let file = q
             .file_name()
             .map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned());
+        // tên tệp là tên module: tệp có tên không phải định danh (`01_add.gt`, `my-prog.gt`) vẫn dùng được (G1, Seed 1.0)
+        let name = gt_resolve::module_file_name_for(&file);
+        if name != file {
+            eprintln!("gritc: `{file}` không phải tên module hợp lệ; dùng tên module `{name}`");
+        }
         Ok(SourceInput { name, text })
     };
     if p.is_dir() {
@@ -455,6 +477,108 @@ fn cmd_fmt(cli: &Cli) -> i32 {
     }
 }
 
+/// `gritc doctor` (S5a): kiểm môi trường; MỖI mục in `OK`/`LỖI` + cách sửa; cuối cùng dựng và chạy thử một chương trình nhỏ THẬT.
+#[cfg(feature = "llvm")]
+fn cmd_doctor() -> i32 {
+    let mut bad = 0;
+    let mut line = |ok: bool, name: &str, detail: String, fix: &str| {
+        if ok {
+            println!("OK   {name}: {detail}");
+        } else {
+            bad += 1;
+            println!("LỖI  {name}: {detail}\n     → {fix}");
+        }
+    };
+    println!(
+        "gritc doctor — gritc {} · {} {}",
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    );
+    line(
+        true,
+        "backend llvm",
+        "có trong bản dựng này".to_string(),
+        "",
+    );
+    match crate::native::runtime_lib_path() {
+        Ok(p) => line(true, "runtime (gt-rt)", p.display().to_string(), ""),
+        Err(e) => line(
+            false,
+            "runtime (gt-rt)",
+            e.to_string(),
+            "dựng: `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml`, hoặc đặt GRIT_RT_LIB=<đường dẫn libgt_rt.a|gt_rt.lib>",
+        ),
+    }
+    match crate::native::linker_probe() {
+        Ok(v) => line(true, "trình liên kết", v, ""),
+        Err(e) => line(
+            false,
+            "trình liên kết",
+            e.to_string(),
+            "Linux: cài `build-essential` (cung cấp `cc`); Windows: cài Visual Studio Build Tools (link.exe)",
+        ),
+    }
+    let tmp = std::env::temp_dir();
+    let probe = tmp.join(format!("gritc-doctor-{}", std::process::id()));
+    match std::fs::create_dir_all(&probe) {
+        Ok(()) => line(
+            true,
+            "thư mục tạm",
+            format!("{} ghi được", tmp.display()),
+            "",
+        ),
+        Err(e) => line(
+            false,
+            "thư mục tạm",
+            format!("{}: {e}", tmp.display()),
+            "đặt TMPDIR/TEMP tới một thư mục ghi được",
+        ),
+    }
+    // dựng và chạy thử THẬT: phủ LLVM, IR Guard, runtime, trình liên kết và quyền chạy
+    let src = probe.join("probe.gt");
+    let smoke = std::fs::write(&src, "ƒ main() → u64 ! ∅ { 40u64 + 2u64 }\n").is_ok()
+        && std::env::current_exe().is_ok_and(|me| {
+            std::process::Command::new(me)
+                .args(["run"])
+                .arg(&src)
+                .env_remove("GRIT_NOTES")
+                .output()
+                .is_ok_and(|o| {
+                    let t = String::from_utf8_lossy(&o.stdout).into_owned()
+                        + &String::from_utf8_lossy(&o.stderr);
+                    o.status.success() && t.contains("main trả về 42")
+                })
+        });
+    let _ = std::fs::remove_dir_all(&probe);
+    line(
+        smoke,
+        "dựng và chạy thử",
+        if smoke {
+            "chương trình mẫu cho đúng 42 (LLVM + IR Guard + runtime + liên kết)".to_string()
+        } else {
+            "không dựng/chạy được chương trình mẫu".to_string()
+        },
+        "xem các mục LỖI ở trên; nếu tất cả OK mà vẫn hỏng: chạy `gritc run <tệp>` bằng tay và đọc thông báo; LLVM 20 (libLLVM-20.so / LLVM-C.dll) phải có",
+    );
+    if bad == 0 {
+        println!("doctor: XANH");
+        0
+    } else {
+        println!("doctor: ĐỎ ({bad} mục)");
+        3
+    }
+}
+
+#[cfg(not(feature = "llvm"))]
+fn cmd_doctor() -> i32 {
+    println!(
+        "gritc doctor: bản dựng này KHÔNG có backend llvm (--no-default-features): chỉ `check`/`fmt`/`explain` và thông dịch"
+    );
+    println!("doctor: ĐỎ (không có backend llvm)");
+    3
+}
+
 /// Điểm vào: trả mã thoát.
 #[must_use]
 pub fn main(args: Vec<String>) -> i32 {
@@ -484,6 +608,8 @@ pub fn main(args: Vec<String>) -> i32 {
         "run" => cmd_run(&cli),
         "explain" => cmd_explain(&cli),
         "fmt" => cmd_fmt(&cli),
+        "doctor" => cmd_doctor(),
+        "lsp" => crate::lsp::run(),
         other => usage_err(&format!("lệnh lạ `{other}`")),
     }
 }

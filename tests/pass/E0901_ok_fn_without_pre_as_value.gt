@@ -1,0 +1,6 @@
+// expect: pass
+// note: đối chứng FB-C6 — hàm KHÔNG có ⊳ dùng làm giá trị vẫn hợp lệ
+ƒ inc(n: i32) → i32 ! ∅ ⊳ n < 1000 { n + 1 }
+ƒ dbl(n: i32) → i32 ! ∅ { n }
+ƒ ap(f: ƒ(i32) → i32 ! ∅, x: i32) → i32 ! ∅ { f(x) }
+ƒ main() → i32 ! ∅ { ap(dbl, 3) + inc(3) }

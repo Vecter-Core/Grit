@@ -74,7 +74,7 @@
 ƒ run(raw: &[u8], alloc: &Cap<Alloc>, out: &Cap<Out>, err: &Cap<ErrOut>, path: &str) ! {io, div, mem} {
   // 1. kiểm UTF-8 (sao chép vào Text: Text là chủ sở hữu duy nhất của dữ liệu đã kiểm)
   μa0 ≔ alloc.arena();
-  ⌥ Text::from_utf8(&!a0, raw) {
+  ⌥ Text::from_utf8(&a0, raw) {
     None ↦ fail(err, path, "invalid UTF-8"),
     Some(src) ↦ {
       b ≔ src.as_bytes();
@@ -82,8 +82,8 @@
       // 2. thu từ
       μa1 ≔ alloc.arena();
       μa2 ≔ alloc.arena();
-      μx ≔ Vec::new(&!a1);
-      μy ≔ Vec::new(&!a2);
+      μx ≔ Vec::new(&a1);
+      μy ≔ Vec::new(&a2);
       x.reserve(nw);
       y.reserve(nw);
       μstart ≔ 0usize;
@@ -107,8 +107,8 @@
       // 3. đếm đoạn bằng nhau
       μa3 ≔ alloc.arena();
       μa4 ≔ alloc.arena();
-      μe ≔ Vec::new(&!a3);
-      μf ≔ Vec::new(&!a4);
+      μe ≔ Vec::new(&a3);
+      μf ≔ Vec::new(&a4);
       e.reserve(nw);
       f.reserve(nw);
       ws ≔ x.as_slice();
@@ -134,7 +134,7 @@
       msort::sort(e.as_mut_slice(), f.as_mut_slice());
       // 4. 10 dòng đầu vào một Text rồi ghi MỘT lần
       μa5 ≔ alloc.arena();
-      μo ≔ Text::new(&!a5);
+      μo ≔ Text::new(&a5);
       es ≔ e.as_slice();
       lim ≔ ⎇ es.len() < 10usize { es.len() } ⇝ { 10usize };
       μj ≔ 0usize;

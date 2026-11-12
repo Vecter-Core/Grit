@@ -1,0 +1,4 @@
+// probe: reject E0401|E0402
+// why: dup(&!x) ⇒ hai &! cùng ghi một chỗ (chạy được trên thông dịch: kết quả 20)
+ƒ dup<T>(x: T) → (T, T) ! ∅ { (x, x) }
+ƒ main() → i32 ! ∅ { μx ≔ 1; p ≔ dup(&!x); *p.0 ← 10; *p.1 ← 20; x }

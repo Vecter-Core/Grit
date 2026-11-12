@@ -1,0 +1,1 @@
+◈ ƒ main(x: u64) → Cap<Fs> ! {io} { root_fs() }

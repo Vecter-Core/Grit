@@ -1,0 +1,3 @@
+// probe: reject E0301
+// why: deref số nguyên
+ƒ main() → i32 ! ∅ { x ≔ 5; *x }

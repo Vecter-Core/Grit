@@ -797,6 +797,57 @@ impl<'a> Oracle<'a> {
             }
             return Ok(V::Unit);
         }
+        // `Vec<'a, T>` trên Arena CHIA SẺ (R6): mô hình `{ arena: &'a Arena, items }` — `new` lưu tham chiếu Arena (khoản vay chung nằm TRONG Vec);
+        // mọi thao tác trên Vec phải còn dùng được khoản vay Arena đó (reset đã vô hiệu nó ⇒ vi phạm); lát lấy từ Vec là khoản vay CON của khoản
+        // vay Arena (reset làm lát vô hiệu — dùng-sau-reset, FB-C9) và đồng thời chồng lên ô `items` (ghi vào Vec làm lát vô hiệu — E0403).
+        if key.starts_with("$prelude::Vec") {
+            let m = key.rsplit("::").next().unwrap_or("");
+            match m {
+                "new" => {
+                    let Some(a @ V::Ref(_)) = args.pop() else {
+                        return bug("Vec::new: đối số không phải tham chiếu Arena");
+                    };
+                    return Ok(V::Adt(0, vec![a, V::Array(Vec::new())]));
+                }
+                "push" | "as_slice" | "as_mut_slice" => {
+                    let x = if m == "push" { args.pop() } else { None };
+                    let Some(V::Ref(vr)) = args.pop() else {
+                        return bug("Vec: người nhận không phải tham chiếu");
+                    };
+                    self.use_loan(vr.loan)?;
+                    let kind = if m == "push" { AK::Write } else { AK::Read };
+                    self.access(&vr.loc, kind, Some(vr.loan))?;
+                    let mut aloc = vr.loc.clone();
+                    aloc.path.push(Step::Field(0));
+                    let Ok(V::Ref(ar)) = self.get(&aloc) else {
+                        return bug("Vec: thiếu tham chiếu Arena");
+                    };
+                    self.use_loan(ar.loan)?;
+                    let mut iloc = vr.loc.clone();
+                    iloc.path.push(Step::Field(1));
+                    let Ok(V::Array(mut items)) = self.get(&iloc) else {
+                        return bug("Vec: thiếu danh sách phần tử");
+                    };
+                    if m == "push" {
+                        items.push(x.ok_or(Flow::Bug("push thiếu giá trị".into()))?);
+                        self.set(&iloc, V::Array(items))?;
+                        return Ok(V::Unit);
+                    }
+                    let fid = self.frames.len();
+                    self.frames.push(FrameData {
+                        locals: vec![V::Array(items)],
+                    });
+                    let cell = Loc {
+                        fid,
+                        local: 0,
+                        path: vec![],
+                    };
+                    let loan = self.new_loan(m == "as_mut_slice", iloc, Some(ar.loan), false);
+                    return Ok(V::Ref(RefV { loc: cell, loan }));
+                }
+                _ => {}
+            }
+        }
         // Lang item MUTABILITY BÊN TRONG (`Cell`, `Mutex`, `Atomic`; công cụ test, NGOÀI TCB, tuần tự): ghi qua `&self` mà KHÔNG làm vô hiệu
         // khoản vay chung khác. Ngữ nghĩa này không phải bằng chứng cho codegen (ADR-027 §1).
         let cell_like = key.contains("Cell") || key.contains("Mutex") || key.contains("Atomic");

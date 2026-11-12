@@ -2,6 +2,6 @@
 // note: tuple chứa Arena cần drop
 ƒ main() ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.push((Arena::new(), 1u8));
 }

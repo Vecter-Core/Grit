@@ -1,0 +1,11 @@
+// expect: pass
+// note: R6 — Vec và Text (và alloc) trên cùng MỘT Arena
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&ar);
+  μt ≔ Text::new(&ar);
+  v.push(41u64);
+  t.push_str("hi");
+  x ≔ ar.alloc(1u64);
+  v.as_slice()[0] +% *x +% (t.len() as u64)
+}

@@ -8,8 +8,8 @@
 //! gọi (`a.load(o)`, `Atomic::load(&a, o)`) cùng đi qua một chỗ.
 use gt_diag::{Code, Diagnostic, Diagnostics};
 use gt_mir::{
-    AggregateKind, Body, BodyKind, Callee, Const, Local, MirOutput, Operand, Rvalue, StatementKind,
-    TerminatorKind,
+    AggregateKind, Body, BodyKind, BorrowKind, Callee, Const, Local, MirOutput, Operand, Rvalue,
+    StatementKind, TerminatorKind,
 };
 use gt_span::Span;
 use gt_types::{Lang, Ty, TypesOutput};
@@ -37,6 +37,12 @@ fn variant_of(b: &Body, op: &Operand, ord_def: gt_resolve::DefId, depth: u32) ->
     let mut found: Option<&Rvalue> = None;
     for bb in &b.blocks {
         for s in &bb.statements {
+            if let StatementKind::Assign(_, Rvalue::Ref(_, BorrowKind::Unique, bp)) = &s.kind
+                && bp.local == l
+            {
+                // `&!l`: có thể bị gán lại qua tham chiếu ⇒ không truy ngược được về biến thể viết thẳng (FB-C22)
+                return None;
+            }
             if let StatementKind::Assign(dst, rv) = &s.kind
                 && dst.local == l
             {

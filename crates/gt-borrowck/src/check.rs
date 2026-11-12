@@ -387,6 +387,10 @@ impl<'a> Checker<'a> {
     }
 
     fn check_uses(&mut self, mp: &MovePaths, us: &BitSet, accs: &[Access], src: SourceInfo) {
+        // `us` là trạng thái ĐẦU câu lệnh; nhiều toán hạng của CÙNG một câu lệnh (tuple/mảng/struct literal, đối số lời gọi) phải thấy move của
+        // toán hạng đứng trước ⇒ giữ bản sao cục bộ và áp move ngay sau mỗi truy cập `Kind::Move` (tests/same_stmt.rs).
+        let mut us = us.clone();
+        let us = &mut us;
         for a in accs {
             let is_use = !matches!(a.kind, Kind::StorageDead | Kind::Drop);
             if !is_use {
@@ -404,7 +408,7 @@ impl<'a> Checker<'a> {
                 if let Some(k) = last_indirection {
                     let mut base = a.place.clone();
                     base.projection.truncate(k);
-                    if Self::maybe_uninit(mp, us, &base) {
+                    if Self::maybe_uninit(mp, &*us, &base) {
                         self.report_use_after_move(&a.place, src, "ghi qua");
                         continue;
                     }
@@ -423,8 +427,13 @@ impl<'a> Checker<'a> {
                 }
                 continue;
             }
-            if Self::maybe_uninit(mp, us, &a.place) {
+            if Self::maybe_uninit(mp, &*us, &a.place) {
                 self.report_use_after_move(&a.place, src, "dùng");
+            }
+            if a.kind == Kind::Move && !a.place.has_deref() {
+                for k in mp.subtree(mp.find(&a.place)) {
+                    us.insert(k);
+                }
             }
         }
     }

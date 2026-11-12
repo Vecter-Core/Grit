@@ -1,0 +1,6 @@
+// expect: pass
+// note: đệ quy sau tham chiếu có kích thước hữu hạn (đối chứng của E0301_recursive_*)
+▢ L<'a> { n: i32, next: Option<&'a L<'a>> }
+▢ P { a: [i32; 2], t: (i32, bool) }
+▢ Q { p: P, o: Option<P> }
+ƒ main() → i32 ! ∅ { 0 }

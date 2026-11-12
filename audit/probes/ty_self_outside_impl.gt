@@ -1,0 +1,4 @@
+// probe: reject E0201
+// why: Self ngoài impl
+ƒ f(x: Self) ! ∅ { }
+ƒ main() → i32 ! ∅ { 0 }

@@ -81,7 +81,7 @@ fn is_atomic(inst: &InstructionValue<'_>) -> bool {
 
 /// Bảng lời gọi runtime hợp lệ: (tên, lớp nghĩa vụ phải mang; `None` = không nhạy cảm). Hợp đồng với `gt-codegen-llvm` và `runtime/gt-rt`
 /// (docs/TCB_INTRINSICS.md). Thêm hàm runtime MỚI = thêm dòng ở đây (nếu quên, Guard từ chối ⇒ fail-closed).
-pub const RUNTIME: [(&str, Option<&str>); 24] = [
+pub const RUNTIME: [(&str, Option<&str>); 27] = [
     ("gritrt_abort", None),
     ("gritrt_exit", None),
     ("gritrt_start", None),
@@ -98,7 +98,10 @@ pub const RUNTIME: [(&str, Option<&str>); 24] = [
     ("gritrt_arg_len", Some("E0310")),
     ("gritrt_fs_read", Some("E0310")),
     ("gritrt_fs_open", Some("E0310")),
+    ("gritrt_stdin_read", Some("E0310")),
+    ("gritrt_fs_write", Some("E0310")),
     ("gritrt_utf8_valid", None),
+    ("gritrt_bytes_eq", None),
     ("gritrt_arena_new", Some("E0405")),
     ("gritrt_arena_alloc", Some("E0405")),
     ("gritrt_arena_reset", Some("E0405")),
@@ -131,14 +134,15 @@ fn inst_of<'c>(v: AnyValueEnum<'c>) -> Option<InstructionValue<'c>> {
     }
 }
 
-/// FAIL_OPEN_AUDIT G1: `callee_name` chỉ nhận lời gọi TRỰC TIẾP, nên gọi `gritrt_*` qua con trỏ (hoặc `invoke`/`callbr`) tránh được luật "lớp nghĩa vụ" và luật "đích
+/// FAIL_OPEN_AUDIT G1 (+ FB-C27: áp cho MỌI khai báo ngoài, không chỉ `gritrt_*`): `callee_name` chỉ nhận lời gọi TRỰC TIẾP, nên gọi `gritrt_*` qua con trỏ (hoặc `invoke`/`callbr`) tránh được luật "lớp nghĩa vụ" và luật "đích
 /// mọi lời gọi". Quy tắc đóng lỗ: (a) địa chỉ của hàm `gritrt_*` chỉ được dùng làm ĐÍCH của một `call` TRỰC TIẾP (không lưu, không truyền làm đối số, không nằm trong
 /// hằng/khởi tạo); (b) không có `invoke`/`callbr` (codegen không bao giờ phát; Phase 1 không có unwind).
 fn runtime_address_violations(m: &Module<'_>) -> Vec<String> {
     let mut v = Vec::new();
     for f in m.get_functions() {
         let name = f.get_name().to_string_lossy().into_owned();
-        if !name.starts_with("gritrt_") {
+        // MỌI hàm chỉ khai báo (không thân) trừ intrinsic `llvm.*` — không chỉ `gritrt_*` (FB-C27: `declare @system` + lời gọi gián tiếp lách luật đích mọi lời gọi)
+        if f.count_basic_blocks() > 0 || name.starts_with("llvm.") {
             continue;
         }
         let fptr = f.as_global_value().as_pointer_value();

@@ -95,3 +95,17 @@ fn instance_graph_verdicts() {
         "{cyc:?}"
     );
 }
+
+/// FB-C15 (kiểu (a), M8): hàm dùng làm giá trị qua `[f; N]` (`Rvalue::Repeat`) không được ghi nhận là "thoát" ⇒ không có cạnh tới `f` ⇒ đệ quy qua giá trị hàm không bị E0703.
+/// Đối chứng: `g ≔ f; g(n)` (Use) bị E0703.
+#[test]
+fn recursion_through_a_repeated_fn_value_is_still_e0703_fb_c15() {
+    only(
+        "ƒ f(n: u32) → u32 ! ∅ { μa ≔ [f; 2]; μg ≔ a[0]; g(n) } ƒ main() ! ∅ { μr ≔ f(1); }",
+        "E0703",
+    );
+    only(
+        "ƒ f(n: u32) → u32 ! ∅ { μg ≔ f; g(n) } ƒ main() ! ∅ { μr ≔ f(1); }",
+        "E0703",
+    );
+}

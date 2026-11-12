@@ -221,7 +221,16 @@ impl Env<'_> {
         };
         if matches!(
             adt.lang,
-            Some(Lang::Secret | Lang::Cap | Lang::Vec | Lang::Text)
+            Some(
+                Lang::Secret
+                    | Lang::Cap
+                    | Lang::Vec
+                    | Lang::Text
+                    | Lang::Arena
+                    | Lang::Mutex
+                    | Lang::Atomic
+                    | Lang::Cell
+            )
         ) {
             let name = self.defs()[d.index()].path.clone();
             self.err(
@@ -236,8 +245,7 @@ impl Env<'_> {
             AdtKind::Struct(fs) => fs.iter().map(|f| f.ty.clone()).collect(),
             AdtKind::Enum(vs) => vs.iter().flat_map(|v| v.fields.clone()).collect(),
         };
-        // Copy của trường được xét THEO đối số thật của impl (`W<T>` ⇒ T là tham số của impl) với ràng buộc impl khai báo:
-        // `⊐ <T> Copy for W<T>` (không `T: Copy`) với trường kiểu T bị từ chối (R3; trước đây dùng biến suy luận ⇒ luôn "Copy").
+        // Thay tham số của ADT bằng đối số thật của `self_ty` và kiểm Copy dưới các ràng buộc của chính impl.
         let scope = crate::traits::scope_bounds(&imp.generics.iter().collect::<Vec<_>>());
         let mut infer = InferCtx::new();
         for t in tys {
@@ -248,7 +256,7 @@ impl Env<'_> {
                     "E0311",
                     node,
                     imp.span,
-                    format!("`⊐ Copy` không hợp lệ: trường kiểu `{s}` không phải Copy"),
+                    format!("`⊐ Copy` không hợp lệ: trường kiểu `{s}` không phải Copy (tham số kiểu cần ràng buộc `T: Copy` trên impl)"),
                 );
                 return;
             }

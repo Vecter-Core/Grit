@@ -1,0 +1,1 @@
+- `gt-guard` (IR Guard), `gt-codegen-llvm`, `gt-llvm` và `gt-rt` (6 test) đều đạt trên bản port — gồm các test IR dựng tay của Guard và các lỗi chèn.

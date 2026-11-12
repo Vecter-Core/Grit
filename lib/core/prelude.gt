@@ -51,6 +51,9 @@
 ⊐ <T> Cell<T> {
   ƒ new(v: T) → Cell<T> ! ∅ { }
   ƒ set(&self, x: T) ! ∅ { }
+}
+// `get` sao chép giá trị ra ngoài: chỉ cho `T: Copy` (FB-C17b; nếu không, `Cell<Arena>::get` nhân đôi Arena/Vec/Cap mà không cần `⊐ Copy`)
+⊐ <T: Copy> Cell<T> {
   ƒ get(&self) → T ! ∅ { }
 }
 #lang(drop)
@@ -72,22 +75,24 @@
 ▢ Clock { x: i32 }
 ▢ Alloc { x: i32 }
 ▢ Out { x: i32 }
+// stdin (Seed 1.0 G5): capability đọc đầu vào chuẩn; `Cap<In>::read_all` đọc NGUYÊN stdin tới EOF (lỗi ⇒ `Err`)
+▢ In { x: i32 }
 // stderr riêng. Tên `ErrOut` (không phải `Err`) vì `Err` là biến thể của `Result` và sẽ bị che/che khuất (xem DOGFOOD #11).
 ▢ ErrOut { x: i32 }
 ▢ Host { x: i32 }
 #lang(arena)
 ▢ Arena { x: i32 }
-// Vec<'a, T> (ADR-032 phụ lục A, TCB): mảng tăng trưởng nằm trong MỘT Arena. Giữ `&!Arena` ĐỘC QUYỀN (không mutability bên trong): một Arena
-// chỉ phục vụ một Vec tại một thời điểm và không dùng/reset được khi Vec còn sống (M6). Không Drop (arena giải phóng cả khối); T không được
+// Vec<'a, T> (ADR-032 phụ lục A, TCB): mảng tăng trưởng nằm trong MỘT Arena. Giữ `&'a Arena` CHIA SẺ (ADR-038 hướng (ii), Seed 1.0 R6): nhiều Vec/Text dùng chung một Arena; `reset` (`&!`) bị M6 chặn khi còn Vec sống. Không Drop (arena giải phóng cả khối); T không được
 // cần drop (E0318). Phần tử đọc qua `as_slice` (kiểm biên có sẵn). Trường private + literal ngoài lib/core bị cấm (E0313).
 #lang(vec)
-▢ Vec<'a, T> { arena: &!'a Arena, ptr: *μ T, len: usize, cap: usize }
+▢ Vec<'a, T> { arena: &'a Arena, ptr: *μ T, len: usize, cap: usize }
 ▢ File { x: i32 }
 ⊔ IoError { NotFound, Denied, Invalid, Other }
 ⊐ <T> [T] { ƒ len(&self) → usize ! ∅ { } }
 ⊐ File {
   ƒ len(&self) → usize ! ∅ { }
-  ƒ bytes(&self) → &[u8] ! ∅ { }
+  // nội dung tệp: bộ nhớ RÒ RỈ CÓ CHỦ ĐÍCH sống tới hết tiến trình (gt-rt) nên là `'static` — có thể lưu trong cấu trúc dài hơn `File` (Seed 1.0 G10)
+  ƒ bytes(&self) → &'static [u8] ! ∅ { }
 }
 ⊐ <T> Option<T> {
   ƒ is_some(&self) → bool ! ∅ { }
@@ -106,6 +111,8 @@
   ƒ read(&self, p: &str) → File ! {io} { }
   ƒ open(&self, p: &str) → Result<File, IoError> ! {io} { }
   ƒ sub(&self, p: &str) → Cap<Fs> ! {io} { }
+  // ghi NGUYÊN tệp (tạo/cắt cụt); lỗi ⇒ `Err` (Seed 1.0 G6)
+  ƒ write(&self, p: &str, b: &[u8]) → Result<(), IoError> ! {io} { }
 }
 ⊐ Cap<Net> { ƒ connect(&self, h: &str) → File ! {io} { } }
 ⊐ Cap<Env> {
@@ -118,6 +125,9 @@
   ƒ write_str(&self, s: &str) ! {io} { }
   ƒ write_bytes(&self, b: &[u8]) ! {io} { }
 }
+⊐ Cap<In> {
+  ƒ read_all(&self) → Result<File, IoError> ! {io} { }
+}
 ⊐ Cap<ErrOut> {
   ƒ write_u64(&self, n: u64) ! {io} { }
   ƒ write_str(&self, s: &str) ! {io} { }
@@ -127,12 +137,14 @@
 ⊐ Host { ƒ fs() → Cap<Fs> ! {io} { } }
 ⊐ Arena { ƒ new() → Arena ! {mem} { } ƒ alloc<T>(&self, v: T) → &T ! {mem} { } ƒ reset(&!self) ! {mem} { } }
 ⊐ <'a, T> Vec<'a, T> {
-  ƒ new(a: &!'a Arena) → Vec<'a, T> ! {mem} { }
+  ƒ new(a: &'a Arena) → Vec<'a, T> ! {mem} { }
   ƒ push(&!self, x: T) ! {mem} { }
   ƒ reserve(&!self, n: usize) ! {mem} { }
   ƒ len(&self) → usize ! ∅ { }
   ƒ as_slice(&self) → &[T] ! ∅ { }
   ƒ as_mut_slice(&!self) → &![T] ! ∅ { }
+  // cắt bớt còn `min(n, len)` phần tử (không bao giờ tăng; T không cần drop nên không chạy destructor) — Seed 1.0 G3
+  ƒ truncate(&!self, n: usize) ! ∅ { }
 }
 // Text<'a> (ADR-035, Q72, TCB): bộ đệm UTF-8 trên MỘT Arena, DỰNG rồi ĐÓNG BĂNG. Bất biến UTF-8 chỉ do các intrinsic dưới đây bảo đảm
 // (đường tạo hợp lệ: `new` rỗng, `push_str` (&str hợp lệ), `push_char` (char hợp lệ), `push_utf8`/`from_utf8` (KIỂM RFC 3629 bằng runtime)).
@@ -140,11 +152,11 @@
 #lang(text)
 ▢ Text<'a> { bytes: Vec<'a, u8> }
 ⊐ <'a> Text<'a> {
-  ƒ new(a: &!'a Arena) → Text<'a> ! {mem} { }
+  ƒ new(a: &'a Arena) → Text<'a> ! {mem} { }
   ƒ push_str(&!self, s: &str) ! {mem} { }
   ƒ push_char(&!self, c: char) ! {mem} { }
   ƒ push_utf8(&!self, b: &[u8]) → bool ! {mem} { }
-  ƒ from_utf8(a: &!'a Arena, b: &[u8]) → Option<Text<'a>> ! {mem} { }
+  ƒ from_utf8(a: &'a Arena, b: &[u8]) → Option<Text<'a>> ! {mem} { }
   ƒ len(&self) → usize ! ∅ { }
   ƒ as_str(&self) → &str ! ∅ { }
   ƒ as_bytes(&self) → &[u8] ! ∅ { }
@@ -159,6 +171,8 @@
   ƒ is_nan(self) → bool ! ∅ { }
 }
 ⊐ str {
+  // khung nhìn byte của chuỗi (cùng bộ nhớ, không sao chép) — Seed 1.0 G4
+  ƒ as_bytes(&self) → &[u8] ! ∅ { }
   ƒ len(&self) → usize ! ∅ { }
   ƒ slice(&self, from: usize, to: usize) → &str ! ∅ { }
 }
@@ -178,5 +192,6 @@
 ƒ root_clock() → Cap<Clock> ! ∅ { }
 ƒ root_alloc() → Cap<Alloc> ! ∅ { }
 ƒ root_out() → Cap<Out> ! ∅ { }
+ƒ root_in() → Cap<In> ! ∅ { }
 ƒ root_err() → Cap<ErrOut> ! ∅ { }
 ƒ raw_read(p: usize) → i32 ! ∅ { }

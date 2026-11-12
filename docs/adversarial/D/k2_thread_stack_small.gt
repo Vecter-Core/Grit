@@ -1,0 +1,12 @@
+■ DONE: Atomic<u32> ≔ Atomic::new(0u32);
+ƒ big(n: u32) ! ∅ {
+  μa ≔ [0u8; 3000000];
+  a[2999999usize] ← 1u8;
+  DONE.fetch_add(a[2999999usize] as u32, AtomicOrdering::SeqCst);
+}
+ƒ main() → u32 ! ∅ {
+  spawn(big, 0u32);
+  μspin ≔ 0u64;
+  ⟳ spin < 3000000000u64 ∧ DONE.load(AtomicOrdering::SeqCst) < 1u32 ↓ 3000000000u64 - spin { spin ← spin + 1u64; }
+  DONE.load(AtomicOrdering::SeqCst)
+}

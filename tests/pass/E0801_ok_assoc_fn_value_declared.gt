@@ -1,0 +1,5 @@
+// expect: pass
+// note: đối chứng FB-C5 — hàm kết hợp có {io} làm giá trị trong hàm khai báo io
+▢ S { x: i32 }
+⊐ S { ƒ mk() ! {io} { } }
+ƒ f() ! {io} { g ≔ S::mk; g(); }

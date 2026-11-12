@@ -547,7 +547,7 @@ pub fn program(seed: u64, edge: bool, mem_only: bool) -> Prog {
             };
             let id = b.calls;
             let body = format!(
-                "{{ μpa{id} ≔ alloc.arena(); μpb{id} ≔ alloc.arena(); μta{id} ≔ Text::new(&!pa{id}); μtb{id} ≔ Text::new(&!pb{id}); ta{id}.push_str(\"{x}\"); tb{id}.push_str(\"{y}\"); rk(ta{id}.cmp(&tb{id})) }}"
+                "{{ μpa{id} ≔ alloc.arena(); μpb{id} ≔ alloc.arena(); μta{id} ≔ Text::new(&pa{id}); μtb{id} ≔ Text::new(&pb{id}); ta{id}.push_str(\"{x}\"); tb{id}.push_str(\"{y}\"); rk(ta{id}.cmp(&tb{id})) }}"
             );
             b.push(&body, rk(x.as_bytes().cmp(y.as_bytes())), true);
         }

@@ -1,0 +1,4 @@
+// expect: fail E0901
+// note: FB-C6 — hàm có ⊳ dùng làm GIÁ TRỊ: lời gọi qua giá trị không còn điểm gọi để chứng minh/kiểm ⊳ ⇒ từ chối (fail-closed)
+ƒ pos(n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ main() → i32 ! ∅ { f ≔ pos; f(0) }

@@ -1,0 +1,3 @@
+// probe: reject E1202|E0101
+// why: D15: zero-width trong định danh
+ƒ ma​in() → i32 ! ∅ { 0 }

@@ -203,7 +203,12 @@ fn checked_arithmetic_returns_the_lang_option() {
 #[test]
 fn equality_is_limited_to_comparable_types() {
     ok("ƒ f(a: &str, b: &str) → bool ! ∅ { a == b }");
-    ok("ƒ f(a: (i32, bool), b: (i32, bool)) → bool ! ∅ { a == b }");
+    // tuple: CHƯA (FB-C13: backend LLVM không cài, thông dịch từng khác ngữ nghĩa) ⇒ E0301 ngay ở cổng
+    err(
+        "ƒ f(a: (i32, bool), b: (i32, bool)) → bool ! ∅ { a == b }",
+        "E0301",
+        1,
+    );
     err(
         "▢ P { x: i32 } ƒ f(a: P, b: P) → bool ! ∅ { a == b }",
         "E0301",

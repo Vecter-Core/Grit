@@ -1,6 +1,7 @@
 //! ADR-036 §6c (Q77): bẫy abort cho MỌI loại abort mà chương trình Grit chạm tới được, và bẫy số thực (FMA, gập hằng, đổi thứ tự cộng, NaN, ±0, dưới chuẩn).
 //! Mỗi chương trình chạy ở dev VÀ release (qua tiến trình `gritc run --profile=…`); đòi cùng mã thoát/loại abort/giá trị, và đúng KỲ VỌNG ĐỘC LẬP
 //! (loại abort cố định; số thực do Rust tính theo IEEE từng phép, KHÔNG hợp nhất).
+#![cfg(feature = "llvm")]
 use std::process::Command;
 
 /// hồ sơ release dưới kiểm: `GT_PROFILE` (`release` hoặc `release-o2`; mặc định `release`)
@@ -143,7 +144,7 @@ fn abort_cases() -> Vec<Case> {
         ),
         (
             "arena_exhausted",
-            "ƒ main() → u64 ! {mem} {\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&!ar);\n  μi ≔ 0u64;\n  ⟳ i < 1000000u64 ↓ 1000000u64 - i { v.push(i); i ← i + 1u64; }\n  v.len() as u64\n}\n",
+            "ƒ main() → u64 ! {mem} {\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&ar);\n  μi ≔ 0u64;\n  ⟳ i < 1000000u64 ↓ 1000000u64 - i { v.push(i); i ← i + 1u64; }\n  v.len() as u64\n}\n",
             vec![("GRITRT_ARENA_LIMIT", "2097152")],
         ),
     ]

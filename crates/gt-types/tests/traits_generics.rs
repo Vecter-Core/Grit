@@ -240,3 +240,105 @@ fn e0312_polymorphic_recursion_is_cut_off_at_the_depth_limit() {
     // nở nhưng không có gốc dùng nó: không có instance để cắt (hàm generic không được gọi)
     ok("ƒ f<T>(x: T) ! ∅ { f((x,)); }");
 }
+
+/// FB-C10: `⊐ <K: Copy> Copy for E<K>` phải được thấy khi `K` chỉ là tham số có ràng buộc `K: Copy` trong phạm vi
+/// (trước đây `find_impl` kiểm ràng buộc impl với phạm vi RỖNG ⇒ `E<K>` bị coi là không-Copy ⇒ E0318 trong `Vec<E<K>>`).
+#[test]
+fn generic_copy_adt_is_copy_under_its_scope_bounds_fb_c10() {
+    let defs = "▢ E<K> { k: K } ⊐ <K: Copy> Copy for E<K> { } ";
+    ok(&format!(
+        "{defs}ƒ f<'a, K: Copy>(v: &Vec<'a, E<K>>) → usize ! ∅ {{ v.len() }}"
+    ));
+    ok(&format!(
+        "{defs}ƒ g<K: Copy>(e: E<K>) → (E<K>, E<K>) ! ∅ {{ (e, e) }}"
+    ));
+    // fail-closed: không có `K: Copy` trong phạm vi ⇒ vẫn E0318
+    err(
+        &format!("{defs}ƒ h<'a, K>(v: &Vec<'a, E<K>>) → usize ! ∅ {{ v.len() }}"),
+        "E0318",
+        1,
+    );
+}
+
+/// FB-C13: `==`/`≠` chỉ nhận kiểu mà MỌI backend cài đúng: số nguyên/bool/char và `&str`. Tuple và `&T` (T ≠ str) được M4 chấp nhận trước đây
+/// nhưng backend LLVM từ chối (`Eq trên Ref`) và thông dịch so ĐỊA CHỈ ⇒ hai bên bất đồng; nay là E0301 ngay ở cổng.
+#[test]
+fn equality_is_limited_to_scalars_and_str_fb_c13() {
+    ok("ƒ f(a: &str, b: &str) → bool ! ∅ { a == b }");
+    ok("ƒ f(a: &str, b: &str) → bool ! ∅ { a != b }");
+    ok("ƒ f(a: u8, b: u8) → bool ! ∅ { a == b }");
+    ok("ƒ f(a: char, b: char) → bool ! ∅ { a == b }");
+    err(
+        "ƒ f(a: (u32, bool), b: (u32, bool)) → bool ! ∅ { a == b }",
+        "E0301",
+        1,
+    );
+    err("ƒ f(a: &u32, b: &u32) → bool ! ∅ { a == b }", "E0301", 1);
+    ok("ƒ f(a: &u32, b: &u32) → bool ! ∅ { *a == *b }");
+}
+
+/// FB-C14: `x ≔ 1.5; x as i32` (biến nhận literal số thực KHÔNG chú thích) lọt qua M4 chỉ với N0604 vì kiểu còn là biến suy diễn số thực
+/// khi kiểm `as`; phải là E0319 như `x: f64`/`1.5f64` (ADR-035 Q70).
+#[test]
+fn float_to_int_cast_through_an_inferred_float_literal_is_e0319_fb_c14() {
+    err("ƒ f() → i32 ! ∅ { x ≔ 1.5; x as i32 }", "E0319", 1);
+    err("ƒ f() → i32 ! ∅ { (2.5) as i32 }", "E0319", 1);
+    err("ƒ f(y: f64) → i32 ! ∅ { y as i32 }", "E0319", 1);
+    ok("ƒ f() → f64 ! ∅ { x ≔ 1.5; x }");
+    ok("ƒ f() → f64 ! ∅ { n ≔ 3; n as f64 }");
+}
+
+/// FB-C16 (kiểu (a), NGHIÊM TRỌNG): `⊐ <T> Copy for W<T> { }` (thiếu `T: Copy`) làm `W<Cap<Out>>`/`W<Arena>` thành Copy ⇒ nhân đôi capability/tay cầm Arena.
+/// `validate_copy_impl` bỏ qua trường kiểu tham số (`Ty::Param ⇒ continue`) và thay tham số ADT bằng biến suy diễn (luôn "Copy"). Phải: mọi trường, SAU khi thế bằng
+/// đối số của `self_ty` của impl, là Copy dưới các ràng buộc của CHÍNH impl.
+#[test]
+fn copy_impl_must_bound_every_type_parameter_it_stores_fb_c16() {
+    err("▢ W<T> { v: T } ⊐ <T> Copy for W<T> { }", "E0311", 1);
+    // ADT lồng: `In<T>` chỉ Copy khi `T: Copy` ⇒ `H<T>` cần ràng buộc đó trên impl của nó
+    let nest = "▢ In<T> { v: T } ⊐ <T: Copy> Copy for In<T> { } ▢ H<T> { o: In<T> } ";
+    err(&format!("{nest}⊐ <T> Copy for H<T> {{ }}"), "E0311", 1);
+    ok(&format!("{nest}⊐ <T: Copy> Copy for H<T> {{ }}"));
+    ok("▢ W<T> { v: T } ⊐ <T: Copy> Copy for W<T> { }");
+    ok("▢ W<T> { v: T } ⊐ Copy for W<u32> { }");
+    // thân không tham số nhưng impl cụ thể cho kiểu không Copy
+    err("▢ W<T> { v: T } ⊐ Copy for W<Cap<Out>> { }", "E0311", 1);
+}
+
+/// FB-C17 (kiểu (a), NGHIÊM TRỌNG): `Arena` (và `Mutex`/`Atomic`/`Cell`) không bao giờ `Copy`: `⊐ Copy for Arena { }` nhân đôi Arena ⇒ `reset` bản này, đọc qua bản kia = dùng sau giải phóng.
+#[test]
+fn copy_is_forbidden_for_arena_and_interior_mutable_lang_types_fb_c17() {
+    for t in ["Arena", "Mutex<u32, ()>", "Atomic<u32>", "Cell<u32>"] {
+        let src = format!("⊐ Copy for {t} {{ }}");
+        let c = codes(&one(&src));
+        assert!(
+            !c.is_empty() && c.iter().all(|x| x == "E0313" || x == "E0311"),
+            "{t}: {c:?}"
+        );
+    }
+}
+
+/// FB-C17b: `Cell<T>::get` đòi `T: Copy` (nếu không, `Cell<Arena>::get` nhân đôi giá trị không Copy mà không cần impl Copy).
+#[test]
+fn cell_get_requires_copy_fb_c17() {
+    err("ƒ f(c: &Cell<Arena>) ! {mem} { a ≔ c.get(); }", "E0309", 1);
+    ok("ƒ f(c: &Cell<u32>) → u32 ! ∅ { c.get() }");
+}
+
+/// FB-C19 (kiểu (a)): `==` trên biến suy diễn TỔNG QUÁT (chưa biết kiểu lúc gặp `==`) lọt qua `eq_ok(Infer) = true`; sau đó biến được hợp nhất với `f64`/tuple ⇒ bỏ qua cấm D4 (E0303)
+/// và cấm tuple (FB-C13). Phải kiểm lại SAU khi kiểu đã giải.
+#[test]
+fn equality_on_a_later_resolved_inference_variable_is_rechecked_fb_c19() {
+    err(
+        "ƒ f() → bool ! ∅ { μx ≔ None; μr ≔ ⌥ x { Some(v) ↦ v == v, None ↦ false }; x ← Some(1.5); r }",
+        "E0303",
+        1,
+    );
+    err(
+        "ƒ f() → bool ! ∅ { μx ≔ None; μr ≔ ⌥ x { Some(v) ↦ v == v, None ↦ false }; x ← Some((1, 2)); r }",
+        "E0301",
+        1,
+    );
+    ok(
+        "ƒ f() → bool ! ∅ { μx ≔ None; μr ≔ ⌥ x { Some(v) ↦ v == v, None ↦ false }; x ← Some(3); r }",
+    );
+}

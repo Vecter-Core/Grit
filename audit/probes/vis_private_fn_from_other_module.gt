@@ -1,0 +1,5 @@
+// probe: reject E0203
+// why: gọi hàm private của mô-đun khác
+▦ m { ƒ secret() → i32 ! ∅ { 1 } }
+ƒ f() → i32 ! ∅ { m::secret() }
+ƒ main() → i32 ! ∅ { 0 }

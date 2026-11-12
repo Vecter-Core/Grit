@@ -1,0 +1,3 @@
+// probe: reject
+// why: D5: ghi phần tử của mảng bất biến
+ƒ main() → i32 ! ∅ { a ≔ [1, 2, 3]; a[0] ← 9; a[0] }

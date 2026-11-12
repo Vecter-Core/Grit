@@ -1,0 +1,4 @@
+// probe: reject E0702|E0701
+// why: callee giảm lại biến đếm qua &! ⇒ tiến độ thuần 0
+ƒ dec(p: &!i32) ! ∅ { *p ← *p - 1; }
+ƒ main() → i32 ! ∅ { μi ≔ 0i32; ⟳ i < 10 ↓ 10 - i { dec(&!i); i ← i + 1; } i }

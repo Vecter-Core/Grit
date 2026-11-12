@@ -1,0 +1,4 @@
+// probe: reject E0304
+// why: trường không tồn tại
+▢ S { n: i32 }
+ƒ main() → i32 ! ∅ { s ≔ S { n: 1 }; s.m }

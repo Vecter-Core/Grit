@@ -90,13 +90,13 @@ fn a_cell_among_several_fields_variants_and_impl_members_is_still_found() {
         "⊔ E { A(i32), B(Cell<i32>) }\nƒ p(x: &E) → bool ! ∅ { true }",
         "main::p"
     ));
-    // ADT đệ quy có ô / không có ô
+    // ADT đệ quy (qua tham chiếu: đệ quy theo giá trị bị M4 chặn bằng E0301) có ô / không có ô
     assert!(!is_pure(
-        "▢ N { next: Option<N>, c: Cell<i32> }\nƒ p(x: &N) → bool ! ∅ { true }",
+        "▢ N<'a> { next: Option<&'a N<'a>>, c: Cell<i32> }\nƒ p(x: &N) → bool ! ∅ { true }",
         "main::p"
     ));
     assert!(is_pure(
-        "▢ N { next: Option<N>, v: i32 }\nƒ p(x: &N) → bool ! ∅ { true }",
+        "▢ N<'a> { next: Option<&'a N<'a>>, v: i32 }\nƒ p(x: &N) → bool ! ∅ { true }",
         "main::p"
     ));
     // impl nhiều thành viên: kiểu của `self` vẫn được xét

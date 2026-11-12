@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: `str` theo giá trị ở kiểu trả về (chỉ hợp lệ sau `&`)
+ƒ f() → str ! ∅ { }
+ƒ main() → i32 ! ∅ { 0 }

@@ -113,9 +113,9 @@ fn main::slices(_1: &[i32]) -> &[i32] {
         StorageLive(_2);
         StorageLive(_3);
         _3 = const 1_usize;
-        _2 = Len((*_1));
         StorageLive(_4);
         _4 = const 2_usize;
+        _2 = Len((*_1));
         StorageLive(_5);
         _5 = Lt(copy _4, copy _2);
         assert(copy _5, index_out_of_bounds(len copy _2, index copy _4)) -> bb1;

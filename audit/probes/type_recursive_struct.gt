@@ -1,0 +1,4 @@
+// probe: reject
+// why: struct chứa chính nó theo giá trị (kích thước vô hạn)
+▢ L { n: i32, next: Option<L> }
+ƒ main() → i32 ! ∅ { 0 }

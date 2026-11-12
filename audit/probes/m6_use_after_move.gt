@@ -1,0 +1,5 @@
+// probe: reject E0401
+// why: E0401: dùng sau khi move
+▢ B { v: i32 }
+ƒ eat(b: B) ! ∅ { }
+ƒ main() → i32 ! ∅ { b ≔ B { v: 1 }; eat(b); b.v }

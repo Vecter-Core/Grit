@@ -406,7 +406,7 @@ fn gen_vec_ops(rng: &mut Rng) -> (String, Want) {
     }
     h = h.wrapping_add(model.len() as u64);
     let src = format!(
-        "{}ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&!ar);\n{body}  fold(v.as_slice()) +% (v.len() as u64)\n}}\n",
+        "{}ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&ar);\n{body}  fold(v.as_slice()) +% (v.len() as u64)\n}}\n",
         vec_prelude(e)
     );
     (src, Ok(h.to_string()))
@@ -425,7 +425,7 @@ fn gen_vec_oob(rng: &mut Rng) -> (String, Want) {
         format!("  m ≔ v.as_mut_slice();\n  m[{}] ← 1u64;\n  0u64\n", n + d)
     };
     let src = format!(
-        "ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&!ar);\n{body}{tail}}}\n"
+        "ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&ar);\n{body}{tail}}}\n"
     );
     (src, Err("index_out_of_bounds"))
 }
@@ -442,7 +442,7 @@ fn gen_vec_exhaust(rng: &mut Rng) -> (String, Want) {
         300_000 + rng.below(400_000)
     };
     let src = format!(
-        "ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&!ar);\n  μi ≔ 0u64;\n  ⟳ i < {n}u64 ↓ {n}u64 - i {{ v.push(i); i ← i + 1u64; }}\n  v.len() as u64\n}}\n"
+        "ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μv ≔ Vec::new(&ar);\n  μi ≔ 0u64;\n  ⟳ i < {n}u64 ↓ {n}u64 - i {{ v.push(i); i ← i + 1u64; }}\n  v.len() as u64\n}}\n"
     );
     (
         src,
@@ -499,7 +499,7 @@ fn gen_line_sort(rng: &mut Rng) -> (String, Want) {
     for (i, l) in lines.iter().enumerate() {
         body.push_str(&format!("  l{i} ≔ {};\n", arr_lit(l)));
     }
-    body.push_str("  μar1 ≔ Arena::new();\n  μar2 ≔ Arena::new();\n  μx ≔ Vec::new(&!ar1);\n  μy ≔ Vec::new(&!ar2);\n");
+    body.push_str("  μar1 ≔ Arena::new();\n  μar2 ≔ Arena::new();\n  μx ≔ Vec::new(&ar1);\n  μy ≔ Vec::new(&ar2);\n");
     for (i, l) in lines.iter().enumerate() {
         let r = if l.is_empty() { "0..0" } else { ".." };
         body.push_str(&format!(
@@ -691,8 +691,8 @@ fn gen_big_sort(rng: &mut Rng) -> (String, Want) {
 ƒ main() → u64 ! {{mem}} {{
   μar1 ≔ Arena::new();
   μar2 ≔ Arena::new();
-  μx ≔ Vec::new(&!ar1);
-  μy ≔ Vec::new(&!ar2);
+  μx ≔ Vec::new(&ar1);
+  μy ≔ Vec::new(&ar2);
 {body}{pad}  msort::sort(x.as_mut_slice(), y.as_mut_slice());
   t ≔ x.as_slice();
   μr ≔ 0u64;
@@ -992,7 +992,7 @@ fn gen_text_build(rng: &mut Rng) -> (String, Want) {
         }
     }
     let src = format!(
-        "{TEXT_HASH_FN}ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μt ≔ Text::new(&!ar);\n{body}  s ≔ t.as_str();\n  (s.len() as u64) *% 1000003u64 +% (t.len() as u64) *% 101u64 +% bh(t.as_bytes())\n}}\n"
+        "{TEXT_HASH_FN}ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μt ≔ Text::new(&ar);\n{body}  s ≔ t.as_str();\n  (s.len() as u64) *% 1000003u64 +% (t.len() as u64) *% 101u64 +% bh(t.as_bytes())\n}}\n"
     );
     let h = (expect.len() as u64)
         .wrapping_mul(1_000_003)
@@ -1055,8 +1055,8 @@ fn gen_text_utf8(rng: &mut Rng) -> (String, Want) {
   b ≔ {lit};
   μar1 ≔ Arena::new();
   μar2 ≔ Arena::new();
-  a ≔ ⌥ Text::from_utf8(&!ar1, &b[{r}]) {{ Some(t) ↦ bh(t.as_bytes()) +% (t.len() as u64) *% 7u64 +% 1u64, None ↦ 0u64 }};
-  μt ≔ Text::new(&!ar2);
+  a ≔ ⌥ Text::from_utf8(&ar1, &b[{r}]) {{ Some(t) ↦ bh(t.as_bytes()) +% (t.len() as u64) *% 7u64 +% 1u64, None ↦ 0u64 }};
+  μt ≔ Text::new(&ar2);
   t.push_str(\"x\");
   ok ≔ t.push_utf8(&b[{r}]);
   c ≔ ⎇ ok {{ 1u64 }} ⇝ {{ 0u64 }};
@@ -1112,11 +1112,11 @@ fn gen_text_slice(rng: &mut Rng) -> (String, Want) {
         "{TEXT_HASH_FN}ƒ main() → u64 ! {{mem}} {{
   μar1 ≔ Arena::new();
   μar2 ≔ Arena::new();
-  μt ≔ Text::new(&!ar1);
+  μt ≔ Text::new(&ar1);
   t.push_str(\"{s}\");
   v ≔ t.as_str();
   w ≔ v.slice({from}usize, {to}usize);
-  μu ≔ Text::new(&!ar2);
+  μu ≔ Text::new(&ar2);
   u.push_str(w);
   (w.len() as u64) *% 1000003u64 +% bh(u.as_bytes())
 }}

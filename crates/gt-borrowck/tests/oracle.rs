@@ -380,6 +380,8 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
                 let body = src.replace(progen::PRELUDE, "");
                 let cat = if body.contains("fv") && body.contains("≔ pick2;") {
                     "kiểu hàm KHÔNG mang region (ADR-042): gọi `pick2` qua giá trị hàm ⇒ M6 bảo thủ, kết quả buộc với MỌI đối số (oracle thấy thân thật chỉ mượn từ `x`)"
+                } else if prog.tags.contains("fn_value_ref") {
+                    "gọi qua GIÁ TRỊ hàm: kiểu hàm không mang region ⇒ M6 coi kết quả có thể mượn từ MỌI đối số (bảo thủ có chủ đích, S1.i)"
                 } else if body.contains("≔ pick;")
                     || body.contains("≔ first;")
                     || body.contains("pick(")

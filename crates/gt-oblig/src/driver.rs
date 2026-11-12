@@ -155,6 +155,63 @@ pub fn analyze_program_with(
         bag.push(d);
     }
     let info = build_prog_info(t, m);
+    // FB-C6: hàm có `⊳` dùng làm GIÁ TRỊ ⇒ lời gọi qua giá trị không có điểm gọi để chứng minh/kiểm `⊳` (intrinsic: UB native) ⇒ từ chối
+    for (f, src) in escaped_sites(m) {
+        if info.pre.contains_key(&f) {
+            let name = m
+                .keys
+                .get(&f)
+                .map_or_else(|| "?".to_string(), |k| k.clone());
+            stats.rejected += 1;
+            bag.push(mk(
+                t,
+                "E0901",
+                src.node,
+                src.span,
+                format!("hàm `{name}` có tiền điều kiện `⊳` nhưng được dùng làm giá trị: lời gọi qua giá trị không có điểm gọi để chứng minh hay kiểm `⊳`; gọi trực tiếp, hoặc bọc trong một hàm không có `⊳` tự kiểm điều kiện"),
+            ));
+        }
+    }
+    // FB-C25: lời gọi qua tham số kiểu (`Callee::TraitMethod`) không có điểm gọi cụ thể ⇒ `⊳` của thành viên trait (hay của BẤT KỲ impl nào của nó) không
+    // được chứng minh/kiểm ⇒ từ chối (fail-closed; cách né: gọi trên kiểu cụ thể, hoặc để thân tự kiểm điều kiện)
+    for b in &m.bodies {
+        for bb in &b.blocks {
+            let Some(term) = &bb.terminator else { continue };
+            let TerminatorKind::Call {
+                callee:
+                    Callee::TraitMethod {
+                        trait_def, member, ..
+                    },
+                ..
+            } = &term.kind
+            else {
+                continue;
+            };
+            let Some(sig) =
+                t.db.traits
+                    .get(trait_def)
+                    .and_then(|tr| tr.members.get(*member))
+            else {
+                continue;
+            };
+            let in_impls = t.db.impls.iter().any(|i| {
+                i.trait_ref.as_ref().map(|r| r.trait_def) == Some(*trait_def)
+                    && i.members
+                        .iter()
+                        .any(|mm| mm.name == sig.name && info.pre.contains_key(&mm.node))
+            });
+            if sig.has_contracts || info.pre.contains_key(&sig.node) || in_impls {
+                stats.rejected += 1;
+                bag.push(mk(
+                    t,
+                    "E0901",
+                    term.source.node,
+                    term.source.span,
+                    format!("`{}` có tiền điều kiện `⊳` (ở trait hoặc ở một impl) nhưng được gọi qua tham số kiểu: không có điểm gọi cụ thể để chứng minh hay kiểm `⊳`; gọi trên kiểu cụ thể, hoặc để thân tự kiểm điều kiện", sig.name),
+                ));
+            }
+        }
+    }
     let mut bodies = Vec::with_capacity(m.bodies.len());
     let mut per_body = Vec::with_capacity(m.bodies.len());
     for b in &m.bodies {
@@ -381,16 +438,17 @@ pub fn remaining_checks_json(out: &OblOutput) -> String {
 
 // ====================================================================== thông tin hợp đồng toàn chương trình
 
-fn escaped_fns(m: &MirOutput) -> BTreeSet<gt_ast::NodeId> {
-    let mut out = BTreeSet::new();
-    let mut visit = |o: &Operand| {
-        if let Operand::Const(Const::FnItem { node, .. }) = o {
-            out.insert(*node);
-        }
-    };
+/// Mọi chỗ một hàm được dùng làm GIÁ TRỊ (`Const::FnItem` ở vị trí KHÔNG phải callee trực tiếp): (hàm, nơi dùng).
+fn escaped_sites(m: &MirOutput) -> Vec<(gt_ast::NodeId, gt_mir::SourceInfo)> {
+    let mut out = Vec::new();
     for b in &m.bodies {
         for bb in &b.blocks {
             for st in &bb.statements {
+                let mut visit = |o: &Operand| {
+                    if let Operand::Const(Const::FnItem { node, .. }) = o {
+                        out.push((*node, st.source));
+                    }
+                };
                 if let StatementKind::Assign(_, rv) = &st.kind {
                     match rv {
                         Rvalue::Use(o)
@@ -403,24 +461,39 @@ fn escaped_fns(m: &MirOutput) -> BTreeSet<gt_ast::NodeId> {
                             visit(c);
                         }
                         Rvalue::Aggregate(_, v) => v.iter().for_each(&mut visit),
-                        _ => {}
+                        // liệt kê TƯỜNG MINH: thêm biến thể `Rvalue` có toán hạng mới mà quên ở đây sẽ là lỗi biên dịch (không im lặng bỏ sót hàm thoát qua `FnItem`)
+                        Rvalue::Ref(..) | Rvalue::Len(_) | Rvalue::Discriminant(_) => {}
                     }
                 }
             }
-            match bb.terminator.as_ref().map(|t| &t.kind) {
-                Some(TerminatorKind::Call { callee, args, .. }) => {
-                    args.iter().for_each(&mut visit);
-                    if let Callee::Value(o) = callee {
-                        visit(o);
+            if let Some(t) = &bb.terminator {
+                let mut visit = |o: &Operand| {
+                    if let Operand::Const(Const::FnItem { node, .. }) = o {
+                        out.push((*node, t.source));
                     }
+                };
+                match &t.kind {
+                    TerminatorKind::Call { callee, args, .. } => {
+                        args.iter().for_each(&mut visit);
+                        if let Callee::Value(o) = callee {
+                            visit(o);
+                        }
+                    }
+                    TerminatorKind::SwitchInt { discr, .. } => visit(discr),
+                    TerminatorKind::Assert { cond, .. } => visit(cond),
+                    TerminatorKind::Goto(_)
+                    | TerminatorKind::Return
+                    | TerminatorKind::Unreachable
+                    | TerminatorKind::Drop { .. } => {}
                 }
-                Some(TerminatorKind::SwitchInt { discr, .. }) => visit(discr),
-                Some(TerminatorKind::Assert { cond, .. }) => visit(cond),
-                _ => {}
             }
         }
     }
     out
+}
+
+fn escaped_fns(m: &MirOutput) -> BTreeSet<gt_ast::NodeId> {
+    escaped_sites(m).into_iter().map(|(n, _)| n).collect()
 }
 
 /// Gom hợp đồng: trích mệnh đề từng thân `⊳`/`⊲`, chọn hàm có `⊳` được phép làm giả thiết (ADR-025 §6 + §12).

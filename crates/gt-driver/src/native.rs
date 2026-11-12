@@ -66,6 +66,12 @@ impl std::fmt::Display for NativeError {
 }
 
 /// `LLVM-C.dll` phải nằm trên PATH (nạp trễ: thiếu thì dừng Ở ĐÂY với thông báo rõ, không để tiến trình chết lúc nạp).
+#[cfg(not(windows))]
+fn check_llvm_dll() -> Result<(), NativeError> {
+    Ok(())
+}
+
+#[cfg(windows)]
 fn check_llvm_dll() -> Result<(), NativeError> {
     let path = std::env::var_os("PATH").unwrap_or_default();
     if std::env::split_paths(&path).any(|d| d.join("LLVM-C.dll").is_file()) {
@@ -78,7 +84,39 @@ fn check_llvm_dll() -> Result<(), NativeError> {
     }
 }
 
-/// Thư viện `gt_rt.lib`: biến `GRIT_RT_LIB`, hoặc bản dựng cạnh mã nguồn (dev: `runtime/gt-rt/target/release/gt_rt.lib`).
+/// Đường dẫn thư viện runtime đang dùng (cho `gritc doctor`).
+pub fn runtime_lib_path() -> Result<PathBuf, NativeError> {
+    rt_lib()
+}
+
+/// Tên + phiên bản trình liên kết đang dùng (Linux: `cc`; Windows: `link.exe` của MSVC) — cho `gritc doctor`.
+pub fn linker_probe() -> Result<String, NativeError> {
+    let mut c = linker()?;
+    #[cfg(not(windows))]
+    {
+        c.arg("--version");
+        let o = c
+            .output()
+            .map_err(|e| NativeError::Env(format!("không chạy được `cc`: {e}")))?;
+        let first = String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .next()
+            .unwrap_or("")
+            .to_string();
+        if o.status.success() {
+            Ok(first)
+        } else {
+            Err(NativeError::Env("`cc --version` thất bại".to_string()))
+        }
+    }
+    #[cfg(windows)]
+    {
+        let _ = &mut c;
+        Ok("link.exe (MSVC)".to_string())
+    }
+}
+
+/// Thư viện runtime (`gt_rt.lib` ở Windows, `libgt_rt.a` ở Linux): biến `GRIT_RT_LIB`, hoặc bản dựng cạnh mã nguồn (dev: `runtime/gt-rt/target/release/`).
 fn rt_lib() -> Result<PathBuf, NativeError> {
     if let Some(p) = std::env::var_os("GRIT_RT_LIB") {
         let p = PathBuf::from(p);
@@ -91,8 +129,11 @@ fn rt_lib() -> Result<PathBuf, NativeError> {
             )))
         };
     }
-    let dev =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtime/gt-rt/target/release/gt_rt.lib");
+    let dev = Path::new(env!("CARGO_MANIFEST_DIR")).join(if cfg!(windows) {
+        "../../runtime/gt-rt/target/release/gt_rt.lib"
+    } else {
+        "../../runtime/gt-rt/target/release/libgt_rt.a"
+    });
     if dev.is_file() {
         Ok(dev)
     } else {
@@ -103,6 +144,12 @@ fn rt_lib() -> Result<PathBuf, NativeError> {
     }
 }
 
+#[cfg(not(windows))]
+fn linker() -> Result<Command, NativeError> {
+    Ok(Command::new("cc"))
+}
+
+#[cfg(windows)]
 fn linker() -> Result<Command, NativeError> {
     let Some(tool) = find_msvc_tools::find_tool("x86_64-pc-windows-msvc", "link.exe") else {
         return Err(NativeError::Env(
@@ -215,6 +262,7 @@ pub fn build_exe_profile(
         .map_err(|e| NativeError::Link(format!("không ghi được {}: {e}", obj.display())))?;
     let mut cmd = linker()?;
     // /Brepro: bỏ dấu thời gian khỏi PE ⇒ cùng nguồn cho cùng nhị phân (tái lập, M11); không sinh PDB nên không rò đường dẫn
+    #[cfg(windows)]
     cmd.arg("/NOLOGO")
         .arg("/Brepro")
         .arg("/SUBSYSTEM:CONSOLE")
@@ -229,6 +277,14 @@ pub fn build_exe_profile(
             "dbghelp.lib",
             "/defaultlib:msvcrt",
         ]);
+    #[cfg(not(windows))]
+    cmd.arg("-no-pie")
+        .arg("-Wl,--build-id=none")
+        .arg("-o")
+        .arg(out)
+        .arg(&obj)
+        .arg(&rt)
+        .args(["-lpthread", "-ldl", "-lm"]);
     let mut r = cmd.output();
     for k in 1..=5u64 {
         let again = matches!(&r, Ok(o) if !o.status.success()

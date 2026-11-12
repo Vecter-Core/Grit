@@ -333,6 +333,10 @@ impl Builder<'_> {
                 // chỗ trước (kể cả kiểm chỉ số), rồi giá trị, rồi drop giá trị cũ, rồi ghi (semantics §3a)
                 let p = b.as_place(target)?;
                 let rv = b.as_rvalue(value)?;
+                if !Self::is_read_only(value) {
+                    // giá trị có thể làm đổi gốc của chỗ đích (`s[i] ← { s ← …; x }`): kiểm biên lại theo trạng thái lúc GHI (FB-C20)
+                    b.recheck_place(&p)?;
+                }
                 let ty = b.place_ty_of(&p)?;
                 if b.needs_drop(&ty) {
                     // giữ giá trị mới trong một tạm trong lúc drop giá trị cũ
@@ -460,6 +464,83 @@ impl Builder<'_> {
         t
     }
 
+    /// Kiểm lại biên của MỌI `Index`/`Subslice` trong `p` theo trạng thái HIỆN TẠI (FB-C20): chỗ `(*s)[i]` đọc `s` ở lúc DÙNG, nên nếu giữa lúc dựng chỗ
+    /// (kèm kiểm biên) và lúc dùng có biểu thức làm đổi `s` (`s ← &khác[..]`) thì kiểm biên cũ không còn nói gì về ô nhớ thật.
+    /// Dùng lại các tạm chỉ số đã tính (không đánh giá lại biểu thức ⇒ không lặp tác dụng phụ).
+    pub(crate) fn recheck_place(&mut self, p: &Place) -> R<()> {
+        let usz = Ty::Int(IntTy::Usize);
+        let mut pre = Place::local(p.local);
+        for e in &p.projection {
+            match e {
+                PlaceElem::Index(i) => {
+                    let len = self.temp(usz.clone());
+                    self.assign(Place::local(len), Rvalue::Len(pre.clone()));
+                    let ok = self.temp(Ty::Bool);
+                    self.assign(
+                        Place::local(ok),
+                        Rvalue::BinaryOp(
+                            BinOp::Lt,
+                            Operand::Copy(Place::local(*i)),
+                            Operand::Copy(Place::local(len)),
+                        ),
+                    );
+                    self.assert(
+                        Operand::Copy(Place::local(ok)),
+                        true,
+                        AssertKind::IndexOutOfBounds {
+                            len: Operand::Copy(Place::local(len)),
+                            index: Operand::Copy(Place::local(*i)),
+                        },
+                    )?;
+                }
+                PlaceElem::Subslice { from, to } => {
+                    let len = self.temp(usz.clone());
+                    self.assign(Place::local(len), Rvalue::Len(pre.clone()));
+                    let to_op = match to {
+                        Some(t) => Operand::Copy(Place::local(*t)),
+                        None => Operand::Copy(Place::local(len)),
+                    };
+                    self.assert_range(*from, to_op, len)?;
+                }
+                _ => {}
+            }
+            pre = pre.project(e.clone());
+        }
+        Ok(())
+    }
+
+    /// `from ≤ to ≤ len` (abort `slice_range`)
+    fn assert_range(&mut self, from: Local, to_op: Operand, len: Local) -> R<()> {
+        let a = self.temp(Ty::Bool);
+        self.assign(
+            Place::local(a),
+            Rvalue::BinaryOp(BinOp::Le, Operand::Copy(Place::local(from)), to_op.clone()),
+        );
+        let c = self.temp(Ty::Bool);
+        self.assign(
+            Place::local(c),
+            Rvalue::BinaryOp(BinOp::Le, to_op.clone(), Operand::Copy(Place::local(len))),
+        );
+        let both = self.temp(Ty::Bool);
+        self.assign(
+            Place::local(both),
+            Rvalue::BinaryOp(
+                BinOp::BitAnd,
+                Operand::Copy(Place::local(a)),
+                Operand::Copy(Place::local(c)),
+            ),
+        );
+        self.assert(
+            Operand::Copy(Place::local(both)),
+            true,
+            AssertKind::SliceRange {
+                from: Operand::Copy(Place::local(from)),
+                to: to_op,
+                len: Operand::Copy(Place::local(len)),
+            },
+        )
+    }
+
     fn index_place(&mut self, base: &Expr, index: &Expr) -> R<Place> {
         let (p, ty) = self.autoderef_place(base)?;
         if !matches!(ty, Ty::Array(..) | Ty::Slice(_)) {
@@ -473,7 +554,7 @@ impl Builder<'_> {
             inclusive,
         } = &index.kind
         {
-            // lát con: from ≤ to ≤ len
+            // lát con: from ≤ to ≤ len. Đánh giá `from`, `to` TRƯỚC rồi mới đọc độ dài (FB-C20: `&s[0..{ s ← …; n }]`)
             let from = match start {
                 Some(s) => {
                     let o = self.as_operand(s)?;
@@ -481,79 +562,60 @@ impl Builder<'_> {
                 }
                 None => self.usize_temp(Operand::Const(int_const(0, IntTy::Usize))),
             };
-            self.assign(Place::local(len), Rvalue::Len(p.clone()));
             let to = match end {
                 Some(e) => {
                     let o = self.as_operand(e)?;
-                    let t = self.usize_temp(o);
-                    if *inclusive {
-                        // `..=b`: b < len trước, nên b + 1 không tràn
-                        let ok = self.temp(Ty::Bool);
-                        self.assign(
-                            Place::local(ok),
-                            Rvalue::BinaryOp(
-                                BinOp::Lt,
-                                Operand::Copy(Place::local(t)),
-                                Operand::Copy(Place::local(len)),
-                            ),
-                        );
-                        self.assert(
-                            Operand::Copy(Place::local(ok)),
-                            true,
-                            AssertKind::IndexOutOfBounds {
-                                len: Operand::Copy(Place::local(len)),
-                                index: Operand::Copy(Place::local(t)),
-                            },
-                        )?;
-                        self.assign(
-                            Place::local(t),
-                            Rvalue::BinaryOp(
-                                BinOp::AddWrap,
-                                Operand::Copy(Place::local(t)),
-                                Operand::Const(int_const(1, IntTy::Usize)),
-                            ),
-                        );
-                    }
-                    Some(t)
+                    Some(self.usize_temp(o))
                 }
                 None => None,
             };
+            let may_mutate = start.as_ref().is_some_and(|s| !Self::is_read_only(s))
+                || end.as_ref().is_some_and(|e| !Self::is_read_only(e));
+            if may_mutate {
+                // các chỉ số có thể đã làm đổi gốc của `p` (kiểm biên của phần tiền tố được dựng trước đó thành cũ)
+                self.recheck_place(&p)?;
+            }
+            self.assign(Place::local(len), Rvalue::Len(p.clone()));
+            if let (true, Some(t)) = (*inclusive, to) {
+                // `..=b`: b < len trước, nên b + 1 không tràn
+                let ok = self.temp(Ty::Bool);
+                self.assign(
+                    Place::local(ok),
+                    Rvalue::BinaryOp(
+                        BinOp::Lt,
+                        Operand::Copy(Place::local(t)),
+                        Operand::Copy(Place::local(len)),
+                    ),
+                );
+                self.assert(
+                    Operand::Copy(Place::local(ok)),
+                    true,
+                    AssertKind::IndexOutOfBounds {
+                        len: Operand::Copy(Place::local(len)),
+                        index: Operand::Copy(Place::local(t)),
+                    },
+                )?;
+                self.assign(
+                    Place::local(t),
+                    Rvalue::BinaryOp(
+                        BinOp::AddWrap,
+                        Operand::Copy(Place::local(t)),
+                        Operand::Const(int_const(1, IntTy::Usize)),
+                    ),
+                );
+            }
             let to_op = match to {
                 Some(t) => Operand::Copy(Place::local(t)),
                 None => Operand::Copy(Place::local(len)),
             };
-            let a = self.temp(Ty::Bool);
-            self.assign(
-                Place::local(a),
-                Rvalue::BinaryOp(BinOp::Le, Operand::Copy(Place::local(from)), to_op.clone()),
-            );
-            let c = self.temp(Ty::Bool);
-            self.assign(
-                Place::local(c),
-                Rvalue::BinaryOp(BinOp::Le, to_op.clone(), Operand::Copy(Place::local(len))),
-            );
-            let both = self.temp(Ty::Bool);
-            self.assign(
-                Place::local(both),
-                Rvalue::BinaryOp(
-                    BinOp::BitAnd,
-                    Operand::Copy(Place::local(a)),
-                    Operand::Copy(Place::local(c)),
-                ),
-            );
-            self.assert(
-                Operand::Copy(Place::local(both)),
-                true,
-                AssertKind::SliceRange {
-                    from: Operand::Copy(Place::local(from)),
-                    to: to_op,
-                    len: Operand::Copy(Place::local(len)),
-                },
-            )?;
+            self.assert_range(from, to_op, len)?;
             return Ok(p.project(PlaceElem::Subslice { from, to }));
         }
         let o = self.as_operand(index)?;
         let i = self.usize_temp(o);
+        if !Self::is_read_only(index) {
+            self.recheck_place(&p)?;
+        }
         self.assign(Place::local(len), Rvalue::Len(p.clone()));
         let ok = self.temp(Ty::Bool);
         self.assign(
@@ -1400,6 +1462,10 @@ impl Builder<'_> {
             // (ADR-022 §5: `x.consume(x.len())` hợp lệ — đối số đánh giá trước khi người nhận bị tiêu thụ)
             let es: Vec<&Expr> = args.iter().collect();
             let ops = self.seq_operands(&es, true)?;
+            if !es.iter().all(|a| Self::is_read_only(a)) {
+                // đối số có thể đã đổi gốc của người nhận (FB-C20): kiểm biên lại ngay trước khi mượn/dùng người nhận
+                self.recheck_place(&recv)?;
+            }
             let mut spans = vec![base.span];
             spans.extend(args.iter().map(|a| a.span));
             let rty = self.place_ty_of(&recv)?;

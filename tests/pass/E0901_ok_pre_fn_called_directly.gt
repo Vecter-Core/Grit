@@ -1,0 +1,4 @@
+// expect: pass
+// note: đối chứng FB-C6 — hàm có ⊳ gọi TRỰC TIẾP với đối số thoả ⊳ (không làm giá trị)
+ƒ pos(n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ main() → i32 ! ∅ { pos(5) }

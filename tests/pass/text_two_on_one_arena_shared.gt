@@ -1,0 +1,10 @@
+// expect: pass
+// note: R6 (Arena chia sẻ): hai Text cùng sống trên MỘT Arena là hợp lệ (trước đây E0402 vì Vec giữ &!Arena độc quyền)
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μa ≔ Text::new(&ar);
+  μb ≔ Text::new(&ar);
+  a.push_str("x");
+  b.push_str("y");
+  a.len() as u64
+}

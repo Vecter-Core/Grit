@@ -146,3 +146,75 @@ Phương pháp: viết test chạm đúng nhánh, hoàn nguyên CHỈ chỗ sử
 - **Phân loại:** lỗi THẬT nhưng nhẹ (núm điều khiển tài nguyên, KHÔNG phải kiểm tra an toàn bộ nhớ): người đặt giới hạn tưởng có mà không có; fail-open của một cấu hình.
 - **Sửa:** giá trị sai hoặc không phải UTF-8 ⇒ `arena_exhausted` (abort, mã thoát 70) kèm thông báo; không đặt ⇒ không giới hạn như cũ.
 - **Bằng chứng:** `crates/gt-driver/tests/llvm_vec.rs::malformed_arena_limit_is_not_silently_unlimited` (4 giá trị sai + 1 đúng). Test đỏ chứng kiến qua lần chạy với `gt_rt.lib` cũ (không commit riêng vì cần dựng lại runtime release).
+## Hồ sơ nhánh `claude/gallant-darwin-m251cq` (tiền tố FB-C để merge không trùng số với bản Windows)
+Phát hiện bằng kiểm toán ngoài 2026-10-20/21 (Linux). Mỗi mục: test hồi quy ĐỎ TRƯỚC sửa đã được kiểm bằng cách hoàn nguyên bản sửa (bảng ở `docs/FAIL_OPEN_AUDIT.md` mục "F-01..F-08"). Chi tiết tái hiện: `audit/ANALYSIS.md`.
+
+### FB-C1 — M6 không thấy nhiều toán hạng cùng một câu lệnh (kiểu (a), âm tính giả, NGHIÊM TRỌNG) — ĐÃ SỬA
+`(b, b)`, `two(b, b)`, `[b, b]`, `P { a: b, b: b }`, `g(b, b.v)` với `b` không-Copy được phán XANH ⇒ nhân đôi `&!`/`Cap`/tay cầm Arena; native: dùng-sau-reset đọc 99 thay vì 1234. Gốc: `check_uses` đối chiếu mọi truy cập với trạng thái chưa-khởi-tạo ĐẦU câu lệnh. Sửa: bản sao cục bộ + áp move sau mỗi truy cập `Move`. Test: `gt-borrowck/tests/same_stmt.rs`, 14 mẫu `tests/fail/E0401_{same_stmt,dup}_*`. Chạm điều kiện cứng #9 (mutability bên trong): không. Còn thiếu: kịch bản `dup_operand` trong bộ sinh progen (S1).
+### FB-C2 — kiểu không biết/vô hạn kích thước được chấp nhận (kiểu (a)) — ĐÃ SỬA
+`[T]`/`str` theo giá trị ở tham số/trả về/trường (chỉ `let` bị chặn); kiểu chứa chính nó theo giá trị ⇒ `gritc` tràn ngăn xếp (mã 134) ở codegen. Sửa: `sized_ty` trong `elem_ty`/tham số/trả về; `contains_itself_by_value` (kể cả qua ADT generic, đa hình bung vô hạn) ⇒ E0301. Test: 9 mẫu `tests/fail/E0301_*`, 1 mẫu pass.
+### FB-C3 — nguồn capability gọi qua giá trị hàm (kiểu (a), điều kiện #12) — ĐÃ SỬA
+`helper(mk: ƒ() → Cap<Out>)` + `main` gọi `helper(root_out)` ⇒ `helper` đúc `Cap<Out>` tuỳ ý. Sửa: lời gọi qua giá trị hàm ghi `CapUse` (E0310). ĐO trước/sau: `docs/INTRINSIC_AS_VALUE.md`. Test: `E0310_call_through_fn_value`, `E0310_call_through_local_fn_value`, pass `206_fn_value_with_cap_param`.
+### FB-C4 — tên biến ở vị trí kiểu ⇒ ICE E9901 thay vì chẩn đoán (kiểu (a)/(d), fail-closed) — ĐÃ SỬA
+`ƒ f(b: i32) → b` ⇒ `Ty::Err` không chẩn đoán (`collect.rs`). Sửa: E0301. Test `E0301_local_name_in_type_position`.
+### FB-C5 — hàm kết hợp `Kiểu::hàm` dùng làm giá trị MẤT hiệu ứng (kiểu (a), âm tính giả) — ĐÃ SỬA (S1.iii)
+`Arena::new` (`{mem}`), `S::mk` (`{io}`) truyền vào tham số thuần hoặc gọi qua biến trong hàm thuần: XANH; gọi trực tiếp: E0801. Gốc: `call.rs` nhánh đường dẫn kết hợp dựng `Ty::Fn(ps, ret, Vec::new())`. Sửa: `Pick.effects` (traits.rs) → `Ty::Fn`. Test: 4 mẫu fail (`E0801_assoc_fn_value_*`, `E0301_assoc_fn_value_*`) + 3 mẫu pass; đỏ trước ở commit `a5da840` (corpus lệch 5), xanh ở `fdce836`.
+### FB-C6 — tiền điều kiện `⊳` không được kiểm khi gọi qua giá trị hàm (kiểu (a), âm tính giả) — ĐÃ SỬA (S1.ii)
+`f ≔ shl; f(1u32, 40u32)` XANH (trực tiếp: E0901); native: `shl` với n ≥ 32 là poison/UB của LLVM; thông dịch: ICE "MIR không hợp lệ". Cùng `rotr`, hàm người dùng có `⊳` (chạy ra 0, ⊳ bị bỏ qua), `Option::unwrap`. Sửa (`gt-oblig/src/driver.rs`): hàm có `⊳` dùng làm giá trị ⇒ E0901 (fail-closed; cách né: bọc trong hàm không có `⊳` tự kiểm). ADR-C02. Test: 4 mẫu fail `E0901_pre_fn_value_*` + 3 pass; đỏ trước `a5c4295`, xanh `f000546`.
+### FB-C7 — `gritc` hoàn toàn không dựng được ngoài Windows / `--no-default-features` hỏng (kiểu (c)) — ĐÃ SỬA
+Kiểu `Opt` thay thế khi tắt feature `llvm`; test `release_*` gắn cfg; port Linux (LLVM 20 `.so`, `libgt_rt.a`, `cc`). Windows: chưa kiểm sau sửa.
+### FB-C8 — chương trình hợp lệ bị HĐH giết do ngăn xếp (kiểu (b)) — ĐÃ SỬA (giới hạn 256 MiB)
+Đệ quy 2 triệu tầng có `↓`, mảng 20 MB cục bộ ⇒ SIGSEGV, `gritc run` báo mã 2. Sửa: `gritrt_start` chạy `main` trên luồng 256 MiB. Test `gt-driver/tests/stack_depth.rs`. Còn: tràn quá 256 MiB vẫn bị giết (KNOWN_LIMITATIONS).
+### FB-C9 — M6: lát lấy từ `Vec` sống qua `Arena::reset` (kiểu (a), âm tính giả, dùng-sau-reset) — ĐÃ SỬA
+Tồn tại TRƯỚC R6 (ĐO ở bản `53bfb4d`, `Vec::new(&!ar)`): `s ≔ v.as_slice(); ar.reset(); s[0]` ⇒ XANH. Gốc: `Rvalue::Ref` không thêm ràng buộc WF (`'a: 'b` cho mọi region bên trong kiểu `T` của `&'b T`) nên khoản vay Arena giữ trong `v` không sống tới lần dùng `s`. Sửa: `regions.rs::assign` thêm `outl(region bên trong pslots, [region của khoản vay])`. Test: `E0405_vec_view_alive_across_reset` (đỏ ở commit WIP `R6 (WIP)`, xanh sau sửa); oracle `arena_vec` TỰ bắt khi tắt sửa (`#1241`). Chạm điều kiện #9: không (không đổi mutability bên trong); chạm D27 (Arena): có — đã đóng.
+
+### FB-C10 — ADT `Copy` generic không được coi là Copy dưới `K: Copy` trong phạm vi (kiểu (b), từ chối chương trình hợp lệ; chặn HashMap trong std) — ĐÃ SỬA
+`▢ E<K> { k: K } ⊐ <K: Copy> Copy for E<K> { }` + `ƒ f<'a, K: Copy>(v: &Vec<'a, E<K>>)` ⇒ E0318 sai. Gốc: `TypeDb::find_impl` kiểm ràng buộc inline của impl với phạm vi RỖNG. Sửa: truyền `scope` (`db.rs`). Fail-closed giữ nguyên (không có `K: Copy` ⇒ vẫn E0318). Test ĐỎ trước: `traits_generics::generic_copy_adt_is_copy_under_its_scope_bounds_fb_c10` (commit riêng trước bản sửa).
+
+### FB-C12 — thông dịch MIR không ghi được qua lát (`s[i] ← x`, `s = &!a[from..to]`) (kiểu (c), thông dịch ≠ LLVM; ICE fail-closed) — ĐÃ SỬA
+Phát hiện bởi bộ kiểm std2 (`[T]::sort` trên mảng): thông dịch `Bug("ghi vào lát")` ⇒ "MIR không hợp lệ", LLVM đúng. Sửa: `interp.rs::set_at` ghi qua cửa sổ `Step::Sub` (chép cửa sổ, ghi, chép lại; kiểm độ dài). Test ĐỎ trước: `gt-mir/tests/interp_slice_write.rs`. Thông dịch nằm NGOÀI TCB (công cụ test): lỗi này là khoảng trống của công cụ đối chiếu, không phải lỗ hổng an toàn.
+
+### FB-C13 — `==`/`≠` trên `&str`, tuple, `&T`: M4 chấp nhận nhưng backend LLVM từ chối; thông dịch so ĐỊA CHỈ cho `&T` (kiểu (b)/(c)) — ĐÃ SỬA
+Phát hiện khi viết K4 (`a == "-c"` trên `&str`): cổng XANH, `rig build` ⇒ "backend llvm chưa hỗ trợ: phép hai ngôi Eq trên Ref(false, Str)" (mã 3). Thăm dò thêm: tuple cũng bị LLVM từ chối; `&2u32 == &2u32` trong thông dịch ra `false` (so địa chỉ) — thông dịch và LLVM (nếu cài) sẽ bất đồng. Sửa: (1) `&str == &str` cài ở LLVM bằng `gritrt_bytes_eq` (thuần, so BYTE; Guard + TCB row; ≥ 144 cặp × 2 backend × 3 hồ sơ; đột biến Eq↔Ne bị bắt); (2) M4 chỉ nhận `==` cho số nguyên/bool/char/`&str`; tuple và `&T` (T ≠ str) ⇒ E0301 ("chưa hỗ trợ", dùng `*a == *b`). Hai test cũ (`equality_is_limited_to_comparable_types`, `…floats…d4`) từng khẳng định tuple `==` hợp lệ: ĐÃ SỬA có ghi chú (thu hẹp bề mặt ngôn ngữ, fail-closed). Test ĐỎ trước: `gt-driver/tests/str_eq.rs`, `gt-types/tests/traits_generics.rs::equality_is_limited_to_scalars_and_str_fb_c13`.
+
+### FB-C14 — `as` từ số thực suy diễn sang số nguyên lọt qua M4 (kiểu (a), cấm D1/Q70 bị lách; fail-closed ở backend) — ĐÃ SỬA
+Phát hiện bởi người viết LANGUAGE_REFERENCE khi thử: `x ≔ 1.5; x as i32` ⇒ gritc check XANH (chỉ N0604), `gritc run` thoát 3 "backend llvm chưa hỗ trợ: kiểm ép kiểu Float → Int". `x: f64`/`1.5f64` thì E0319 đúng. Gốc: `cast()` so `Ty::Float(_)` sau `shallow`, bỏ sót biến suy diễn số thực. Sửa: dùng `is_float`. Test ĐỎ trước: `traits_generics::float_to_int_cast_through_an_inferred_float_literal_is_e0319_fb_c14`.
+
+### FB-C15 — đệ quy qua `[f; N]` (`Rvalue::Repeat`) không bị E0703 (kiểu (a), âm tính giả; gt-term) — ĐÃ SỬA
+Phát hiện bởi đọc mã đối kháng nhóm gt-term (S7). Gốc: tập toán hạng "hàm thoát làm giá trị" (đồ thị instance và tập escaped) bỏ sót `Rvalue::Repeat`. Sửa: `gt-term/src/lib.rs` thêm `Repeat(o,_)` ở cả hai chỗ. Test ĐỎ trước: `gt-term/tests/instance_graph.rs` (commit `7312474`), xanh `de29fc8`.
+
+### FB-C16 — `⊐ <T> Copy for W<T>` không đòi `T: Copy` (kiểu (a), âm tính giả; chạm bất biến Copy ⇒ nhân đôi tài nguyên) — ĐÃ SỬA
+`validate_copy_impl` kiểm trường với tham số kiểu chưa thế và phạm vi rỗng. Sửa: thế đối số của `imp.self_ty`, dựng `scope` từ ràng buộc của impl, kiểm từng trường (E0311). Test ĐỎ trước: `traits_generics.rs` (commit `fec1768`), xanh `8ba2da0`.
+
+### FB-C17 — `Copy` cho `Arena/Mutex/Atomic/Cell`, và `Cell::get` không đòi `T: Copy` (kiểu (a)) — ĐÃ SỬA
+Cùng commit với FB-C16: `validate_copy_impl` cấm Copy cho `Lang::{Secret,Cap,Vec,Text,Arena,Mutex,Atomic,Cell}` (E0313); prelude tách `Cell::get` sang `impl<T: Copy>`. Hệ quả: băm attestation của prelude đổi (golden `tests/golden_ll` phải bless lại ở lần chốt).
+
+### FB-C18 — `main` có tham số ở tệp khác được miễn E0310; `Cap` bọc trong struct không bị coi là capability (kiểu (a), điều kiện #12) — ĐÃ SỬA
+Sửa: `entry` đòi `params.is_empty()` (như `find_main`); `has_cap` đệ quy vào trường struct/enum (có tập `seen` chống vòng). Test ĐỎ trước commit `9711062`, xanh `0b7e60e`.
+
+### FB-C19 — `==` trên biến suy diễn CHƯA giải lúc gặp toán tử lọt qua cấm float (D4, E0303) và cấm tuple (kiểu (a)) — ĐÃ SỬA
+`x ≔ None; … v == v …; x ← Some(1.5)` XANH (`eq_ok(Infer) = true`, `is_float` thấy biến chung). Sửa: `Checker.eq_deferred` ghi (node, span, kiểu) khi toán hạng là biến suy diễn chưa biết; `finish` kiểm lại bằng `check_eq_operand` sau `default_literals`. Test ĐỎ trước `1a5d2ae`, xanh `f0188d2`.
+
+### FB-C20 — kiểm biên lát/chỉ số dùng độ dài CŨ khi `s` bị gán lại trước lúc dùng chỗ ⇒ đọc/ghi ngoài mảng ở LLVM (kiểu (a), NGHIÊM TRỌNG: an toàn bộ nhớ) — ĐÃ SỬA
+Phát hiện bởi đọc mã đối kháng nhóm C (S7): `μs ≔ &big[0..4096]; t ≔ &s[0..{ s ← &small[0..2]; 2000 }]` ⇒ XANH, native đọc 2000 byte từ mảng 2 phần tử (`2000000013989`); cùng dạng GHI qua `&!` (`victim` bị đè), gán `s[50] ← { s ← …; 9 }`, người nhận `s[50].get({ s ← …; 1 })`. Thông dịch: "MIR không hợp lệ". Gốc (`gt-mir/src/build/expr.rs`): (1) lát tính `Len` TRƯỚC khi đánh giá đầu mút `to`; (2) chỗ `(*s)[i]` đọc `s` ở lúc DÙNG, còn kiểm biên làm lúc DỰNG chỗ — giữa hai thời điểm (giá trị vế phải của gán, đối số của lời gọi phương thức, chỉ số của chỉ số lồng) có thể đổi `s`. Sửa: `index_place` đánh giá `from`/`to` rồi mới đọc `Len`; `recheck_place` phát lại `Len`+`Assert` (dùng lại tạm chỉ số, KHÔNG đánh giá lại biểu thức) cho mọi `Index`/`Subslice` của chỗ ngay trước chỗ dùng bị hoãn (gán, người nhận phương thức, tiền tố của chỉ số không "chỉ đọc"). Chỉ phát khi biểu thức đứng giữa KHÔNG `is_read_only` ⇒ không tốn gì cho mã thường. Test ĐỎ trước: `gt-driver/tests/slice_stale_len.rs` (5 ca × llvm dev/release/release-o2 + thông dịch; commit riêng). Golden `aggregates.mir` đổi thứ tự `Len` (chủ đích) và 3 golden IR bless lại (băm attestation đổi do FB-C17 + sửa này; giữ dòng `target` Windows).
+
+### FB-C21 — thứ tự khởi tạo `■` chỉ theo phụ thuộc TRỰC TIẾP: static đọc qua hàm (kể cả giá trị hàm) bị đọc khi còn ZERO-INIT (kiểu (a), NGHIÊM TRỌNG: gọi con trỏ hàm NULL từ chương trình "xanh") — ĐÃ SỬA
+Phát hiện bởi đọc mã đối kháng nhóm D (D10): `■ A ≔ f(); ■ Z ≔ 9; ƒ f() { Z + 1 }` ⇒ A = 1 (đúng: 10); `■ A ≔ run(); ■ F: ƒ(u32)→u32 ≔ id; ƒ run() { F(41) }` ⇒ SIGSEGV (gọi con trỏ NULL); luồng sinh trong initializer thấy Z = 0. Gốc (`lower.rs`): `static_refs` chỉ thu thập static nhắc trong thân initializer. Sửa: codegen ghi cạnh instance→instance (mọi `get_fn`: gọi trực tiếp, giá trị hàm, `spawn`) và instance→static; thứ tự = DFS hậu thứ tự trên BAO ĐÓNG BẮC CẦU; vòng phụ thuộc (kể cả static đọc chính nó qua hàm) ⇒ `Unsupported` (mã 3, KHÔNG chạy). Bảo thủ: một hàm chỉ NHẮC tới `g` mà không gọi cũng tạo cạnh (chỉ làm thêm ràng buộc thứ tự/vòng giả, không bao giờ bỏ sót). Test ĐỎ trước: `gt-driver/tests/static_init_order.rs` (4 ca × 3 hồ sơ).
+
+### FB-C22 — ordering của `Atomic` là local bị mượn `&!` (kiểu (a); lệch bất biến TCB "ordering đúng như mã nguồn") — ĐÃ SỬA
+`μo ≔ Relaxed; weaken(&!o); A.store(7, o)` ⇒ M8 và codegen coi là Relaxed (IR `monotonic`) dù lúc chạy `o` = SeqCst. Sửa: `gt-conc::variant_of` và `prescan` của codegen coi local bị `&!` (hay thành phần của nó) là KHÔNG truy ngược được ⇒ E0503. Test ĐỎ trước: `tests/fail/E0503_ordering_mut_borrowed{,_copy}.gt`.
+
+### FB-C23 — `alloca` của `io.res`/`cas.res`/`rep.i` đặt tại chỗ gọi ⇒ cấp ngăn xếp mỗi vòng lặp (kiểu (b), chương trình hợp lệ chết SIGSEGV) — ĐÃ SỬA
+40 triệu lần `fs.open("/không-tồn-tại")` trong vòng lặp có `↓` ⇒ SIGSEGV (exit 139) ở dev và release-o2. Sửa: `entry_alloca` (khối đầu hàm). Test ĐỎ trước: `gt-driver/tests/alloca_entry.rs` (mọi `alloca` của IR ở khối entry; dev + release-o2).
+
+### FB-C24 — `imut` coi ADT lạ là "không có mutability bên trong" (kiểu (a), fail-open phòng thủ) — ĐÃ SỬA
+`db.rs::imut` trả `false` khi ADT không có trong db ⇒ vị từ trên kiểu đó bị coi là sự kiện ổn định ở M7. Sửa: trả `true` (bảo thủ). Test ĐỎ trước: `db::imut_tests` (không có đường thật dẫn tới đây; chứng minh nhánh phòng thủ).
+
+### FB-C25 — `⊳` của thành viên trait KHÔNG được kiểm khi gọi qua tham số kiểu (kiểu (a), âm tính giả; trái tài liệu "mỗi lời gọi trực tiếp vẫn bị kiểm") — ĐÃ SỬA
+`⊏ Tr { ƒ f(&self, n: i32) → i32 ! ∅ ⊳ n > 0; } … ƒ g<T: Tr>(t: &T) { t.f(0) }` ⇒ XANH, chạy ra 0 (gọi trực tiếp `s.f(0)` thì E0901). Hợp đồng ở khai báo trait (không thân) không hề được lowering; hợp đồng ở impl không được áp tại điểm gọi `Callee::TraitMethod`. Sửa (fail-closed, `gt-oblig/src/driver.rs`): lời gọi `Callee::TraitMethod` tới thành viên có `⊳`/`⊲` (ở trait HOẶC ở bất kỳ impl nào) ⇒ E0901 (cách né: gọi trên kiểu cụ thể, hoặc cho thân tự kiểm điều kiện). `FnSigInfo.has_contracts` mới. Test ĐỎ trước: `tests/fail/E0901_pre_trait_method_{via_generic,impl_via_generic}.gt`.
+
+### FB-C26 — nguyên tử "nghĩa vụ không biểu diễn được" tràn sang dải nguyên tử vị từ khi hàm ≥ 1024 khối (kiểu (a), điều kiện #… M7; CHỈ `--checks=proven`) — ĐÃ SỬA (hardening, chưa có PoC)
+`unrep_atom = UNREP_BASE + bb*1024 + idx.min(1023)`, `UNREP_BASE + 1024*1024 = PRED_BASE` ⇒ ở khối ≥ 1024 nguyên tử có thể trùng nguyên tử vị từ thuần (pi, local) đã được giả định đúng ⇒ một `⊳` không biểu diễn được bị "chứng minh" sai. 33 cỡ hàm thử bởi người đọc đối kháng KHÔNG tái hiện được; bằng chứng duy nhất là số học (xem `unrep_tests`). Sửa: `unrep_atom_id(bb, idx)` đơn ánh, `UNREP_SLOTS = 32` ô/khối, nằm trọn trong `[UNREP_BASE, PRED_BASE)`; thân vượt `UNREP_MAX_BLOCKS` (32768 khối) ⇒ `fixpoint` từ chối (giữ MỌI check). Test: `analysis::unrep_tests`.
+
+### FB-C27 — IR Guard: địa chỉ của khai báo ngoài không phải `gritrt_*` (vd `@system`) có thể lưu rồi gọi gián tiếp (kiểu (a), phòng thủ; cần lỗi codegen khác để có IR như vậy) — ĐÃ SỬA
+Luật "địa chỉ chỉ làm đích gọi trực tiếp" chỉ áp cho `gritrt_*`. Sửa: áp cho MỌI hàm chỉ khai báo trừ `llvm.*`. Test ĐỎ trước: `gt-guard/tests/guard.rs::external_declarations_may_only_be_called_directly_fb_c27`. Không có chương trình Grit nào sinh được IR như vậy (Guard là lớp thứ hai).

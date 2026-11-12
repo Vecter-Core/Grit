@@ -1,0 +1,3 @@
+// case: struct chứa chính nó theo giá trị (kích thước vô hạn) — M4 chấp nhận; backend LLVM làm TIẾN TRÌNH gritc tràn ngăn xếp (không phải ICE mã 2)
+▢ L { n: i32, next: Option<L> }
+ƒ main() → i32 ! ∅ { x ≔ L { n: 1, next: Option::None }; x.n }

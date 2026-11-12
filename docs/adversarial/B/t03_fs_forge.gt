@@ -1,0 +1,6 @@
+ƒ main() ! {io} {
+  f ≔ Fs { x: 0 };
+  c ≔ Cap { v: f };
+  out ≔ root_out();
+  out.write_u64(c.read("/etc/hostname").len());
+}

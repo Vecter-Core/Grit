@@ -71,7 +71,7 @@ fn reserve_prog(elem: &str, n: &str) -> String {
     format!(
         "ƒ main() → u64 ! {{mem}} {{
   μar ≔ Arena::new();
-  μv: Vec<{elem}> ≔ Vec::new(&!ar);
+  μv: Vec<{elem}> ≔ Vec::new(&ar);
   v.reserve({n});
   v.len() as u64
 }}

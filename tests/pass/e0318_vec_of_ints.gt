@@ -2,7 +2,7 @@
 // note: Vec<u64>: số nguyên không cần drop
 ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.push(1u64);
   v.push(2u64);
   v.len() as u64

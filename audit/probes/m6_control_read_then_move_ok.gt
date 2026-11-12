@@ -1,0 +1,6 @@
+// probe: accept
+// why: đối chứng dương: đọc b.v rồi mới move b trong cùng lời gọi
+▢ B { v: i32 }
+ƒ g(n: i32, b: B) ! ∅ { }
+ƒ f(b: B) ! ∅ { g(b.v, b); }
+ƒ main() → i32 ! ∅ { 0 }

@@ -1,0 +1,10 @@
+// expect: fail E0401
+// note: nhân đôi tay cầm Arena bằng dup ⇒ reset qua bản này, đọc qua bản kia = dangling (E0405 chỉ bám theo biến)
+ƒ dup<T>(x: T) → (T, T) ! ∅ { (x, x) }
+ƒ main() → i32 ! {mem} {
+  a ≔ Arena::new();
+  μp ≔ dup(a);
+  r ≔ p.1.alloc(5);
+  p.0.reset();
+  *r
+}

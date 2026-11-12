@@ -1,0 +1,11 @@
+// expect: fail E0503
+// note: FB-C22: cùng lỗi qua một bản sao trung gian (o2 ≔ o; &!o2)
+■ A: Atomic<u32> ≔ Atomic::new(0u32);
+ƒ weaken(o: &!AtomicOrdering) ! ∅ { *o ← AtomicOrdering::SeqCst; }
+ƒ main() → u32 ! ∅ {
+  o ≔ AtomicOrdering::Relaxed;
+  μo2 ≔ o;
+  weaken(&!o2);
+  A.store(7u32, o2);
+  A.load(AtomicOrdering::SeqCst)
+}

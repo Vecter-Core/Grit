@@ -1,0 +1,5 @@
+// expect: fail E0901
+// note: FB-C6 — hàm có ⊳ truyền làm đối số hàm cấp cao hơn
+ƒ pos(n: i32) → i32 ! ∅ ⊳ n > 0 { n }
+ƒ ap(f: ƒ(i32) → i32 ! ∅, x: i32) → i32 ! ∅ { f(x) }
+ƒ main() → i32 ! ∅ { ap(pos, 0) }

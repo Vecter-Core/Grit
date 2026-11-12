@@ -1021,3 +1021,30 @@ fn a_bad_use_is_caught_wherever_it_sits_among_the_uses_of_a_runtime_address() {
         assert!(has(&v, "gritrt_alloc"), "store_first={store_first}: {v:?}");
     }
 }
+
+/// FB-C27 (đọc mã đối kháng nhóm E, E-4/FAIL_OPEN_AUDIT guard:57): luật địa chỉ chỉ áp cho `gritrt_*`; một khai báo NGOÀI khác (vd `@system`) có địa chỉ được lưu rồi
+/// gọi gián tiếp thì không bị luật "đích mọi lời gọi". Quy tắc đúng: địa chỉ của MỌI hàm chỉ khai báo (trừ `llvm.*`) chỉ được dùng làm đích gọi trực tiếp.
+#[test]
+fn external_declarations_may_only_be_called_directly_fb_c27() {
+    let ctx = Context::create();
+    let w = world(&ctx, true, Some(ATT));
+    let f = w.func("f");
+    let ptr = ctx.ptr_type(Default::default());
+    let sys_ty = ctx.i32_type().fn_type(&[ptr.into()], false);
+    let sys = w.m.add_function("system", sys_ty, None);
+    let slot = w.b.build_alloca(ptr, "slot").expect("alloca");
+    w.b.build_store(slot, sys.as_global_value().as_pointer_value())
+        .expect("store");
+    let fp =
+        w.b.build_load(ptr, slot, "fp")
+            .expect("load")
+            .into_pointer_value();
+    w.b.build_indirect_call(sys_ty, fp, &[ptr.const_null().into()], "")
+        .expect("indirect");
+    finish_ok(&w, f);
+    let v = w.check();
+    assert!(
+        has(&v, "system"),
+        "địa chỉ của khai báo ngoài bị dùng gián tiếp mà được CHẤP NHẬN: {v:?}"
+    );
+}

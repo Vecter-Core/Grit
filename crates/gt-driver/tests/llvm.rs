@@ -285,6 +285,7 @@ fn red_program_produces_no_exe_and_no_run() {
 }
 
 /// ĐIỀU KIỆN CỦA GIANG: exe do gritc sinh KHÔNG phụ thuộc LLVM-C.dll lúc chạy (và không DLL lạ nào ngoài hệ thống/CRT).
+#[cfg(windows)] // dùng `dumpbin.exe` của MSVC
 #[test]
 fn built_exe_does_not_depend_on_llvm_dll() {
     let dir = scratch("deps");
@@ -359,6 +360,8 @@ fn built_exe_does_not_depend_on_llvm_dll() {
 }
 
 /// `gritc check` KHÔNG cần LLVM (nạp trễ): chạy với PATH không có LLVM-C.dll.
+#[cfg(windows)]
+// khái niệm `LLVM-C.dll` trên PATH chỉ có ở Windows (Linux liên kết `libLLVM-20.so` lúc dựng)
 #[test]
 fn check_runs_without_llvm_on_path() {
     let dir = scratch("nollvm");
@@ -669,7 +672,15 @@ fn default_backend_is_llvm_and_is_stated() {
 }
 
 /// Golden test trên LLVM IR (ADR-029 §7 (c)): IR của vài chương trình nhỏ phải KHÔNG đổi ngoài ý muốn. Cập nhật có chủ đích:
-/// `GT_UPDATE_GOLDEN=1` rồi xem `git diff tests/golden_ll`. IR phụ thuộc đúng LLVM 20.1.8 (docs/ENVIRONMENT.md).
+/// `GT_UPDATE_GOLDEN=1` rồi xem `git diff tests/golden_ll`. IR phụ thuộc đúng LLVM 20.1.8 (docs/ENVIRONMENT.md); hai dòng `target triple` và
+/// `target datalayout` thuộc về nền tảng nên KHÔNG so (phần còn lại của IR giống từng byte giữa Windows và Linux).
+fn without_target_lines(ir: &str) -> String {
+    ir.lines()
+        .filter(|l| !l.starts_with("target triple") && !l.starts_with("target datalayout"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn golden(name: &str, src: &str) {
     let dir = scratch(name);
     let f = dir.join("prog.gt");
@@ -706,8 +717,8 @@ fn golden(name: &str, src: &str) {
             })
             .replace("\r\n", "\n");
         assert_eq!(
-            ir,
-            want,
+            without_target_lines(&ir),
+            without_target_lines(&want),
             "IR của `{name}` đổi so với golden {}",
             gold.display()
         );

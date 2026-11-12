@@ -438,6 +438,13 @@ impl<'a> Gen<'a> {
                     self.relate(inner, &pslots, &rest, *m);
                 }
                 let _ = pty;
+                // ràng buộc đúng-đắn (WF/implied bound) của `&'b T`: mọi region BÊN TRONG kiểu được mượn phải sống ít nhất bằng `'b`.
+                // Thiếu nó thì `s ≔ v.as_slice()` (v: Vec<'a, T> giữ `&'a Arena`) không giữ khoản vay Arena sống tới lần dùng `s` cuối ⇒ `reset`
+                // rồi đọc `s` bị chấp nhận (FB-C9, dùng-sau-reset).
+                {
+                    let inner_regions = flat(&pslots);
+                    self.outl(&inner_regions, &[region]);
+                }
                 // reborrow: từ deref trong cùng ra ngoài; dừng sau tham chiếu CHUNG đầu tiên
                 for (r, shared) in derefs.iter().rev() {
                     self.outl(r, &[region]);

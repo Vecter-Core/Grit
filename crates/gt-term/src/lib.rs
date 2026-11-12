@@ -355,7 +355,11 @@ fn instance_graph(
             for st in &bb.statements {
                 if let gt_mir::StatementKind::Assign(_, rv) = &st.kind {
                     match rv {
-                        gt_mir::Rvalue::Use(o) | gt_mir::Rvalue::Cast(o, _) => ops.push(o),
+                        gt_mir::Rvalue::Use(o)
+                        | gt_mir::Rvalue::Cast(o, _)
+                        | gt_mir::Rvalue::Repeat(o, _) => {
+                            ops.push(o);
+                        }
                         gt_mir::Rvalue::Aggregate(_, v) => ops.extend(v.iter()),
                         _ => {}
                     }
@@ -675,7 +679,11 @@ pub fn check_termination(
                     if let gt_mir::StatementKind::Assign(_, rv) = &st.kind {
                         let mut ops: Vec<&gt_mir::Operand> = Vec::new();
                         match rv {
-                            gt_mir::Rvalue::Use(o) | gt_mir::Rvalue::Cast(o, _) => ops.push(o),
+                            gt_mir::Rvalue::Use(o)
+                            | gt_mir::Rvalue::Cast(o, _)
+                            | gt_mir::Rvalue::Repeat(o, _) => {
+                                ops.push(o);
+                            }
                             gt_mir::Rvalue::Aggregate(_, v) => ops.extend(v.iter()),
                             _ => {}
                         }

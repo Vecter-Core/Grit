@@ -46,8 +46,8 @@
   ⎇ bytes > 68719476736u64 { fail(err, path, "too many lines") } ⇝ { }
   μa1 ≔ alloc.arena();
   μa2 ≔ alloc.arena();
-  μx ≔ Vec::new(&!a1);
-  μy ≔ Vec::new(&!a2);
+  μx ≔ Vec::new(&a1);
+  μy ≔ Vec::new(&a2);
   x.reserve(nl);
   y.reserve(nl);
   μstart ≔ 0usize;
@@ -70,7 +70,7 @@
   extra ≔ ⎇ b.len() > 0usize { ⎇ b[b.len() - 1] == 10u8 { 0usize } ⇝ { 1usize } } ⇝ { 0usize };
   total ≔ b.len() + extra;
   μa3 ≔ alloc.arena();
-  μo ≔ Vec::new(&!a3);
+  μo ≔ Vec::new(&a3);
   o.reserve(total);
   s ≔ x.as_slice();
   μk ≔ 0usize;

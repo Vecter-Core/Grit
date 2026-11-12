@@ -1,4 +1,4 @@
 // expect: fail E0318
 // note: Vec<Arena>: Arena cần drop và Vec trên Arena không chạy destructor
-ƒ mk<'a>(a: &!'a Arena) → Vec<'a, Arena> ! {mem} { Vec::new(a) }
-ƒ main() ! {mem} { μar ≔ Arena::new(); mk(&!ar); }
+ƒ mk<'a>(a: &'a Arena) → Vec<'a, Arena> ! {mem} { Vec::new(a) }
+ƒ main() ! {mem} { μar ≔ Arena::new(); mk(&ar); }

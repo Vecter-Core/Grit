@@ -1,0 +1,5 @@
+// expect: pass
+// note: gọi qua giá trị hàm có nhận Cap qua tham số không phải nguồn capability (đối chứng của E0310_call_through_*)
+ƒ emit(out: &Cap<Out>) ! {io} { out.write_u64(1); }
+ƒ apply(f: ƒ(&Cap<Out>) ! {io}, out: &Cap<Out>) ! {io} { f(out); }
+ƒ main() → i32 ! {io} { o ≔ root_out(); apply(emit, &o); 0 }

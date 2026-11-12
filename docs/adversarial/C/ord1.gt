@@ -1,0 +1,6 @@
+ƒ main() → u64 ! ∅ {
+  arr ≔ [1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
+  μs ≔ &arr[0usize..8usize];
+  t ≔ &s[0usize..{ s ← &arr[0usize..2usize]; 5usize }];
+  t.len() as u64 * 100u64 + t[4usize] as u64
+}

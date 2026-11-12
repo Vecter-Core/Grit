@@ -1,0 +1,8 @@
+■ A: Atomic<u32> ≔ Atomic::new(0u32);
+ƒ weaken(o: &!AtomicOrdering) ! ∅ { *o ← AtomicOrdering::SeqCst; }
+ƒ main() → u32 ! ∅ {
+  μo ≔ AtomicOrdering::Relaxed;
+  weaken(&!o);
+  A.store(7u32, o);
+  A.load(AtomicOrdering::SeqCst)
+}

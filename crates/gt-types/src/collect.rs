@@ -130,6 +130,8 @@ pub struct FnSigInfo {
     pub ret: Ty,
     pub effects: Vec<String>,
     pub span: Span,
+    /// có `⊳`/`⊲` (không tính biến thể `↓`) trong chữ ký: thành viên trait/impl được gọi qua tham số kiểu không có điểm gọi cụ thể để kiểm (FB-C25)
+    pub has_contracts: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -517,6 +519,21 @@ impl<'a> Env<'a> {
             );
             return Ty::Err;
         }
+        self.sized_ty(ty, t, what)
+    }
+
+    /// `[T]`/`str` chỉ hợp lệ sau `&`/`&!` (semantics §1): theo GIÁ TRỊ (tham số, kiểu trả về, trường, phần tử, đối số kiểu) là E0301.
+    fn sized_ty(&mut self, ty: Ty, t: &Type, what: &str) -> Ty {
+        if matches!(ty, Ty::Slice(_) | Ty::Str) {
+            let k = if ty == Ty::Str { "str" } else { "[T]" };
+            self.err(
+                "E0301",
+                t.id,
+                t.span,
+                format!("kiểu `{k}` không biết kích thước nên không thể là {what} theo giá trị; chỉ dùng được sau `&`/`&!`"),
+            );
+            return Ty::Err;
+        }
         ty
     }
 
@@ -657,7 +674,16 @@ impl<'a> Env<'a> {
                 );
                 Ty::Err
             }
-            Res::Local(_) | Res::SelfValue => Ty::Err,
+            // tên của biến/`self` đặt ở vị trí kiểu: PHẢI có chẩn đoán (`Ty::Err` không chẩn đoán bị coi là thoả mọi ràng buộc ở phía sau)
+            Res::Local(_) | Res::SelfValue => {
+                self.err(
+                    "E0301",
+                    t.id,
+                    t.span,
+                    "tên này là biến (hoặc `self`), không phải kiểu".to_string(),
+                );
+                Ty::Err
+            }
         }
     }
 
@@ -868,6 +894,79 @@ impl<'a> Env<'a> {
                 ItemKind::TypeAlias(_) | ItemKind::Mod(_) | ItemKind::Use(_) => {}
             }
         }
+        // 3. kiểu có kích thước vô hạn (chứa chính nó THEO GIÁ TRỊ): E0301
+        for n in &nodes {
+            let item: &'a Item = self.items[n].item;
+            if !matches!(item.kind, ItemKind::Struct(_) | ItemKind::Enum(_)) {
+                continue;
+            }
+            if let Some(&d) = self.def_by_node.get(n)
+                && self.contains_itself_by_value(d)
+            {
+                let name = self.defs()[d.index()].path.clone();
+                self.err(
+                    "E0301",
+                    item.id,
+                    item.span,
+                    format!("kiểu `{name}` chứa chính nó theo giá trị nên có kích thước vô hạn; đặt vòng đệ quy sau một tham chiếu"),
+                );
+            }
+        }
+    }
+
+    /// `d` có (trực tiếp hay qua trường/biến thể/tuple/mảng/đối số kiểu của ADT khác) một giá trị của chính `d` không? Tham chiếu và con trỏ
+    /// thô cắt vòng. Đệ quy đa hình theo giá trị (`▢ A<T> { x: A<Option<T>> }`) bung vô hạn ⇒ vượt `DEPTH` cũng là vòng.
+    fn contains_itself_by_value(&self, root: DefId) -> bool {
+        const DEPTH: usize = 32;
+        fn walk(
+            db: &crate::db::TypeDb,
+            root: DefId,
+            ty: &Ty,
+            seen: &mut std::collections::BTreeSet<(DefId, Vec<Ty>)>,
+            depth: usize,
+        ) -> bool {
+            match ty {
+                Ty::Tuple(v) => v.iter().any(|t| walk(db, root, t, seen, depth)),
+                Ty::Array(t, _) => walk(db, root, t, seen, depth),
+                Ty::Adt(d, args) => {
+                    if *d == root {
+                        return true;
+                    }
+                    if depth >= DEPTH {
+                        return true;
+                    }
+                    if !seen.insert((*d, args.clone())) {
+                        return false;
+                    }
+                    let Some(a) = db.adts.get(d) else {
+                        return false;
+                    };
+                    let sub = |t: &Ty| crate::traits::subst_with(t, &a.generics, args);
+                    match &a.kind {
+                        AdtKind::Struct(fs) => fs
+                            .iter()
+                            .any(|f| walk(db, root, &sub(&f.ty), seen, depth + 1)),
+                        AdtKind::Enum(vs) => vs.iter().any(|v| {
+                            v.fields
+                                .iter()
+                                .any(|t| walk(db, root, &sub(t), seen, depth + 1))
+                        }),
+                    }
+                }
+                _ => false,
+            }
+        }
+        let Some(a) = self.db.adts.get(&root) else {
+            return false;
+        };
+        let mut seen = std::collections::BTreeSet::new();
+        let fields: Vec<&Ty> = match &a.kind {
+            AdtKind::Struct(fs) => fs.iter().map(|f| &f.ty).collect(),
+            AdtKind::Enum(vs) => vs.iter().flat_map(|v| v.fields.iter()).collect(),
+        };
+        fields
+            .into_iter()
+            .any(|t| walk(&self.db, root, t, &mut seen, 0))
     }
 
     fn fill_struct(&mut self, item: &'a Item, s: &'a StructItem) {
@@ -969,7 +1068,8 @@ impl<'a> Env<'a> {
                     input_self.push(fs);
                 }
                 ParamKind::Named { ty, .. } => {
-                    params.push(self.lower_ty(ty, cx));
+                    let pt = self.lower_ty(ty, cx);
+                    params.push(self.sized_ty(pt, ty, "tham số"));
                     let mut sl = Vec::new();
                     region::slots(ty, &mut sl, &|p| self.lt_count_of(p), &cx.self_slots);
                     let mut rs = Vec::new();
@@ -993,10 +1093,13 @@ impl<'a> Env<'a> {
                 }
             }
         }
-        let ret = sig
-            .ret
-            .as_ref()
-            .map_or_else(Ty::unit, |t| self.lower_ty(t, cx));
+        let ret = match &sig.ret {
+            Some(t) => {
+                let rt = self.lower_ty(t, cx);
+                self.sized_ty(rt, t, "kiểu trả về")
+            }
+            None => Ty::unit(),
+        };
         // elision của kiểu trả về (semantics §5): có đúng MỘT vị trí tham chiếu đầu vào thì mọi `&` ẩn ở đầu ra nhận region đó
         let all_in = elide_in;
         let mut output = Vec::new();
@@ -1055,6 +1158,10 @@ impl<'a> Env<'a> {
             ret,
             effects: effect_names(&sig.effects),
             span: sig.name.span,
+            has_contracts: sig
+                .contracts
+                .iter()
+                .any(|c| c.kind != gt_ast::ContractKind::Variant),
         }
     }
 

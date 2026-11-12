@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: tên biến đặt ở vị trí kiểu: phải là chẩn đoán E0301, không phải ICE E9901
+ƒ chk(b: i32) → b ! ∅ { true }
+ƒ main() → i32 ! ∅ { 0 }

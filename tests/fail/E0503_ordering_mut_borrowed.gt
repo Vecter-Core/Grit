@@ -1,0 +1,10 @@
+// expect: fail E0503
+// note: FB-C22: local ordering bị mượn `&!` (gán lại qua tham chiếu) — ordering sinh ra có thể yếu hơn giá trị lúc chạy; không truy ngược được ⇒ từ chối
+■ A: Atomic<u32> ≔ Atomic::new(0u32);
+ƒ weaken(o: &!AtomicOrdering) ! ∅ { *o ← AtomicOrdering::SeqCst; }
+ƒ main() → u32 ! ∅ {
+  μo ≔ AtomicOrdering::Relaxed;
+  weaken(&!o);
+  A.store(7u32, o);
+  A.load(AtomicOrdering::SeqCst)
+}

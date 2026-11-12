@@ -154,3 +154,34 @@ fn invalid_inputs_are_rejected_up_front() {
     // rỗng hợp lệ
     assert!(resolve_program(&[], &p).is_ok());
 }
+
+/// G1: `module_file_name_for` luôn trả tên mà `resolve_program` chấp nhận; tên đã hợp lệ giữ nguyên.
+#[test]
+fn module_file_name_for_always_yields_an_accepted_name() {
+    use gt_resolve::{SourceInput, module_file_name_for, resolve_program};
+    for (input, want) in [
+        ("main.gt", Some("main.gt")),
+        ("plain.gt", Some("plain.gt")),
+        ("01_add.gt", Some("m_01_add.gt")),
+        ("my-prog.gt", Some("my_prog.gt")),
+        ("in.gt", Some("in_.gt")),
+        ("self.gt", Some("self_.gt")),
+        (".gt", Some("m_.gt")),
+        ("x y.gt", Some("x_y.gt")),
+        ("noext", Some("noext.gt")),
+        ("tên.gt", None),
+    ] {
+        let got = module_file_name_for(input);
+        if let Some(w) = want {
+            assert_eq!(got, w, "{input}");
+        }
+        let r = resolve_program(
+            &[SourceInput {
+                name: got.clone(),
+                text: String::new(),
+            }],
+            &prelude(),
+        );
+        assert!(r.is_ok(), "{input} -> {got}: {:?}", r.err());
+    }
+}

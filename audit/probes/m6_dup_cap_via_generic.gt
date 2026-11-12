@@ -1,0 +1,4 @@
+// probe: reject E0401
+// why: dup(root_out()) ⇒ hai Cap<Out> từ một
+ƒ dup<T>(x: T) → (T, T) ! ∅ { (x, x) }
+ƒ main() → i32 ! {io} { o ≔ root_out(); p ≔ dup(o); p.0.write_u64(1); p.1.write_u64(2); 0 }

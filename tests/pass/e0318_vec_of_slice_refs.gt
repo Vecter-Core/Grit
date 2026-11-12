@@ -2,7 +2,7 @@
 // note: Vec<&[u8]>: tham chiếu không cần drop (dùng cho sortlines)
 ƒ main(s: &[u8]) → u64 ! {mem} {
   μar ≔ Arena::new();
-  μv ≔ Vec::new(&!ar);
+  μv ≔ Vec::new(&ar);
   v.push(s);
   v.len() as u64
 }

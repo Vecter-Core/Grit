@@ -1,0 +1,1 @@
+- 11 test đạt (4 unit + 5 `rig.rs` + 1 `dogfood_wordfreq` + …), phần còn lại đỏ vì `rig build/run/test` và 6 công cụ dogfood cần backend LLVM + liên kết exe (bản sao không có). Xem giai đoạn L03 (bản sao có port Linux) cho kết quả với backend native thật.

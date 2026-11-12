@@ -1,0 +1,4 @@
+// expect: fail E0310
+// note: gọi nguồn capability QUA GIÁ TRỊ hàm (tham số kiểu ƒ() → Cap<Out>) — hàm không phải main đúc capability tuỳ ý
+ƒ helper(mk: ƒ() → Cap<Out> ! ∅) ! {io} { o ≔ mk(); o.write_u64(1); }
+ƒ main() → i32 ! {io} { helper(root_out); 0 }

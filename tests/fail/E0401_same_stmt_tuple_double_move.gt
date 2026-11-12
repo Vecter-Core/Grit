@@ -1,0 +1,5 @@
+// expect: fail E0401
+// note: (b, b): move cùng giá trị hai lần trong MỘT tuple
+▢ B { v: i32 }
+ƒ f(b: B) → (B, B) ! ∅ { (b, b) }
+ƒ main() → i32 ! ∅ { 0 }

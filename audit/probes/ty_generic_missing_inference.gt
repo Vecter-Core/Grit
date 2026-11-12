@@ -1,0 +1,4 @@
+// probe: reject
+// why: không suy ra được tham số kiểu
+ƒ mk<T>() → Option<T> ! ∅ { Option::None }
+ƒ main() → i32 ! ∅ { x ≔ mk(); 0 }

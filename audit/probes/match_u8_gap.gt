@@ -1,0 +1,3 @@
+// probe: reject E0305
+// why: D6: u8 thiếu khoảng 128..=255
+ƒ main() → i32 ! ∅ { x ≔ 7u8; ⌥ x { 0..=127 ↦ 1 } }

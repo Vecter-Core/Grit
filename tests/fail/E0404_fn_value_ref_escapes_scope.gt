@@ -1,0 +1,4 @@
+// expect: fail E0404
+// note: S1.i — kết quả gọi QUA GIÁ TRỊ hàm vẫn mượn từ đối số: dùng sau khi biến bị drop
+ƒ id(a: &i32) → &i32 ! ∅ { a }
+ƒ main() → i32 ! ∅ { f ≔ id; μr ≔ &0; ⎇ true { x ≔ 1; r ← f(&x); } *r }

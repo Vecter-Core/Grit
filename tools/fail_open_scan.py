@@ -19,10 +19,23 @@ import os
 import re
 import sys
 
-ROOT = os.environ.get("FOS_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.environ.get("GRIT_ROOT") or os.environ.get("FOS_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LEDGER = os.path.join(ROOT, "docs", "FAIL_OPEN_LEDGER.jsonl")
 AUDIT = os.path.join(ROOT, "docs", "FAIL_OPEN_AUDIT.md")
 SRC_ROOTS = ["crates", os.path.join("runtime", "gt-rt", "src")]
+SEED_CRATES = ["gt-types", "gt-mir", "gt-borrowck", "gt-oblig", "gt-term", "gt-effects", "gt-conc", "gt-secrets", "gt-guard", "gt-driver", "gt-codegen-llvm"]
+SEED_PATTERNS = [
+    ("unwrap_or", re.compile(r"\.unwrap_or\(")),
+    ("unwrap_or_default", re.compile(r"\.unwrap_or_default\(")),
+    ("ok()?", re.compile(r"\.ok\(\)\s*\?")),
+    ("let _ =", re.compile(r"\blet\s+_\s*=")),
+    ("_ =>", re.compile(r"^\s*_\s*=>")),
+    ("map_or(true", re.compile(r"\.map_or\(\s*true\b")),
+    ("map_or(false", re.compile(r"\.map_or\(\s*false\b")),
+    ("is_none_or", re.compile(r"\.is_none_or\(")),
+    ("is_some_and", re.compile(r"\.is_some_and\(")),
+    ("if let Some … else {}", re.compile(r"\belse\s*\{\s*\}")),
+]
 PATTERNS = [
     ("unwrap_or", re.compile(r"\bunwrap_or(_default|_else)?\b")),
     ("_ =>", re.compile(r"^\s*_\s*(if [^=]*)?=>")),
@@ -83,6 +96,77 @@ def scan():
             fp = hashlib.sha1((key + "|" + str(n)).encode("utf-8")).hexdigest()[:14]
             hits.append({"fp": fp, "file": rel, "line": i + 1, "text": norm(l)[:160], "pat": ",".join(names), "ctx": lines[max(0, i - 2):i + 3]})
     return hits
+
+
+def scan_baseline():
+    """Seed 1.0 gate scan; stable key intentionally excludes line number and context."""
+    hits = []
+    roots = [os.path.join("crates", c, "src") for c in SEED_CRATES]
+    for base in roots:
+        full = os.path.join(ROOT, base)
+        if not os.path.isdir(full):
+            continue
+        for dp, _, files in os.walk(full):
+            for name in sorted(files):
+                if not name.endswith(".rs"):
+                    continue
+                path = os.path.join(dp, name)
+                rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
+                in_test = False
+                with io.open(path, encoding="utf-8") as source:
+                    for number, line in enumerate(source, 1):
+                        if re.match(r"\s*#\[cfg\(test\)\]", line):
+                            in_test = True
+                        code = line.split("//", 1)[0]
+                        if in_test or not code.strip():
+                            continue
+                        for pattern, rx in SEED_PATTERNS:
+                            if rx.search(code):
+                                hits.append({"file": rel, "line": number, "pattern": pattern, "code": norm(code)})
+    return hits
+
+
+def baseline_key(hit):
+    return f"{hit['file']}|{hit['pattern']}|{hit['code']}"
+
+
+def cmd_baseline(argv):
+    hits = scan_baseline()
+    if "--summary" in argv:
+        by_file = {}
+        for hit in hits:
+            crate = hit["file"].split("/")[1]
+            by_file.setdefault(crate, {})[hit["pattern"]] = by_file.setdefault(crate, {}).get(hit["pattern"], 0) + 1
+        for crate in sorted(by_file):
+            counts = dict(sorted(by_file[crate].items()))
+            print(crate, sum(counts.values()), counts)
+        print("TỔNG", len(hits))
+        return 0
+    baseline = None
+    if "--baseline" in argv:
+        i = argv.index("--baseline")
+        if i + 1 >= len(argv):
+            print("thiếu đường dẫn sau --baseline", file=sys.stderr)
+            return 2
+        baseline = argv[i + 1]
+    if "--write-baseline" in argv:
+        if not baseline:
+            print("--write-baseline cần --baseline <tệp.json>", file=sys.stderr)
+            return 2
+        with io.open(baseline, "w", encoding="utf-8", newline="\n") as out:
+            json.dump(sorted({baseline_key(hit) for hit in hits}), out, ensure_ascii=False, indent=0)
+            out.write("\n")
+        print(f"đã ghi baseline {len(hits)} mục -> {baseline}")
+        return 0
+    known = set()
+    if baseline and os.path.exists(baseline):
+        with io.open(baseline, encoding="utf-8") as source:
+            known = set(json.load(source))
+    new = [hit for hit in hits if baseline_key(hit) not in known]
+    for hit in new:
+        print(f"{hit['file']}:{hit['line']} | {hit['pattern']} | {hit['code']}")
+    print(f"FAIL_OPEN_SCAN: {len(hits)} mục, {len(new)} MỚI so với baseline")
+    return 1 if baseline and new else 0
 
 
 def load_ledger():
@@ -193,6 +277,8 @@ def cmd_check(a):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
+    if any(arg in sys.argv[1:] for arg in ("--baseline", "--write-baseline", "--summary")):
+        sys.exit(cmd_baseline(sys.argv[1:]))
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("stats")

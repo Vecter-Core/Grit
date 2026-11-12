@@ -44,6 +44,23 @@ pub const PRED_BASE: u32 = 7 << 20;
 
 pub const MAX_BLOCK_STEPS: u64 = 400_000;
 
+/// số ô nguyên tử "nghĩa vụ không biểu diễn được" cho mỗi khối (ô cuối dành cho nghĩa vụ không gắn hợp đồng)
+pub const UNREP_SLOTS: usize = 32;
+/// số khối tối đa của một thân để các nguyên tử `unrep` nằm TRỌN trong `[UNREP_BASE, PRED_BASE)` (không trùng nguyên tử vị từ; FB-C26)
+pub const UNREP_MAX_BLOCKS: usize = ((PRED_BASE - UNREP_BASE) as usize) / UNREP_SLOTS;
+
+/// Nguyên tử riêng của nghĩa vụ không biểu diễn được ở (khối `bb`, hợp đồng `idx`; `idx = UNREP_SLOTS-1` là ô dành riêng): ĐƠN ÁNH và nằm trong
+/// `[UNREP_BASE, PRED_BASE)`; `None` nếu ngoài miền. (Trước FB-C26: `bb*1024 + idx.min(1023)` tràn sang `PRED_BASE` khi bb ≥ 1024.)
+#[must_use]
+pub fn unrep_atom_id(bb: usize, idx: usize) -> Option<VarId> {
+    if bb >= UNREP_MAX_BLOCKS || idx >= UNREP_SLOTS {
+        return None;
+    }
+    u32::try_from(bb * UNREP_SLOTS + idx)
+        .ok()
+        .map(|k| UNREP_BASE + k)
+}
+
 /// Kết cục của một nghĩa vụ.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -1042,7 +1059,11 @@ impl<'a> Ctx<'a> {
     }
 
     fn unrep_atom(&self, bb: usize, idx: usize) -> VarId {
-        UNREP_BASE + (bb as u32) * 1024 + idx.min(1023) as u32
+        // `fixpoint` đã từ chối thân vượt miền (khối ≥ UNREP_MAX_BLOCKS hoặc ≥ UNREP_SLOTS-1 hợp đồng ở một hàm) nên không tới được đây; nếu tới: ICE (E9901), KHÔNG đoán
+        let Some(a) = unrep_atom_id(bb, idx) else {
+            panic!("unrep_atom ngoài miền: bb={bb} idx={idx}")
+        };
+        a
     }
 
     fn subst_term(t: &Term, ints: &BTreeMap<VarId, Term>) -> Option<Term> {
@@ -1486,7 +1507,7 @@ impl<'a> Ctx<'a> {
                 Prop::Lt(now.clone(), own.clone()),
                 Prop::Le(Term::int(0), now),
             ]),
-            _ => Prop::Atom(self.unrep_atom(bb, 1000)),
+            _ => Prop::Atom(self.unrep_atom(bb, UNREP_SLOTS - 1)),
         };
         j.judge_core(
             self,
@@ -1986,6 +2007,10 @@ fn collect_unknown(cx: &Ctx<'_>, judge: &mut Judge<'_>) {
 /// Lặp tới điểm cố định (RPO) với widening tại đầu vòng lặp; `None` nếu vượt ngân sách bước.
 fn fixpoint(cx: &Ctx<'_>, steps: &mut u64) -> Option<Vec<Option<AState>>> {
     let n = cx.body.blocks.len();
+    if n > UNREP_MAX_BLOCKS {
+        // nguyên tử `unrep` không còn đơn ánh ngoài miền ⇒ không phân tích (giữ mọi check; FB-C26)
+        return None;
+    }
     let mut states: Vec<Option<AState>> = vec![None; n];
     states[0] = Some(cx.init());
     let mut visits = vec![0u32; n];
@@ -2288,5 +2313,38 @@ impl<'a> DomainQuery<'a> {
     #[must_use]
     pub fn local_interval(&self, loc: gt_mir::Location, l: gt_mir::Local) -> Option<Interval> {
         self.interval_at(loc, &Term::Var(l.0))
+    }
+}
+
+#[cfg(test)]
+mod unrep_tests {
+    use super::*;
+
+    /// FB-C26: nguyên tử nghĩa vụ không biểu diễn được phải ĐƠN ÁNH theo (khối, hợp đồng) và không bao giờ rơi vào dải nguyên tử vị từ (`PRED_BASE…`).
+    #[test]
+    fn unrep_atoms_are_injective_and_below_the_predicate_range() {
+        let mut seen = std::collections::BTreeSet::new();
+        for bb in [
+            0usize,
+            1,
+            2,
+            1023,
+            1024,
+            1025,
+            2047,
+            2048,
+            20_000,
+            UNREP_MAX_BLOCKS - 1,
+        ] {
+            for idx in 0..UNREP_SLOTS {
+                let a = unrep_atom_id(bb, idx).expect("trong miền");
+                assert!((UNREP_BASE..PRED_BASE).contains(&a), "bb={bb} idx={idx}");
+                assert!(seen.insert(a), "trùng nguyên tử tại bb={bb} idx={idx}");
+            }
+        }
+        // bb = 1024 từng cho UNREP_BASE + 1024*1024 = PRED_BASE (trùng nguyên tử vị từ pi=0, local=0)
+        assert_ne!(unrep_atom_id(1024, 0), Some(PRED_BASE));
+        assert_eq!(unrep_atom_id(UNREP_MAX_BLOCKS, 0), None);
+        assert_eq!(unrep_atom_id(0, UNREP_SLOTS), None);
     }
 }

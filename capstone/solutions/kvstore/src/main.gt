@@ -1,0 +1,234 @@
+// kvstore: kho khoá-giá trị đọc lệnh từ stdin
+▢ Pair { k: std::Bytes<'static>, v: std::Bytes<'static> }
+⊐ Copy for Pair { }
+⊐ Ord for Pair {
+  ƒ cmp(&self, o: &Self) → Ordering ! ∅ { self.k.cmp(&o.k) }
+}
+
+ƒ valid_key(k: &[u8]) → bool ! ∅ {
+  k.len() > 0usize ∧ k.find_byte(0usize, 32u8).is_none() ∧ k.find_byte(0usize, 9u8).is_none() ∧ k.find_byte(0usize, 61u8).is_none()
+}
+
+ƒ cont(b: &[u8], i: usize, lo: u8, hi: u8) → bool ! ∅ {
+  i < b.len() ∧ b[i] >= lo ∧ b[i] <= hi
+}
+
+// Chuỗi UTF-8 tại i: 1..4 = hợp lệ dài ngần ấy byte; 8+p = không hợp lệ, tiền tố cực đại dài p.
+ƒ utf8_seq(b: &[u8], i: usize) → usize ! ∅ ⊳ i < b.len() {
+  c ≔ b[i];
+  ⎇ c < 128u8 {
+    1usize
+  } ⇝ ⎇ c >= 194u8 ∧ c <= 223u8 {
+    ⎇ cont(b, i + 1usize, 128u8, 191u8) { 2usize } ⇝ { 9usize }
+  } ⇝ ⎇ c >= 224u8 ∧ c <= 239u8 {
+    lo ≔ ⎇ c == 224u8 { 160u8 } ⇝ { 128u8 };
+    hi ≔ ⎇ c == 237u8 { 159u8 } ⇝ { 191u8 };
+    ⎇ cont(b, i + 1usize, lo, hi) {
+      ⎇ cont(b, i + 2usize, 128u8, 191u8) { 3usize } ⇝ { 10usize }
+    } ⇝ { 9usize }
+  } ⇝ ⎇ c >= 240u8 ∧ c <= 244u8 {
+    lo4 ≔ ⎇ c == 240u8 { 144u8 } ⇝ { 128u8 };
+    hi4 ≔ ⎇ c == 244u8 { 143u8 } ⇝ { 191u8 };
+    ⎇ cont(b, i + 1usize, lo4, hi4) {
+      ⎇ cont(b, i + 2usize, 128u8, 191u8) {
+        ⎇ cont(b, i + 3usize, 128u8, 191u8) { 4usize } ⇝ { 11usize }
+      } ⇝ { 10usize }
+    } ⇝ { 9usize }
+  } ⇝ { 9usize }
+}
+
+// Chuyển byte bất kỳ thành UTF-8 hợp lệ (thay phần sai bằng U+FFFD) vào o.
+ƒ lossy<'a>(b: &[u8], o: &!Vec<'a, u8>) ! {mem} {
+  o.clear();
+  n ≔ b.len();
+  μi ≔ 0usize;
+  μfuel ≔ (n as u64) + 1u64;
+  ⟳ i < n ∧ fuel > 0u64 ↓ fuel {
+    r ≔ utf8_seq(b, i);
+    ⎇ r >= 8usize {
+      o.push(239u8);
+      o.push(191u8);
+      o.push(189u8);
+      i ← i + (r - 8usize);
+    } ⇝ {
+      o.extend_from_slice(&b[i..i + r]);
+      i ← i + r;
+    }
+    fuel ← fuel - 1u64;
+  }
+  core::fuel_left(fuel);
+}
+
+// Dựng "KEY=VALUE\n" sắp xếp theo khoá vào buf.
+ƒ render<'a>(m: &std::HashMap<'a, std::Bytes<'static>, std::Bytes<'static>>, tmp: &!Vec<'a, Pair>, buf: &!Vec<'a, u8>) ! {mem} {
+  tmp.clear();
+  buf.clear();
+  cnt ≔ m.entry_count();
+  μi ≔ 0usize;
+  ⟳ i < cnt {
+    ⌥ m.entry_at(i) {
+      Some(t) ↦ { tmp.push(Pair { k: t.0, v: t.1 }); },
+      None ↦ { },
+    }
+    i ← i + 1usize;
+  }
+  μsl ≔ tmp.as_mut_slice();
+  sl.sort();
+  μj ≔ 0usize;
+  ⟳ j < sl.len() {
+    e ≔ sl[j];
+    buf.extend_from_slice(e.k.b);
+    buf.push(61u8);
+    buf.extend_from_slice(e.v.b);
+    buf.push(10u8);
+    j ← j + 1usize;
+  }
+}
+
+ƒ main() ! {io, div, mem} {
+  out ≔ root_out();
+  inp ≔ root_in();
+  fs ≔ root_fs();
+  data ≔ ⌥ inp.read_all() { Ok(f) ↦ f.bytes(), Err(_) ↦ "".as_bytes() };
+  μar ≔ Arena::new();
+  μm ≔ std::HashMap::new(&ar);
+  μtmp ≔ Vec::new(&ar);
+  μbuf ≔ Vec::new(&ar);
+  μpbuf ≔ Vec::new(&ar);
+  n ≔ data.len();
+  μpos ≔ 0usize;
+  ⟳ pos < n ↓ n - pos {
+    end ≔ data.find_byte_or_end(pos, 10u8);
+    line ≔ &data[pos..end];
+    ll ≔ line.len();
+    ⎇ ll > 0usize {
+      ce ≔ line.find_byte_or_end(0usize, 32u8);
+      cmd ≔ &line[0usize..ce];
+      has ≔ ce < ll;
+      a0 ≔ ce + 1usize;
+      arg ≔ ⎇ has { &line[a0..ll] } ⇝ { &line[0usize..0usize] };
+      al ≔ arg.len();
+      ⎇ cmd.equals("set".as_bytes()) {
+        ⎇ has {
+          ke ≔ arg.find_byte_or_end(0usize, 32u8);
+          skey ≔ &arg[0usize..ke];
+          sv0 ≔ ke + 1usize;
+          sval ≔ ⎇ ke < al { &arg[sv0..al] } ⇝ { &arg[0usize..0usize] };
+          ⎇ valid_key(skey) {
+            m.insert(std::Bytes { b: skey }, std::Bytes { b: sval });
+            out.write_str("ok\n");
+          } ⇝ {
+            out.write_str("error: bad key\n");
+          }
+        } ⇝ {
+          out.write_str("error: usage\n");
+        }
+      } ⇝ ⎇ cmd.equals("get".as_bytes()) {
+        ⎇ has {
+          gk ≔ std::Bytes { b: arg };
+          ⌥ m.get(&gk) {
+            Some(gv) ↦ { out.write_bytes(gv.b); out.write_str("\n"); },
+            None ↦ { out.write_str("(nil)\n"); },
+          }
+        } ⇝ {
+          out.write_str("error: usage\n");
+        }
+      } ⇝ ⎇ cmd.equals("del".as_bytes()) {
+        ⎇ has {
+          dk ≔ std::Bytes { b: arg };
+          ⎇ m.remove(&dk) { out.write_str("1\n"); } ⇝ { out.write_str("0\n"); }
+        } ⇝ {
+          out.write_str("error: usage\n");
+        }
+      } ⇝ ⎇ cmd.equals("count".as_bytes()) {
+        ⎇ has {
+          out.write_str("error: usage\n");
+        } ⇝ {
+          out.write_u64(m.len() as u64);
+          out.write_str("\n");
+        }
+      } ⇝ ⎇ cmd.equals("dump".as_bytes()) {
+        ⎇ has {
+          out.write_str("error: usage\n");
+        } ⇝ {
+          render(&m, &!tmp, &!buf);
+          out.write_bytes(buf.as_slice());
+        }
+      } ⇝ ⎇ cmd.equals("save".as_bytes()) {
+        ⎇ has {
+          render(&m, &!tmp, &!buf);
+          lossy(arg, &!pbuf);
+          ⌥ Text::from_utf8(&ar, pbuf.as_slice()) {
+            Some(pt) ↦ {
+              ⌥ fs.write(pt.as_str(), buf.as_slice()) {
+                Ok(_) ↦ { out.write_str("ok\n"); },
+                Err(_) ↦ { out.write_str("error: cannot write\n"); },
+              }
+            },
+            None ↦ { out.write_str("error: cannot write\n"); },
+          }
+        } ⇝ {
+          out.write_str("error: usage\n");
+        }
+      } ⇝ ⎇ cmd.equals("load".as_bytes()) {
+        ⎇ has {
+          lossy(arg, &!pbuf);
+          ⌥ Text::from_utf8(&ar, pbuf.as_slice()) {
+            Some(lt) ↦ {
+              ⌥ fs.open(lt.as_str()) {
+                Ok(lf) ↦ {
+                  fd ≔ lf.bytes();
+                  fn_ ≔ fd.len();
+                  // pass 1: kiểm tra
+                  μp1 ≔ 0usize;
+                  μln ≔ 0u64;
+                  μbad ≔ 0u64;
+                  ⟳ p1 < fn_ ↓ fn_ - p1 {
+                    e1 ≔ fd.find_byte_or_end(p1, 10u8);
+                    l1 ≔ &fd[p1..e1];
+                    ln ← ln + 1u64;
+                    okl ≔ ⌥ l1.find_byte(0usize, 61u8) {
+                      Some(q) ↦ valid_key(&l1[0usize..q]),
+                      None ↦ false,
+                    };
+                    ⎇ okl ∨ bad > 0u64 { } ⇝ { bad ← ln; }
+                    p1 ← e1 + 1usize;
+                  }
+                  ⎇ bad > 0u64 {
+                    out.write_str("error: bad line ");
+                    out.write_u64(bad);
+                    out.write_str("\n");
+                  } ⇝ {
+                    μp2 ≔ 0usize;
+                    ⟳ p2 < fn_ ↓ fn_ - p2 {
+                      e2 ≔ fd.find_byte_or_end(p2, 10u8);
+                      l2 ≔ &fd[p2..e2];
+                      ⌥ l2.find_byte(0usize, 61u8) {
+                        Some(q2) ↦ {
+                          v0 ≔ q2 + 1usize;
+                          m.insert(std::Bytes { b: &l2[0usize..q2] }, std::Bytes { b: &l2[v0..l2.len()] });
+                        },
+                        None ↦ { },
+                      }
+                      p2 ← e2 + 1usize;
+                    }
+                    out.write_str("loaded ");
+                    out.write_u64(ln);
+                    out.write_str("\n");
+                  }
+                },
+                Err(_) ↦ { out.write_str("error: cannot read\n"); },
+              }
+            },
+            None ↦ { out.write_str("error: cannot read\n"); },
+          }
+        } ⇝ {
+          out.write_str("error: usage\n");
+        }
+      } ⇝ {
+        out.write_str("error: unknown command\n");
+      }
+    } ⇝ { }
+    pos ← end + 1usize;
+  }
+}

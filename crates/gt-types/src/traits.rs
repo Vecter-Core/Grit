@@ -40,6 +40,8 @@ pub struct Pick {
     pub recv_self: Ty,
     pub params: Vec<Ty>,
     pub ret: Ty,
+    /// Hiệu ứng khai báo của hàm (đã sắp) — phải đi theo `Ty::Fn` khi `Kiểu::hàm` được dùng làm GIÁ TRỊ (FB-C5), nếu không hiệu ứng bị mất.
+    pub effects: Vec<String>,
     pub generics: Vec<Ty>,
     pub bounds: Vec<(Ty, DefId)>,
 }
@@ -149,6 +151,7 @@ impl Env<'_> {
                             recv_self: u.clone(),
                             params: m.params.iter().map(&sub).collect(),
                             ret: sub(&m.ret),
+                            effects: m.effects.clone(),
                             bounds: bounds_of(&m.generics, &targs),
                             generics: targs,
                         });
@@ -213,6 +216,7 @@ impl Env<'_> {
             recv_self: u.clone(),
             params,
             ret,
+            effects: m.effects.clone(),
             generics: margs,
             bounds,
         })

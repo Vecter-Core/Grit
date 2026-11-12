@@ -1,0 +1,3 @@
+// probe: accept
+// why: đối chứng dương: hai vòng lồng có biến thể hợp lệ
+ƒ main() → u32 ! ∅ { μi ≔ 3u32; μs ≔ 0u32; ⟳ i > 0 ↓ i { μj ≔ 2u32; ⟳ j > 0 ↓ j { j ← j - 1; s ← s + 1; } i ← i - 1; } s }

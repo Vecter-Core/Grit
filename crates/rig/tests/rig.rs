@@ -641,3 +641,21 @@ fn option_ord_in_another_package_uses_reference_patterns_passes_e0703_and_runs_c
         assert_eq!(run_exe(&app), want, "{a} vs {b}");
     }
 }
+
+/// Seed 1.0 G14: `rig new` thêm phụ thuộc `std` (nếu tìm thấy `lib/std` cạnh rig hoặc qua `GRIT_STD`) để chương trình dùng thật gọi được `std::…` ngay;
+/// `--no-std` tắt. Gói mới có `std` phải `check` được và `rig.lock` có đủ hai gói.
+#[test]
+fn new_adds_the_std_dependency_g14() {
+    let d = tmp("newstd");
+    let o = rig(&d, &["new", "withstd"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let toml = std::fs::read_to_string(d.join("withstd/rig.toml")).expect("toml");
+    assert!(toml.contains("std = { path = "), "{toml}");
+    let lock = std::fs::read_to_string(d.join("withstd/rig.lock")).expect("lock");
+    assert!(lock.contains("std"), "{lock}");
+    assert_eq!(code(&rig(&d.join("withstd"), &["check"])), 0);
+    let o = rig(&d, &["new", "nostd", "--no-std"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let toml = std::fs::read_to_string(d.join("nostd/rig.toml")).expect("toml");
+    assert!(!toml.contains("std ="), "{toml}");
+}

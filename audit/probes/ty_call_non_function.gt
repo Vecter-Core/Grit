@@ -1,0 +1,3 @@
+// probe: reject
+// why: gọi một số nguyên
+ƒ main() → i32 ! ∅ { x ≔ 5; x(1) }

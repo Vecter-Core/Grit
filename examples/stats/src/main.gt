@@ -63,7 +63,7 @@
 ƒ run(b: &[u8], alloc: &Cap<Alloc>, out: &Cap<Out>, err: &Cap<ErrOut>, path: &str) ! {io, div, mem} {
   nt ≔ count_tokens(b);
   μa1 ≔ alloc.arena();
-  μxs ≔ Vec::new(&!a1);
+  μxs ≔ Vec::new(&a1);
   xs.reserve(nt);
   // phân tích token: chỉ chữ số thập phân; mỗi giá trị ≤ 2^53
   μi ≔ 0usize;
@@ -106,7 +106,7 @@
     sd ← (acc / nf).sqrt();
   } ⇝ { }
   μa2 ≔ alloc.arena();
-  μo ≔ Text::new(&!a2);
+  μo ≔ Text::new(&a2);
   o.push_str("count ");
   push_u64(&!o, n as u64);
   o.push_str("\nmean ");

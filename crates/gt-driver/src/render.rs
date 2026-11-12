@@ -259,7 +259,15 @@ pub fn human_report(res: &CheckResult, color: bool) -> String {
     let files = source_files(res);
     let refs: Vec<&SourceFile> = files.iter().collect();
     let mut out = String::new();
+    // Ghi chú `N…` (kiểm tra hạ thành lúc chạy) rất nhiều (hàng chục, kể cả từ gói std) và làm chìm lỗi thật: văn bản cho người ẨN chúng trừ khi
+    // `GRIT_NOTES=1`; chúng vẫn được ĐẾM ở dòng tóm tắt và LUÔN có trong `--json`.
+    let show_notes = std::env::var_os("GRIT_NOTES").is_some_and(|v| v == "1");
+    let mut hidden = 0usize;
     for d in &res.report.diagnostics {
+        if !show_notes && d.code.as_str().starts_with('N') && d.code.as_str() != "N0606" {
+            hidden += 1;
+            continue;
+        }
         out.push_str(&render_human_files(d, &refs, &RenderOptions { color }));
         if !out.ends_with('\n') {
             out.push('\n');
@@ -282,6 +290,9 @@ pub fn human_report(res: &CheckResult, color: bool) -> String {
     );
     if !failed.is_empty() {
         let _ = write!(out, "; pass hỏng: {}", failed.join(", "));
+    }
+    if hidden > 0 {
+        let _ = write!(out, " (ghi chú ẩn; GRIT_NOTES=1 hoặc --json để xem)");
     }
     out.push('\n');
     out

@@ -4,6 +4,8 @@
 //! Oracle ĐỘC LẬP: hợp các khoảng (độ lệch `u128` so với giá trị nhỏ nhất, không tràn) có phủ trọn miền hợp lệ không. Miền `char` KHÔNG liền khối: 0xD800–0xDFFF không phải giá trị.
 //! * mọi kiểu trừ `u128`: gt-types chấp nhận (không E0305) ⇔ oracle vét cạn (HAI CHIỀU, chính xác);
 //! * `u128`: miền không mô hình hoá (ADR-041) ⇒ chỉ kiểm chiều AN TOÀN (chấp nhận ⇒ vét cạn); đếm riêng số ca bảo thủ (oracle vét cạn nhưng E0305).
+//! Giá trị luôn xử lý như độ lệch `u128` so với giá trị nhỏ nhất của kiểu (lật bit dấu cho `i128`) nên không dùng số học tràn.
+//! Với `char`, miền không liền khối: 0xD800–0xDFFF không phải giá trị Unicode scalar hợp lệ.
 mod common;
 
 const N_DEFAULT: usize = 650;

@@ -1,0 +1,6 @@
+// expect: pass
+// note: đối chứng FB-C5 — hàm kết hợp thuần làm giá trị truyền vào tham số thuần
+▢ S { x: i32 }
+⊐ S { ƒ mk() → i32 ! ∅ { 1 } }
+ƒ ap(g: ƒ() → i32 ! ∅) → i32 ! ∅ { g() }
+ƒ f() → i32 ! ∅ { ap(S::mk) }

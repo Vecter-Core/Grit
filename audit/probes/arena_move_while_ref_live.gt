@@ -1,0 +1,4 @@
+// probe: reject E0405|E0403|E0406
+// why: move Arena khi tham chiếu cấp phát còn sống
+ƒ keep(a: Arena) ! {mem} { }
+ƒ main() → i32 ! {mem} { a ≔ Arena::new(); r ≔ a.alloc(5); keep(a); *r }

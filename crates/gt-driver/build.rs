@@ -3,7 +3,9 @@ use std::{env, fs, path::PathBuf};
 
 fn main() {
     // Nạp LLVM-C.dll TRỄ (ADR-029): `rustc-link-arg` của crate thư viện KHÔNG lan sang crate dùng nó, nên phát ở đây cho bin và test.
-    if env::var_os("CARGO_FEATURE_LLVM").is_some() {
+    if env::var_os("CARGO_FEATURE_LLVM").is_some()
+        && env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
+    {
         println!("cargo:rustc-link-arg-bins=/DELAYLOAD:LLVM-C.dll");
         println!("cargo:rustc-link-arg-tests=/DELAYLOAD:LLVM-C.dll");
         println!("cargo:rustc-link-arg-tests=/IGNORE:4199");

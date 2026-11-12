@@ -1,0 +1,3 @@
+// probe: reject E0301
+// why: true + 1
+ƒ main() → i32 ! ∅ { x ≔ true + 1; 0 }

@@ -6,4 +6,4 @@ name = "wordfreq"
 version = "0.1.0"
 source = "root"
 deps = []
-hash = "sha256:4079681794d834511a2ecfaffa6a4f968dca28ba434af51d87e9f956f975cf44"
+hash = "sha256:a4600ffc212dd12ac2986d79301a0f1c3aef8fa02c12987448196f29ebf75807"

@@ -1,0 +1,11 @@
+// probe: reject E0401|E0405
+// why: BẰNG CHỨNG CHẠY THẬT (backend LLVM, L06): chương trình được phán quyết XANH nhưng `*r` trả 99 thay vì 1234 vì bộ nhớ Arena đã reset rồi cấp lại cho `s` — dùng-sau-reset (dangling) trong mã "đã kiểm"
+ƒ dup<T>(x: T) → (T, T) ! ∅ { (x, x) }
+ƒ main() → i32 ! {mem} {
+  a ≔ Arena::new();
+  μp ≔ dup(a);
+  r ≔ p.1.alloc(1234);
+  p.0.reset();
+  s ≔ p.1.alloc(99);
+  *r
+}

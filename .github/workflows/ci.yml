@@ -1,0 +1,80 @@
+# CI cho Linux (ubuntu-24.04) và Windows (windows-2022). CHƯA được chạy trên GitHub từ môi trường soạn thảo (chỉ viết, không push workflow lên chạy):
+# Linux đã kiểm bằng `bash tools/gate.sh .` trong container Ubuntu 24.04 (libllvm20 = LLVM 20.1.2); **Windows: chưa kiểm** sau các thay đổi của nhánh Seed 1.0.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux-gate:
+    # cổng đầy đủ (fmt, clippy -D warnings, audit, mọi test, doc_test, nul, deletions, track); giai đoạn `track` cần git sạch ⇒ checkout đầy đủ
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cài môi trường (Rust, libllvm20, dựng runtime/gritc/rig, gritc doctor)
+        run: bash tools/setup_cloud.sh
+      - run: cargo install cargo-audit --locked
+      - name: Cổng đầy đủ
+        run: bash tools/gate.sh .
+        env:
+          GRIT_LLVM_LIB_DIR: /usr/lib/x86_64-linux-gnu
+      - name: Capstone K1–K4 (dev và release-o2) so với bản tham chiếu Rust
+        run: |
+          (cd capstone/reference && cargo build --release)
+          GRITC=$PWD/target/debug/gritc python3 capstone/verify.py
+
+  linux-nollvm:
+    # gritc dựng KHÔNG có backend llvm (chỉ thông dịch)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --locked -p gt-driver --no-default-features -- --test-threads=2
+
+  deny:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  determinism:
+    # D9: dựng gritc hai lần từ cùng nguồn (cùng đường dẫn), so sha256
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libllvm20
+      - run: |
+          export GRIT_LLVM_LIB_DIR=/usr/lib/x86_64-linux-gnu
+          cargo build --locked --release -p gt-driver --bin gritc
+          a=$(sha256sum target/release/gritc | cut -d' ' -f1)
+          cargo clean
+          cargo build --locked --release -p gt-driver --bin gritc
+          b=$(sha256sum target/release/gritc | cut -d' ' -f1)
+          echo "$a" "$b"
+          test "$a" = "$b"
+
+  windows-gate:
+    # Windows: CHƯA KIỂM. LLVM 20.1.8 bản dựng sẵn ở D:\Tools\llvm-20.1.8 trên máy chính (docs/ENVIRONMENT.md); trên runner phải tải và đặt GRIT_LLVM_DIR.
+    runs-on: windows-2022
+    timeout-minutes: 300
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: LLVM 20.1.8 (bản dựng sẵn)
+        run: |
+          curl -sSfL -o llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/clang+llvm-20.1.8-x86_64-pc-windows-msvc.tar.xz
+          mkdir -p "$RUNNER_TEMP/llvm" && tar -xJf llvm.tar.xz -C "$RUNNER_TEMP/llvm" --strip-components=1
+          echo "GRIT_LLVM_DIR=$(cygpath -w "$RUNNER_TEMP/llvm")" >> "$GITHUB_ENV"
+          echo "$(cygpath -u "$RUNNER_TEMP/llvm")/bin" >> "$GITHUB_PATH"
+      - name: runtime gt-rt
+        run: cargo build --release --manifest-path runtime/gt-rt/Cargo.toml
+      - name: gritc doctor
+        run: cargo run --release -p gt-driver --bin gritc -- doctor
+      - name: Cổng đầy đủ
+        run: bash tools/gate.sh .

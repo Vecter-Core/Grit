@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: FB-C5 — Arena::new ({mem}) truyền vào tham số ƒ() → Arena ! ∅
+ƒ ap(g: ƒ() → Arena ! ∅) ! ∅ { a ≔ g(); }
+ƒ f() ! ∅ { ap(Arena::new); }

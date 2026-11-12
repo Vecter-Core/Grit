@@ -1,0 +1,5 @@
+// probe: reject E0310
+// why: E0310: phương thức tên `main` KHÔNG phải main cấp cao
+▢ S { n: i32 }
+⊐ S { ƒ main(&self) ! {io} { o ≔ root_out(); o.write_u64(1); } }
+ƒ main() → i32 ! {io} { s ≔ S { n: 0 }; s.main(); 0 }

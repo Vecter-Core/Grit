@@ -1,0 +1,2 @@
+ƒ helper() → u64 ! {io} { fs ≔ util::main(1u64); fs.read("/etc/hostname").len() as u64 }
+ƒ main() ! {io} { root_out().write_u64(helper()); }

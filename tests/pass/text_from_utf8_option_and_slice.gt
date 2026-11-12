@@ -4,9 +4,9 @@
   μar1 ≔ Arena::new();
   μar2 ≔ Arena::new();
   b ≔ [104u8, 195u8, 169u8];
-  ⌥ Text::from_utf8(&!ar1, &b[..]) {
+  ⌥ Text::from_utf8(&ar1, &b[..]) {
     Some(t) ↦ {
-      μu ≔ Text::new(&!ar2);
+      μu ≔ Text::new(&ar2);
       u.push_str(t.as_str().slice(0usize, 1usize));
       u.len() as u64
     },

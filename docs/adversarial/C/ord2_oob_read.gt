@@ -1,0 +1,11 @@
+ƒ main() → u64 ! ∅ {
+  big ≔ [7u8; 4096];
+  small ≔ [1u8, 2u8];
+  guard ≔ [99u8, 98u8, 97u8, 96u8, 95u8, 94u8, 93u8, 92u8];
+  μs ≔ &big[0usize..4096usize];
+  t ≔ &s[0usize..{ s ← &small[0usize..2usize]; 2000usize }];
+  // t.len() == 2000 although the underlying array `small` has 2 elements
+  μacc ≔ 0u64; μi ≔ 0usize;
+  ⟳ i < 2000usize ↓ 2000usize - i { acc ← acc + t[i] as u64; i ← i + 1usize; }
+  t.len() as u64 * 1000000000u64 + acc
+}

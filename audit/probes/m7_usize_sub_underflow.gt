@@ -1,0 +1,3 @@
+// probe: reject E0601
+// why: E0601: usize 0 - 1
+ƒ main() → usize ! ∅ { a ≔ 0usize; a - 1 }

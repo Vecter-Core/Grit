@@ -1,0 +1,4 @@
+// expect: fail E0405
+// note: S1.i — tham chiếu cấp từ Arena đi qua hàm giá trị rồi reset Arena trong khi còn dùng
+ƒ id(a: &i32) → &i32 ! ∅ { a }
+ƒ main() → i32 ! {mem} { μar ≔ Arena::new(); f ≔ id; r ≔ f(ar.alloc(7)); ar.reset(); *r }

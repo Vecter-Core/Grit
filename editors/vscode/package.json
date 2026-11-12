@@ -1,0 +1,26 @@
+{
+  "name": "grit-vscode",
+  "displayName": "Grit",
+  "description": "Ngôn ngữ Grit (.gt): tô màu cú pháp và chẩn đoán/định dạng qua `gritc lsp`. KHUNG SƠ KHAI (Seed 1.0): chưa đóng gói, chưa thử trong VS Code thật.",
+  "version": "0.1.0",
+  "publisher": "grit",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages"],
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:grit"],
+  "contributes": {
+    "languages": [
+      { "id": "grit", "aliases": ["Grit"], "extensions": [".gt"], "configuration": "./language-configuration.json" }
+    ],
+    "grammars": [
+      { "language": "grit", "scopeName": "source.grit", "path": "./syntaxes/grit.tmLanguage.json" }
+    ],
+    "configuration": {
+      "title": "Grit",
+      "properties": {
+        "grit.gritcPath": { "type": "string", "default": "gritc", "description": "Đường dẫn tới tệp thực thi gritc (chạy `gritc lsp`)." }
+      }
+    }
+  },
+  "dependencies": { "vscode-languageclient": "^9.0.1" }
+}

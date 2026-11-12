@@ -1,0 +1,3 @@
+// probe: reject E0301
+// why: hai nhánh khác kiểu
+ƒ main() → i32 ! ∅ { ⎇ true { 1 } ⇝ { true } }

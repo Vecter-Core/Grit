@@ -1,0 +1,6 @@
+// expect: fail E0301
+// note: FB-C5 — hàm kết hợp có {io} truyền vào tham số ƒ() ! ∅ (hiệu ứng là một phần của kiểu hàm)
+▢ S { x: i32 }
+⊐ S { ƒ mk() ! {io} { } }
+ƒ ap(g: ƒ() ! ∅) ! ∅ { g(); }
+ƒ f() ! ∅ { ap(S::mk); }

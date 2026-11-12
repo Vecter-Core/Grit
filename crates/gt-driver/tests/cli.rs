@@ -449,5 +449,80 @@ fn directory_input_and_version() {
     assert!(out(&o).contains("Int(7"));
     let o = gritc().arg("--version").output().expect("chạy");
     assert_eq!(code(&o), 0);
-    assert!(out(&o).contains("backend mặc định: llvm"), "{}", out(&o));
+    let want = if cfg!(feature = "llvm") {
+        "backend mặc định: llvm"
+    } else {
+        "backend mặc định: interpreter"
+    };
+    assert!(out(&o).contains(want), "{}", out(&o));
+}
+
+/// G1 (Seed 1.0): tệp được chỉ định là module gốc BẤT KỂ tên (trước đây `01_add.gt`, `my-prog.gt`, `in.gt` bị từ chối với `BadModuleName`).
+#[test]
+fn file_with_non_identifier_name_is_accepted_as_the_root_module() {
+    let d = scratch("badname");
+    for (name, ok) in [
+        ("01_add.gt", true),
+        ("my-prog.gt", true),
+        ("in.gt", true),
+        ("tên-chương-trình.gt", true),
+        ("plain.gt", true),
+    ] {
+        write(&d, name, "ƒ main() → u32 ! ∅ { 7u32 }\n");
+        let o = gritc()
+            .args(["run", "--backend=interpreter"])
+            .arg(d.join(name))
+            .output()
+            .expect("chạy");
+        assert_eq!(code(&o) == 0, ok, "{name}: {}{}", out(&o), err(&o));
+        assert!(out(&o).contains("Int(7"), "{name}: {}{}", out(&o), err(&o));
+    }
+    // chẩn đoán vẫn trỏ về tên tệp người dùng nhìn thấy được (đã chuẩn hoá thành định danh hợp lệ)
+    write(&d, "7bad-name.gt", "ƒ main() → u32 ! ∅ { true }\n");
+    let o = gritc()
+        .arg("check")
+        .arg(d.join("7bad-name.gt"))
+        .output()
+        .expect("chạy");
+    assert_eq!(code(&o), 1, "{}{}", out(&o), err(&o));
+    assert!(
+        out(&o).contains("E0301") || err(&o).contains("E0301"),
+        "{}{}",
+        out(&o),
+        err(&o)
+    );
+}
+
+/// Seed 1.0 S5a: `gritc doctor` kiểm môi trường bằng lần dựng+chạy THẬT một chương trình nhỏ và báo cách sửa khi hỏng.
+#[cfg(feature = "llvm")]
+#[test]
+fn doctor_passes_on_a_healthy_environment_and_explains_failures() {
+    let o = std::process::Command::new(env!("CARGO_BIN_EXE_gritc"))
+        .arg("doctor")
+        .output()
+        .expect("chạy gritc doctor");
+    let out = String::from_utf8_lossy(&o.stdout).into_owned() + &String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(0), "{out}");
+    for needle in [
+        "gritc doctor",
+        "runtime",
+        "trình liên kết",
+        "thư mục tạm",
+        "dựng và chạy thử",
+        "doctor: XANH",
+    ] {
+        assert!(out.contains(needle), "thiếu `{needle}`:\n{out}");
+    }
+    // runtime hỏng ⇒ mã 3, nêu GRIT_RT_LIB và cách sửa
+    let o = std::process::Command::new(env!("CARGO_BIN_EXE_gritc"))
+        .arg("doctor")
+        .env("GRIT_RT_LIB", "/không/tồn/tại/libgt_rt.a")
+        .output()
+        .expect("chạy gritc doctor");
+    let out = String::from_utf8_lossy(&o.stdout).into_owned() + &String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(3), "{out}");
+    assert!(
+        out.contains("GRIT_RT_LIB") && out.contains("doctor: ĐỎ"),
+        "{out}"
+    );
 }

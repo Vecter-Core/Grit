@@ -2,4 +2,4 @@
 // note: trường Vec trong biến thể: bind qua tham chiếu (v: &Vec) hợp lệ, đọc độ dài
 ⊔ V<'a> { Many(Vec<'a, u32>), Zero }
 ƒ n<'a>(r: &V<'a>) → usize ! {mem} { ⌥ r { V::Many(v) ↦ v.len(), V::Zero ↦ 0 } }
-ƒ main() → usize ! {mem} { μar ≔ Arena::new(); μv ≔ Vec::new(&!ar); v.push(1); v.push(2); w ≔ V::Many(v); n(&w) }
+ƒ main() → usize ! {mem} { μar ≔ Arena::new(); μv ≔ Vec::new(&ar); v.push(1); v.push(2); w ≔ V::Many(v); n(&w) }

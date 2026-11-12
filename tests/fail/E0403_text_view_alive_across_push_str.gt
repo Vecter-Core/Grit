@@ -2,7 +2,7 @@
 // note: Text: khung nhìn &str lấy bằng &self; dựng thêm (push_str cần &!self) làm khung nhìn vô hiệu (M6 chặn tĩnh)
 ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μt ≔ Text::new(&!ar);
+  μt ≔ Text::new(&ar);
   t.push_str("abc");
   v ≔ t.as_str();
   t.push_str("def");

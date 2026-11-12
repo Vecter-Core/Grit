@@ -1,0 +1,4 @@
+// probe: reject E0301
+// why: dùng () như số
+ƒ f() ! ∅ { }
+ƒ main() → i32 ! ∅ { f() + 1 }

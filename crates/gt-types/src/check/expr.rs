@@ -296,21 +296,11 @@ impl<'e, 'a> Checker<'e, 'a> {
                 let r = self.infer.shallow(&lt);
                 let float = self.is_float(&lt);
                 if matches!(op, Eq | Ne) {
-                    if float {
-                        self.err(
-                            "E0303",
-                            e.id,
-                            e.span,
-                            "`==`/`≠` trên số thực bị cấm (D4): so sánh theo ngưỡng (`|a - b| < eps`) hoặc dùng hàm `core` có tên".to_string(),
-                        );
-                    } else if !self.eq_ok(&lt) && r != Ty::Err {
-                        let s = self.show(&lt);
-                        self.err(
-                            "E0301",
-                            e.id,
-                            e.span,
-                            format!("`==`/`≠` chưa hỗ trợ cho kiểu `{s}`"),
-                        );
+                    if matches!(r, Ty::Infer(_)) && !float {
+                        // kiểu chưa biết (vd. `Some(v)` của `None` ban đầu): kiểm lại SAU khi giải (FB-C19)
+                        self.eq_deferred.push((e.id, e.span, lt.clone()));
+                    } else {
+                        self.check_eq_operand(e.id, e.span, &lt);
                     }
                 } else {
                     let ok = self.is_numeric(&lt) || matches!(r, Ty::Char | Ty::Err);
@@ -387,11 +377,32 @@ impl<'e, 'a> Checker<'e, 'a> {
         }
     }
 
+    /// cấm D4 (`E0303`) và tập kiểu so bằng được (`E0301`) cho `==`/`≠`
+    pub(crate) fn check_eq_operand(&mut self, node: NodeId, span: Span, lt: &Ty) {
+        let r = self.infer.shallow(lt);
+        if self.is_float(lt) {
+            self.err(
+                "E0303",
+                node,
+                span,
+                "`==`/`≠` trên số thực bị cấm (D4): so sánh theo ngưỡng (`|a - b| < eps`) hoặc dùng hàm `core` có tên".to_string(),
+            );
+        } else if !self.eq_ok(lt) && r != Ty::Err {
+            let s = self.show(lt);
+            self.err(
+                "E0301",
+                node,
+                span,
+                format!("`==`/`≠` chưa hỗ trợ cho kiểu `{s}`"),
+            );
+        }
+    }
+
     fn eq_ok(&self, t: &Ty) -> bool {
         match self.infer.resolve(t) {
             Ty::Int(_) | Ty::Bool | Ty::Char | Ty::Err | Ty::Infer(_) => true,
-            Ty::Tuple(v) => v.iter().all(|x| self.eq_ok(x)),
-            Ty::Ref(_, inner) => matches!(*inner, Ty::Str) || self.eq_ok(&inner),
+            // `&str` so theo BYTE (`gritrt_bytes_eq`). Tuple và `&T` (T ≠ str) CHƯA có: thông dịch từng so địa chỉ còn LLVM từ chối (FB-C13); dùng `*a == *b`
+            Ty::Ref(false, inner) => matches!(*inner, Ty::Str),
             _ => false,
         }
     }
@@ -401,7 +412,8 @@ impl<'e, 'a> Checker<'e, 'a> {
         let target = self.env.lower_ty(ty, &cx);
         let from = self.expr(inner, None);
         let (f, t) = (self.infer.shallow(&from), self.infer.shallow(&target));
-        if matches!(f, Ty::Float(_)) && matches!(t, Ty::Int(_) | Ty::Char | Ty::Bool) {
+        // `is_float` thấy cả biến suy diễn số thực (literal `1.5` chưa chú thích): trước đây chỉ `Ty::Float` nên `x ≔ 1.5; x as i32` lọt (FB-C14)
+        if self.is_float(&f) && matches!(t, Ty::Int(_) | Ty::Char | Ty::Bool) {
             self.err(
                 "E0319",
                 e.id,

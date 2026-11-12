@@ -1,0 +1,6 @@
+// expect: fail E0401
+// note: g(b, b.v): đọc b.v sau khi b đã bị move ở đối số trước
+▢ B { v: i32 }
+ƒ g(b: B, n: i32) ! ∅ { }
+ƒ f(b: B) ! ∅ { g(b, b.v); }
+ƒ main() → i32 ! ∅ { 0 }

@@ -7,9 +7,9 @@
 //! * `gritrt_spawn(f, arg)` tạo luồng HĐH thật chạy `f(arg)`; không có `join` (đúng ngữ nghĩa M8).
 #![allow(unsafe_code)]
 
-#[cfg(not(all(windows, target_arch = "x86_64")))]
+#[cfg(not(all(any(windows, target_os = "linux"), target_arch = "x86_64")))]
 compile_error!(
-    "gt-rt Phase 1 chỉ hỗ trợ x86_64 Windows (ADR-029); target khác phải được thêm có chủ đích"
+    "gt-rt Phase 1 chỉ hỗ trợ x86_64 Windows (ADR-029) và x86_64 Linux; target khác phải được thêm có chủ đích"
 );
 
 use std::io::Write;
@@ -60,10 +60,29 @@ pub extern "C" fn gritrt_exit(code: u32) -> ! {
     std::process::exit(i32::try_from(code.min(255)).unwrap_or(255))
 }
 
+/// Ngăn xếp của luồng chạy `main`: 256 MiB (chỉ giữ chỗ địa chỉ; trang được cấp khi chạm tới). Ngăn xếp mặc định của tiến trình (1 MiB ở Windows,
+/// 8 MiB ở Linux) quá nhỏ cho chương trình HỢP LỆ và đã được M8 chứng minh dừng (đệ quy sâu có `↓`, mảng lớn cục bộ) — chúng bị HĐH giết và
+/// bị báo như lỗi nội bộ (F-06 của bộ kiểm toán). Tràn quá 256 MiB vẫn là giới hạn tài nguyên của chương trình (docs/KNOWN_LIMITATIONS.md).
+const MAIN_STACK_BYTES: usize = 256 << 20;
+
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_start(main: extern "C" fn()) -> i32 {
-    main();
-    0
+    match std::thread::Builder::new()
+        .name("grit-main".to_string())
+        .stack_size(MAIN_STACK_BYTES)
+        .spawn(move || main())
+    {
+        // `panic = "abort"` nên `join` chỉ Err khi luồng chết bất thường; không để lỗi đó thành "thành công"
+        Ok(h) => match h.join() {
+            Ok(()) => 0,
+            Err(_) => gritrt_abort(ABORT_KINDS.len().try_into().unwrap_or(i32::MAX)),
+        },
+        // không giữ chỗ được 256 MiB (giới hạn bộ nhớ ảo của môi trường): lùi về ngăn xếp tiến trình thay vì không chạy được
+        Err(_) => {
+            main();
+            0
+        }
+    }
 }
 
 /// Báo kết quả của `main` (số nguyên/bool) cho `gritc run`: ghi `<giá trị>` vào tệp có đường dẫn trong biến môi trường
@@ -83,9 +102,11 @@ pub extern "C" fn gritrt_report_int(value: i64, signed: i32) {
     }
 }
 
+#[cfg(windows)]
 #[repr(C)]
 struct SrwLock(*mut u8);
 
+#[cfg(windows)]
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn AcquireSRWLockExclusive(l: *mut SrwLock);
@@ -94,6 +115,7 @@ unsafe extern "system" {
 
 /// # Safety
 /// `lock` trỏ tới ô 8 byte căn lề 8, khởi tạo 0 và sống suốt thời gian khoá (codegen đảm bảo: ô nằm trong `Mutex`).
+#[cfg(windows)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gritrt_mutex_lock(lock: *mut u8) {
     unsafe { AcquireSRWLockExclusive(lock.cast()) }
@@ -101,9 +123,40 @@ pub unsafe extern "C" fn gritrt_mutex_lock(lock: *mut u8) {
 
 /// # Safety
 /// Như `gritrt_mutex_lock`; luồng gọi đang giữ khoá (M8 đảm bảo `with` bao cặp lock/unlock).
+#[cfg(windows)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gritrt_mutex_unlock(lock: *mut u8) {
     unsafe { ReleaseSRWLockExclusive(lock.cast()) }
+}
+
+/// Linux: khoá quay + nhường luồng trên ô 8 byte khởi tạo 0 (cùng hợp đồng ô khoá với SRWLOCK của Windows; không cần phụ thuộc ngoài).
+///
+/// # Safety
+/// `lock` trỏ tới ô 8 byte căn lề 8, khởi tạo 0.
+#[cfg(not(windows))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_mutex_lock(lock: *mut u8) {
+    let a = unsafe { &*lock.cast::<std::sync::atomic::AtomicU64>() };
+    while a
+        .compare_exchange_weak(
+            0,
+            1,
+            std::sync::atomic::Ordering::Acquire,
+            std::sync::atomic::Ordering::Relaxed,
+        )
+        .is_err()
+    {
+        std::thread::yield_now();
+    }
+}
+
+/// # Safety
+/// Như `gritrt_mutex_lock`.
+#[cfg(not(windows))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_mutex_unlock(lock: *mut u8) {
+    let a = unsafe { &*lock.cast::<std::sync::atomic::AtomicU64>() };
+    a.store(0, std::sync::atomic::Ordering::Release);
 }
 
 /// Con trỏ thô gửi qua luồng; tính `Send` do kiểm tĩnh E0501 ở compiler bảo đảm (đối số của `spawn` là `Send`).
@@ -238,6 +291,51 @@ pub unsafe extern "C" fn gritrt_fs_open(p: *const u8, n: u64) -> i32 {
     }
 }
 
+/// Mã lỗi âm của I/O không abort: -1 không có, -2 bị từ chối quyền, -3 đường dẫn không hợp lệ (không UTF-8), -4 lỗi khác.
+fn io_code(e: &std::io::Error) -> i32 {
+    match e.kind() {
+        std::io::ErrorKind::NotFound => -1,
+        std::io::ErrorKind::PermissionDenied => -2,
+        _ => -4,
+    }
+}
+
+/// `Cap<In>::read_all`: đọc NGUYÊN stdin tới EOF vào bộ nhớ (rò rỉ có chủ đích, sống tới hết tiến trình, như `gritrt_fs_open`); trả tay cầm (≥ 0)
+/// hoặc mã lỗi âm. Gọi lần thứ hai thấy EOF ngay ⇒ tay cầm tới tệp rỗng.
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_stdin_read() -> i32 {
+    use std::io::Read;
+    let mut v = Vec::new();
+    if let Err(e) = std::io::stdin().lock().read_to_end(&mut v) {
+        return io_code(&e);
+    }
+    let leaked: &'static [u8] = Box::leak(v.into_boxed_slice());
+    let mut g = files().lock().unwrap_or_else(|e| e.into_inner());
+    g.push(leaked);
+    i32::try_from(g.len() - 1).unwrap_or(-4)
+}
+
+/// `Cap<Fs>::write`: ghi NGUYÊN `d[0..dn)` vào tệp `p[0..n)` (tạo mới hoặc cắt cụt); 0 nếu được, ngược lại mã lỗi âm (xem [`io_code`]; -3 đường dẫn không UTF-8).
+///
+/// # Safety
+/// `p` trỏ tới `n` byte đọc được và `d` trỏ tới `dn` byte đọc được (`dn = 0`: `d` có thể null).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_fs_write(p: *const u8, n: u64, d: *const u8, dn: u64) -> i32 {
+    let pb = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let Ok(path) = std::str::from_utf8(pb) else {
+        return -3;
+    };
+    let data: &[u8] = if dn == 0 {
+        &[] // lát rỗng của `Vec` có thể mang con trỏ null: không dựng `&[u8]` từ null (UB)
+    } else {
+        unsafe { std::slice::from_raw_parts(d, usize::try_from(dn).unwrap_or(0)) }
+    };
+    match std::fs::write(path, data) {
+        Ok(()) => 0,
+        Err(e) => io_code(&e),
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_file_len(h: i32) -> u64 {
     file_at(h).len() as u64
@@ -293,6 +391,28 @@ pub unsafe extern "C" fn gritrt_utf8_valid(p: *const u8, n: u64) -> i32 {
     }
     let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
     i32::from(std::str::from_utf8(bytes).is_ok())
+}
+
+/// Hai dãy byte có bằng nhau không (`==` trên `&str`, Seed 1.0 FB-C13): khác độ dài ⇒ 0; cùng độ dài ⇒ so từng byte. Thuần: chỉ ĐỌC.
+///
+/// # Safety
+/// `a` trỏ tới `an` byte đọc được và `b` trỏ tới `bn` byte đọc được (độ dài 0: con trỏ có thể null, không bao giờ được đọc).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_bytes_eq(a: *const u8, an: u64, b: *const u8, bn: u64) -> i32 {
+    if an != bn {
+        return 0;
+    }
+    if an == 0 {
+        return 1;
+    }
+    let n = usize::try_from(an).unwrap_or(0);
+    let (x, y) = unsafe {
+        (
+            std::slice::from_raw_parts(a, n),
+            std::slice::from_raw_parts(b, n),
+        )
+    };
+    i32::from(x == y)
 }
 
 /// # Safety

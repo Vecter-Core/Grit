@@ -1,0 +1,6 @@
+// probe: reject E0401
+// why: b.take(b): receiver và đối số cùng bị move
+▢ B { v: i32 }
+⊐ B { ƒ take(self, o: B) ! ∅ { } }
+ƒ f(b: B) ! ∅ { b.take(b); }
+ƒ main() → i32 ! ∅ { 0 }

@@ -1,0 +1,4 @@
+// probe: reject
+// why: enum chứa chính nó theo giá trị
+⊔ T { Leaf, Node(T, T) }
+ƒ main() → i32 ! ∅ { 0 }

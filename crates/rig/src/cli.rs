@@ -41,6 +41,7 @@ struct Args {
     deny_yellow: bool,
     check: bool,
     locked: bool,
+    no_std: bool,
 }
 
 fn parse(args: &[String]) -> Result<Args, String> {
@@ -52,12 +53,14 @@ fn parse(args: &[String]) -> Result<Args, String> {
         deny_yellow: false,
         check: false,
         locked: false,
+        no_std: false,
     };
     for s in it {
         match s.as_str() {
             "--deny-yellow" => a.deny_yellow = true,
             "--check" => a.check = true,
             "--locked" => a.locked = true,
+            "--no-std" => a.no_std = true,
             x if x.starts_with('-') => return Err(format!("đối số lạ `{x}`")),
             x => a.pos.push(x.to_string()),
         }
@@ -358,6 +361,19 @@ fn cmd_lock() -> i32 {
     }
 }
 
+/// Thư mục `lib/std` của bản Grit đang chạy: biến `GRIT_STD`, hoặc `lib/std` ở một thư mục tổ tiên của tệp `rig` (bố cục kho: `target/<hồ-sơ>/rig`).
+fn find_std() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("GRIT_STD") {
+        let p = PathBuf::from(p);
+        return p.join("rig.toml").is_file().then_some(p);
+    }
+    let exe = std::env::current_exe().ok()?;
+    exe.ancestors()
+        .skip(1)
+        .map(|d| d.join("lib").join("std"))
+        .find(|c| c.join("rig.toml").is_file())
+}
+
 fn cmd_new(a: &Args) -> i32 {
     let [name] = a.pos.as_slice() else {
         return usage_err("`rig new` cần đúng một tên gói");
@@ -375,11 +391,26 @@ fn cmd_new(a: &Args) -> i32 {
     if dir.exists() {
         return fail(&format!("{} đã tồn tại", dir.display()));
     }
+    let std_dir = if a.no_std { None } else { find_std() };
+    let std_dep = match &std_dir {
+        Some(p) => format!(
+            "std = {{ path = \"{}\" }}\n",
+            p.display().to_string().replace('\\', "/")
+        ),
+        None => String::new(),
+    };
+    if std_dir.is_none() && !a.no_std {
+        eprintln!(
+            "rig: không tìm thấy lib/std (đặt GRIT_STD hoặc chạy `rig add <đường-dẫn lib/std>`); gói mới không có `std`"
+        );
+    }
     let mk = || -> std::io::Result<()> {
         std::fs::create_dir_all(dir.join("src"))?;
         std::fs::write(
             dir.join("rig.toml"),
-            format!("[package]\nname = \"{name}\"\nversion = \"0.1.0\"\n\n[dependencies]\n"),
+            format!(
+                "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\n\n[dependencies]\n{std_dep}"
+            ),
         )?;
         std::fs::write(
             dir.join("src").join("main.gt"),

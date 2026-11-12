@@ -62,7 +62,7 @@ pub const PRELUDE: &str = "\
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
-pub const KINDS: [&str; 19] = [
+pub const KINDS: [&str; 21] = [
     "move",
     "reborrow",
     "borrow_in_loop",
@@ -82,6 +82,8 @@ pub const KINDS: [&str; 19] = [
     "ref_pat_disjoint",
     "ref_pat_subfield",
     "fn_value_call",
+    "fn_value_ref",
+    "arena_vec",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -268,7 +270,7 @@ impl Gen {
     }
 
     fn scenario(&mut self) -> Vec<St> {
-        match self.rng.below(124) {
+        match self.rng.below(136) {
             0..=16 => self.int_borrow(),
             17..=28 => self.reborrow(),
             29..=36 => self.moves(),
@@ -281,7 +283,8 @@ impl Gen {
             86..=94 => self.interior_mut(),
             95..=99 => self.flow(),
             100..=111 => self.ref_pattern(),
-            _ => self.calls_via_value(),
+            112..=123 => self.calls_via_value(),
+            _ => self.arena_vec(),
         }
     }
 
@@ -907,6 +910,47 @@ impl Gen {
         out
     }
 
+    /// `Vec` trên Arena CHIA SẺ (R6) + lát lấy từ Vec: push/lát/reset/alloc/dùng lát theo thứ tự ngẫu nhiên. Phủ ràng buộc "region BÊN TRONG
+    /// kiểu được mượn sống ít nhất bằng khoản vay" (FB-C9: `s ≔ v.as_slice(); ar.reset(); s[0]` từng được chấp nhận).
+    fn arena_vec(&mut self) -> Vec<St> {
+        self.tags.insert("arena_vec");
+        let a = self.fresh("a");
+        let v = self.fresh("v");
+        let s = self.fresh("s");
+        let q = self.fresh("q");
+        let k0 = self.k();
+        let mut out = vec![
+            raw(format!("μ{a} ≔ Arena::new();")),
+            raw(format!("μ{v} ≔ Vec::new(&{a});")),
+            raw(format!("{v}.push({k0});")),
+        ];
+        let mut has_slice = false;
+        let mut has_q = false;
+        for _ in 0..1 + self.rng.below(5) {
+            let k = self.k();
+            let st = match self.rng.below(8) {
+                0 if !has_slice => {
+                    has_slice = true;
+                    raw(format!("{s} ≔ {v}.as_slice();"))
+                }
+                1 | 2 if has_slice => raw(format!("use_i({s}[0]);")),
+                3 => raw(format!("{v}.push({k});")),
+                4 => {
+                    self.tags.insert("arena_reset");
+                    raw(format!("{a}.reset();"))
+                }
+                5 if !has_q => {
+                    has_q = true;
+                    raw(format!("{q} ≔ {a}.alloc({k});"))
+                }
+                6 if has_q => raw(format!("use_i(*{q});")),
+                _ => raw(format!("use_i({v}.as_slice()[0]);")),
+            };
+            out.push(st);
+        }
+        out
+    }
+
     /// Arena: cấp phát, dùng, reset/move/gán đè theo thứ tự ngẫu nhiên.
     fn arena(&mut self) -> Vec<St> {
         let a = self.fresh("a");
@@ -958,7 +1002,20 @@ impl Gen {
         out
     }
 
-    /// Lời gọi theo `RegionSig`: `idr`, `pick`, `pick2`, `first`, `two`, `mix`.
+    /// Tên để GỌI một hàm: đôi khi qua một GIÁ TRỊ hàm (`fvN ≔ idr;` rồi `fvN(..)`): kiểu hàm không mang region nên M6 phải coi kết quả có thể
+    /// mượn từ MỌI đối số (đường bảo thủ); oracle động chạy chương trình thật nên thấy vi phạm nếu M6 lỡ chấp nhận (kịch bản `fn_value_ref`).
+    fn callee(&mut self, name: &str, out: &mut Vec<St>) -> String {
+        if self.rng.chance(40) {
+            self.tags.insert("fn_value_ref");
+            let fv = self.fresh("fv");
+            out.push(raw(format!("{fv} ≔ {name};")));
+            fv
+        } else {
+            name.to_string()
+        }
+    }
+
+    /// Lời gọi theo `RegionSig`: `idr`, `pick`, `pick2`, `first`, `two`, `mix` (trực tiếp hoặc qua giá trị hàm).
     fn calls(&mut self) -> Vec<St> {
         self.tags.insert("call_regionsig");
         let x = self.fresh("x");
@@ -973,20 +1030,30 @@ impl Gen {
             y.clone()
         };
         match self.rng.below(6) {
-            0 => out.push(raw_r(
-                format!("{r} ≔ idr(&{x});"),
-                Role::MakeRef {
-                    var: r.clone(),
-                    base: x.clone(),
-                    unique: false,
-                },
-            )),
-            1 => out.push(raw(format!("{r} ≔ pick(&{x}, &{yy});"))),
-            2 => out.push(raw(format!("{r} ≔ pick2(&{x}, &{yy});"))),
+            0 => {
+                let f = self.callee("idr", &mut out);
+                out.push(raw_r(
+                    format!("{r} ≔ {f}(&{x});"),
+                    Role::MakeRef {
+                        var: r.clone(),
+                        base: x.clone(),
+                        unique: false,
+                    },
+                ));
+            }
+            1 => {
+                let f = self.callee("pick", &mut out);
+                out.push(raw(format!("{r} ≔ {f}(&{x}, &{yy});")));
+            }
+            2 => {
+                let f = self.callee("pick2", &mut out);
+                out.push(raw(format!("{r} ≔ {f}(&{x}, &{yy});")));
+            }
             3 => {
                 let arr = self.fresh("arr");
                 out.push(raw(format!("μ{arr} ≔ [{kx}, {ky}];")));
-                out.push(raw(format!("{r} ≔ first(&{arr}[..]);")));
+                let f = self.callee("first", &mut out);
+                out.push(raw(format!("{r} ≔ {f}(&{arr}[..]);")));
                 // ghi vào phần tử khác (oracle chính xác theo chỉ số; borrowck coi mọi chỉ số chồng lấn)
                 if self.rng.chance(60) {
                     let i = self.rng.below(2);
@@ -994,11 +1061,13 @@ impl Gen {
                 }
             }
             4 => {
-                out.push(raw(format!("two(&!{x}, &!{yy});")));
+                let f = self.callee("two", &mut out);
+                out.push(raw(format!("{f}(&!{x}, &!{yy});")));
                 out.push(raw(format!("{r} ≔ &{x};")));
             }
             _ => {
-                out.push(raw(format!("mix(&{x}, &!{yy});")));
+                let f = self.callee("mix", &mut out);
+                out.push(raw(format!("{f}(&{x}, &!{yy});")));
                 out.push(raw(format!("{r} ≔ &{y};")));
             }
         }

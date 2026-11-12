@@ -103,6 +103,8 @@ pub(crate) struct Checker<'e, 'a> {
     pub vec_drop_reported: bool,
     /// nút của biểu thức đang đứng ở vị trí NGƯỜI ĐƯỢC GỌI (`callee` của `Call`): đường dẫn tới intrinsic chỉ được phép ở đây (gọi trực tiếp)
     pub callee_pos: Option<NodeId>,
+    /// `==`/`≠` có toán hạng là biến suy diễn CHƯA giải lúc gặp toán tử: kiểm lại ở `finish` (FB-C19)
+    pub eq_deferred: Vec<(NodeId, Span, Ty)>,
     pub oblig: Vec<Oblig>,
     pub types: BTreeMap<NodeId, Ty>,
     pub methods: Vec<(NodeId, MethodRes)>,
@@ -144,6 +146,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             scope: Vec::new(),
             vec_drop_reported: false,
             callee_pos: None,
+            eq_deferred: Vec::new(),
             oblig: Vec::new(),
             types: BTreeMap::new(),
             methods: Vec::new(),
@@ -370,8 +373,10 @@ impl<'e, 'a> Checker<'e, 'a> {
         };
         c.self_kind = f.sig.self_kind;
         // entry: hàm `main` cấp cao của một tệp (`tệp::main`), không phải thành viên impl/trait
+        // FB-C18: entry phải KHÔNG tham số (như `find_main` của codegen/runner); `main(x)` ở tệp khác không phải entry nên không được đúc `Cap`
         c.entry = f.impl_idx.is_none()
             && f.body.is_some()
+            && f.sig.params.is_empty()
             && f.key.split("::").count() == 2
             && f.key.ends_with("::main");
         let all: Vec<&GParam> = impl_gens.iter().chain(f.sig.generics.iter()).collect();
@@ -503,6 +508,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             ret: ty,
             effects: Vec::new(),
             span: value.span,
+            has_contracts: false,
         });
     }
 
@@ -513,16 +519,46 @@ impl<'e, 'a> Checker<'e, 'a> {
         let Some(cap) = self.lang(Lang::Cap) else {
             return false;
         };
-        fn go(t: &Ty, cap: DefId) -> bool {
+        // đi vào trường của struct/enum người dùng (FB-C18b: `W { c: Cap<Fs> }` vẫn là capability); `seen` chặn kiểu đệ quy
+        fn go(db: &crate::db::TypeDb, t: &Ty, cap: DefId, seen: &mut Vec<DefId>) -> bool {
             match t {
-                Ty::Adt(d, args) => *d == cap || args.iter().any(|a| go(a, cap)),
-                Ty::Tuple(v) => v.iter().any(|a| go(a, cap)),
-                Ty::Array(t, _) | Ty::Slice(t) | Ty::Ref(_, t) | Ty::RawPtr(_, t) => go(t, cap),
-                Ty::Fn(p, r, _) => p.iter().any(|a| go(a, cap)) || go(r, cap),
+                Ty::Adt(d, args) => {
+                    if *d == cap || args.iter().any(|a| go(db, a, cap, seen)) {
+                        return true;
+                    }
+                    if seen.contains(d) {
+                        return false;
+                    }
+                    seen.push(*d);
+                    let Some(adt) = db.adts.get(d) else {
+                        return false;
+                    };
+                    let fields: Vec<Ty> = match &adt.kind {
+                        crate::collect::AdtKind::Struct(fs) => {
+                            fs.iter().map(|f| f.ty.clone()).collect()
+                        }
+                        crate::collect::AdtKind::Enum(vs) => {
+                            vs.iter().flat_map(|v| v.fields.clone()).collect()
+                        }
+                    };
+                    fields.iter().any(|f| {
+                        go(
+                            db,
+                            &crate::traits::subst_with(f, &adt.generics, args),
+                            cap,
+                            seen,
+                        )
+                    })
+                }
+                Ty::Tuple(v) => v.iter().any(|a| go(db, a, cap, seen)),
+                Ty::Array(t, _) | Ty::Slice(t) | Ty::Ref(_, t) | Ty::RawPtr(_, t) => {
+                    go(db, t, cap, seen)
+                }
+                Ty::Fn(p, r, _) => p.iter().any(|a| go(db, a, cap, seen)) || go(db, r, cap, seen),
                 _ => false,
             }
         }
-        go(&self.infer.resolve(ty), cap)
+        go(&self.env.db, &self.infer.resolve(ty), cap, &mut Vec::new())
     }
 
     /// D28/D29: hàm trả `Cap<…>` mà không nhận `Cap<…>` nào là NGUỒN capability gốc; chỉ `main` được gọi nó.
@@ -547,6 +583,9 @@ impl<'e, 'a> Checker<'e, 'a> {
     fn finish(&mut self, _sig: &FnSigInfo) {
         // nghĩa vụ trait lần 1 (trước khi mặc định hoá), rồi mặc định hoá literal, rồi lần cuối
         self.infer.default_literals();
+        for (node, span, t) in std::mem::take(&mut self.eq_deferred) {
+            self.check_eq_operand(node, span, &t);
+        }
         let obligs = std::mem::take(&mut self.oblig);
         for o in obligs {
             let ty = self.infer.resolve(&o.ty);

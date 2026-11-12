@@ -2,7 +2,7 @@
 // note: Text: lát byte as_bytes còn sống qua push_char bị từ chối
 ƒ main() → u64 ! {mem} {
   μar ≔ Arena::new();
-  μt ≔ Text::new(&!ar);
+  μt ≔ Text::new(&ar);
   t.push_str("abc");
   b ≔ t.as_bytes();
   t.push_char('é');

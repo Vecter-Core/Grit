@@ -1,0 +1,35 @@
+ƒ show(out: &Cap<Out>, name: &str, r: Result<File, IoError>) ! {io} {
+  out.write_str(name);
+  out.write_str(": ");
+  ⌥ r {
+    Ok(f) ↦ { out.write_str("OK len="); out.write_u64(f.len() as u64); },
+    Err(e) ↦ ⌥ e {
+      IoError::NotFound ↦ { out.write_str("NotFound"); },
+      IoError::Denied ↦ { out.write_str("Denied"); },
+      IoError::Invalid ↦ { out.write_str("Invalid"); },
+      IoError::Other ↦ { out.write_str("Other"); },
+    },
+  }
+  out.write_str("\n");
+}
+ƒ main() ! {io, mem} {
+  out ≔ root_out();
+  fs ≔ root_fs();
+  ar ≔ Arena::new();
+  show(&out, "empty", fs.open(""));
+  show(&out, "dir", fs.open("/tmp"));
+  show(&out, "missing", fs.open("/tmp/nonexistent_zzz"));
+  show(&out, "dev_null", fs.open("/dev/null"));
+  show(&out, "dev_zero", fs.open("/dev/zero"));
+  show(&out, "proc_status", fs.open("/proc/self/status"));
+  show(&out, "etc_shadow", fs.open("/etc/shadow"));
+  show(&out, "etc_hostname", fs.open("/etc/hostname"));
+  t ≔ Text::new(&ar);
+  show(&out, "emptyText", fs.open(t.as_str()));
+  μt2 ≔ Text::new(&ar);
+  t2.push_str("/etc/host");
+  z ≔ [0u8; 1];
+  t2.push_utf8(&z[0usize..1usize]);
+  t2.push_str("name");
+  show(&out, "nul", fs.open(t2.as_str()));
+}

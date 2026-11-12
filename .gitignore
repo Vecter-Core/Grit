@@ -9,3 +9,5 @@ mutants.out
 mutants.out.old
 __pycache__/
 runtime/gt-rt/target
+capstone/reference/target/
+mut_track_*.txt

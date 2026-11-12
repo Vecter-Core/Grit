@@ -1,0 +1,4 @@
+// probe: reject E0310
+// why: E0310: `main` nằm trong ▦ không phải main cấp cao
+▦ m { ◈ ƒ main() ! {io} { o ≔ root_out(); o.write_u64(1); } }
+ƒ main() → i32 ! {io} { m::main(); 0 }

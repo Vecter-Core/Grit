@@ -77,11 +77,11 @@ const PROG: &str = "ƒ main() → u64 ! {mem} {
   e ≔ ar.alloc(9u64);
   s2 ≔ s + *e;
   μar2 ≔ Arena::new();
-  μv ≔ Vec::new(&!ar2);
+  μv ≔ Vec::new(&ar2);
   μi ≔ 0u64;
   ⟳ i < 300u64 ↓ 300u64 - i { v.push(i); i ← i + 1u64; }
   μar3 ≔ Arena::new();
-  μt ≔ Text::new(&!ar3);
+  μt ≔ Text::new(&ar3);
   t.push_str(\"xin chao\");
   s2 + (v.len() as u64) + (t.len() as u64)
 }
