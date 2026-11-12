@@ -1,0 +1,1 @@
+{"id": "9f839b391ca7", "file": "crates/gt-term/src/lib.rs", "line": 361, "rule": "xoá câu lệnh", "old": "ops.push(o);", "new": "{}; // đã xoá", "status": "survived", "note": "", "source": "tự động"}

@@ -109,3 +109,12 @@ fn recursion_through_a_repeated_fn_value_is_still_e0703_fb_c15() {
         "E0703",
     );
 }
+
+/// Generic specialization first encountered as a repeated function value must enter the instance graph too.
+#[test]
+fn generic_recursion_through_a_repeated_fn_value_is_e0703() {
+    only(
+        "ƒ f<T: Copy>(n: u32, x: T) → u32 ! ∅ { μa ≔ [f; 2]; μg ≔ a[0]; g(n, x) } ƒ main() → u32 ! ∅ { f(1u32, 2u32) }",
+        "E0703",
+    );
+}
