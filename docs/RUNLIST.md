@@ -8,8 +8,8 @@
 ## Gói 2
 | Giai đoạn | Trạng thái | Bằng chứng / việc mở |
 |---|---|---|
-| G2.0 | ĐANG LÀM | G2.0.a bỏ theo lệnh mới, chưa đụng `main`; bundle `grit-9359db8.bundle` đã verify ở `.backup`; G2.0.c ghi hai test G1.6; G2.0.d fallback `gritrt_start` fail-closed, runtime 8/8; G2.0.e authorship report còn làm. |
-| G2.1–G2.7 | CHƯA KIỂM | Chưa bắt đầu. |
+| G2.0 | XONG | Không đụng `main`; bundle `grit-9359db8.bundle` verify ở `.backup`; thay đổi hai test G1.6 ghi trong PROGRESS; fallback `gritrt_start` fail-closed, runtime 8/8; authorship script/report có ở `tools/authorship_report.py` và `docs/AUTHORSHIP.md`. |
+| G2.1–G2.7 | CHƯA KIỂM | Chưa bắt đầu; G2.1 trước tiên cần gate xanh trên đầu G2.0 rồi chạy lô nặng tuần tự. |
 
 | ID | Việc | Trạng thái | Lệnh chạy lại / bằng chứng | Commit |
 |---|---|---|---|---|

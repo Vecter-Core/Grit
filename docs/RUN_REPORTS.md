@@ -5,7 +5,8 @@
 - **G2.0.b:** `D:/Grit_backup` từ chối ghi. Theo lệnh mới, thêm `/.backup/` vào `.gitignore`; `tools/backup_bundle.sh D:/Grit D:/Grit/.backup` tạo và verify `grit-9359db8.bundle` (3332 KB). Cảnh báo: cùng ổ D, không bảo vệ khỏi hỏng ổ.
 - **G2.0.c:** thay đổi hai test G1.6 được liệt kê trong `docs/PROGRESS.md` kèm trước/sau/lý do và lý do không yếu kiểm tra.
 - **G2.0.d:** `gritrt_start` chạy entry `main` của Grit trên luồng riêng 256 MiB; khi tạo luồng thất bại, bỏ fallback âm thầm, ghi stderr và thoát 71. Test subprocess ép `GRITRT_TEST_FORCE_MAIN_STACK_FAILURE`, xác nhận mã 71/thông báo. `cargo test --manifest-path runtime/gt-rt/Cargo.toml`: 8/8; preflight và fmt xanh.
-- **G2.0.e:** `tools/authorship_report.py` đã tạo nhưng chưa chạy/đối chiếu; `docs/AUTHORSHIP.md` chưa tạo. Chưa kết thúc G2.0.
+- **G2.0.e:** `tools/authorship_report.py` dùng `git blame` và phân lớp commit theo ancestry `origin/claude/gallant-darwin-m251cq` so với `0a93310..HEAD`; ghi kết quả vào `docs/AUTHORSHIP.md`. Theo phép đo trên HEAD `7080925`: 64.705 dòng TCB, 429 Codex (0,66%), 64.276 Claude; `gt-rt` 105/891 (11,78%), `gt-guard` 68/1.593 (4,27%), `gt-driver` 220/16.147 (1,36%), các nhóm khác theo bảng. Đây là phân loại commit, không suy ra model cụ thể từng dòng. Lượt đầu không có `PYTHONIOENCODING` nên lỗi console; chạy lại UTF-8 thành công.
+- **G2.0:** hoàn tất các mục áp dụng; `main` không đổi theo lệnh mới. G2.1–G2.7 tiếp tục ngay; yêu cầu gate xanh tại đúng HEAD sau G2.0 vẫn phải chạy.
 
 Quy ước: mỗi mục một tiểu mục `## R<n> — <trạng thái> (ngày)`; nêu việc đã làm, số liệu thật, lỗi thật tìm được (FB-n), cái KHÔNG làm/chưa kiểm, chỗ lệnh sai kỹ thuật + phương án fail-closed đã chọn.
 
