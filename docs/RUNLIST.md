@@ -18,7 +18,7 @@
 | R9 | `tools/fuzz_loop.sh` + tích luỹ ≤ 2 giờ | CHƯA | | |
 | R10 | 69 đột biến nguy hiểm của M7 (điều kiện #10) | CHƯA | | |
 | R11 | Mục E: đọc mã H1–H10, IR Guard, `gt-rt`; ghi thí nghiệm và giới hạn ở `docs/TCB_CODE_AUDIT.md` | XONG, G1.5 | FB-C28/C29/C30; Guard 35/35; reader GPT-6 cùng họ với writer nên không phải đánh giá khác họ model |  |
-| R12 | Kết thúc: cổng cuối liền mạch, READINESS bảng §7 từng điều kiện, HANDOFF, bundle, push, báo cáo cuối | ĐANG, G1.6 | Gate lần 1 RED (1.014/2; hai lỗi test, đã sửa; scanner 2 mục đã phân loại); cần gate toàn bộ lần 2 rồi bundle/push |  |
+| R12 | Kết thúc: cổng cuối liền mạch, READINESS bảng §7 từng điều kiện, HANDOFF, bundle, push, báo cáo cuối | ĐANG, G1.6 | Gate lần 2 GREEN (1.017/0/202; fail-open 470/0 mới); báo cáo gate và READINESS đã cập nhật; còn push + bundle + chốt báo cáo |  |
 
 ---
 

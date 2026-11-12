@@ -45,4 +45,4 @@
 - Test hồi quy mới: trước sửa `0 passed; 1 failed`, panic tại assertion với `[]`; sau sửa `1 passed`.
 - `cargo test -p gt-guard --test guard -- --test-threads=2`: 35 passed, 0 failed.
 - Các test H1–H10, runtime và driver bổ sung được ghi theo lệnh/kết quả trong mục G1.5 của `docs/RUN_REPORTS.md` và `docs/HANDOFF.md`.
-- **G1.6 full gate, READINESS cuối, bundle và push:** chưa kết luận tại thời điểm viết mục này; xem HANDOFF/RUNLIST cập nhật sau bước đó.
+- **G1.6 full gate:** chạy liền mạch lần 2 trên HEAD `c5aa45b`, `GATE_RESULT=GREEN`, 1.017/0/202; runtime 7/7; fail-open 470/0 mới. READINESS §7 không được tự suy rộng từ kết quả gate; các giới hạn trên vẫn mở. Chi tiết cổng ở `docs/RUN_REPORTS.md`; tình trạng bundle/push ở HANDOFF/RUNLIST.
