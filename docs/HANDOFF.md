@@ -1,5 +1,11 @@
 # HANDOFF — TRẠNG THÁI HIỆN TẠI (đọc tệp này đầu tiên; lịch sử ở `docs/HANDOFF_ARCHIVE.md`)
 
+## Gói 2 tiếp tục — checkpoint G2.1 (2026-11-12)
+- Nhánh `integration`; `main` chưa đụng. `windows-work` đã push tới `6bfc40c`; log G2.1 đang ghi, chưa commit/push.
+- probe_diff: 20.000 seed độc lập theo range 0..19999, 5 lô tuần tự; edge violations=0; mutant 361/591/554 mỗi mutant `i=0`; đối chứng 238 `i=277`; xem `docs/PROBE_DIFF_RESULTS.jsonl`.
+- GT_FULL8=1: 4/4 tests xanh; hai phép nặng lần lượt 599.26s/6,929,600,568 cặp hộp và 690.44s/4,619,733,712 cặp. Memory free CHƯA KIỂM.
+- Tiếp tục: rà E04xx/A.1; G2.1.c so codegen đúng HEAD; G2.1.d mutation có mục tiêu. Mỗi commit G2 phải có `Author-Model: GPT-6` và push `HEAD:refs/heads/windows-work`.
+
 **Cập nhật tại commit faddecc, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
