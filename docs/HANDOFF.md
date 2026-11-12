@@ -1,10 +1,12 @@
 # HANDOFF — TRẠNG THÁI HIỆN TẠI (đọc tệp này đầu tiên; lịch sử ở `docs/HANDOFF_ARCHIVE.md`)
 
-**Cập nhật tại commit bcec465, ngày 2026-10-18.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit 53e9e55, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
 **WIP R5 (2026-11-12):** `docs/FLAKE_LLVM_SORT.jsonl` ghi 100 lần xanh cũ nhưng chạy song song 2 tiến trình, chỉ có 50 timestamp khác nhau, cùng executable và test dùng seed cố định `20261014`; các dòng này không phải 100 mẫu độc lập và không dùng làm kết luận thống kê. Chưa có lần chạy tuần tự với seed thay đổi.
+
+**G1.1 bảo toàn (2026-11-12; HEAD 53e9e55):** G1.0 commit `3a94c5e`, WIP hai tệp flake commit `53e9e55`; `git push origin HEAD:refs/heads/windows-work` THÀNH CÔNG, `origin/windows-work` trỏ tới `53e9e55`, không push `main`. `git bundle create D:/Grit_backup/grit-53e9e55.bundle --all` CHƯA THÀNH CÔNG: Windows trả `Permission denied` khi tạo `.bundle.lock`; ACL `D:\Grit_backup` chỉ cho `Users`/`Authenticated Users` đọc. Ba bundle cũ còn nguyên; retention chưa chạy. Đã hết rủi ro 58 commit chỉ có trên máy đối với HEAD 53e9e55 nhờ nhánh remote; vẫn cần bundle local sau khi cấp quyền thư mục backup.
 
 ## 1. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ (`.gt`) thiết kế cho AI viết code; ký hiệu toán/logic ngắn (có bí danh ASCII). Chủ dự án **Giang** — trả lời bằng TIẾNG VIỆT.
