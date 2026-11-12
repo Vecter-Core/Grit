@@ -341,7 +341,7 @@ impl<'e, 'a> Checker<'e, 'a> {
 
     /// Hiệu ứng KHAI BÁO của thành viên mà `pick` chọn (FB-15: trước đây kiểu hàm của hàm kết hợp dùng làm giá trị mang hiệu ứng RỖNG ⇒ gọi qua biến mất `io`/`mem`…).
     fn pick_effects(&self, pick: &Pick) -> Vec<String> {
-        match &pick.res {
+        let resolved = match &pick.res {
             MethodRes::Impl {
                 impl_node, member, ..
             } => self
@@ -361,9 +361,12 @@ impl<'e, 'a> Checker<'e, 'a> {
                 .get(trait_def)
                 .and_then(|td| td.members.get(*member))
                 .map(|m| m.effects.clone()),
+        };
+        // Kiểm tra snapshot hiệu ứng đã lưu trong Pick còn khớp DB. Lệch/không tra được ⇒ không đoán là `∅`.
+        match resolved {
+            Some(effects) if effects == pick.effects => pick.effects.clone(),
+            _ => vec!["?unknown".to_string()],
         }
-        // không tra được thành viên (db không nhất quán): KHÔNG đoán là `∅`; dùng một hiệu ứng không bao giờ khai báo được để E0801/E0301 chặn (fail-closed)
-        .unwrap_or_else(|| vec!["?unknown".to_string()])
     }
 
     fn record_pick(&mut self, node: NodeId, span: gt_span::Span, pick: &Pick) {
