@@ -1,6 +1,6 @@
 # HANDOFF — TRẠNG THÁI HIỆN TẠI (đọc tệp này đầu tiên; lịch sử ở `docs/HANDOFF_ARCHIVE.md`)
 
-**Cập nhật tại commit cc51dea, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit c200051, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
@@ -15,6 +15,8 @@
 **G1.3c gate (2026-11-12):** lần đầu bắt thiếu `); }` trong test capability, sửa `587d9be`; lần kế fmt xanh nhưng clippy bắt `Pick.effects` dead code và doc-list formatting. Sửa fail-closed snapshot check + ngắt đoạn doc list ở `83a3e0e`; `cargo fmt --all --check`, gt-rt fmt check, `cargo clippy --workspace --all-targets -- -D warnings` đều exit 0. Hai lượt gate bị dừng trước kết quả cuối; chạy lại toàn bộ gate sau preflight.
 
 **G1.3d policy/test (2026-11-12; commit `cc51dea`):** giữ E0313 nghiêm hơn của Windows cho intrinsic lib/core làm giá trị; chuyển các ca hiệu ứng về hàm Grit `S::mk`, intrinsic precondition sang E0313, cập nhật Vec/Text dùng `&Arena`. F-05 được cô lập bằng test chỉ bật `allow-intrinsic-values`: 13/13 xanh và nhận E0310. Kiểm mục tiêu default: gt-types capabilities 14/14, corpus 3/3, intrinsic 2/2; gt-mir corpus 3/3; expectations 969 fixtures/72 mã/245 refs; deletions 188. Cổng full và F-01..F-08 đỏ-khi-hoàn-nguyên vẫn CHƯA KIỂM.
+
+**G1.3e F-01..F-08 (2026-11-12):** đã bỏ từng sửa trong worktree tạm tại `c200051` rồi chạy hồi quy: F-01 `same_stmt` đỏ 2/3; F-02 no-default build báo E0433; F-03/F-04/F-07 corpus mất E0301 ở 9 fixture; F-05 feature test không còn E0310 (1/13 đỏ); F-06 stack depth đỏ 0/2 (exe thoát 101), đối chứng sau khôi phục 2/2; F-08 `gritc explain` cho 6 mã thoát 3 khi bỏ tài liệu và 0 khi khôi phục. Cây chính sạch sau thử. Cổng hậu merge liền mạch, R5, G1.5/G1.6 còn mở.
 
 
 ## 0. SỰ THẬT MỚI (2026-10-21; lệnh Seed 1.0 bản sửa — ĐỌC TRƯỚC)

@@ -162,6 +162,23 @@ Ghi chú trung thực: F-02 và F-08 không có test tự động riêng (F-02 d
 
 **G1.3c bổ sung (Windows, 2026-11-12):** nhánh Windows có hợp đồng E0313 nghiêm hơn: intrinsic lib/core không được làm giá trị. Do đó `helper(root_out)` bị E0313 ở ranh giới truyền, trước khi đường gọi qua giá trị có thể kiểm độc lập F-05. Để giữ phép thử riêng, `capabilities.rs::calling_a_root_source_through_a_function_value_is_e0310` chỉ bật với feature đo `allow-intrinsic-values`; lệnh `cargo test -p gt-types --features allow-intrinsic-values --test capabilities -- --test-threads=2` xanh 13/13, gồm test đó. Đây là kiểm định trên mã hiện tại, chưa phải đỏ-khi-hoàn-nguyên (mục G1.3c). Ca `E0310_call_through_local_fn_value` giữ E0310; ca truyền trực tiếp chuyển sang E0313.
 
+### Kiểm đỏ-khi-hoàn-nguyên sau merge (2026-11-12, Windows; bản sao worktree tại `c200051`)
+
+Mỗi phép hoàn nguyên dưới đây chỉ diễn ra trong `D:/Grit/target/tmp/Grit_revert_g1`, không thay đổi cây integration; worktree được xoá sau khi kiểm tra sạch.
+
+| F | Hoàn nguyên trong bản sao | Lệnh / kết quả khi bỏ sửa | Đối chứng với sửa |
+|---|---|---|---|
+| F-01 | bỏ phần move ngay trong `check_uses` (`1f0aab0`) | `cargo test -p gt-borrowck --test same_stmt`: ĐỎ, 2/3 test fail; tuple dùng hai lần và struct literal không còn E0401 | ca `valid_twins_stay_accepted` còn xanh |
+| F-02 | bỏ module `Opt` thay thế cho build không LLVM (`1f0aab0`) | `cargo build -p gt-driver --no-default-features`: ĐỎ `E0433`, 5 chỗ không resolve `gt_codegen_llvm` | bản sửa được build workspace ở các gate mục tiêu hiện có; build nguyên trạng sau merge đã pass trong baseline cũ |
+| F-03 | hoàn nguyên phần kiểu tự chứa theo giá trị (`9af99e9`) | `cargo test -p gt-types --test corpus`: ĐỎ; fixture recursive enum/struct/generic không có E0301 | corpus nguyên trạng xanh 3/3 ở kiểm tra sau merge |
+| F-04 | hoàn nguyên phần chặn `[T]`/`str` theo giá trị (`9af99e9`) | cùng lệnh: ĐỎ; slice field/param và str param/return không có E0301 | corpus nguyên trạng xanh 3/3 |
+| F-05 | bỏ riêng `CapUse` cho lời gọi `Ty::Fn` trong `call.rs` (đột biến tay trong bản sao) | `cargo test -p gt-types --features allow-intrinsic-values --test capabilities`: ĐỎ, test F-05 không nhận E0310 (12/13 còn lại xanh) | sau khôi phục, cùng test xanh 13/13; mặc định E0313 vẫn chặn intrinsic làm giá trị |
+| F-06 | đổi `gritrt_start` về gọi thẳng `main()` trong runtime của bản sao | sau build release runtime, `cargo test -p gt-driver --test stack_depth`: ĐỎ 0/2; hai exe native thoát 101 | sau khôi phục, `stack_depth` xanh 2/2 (đệ quy sâu và mảng cục bộ) |
+| F-07 | hoàn nguyên chẩn đoán tên biến ở vị trí kiểu (`9af99e9`) | cùng corpus gt-types: ĐỎ; `E0301_local_name_in_type_position` không phát chẩn đoán | corpus nguyên trạng xanh 3/3 |
+| F-08 | bỏ sáu trang E1201–E1204/E1301/E9901 (`05b4488`) | dựng `gritc`, `explain` từng mã: cả 6 thoát 3 vì thiếu docs | khôi phục, `explain` từng mã đều thoát 0 |
+
+Kết luận phạm vi: F-01…F-08 đều còn regression và bị bắt khi tắt sửa trên mã sau merge. F-02 là compile-time regression; F-08 là tài liệu embedded lúc build. Các lệnh trên đo Windows; không thay thế CI Linux/Windows trên GitHub.
+
 ## 8. Rà soát toàn bộ Seed 1.0 S7 — 469 vị trí, mỗi vị trí ĐỌC và phân loại (2026-10-23; Linux)
 
 Phương pháp: `python3 tools/fail_open_scan.py` (mẫu: `unwrap_or`, `unwrap_or_default`, `.ok()?`, `let _ =`, nhánh `_ =>`, `map_or(true|false`, `is_none_or`, `is_some_and`, `else {}`; 11 crate quyết định phán quyết; bỏ phần `#[cfg(test)]`). Năm subagent mới (không bối cảnh) mỗi người đọc ~94 vị trí, theo dõi tới nơi quyết định, VIẾT chương trình tái hiện cho mọi nghi vấn và chạy `gritc` thật; kết quả từng vị trí ở `docs/fail_open_classification.tsv` (cột: tệp, dòng, mẫu, phân loại, tham chiếu sửa, lý do, dòng mã chuẩn hoá). Phân loại: **AN TOÀN** (có lý do cụ thể: đường tới đó bị chặn/đóng, hoặc hướng bảo thủ), **SỬA** (có đường thật làm âm tính giả), **GHI NHẬN** (nhánh phòng thủ nuốt lỗi nhưng đã có chốt chặn phía sau; nói thẳng). Người đọc là subagent CÙNG HỌ model với tác giả mã, không phải người độc lập.
