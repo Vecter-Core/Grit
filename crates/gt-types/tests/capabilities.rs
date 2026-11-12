@@ -170,6 +170,7 @@ fn passing_a_capability_source_as_a_value_to_mint_capabilities_elsewhere_is_reje
         "E0313",
         1,
     );
+}
 
 /// FB-C18 (kiểu (a), NGHIÊM TRỌNG, điều kiện cứng #12): `main` có THAM SỐ ở tệp khác được miễn E0310 như "entry" nhưng KHÔNG phải entry thật (`find_main` chỉ nhận `main` không
 /// tham số) ⇒ hàm đó đúc `Cap` tuỳ ý, và hàm bất kỳ gọi nó. Entry phải không tham số.
