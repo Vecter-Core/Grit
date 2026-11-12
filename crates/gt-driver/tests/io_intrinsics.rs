@@ -356,7 +356,7 @@ fn stdin_closed_reads_as_empty() {
 }
 
 /// 34 ca ghi tệp: nội dung ngẫu nhiên/biên ghi đúng (đọc lại bằng Rust), ghi đè tệp có sẵn (cắt cụt), nội dung rỗng; lỗi: thư mục cha không có ⇒ NotFound (0),
-/// đường dẫn là THƯ MỤC ⇒ Other (3).
+/// đường dẫn là THƯ MỤC ⇒ mã theo `ErrorKind` của HĐH (Unix thường là Other=3; Windows là PermissionDenied=1).
 #[test]
 fn fs_write_matches_the_model_and_reports_errors() {
     let (d, exe) = build(WRITE_SRC, "write");
@@ -395,6 +395,14 @@ fn fs_write_matches_the_model_and_reports_errors() {
     // đường dẫn là thư mục
     let (code, out) = run_exe(&exe, &[work.to_str().expect("utf8")], b"zzz");
     assert_eq!(code, 0);
-    assert_eq!(String::from_utf8_lossy(&out), "err 3");
+    let expected = match std::fs::write(&work, b"zzz")
+        .expect_err("ghi vào thư mục phải lỗi")
+        .kind()
+    {
+        std::io::ErrorKind::NotFound => "err 0",
+        std::io::ErrorKind::PermissionDenied => "err 1",
+        _ => "err 3",
+    };
+    assert_eq!(String::from_utf8_lossy(&out), expected);
     let _ = std::fs::remove_dir_all(&d);
 }
