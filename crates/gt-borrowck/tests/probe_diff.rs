@@ -264,6 +264,8 @@ fn summarize(rep: &Report) -> String {
 #[test]
 fn mutants_361_591_554_never_accept_what_the_original_rejects() {
     let n_random = env_u64("GT_PROBE_N", 400);
+    let seed_start = env_u64("GT_PROBE_START", 0);
+    println!("PROBE_BATCH: GT_PROBE_START={seed_start} GT_PROBE_N={n_random}");
     let mut rep = Report::default();
     // 1. corpus (không có `entry` ⇒ không chạy oracle)
     for dir in ["pass", "fail"] {
@@ -272,7 +274,7 @@ fn mutants_361_591_554_never_accept_what_the_original_rejects() {
         }
     }
     // 2. bộ sinh ngẫu nhiên có sẵn (13 loại cấu trúc)
-    for s in 0..n_random {
+    for s in seed_start..seed_start + n_random {
         let p = Gen::new(1_000_000 + s).program();
         let src = p.source();
         // cộng vào MỖI loại cấu trúc mà chương trình mang (13 loại của bộ sinh có sẵn) + một dòng chung
@@ -300,7 +302,7 @@ fn mutants_361_591_554_never_accept_what_the_original_rejects() {
     }
     // 3. bộ sinh ĐỊNH HƯỚNG
     let per = n_random.max(70) / 2;
-    for s in 0..per {
+    for s in seed_start..seed_start + per {
         for kd in 0..probegen::KINDS.len() {
             let p = probegen::generate(kd, 7_000_000 + s);
             rep.judge(
