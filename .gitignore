@@ -1,4 +1,5 @@
 /target
+/.backup/
 *.o
 *.tmp
 crates/*/fuzz/target

@@ -20,7 +20,7 @@
 | H5 lát/File | Kiểm lát lấy độ dài mới sau gán lại; `slice_stale_len` 1/1 (FB-C20), `str::slice` 902 trường hợp khớp `is_char_boundary` của Rust. | Đối chiếu runtime không bao phủ mọi đường tạo lát. Interpreter không phải nguồn phán quyết cho LLVM. |
 | H6 Text/UTF-8 | `text_push_utf8_agrees_with_rust_from_utf8_on_100k_strings`: 100.000 đầu vào, 33.409 hợp lệ/66.591 không hợp lệ, dev và release-o2 khớp Rust; cắt chuỗi 902 trường hợp khớp Rust. | `gritrt_utf8_valid` bọc `std::str::from_utf8`; lỗi oracle ở runtime có thể ảnh hưởng toàn đường. Đã xử lý thêm ranh giới FFI rỗng tại FB-C28. |
 | H7 Atomic | Kiểm thứ tự nguyên tử tại M8/codegen và dữ liệu lệnh IR; `threads_repeat`: với dev và release-o2, mỗi mẫu `threads`/`two_locks` chạy 300 lượt, 0 lỗi quan sát được, không treo. | Không có ThreadSanitizer/loom và không có oracle đua dữ liệu/deadlock; 300 lượt không chứng minh vắng race. |
-| H8 Mutex/spawn | Kiểm khóa thứ tự, `Send`/`Sync`, hộp tham số worker và thực thi thread thật; test `stack_depth` 3/3 sau FB-C29, gồm mảng cục bộ worker 3 MB. | Mỗi thread reserve 256 MiB; quá nhiều thread hoặc stack cần hơn mức đó vẫn có thể thất bại. Fallback khi tạo thread `main` 256 MiB thất bại chưa được ép thử. |
+| H8 Mutex/spawn | Kiểm khóa thứ tự, `Send`/`Sync`, hộp tham số worker và thực thi thread thật; test `stack_depth` 3/3 sau FB-C29, gồm mảng cục bộ worker 3 MB. G2.0.d ép lỗi tạo thread main trong subprocess. | Mỗi thread reserve 256 MiB; quá nhiều thread hoặc stack cần hơn mức đó vẫn có thể thất bại. Tạo thread main thất bại nay thoát riêng mã 71, test xác nhận thông báo và mã thoát. |
 | H9 Cell | Kiểm `Cell::get: T: Copy`, cấm `Copy` cho các kiểu mang Arena/interior mutability; `interior_mut` 3/3 và `traits_generics fb_c17` 2/2. | M6 vẫn là hàng rào chính cho vùng chứa mutability bên trong. |
 | H10 đối số môi trường | Đọc đường chuyển đối số thành UTF-8 lossy và lưu trữ tới hết tiến trình; không tạo `&str` từ byte hệ điều hành chưa kiểm. | Không có thí nghiệm mới chỉ dành cho H10 trong G1.5; kết luận phần này chủ yếu là đọc mã và kiểm chứng dogfood sẵn có. |
 
@@ -37,7 +37,7 @@
 2. Attestation là chuỗi metadata; nó không ràng buộc đầy đủ hồ sơ build, thư viện runtime, phiên bản LLVM, object/linker hay binary cuối.
 3. Guard-post đếm abort theo `(hàm, loại)` chứ không theo từng vị trí; phép biến đổi có thể đổi vị trí nhưng giữ số đếm. Các tối ưu muộn phía target sau Guard-post chưa được ràng buộc bằng chứng tương đương.
 4. Không có ThreadSanitizer/loom. Stress test luồng hữu hạn không chứng minh không có race/deadlock.
-5. `gritrt_start` vẫn có fallback chạy entry trên stack hiện tại nếu không tạo được thread main 256 MiB; chưa có fault injection cho nhánh thiếu tài nguyên đó.
+5. G2.0.d đã bỏ fallback chạy entry trên stack hiện tại: lỗi tạo thread main 256 MiB ghi thông báo và thoát mã 71; unit test subprocess ép nhánh này. Việc cấp stack 256 MiB vẫn có thể thất bại vì giới hạn tài nguyên.
 6. `gt-rt` có các khối `unsafe`; G1.5 đọc các đường đã nêu nhưng **chưa** có test tự động đếm `unsafe` khớp danh sách TCB.
 
 ## Lệnh và kết quả G1.5 liên quan
@@ -45,5 +45,6 @@
 - `tools/preflight.sh D:/Grit` qua Git Bash chỉ định: `PREFLIGHT_OK` trước từng lô được chạy trong lượt này.
 - Test hồi quy mới: trước sửa `0 passed; 1 failed`, panic tại assertion với `[]`; sau sửa `1 passed`.
 - `cargo test -p gt-guard --test guard -- --test-threads=2`: 35 passed, 0 failed.
+- G2.0.d `cargo test --manifest-path runtime/gt-rt/Cargo.toml`: 8 passed/0 failed; subprocess ép `GRITRT_TEST_FORCE_MAIN_STACK_FAILURE`, kiểm đúng mã 71 và stderr.
 - Các test H1–H10, runtime và driver bổ sung được ghi theo lệnh/kết quả trong mục G1.5 của `docs/RUN_REPORTS.md` và `docs/HANDOFF.md`.
 - **G1.6 full gate:** chạy liền mạch lần 2 trên HEAD `c5aa45b`, `GATE_RESULT=GREEN`, 1.017/0/202; runtime 7/7; fail-open 470/0 mới. READINESS §7 không được tự suy rộng từ kết quả gate; các giới hạn trên vẫn mở. Chi tiết cổng ở `docs/RUN_REPORTS.md`; tình trạng bundle/push ở HANDOFF/RUNLIST.

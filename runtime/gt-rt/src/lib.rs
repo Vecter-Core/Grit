@@ -64,24 +64,39 @@ pub extern "C" fn gritrt_exit(code: u32) -> ! {
 /// quá nhỏ cho chương trình HỢP LỆ và đã được M8 chứng minh dừng (đệ quy sâu có `↓`, mảng lớn cục bộ) — chúng bị HĐH giết và
 /// bị báo như lỗi nội bộ. Tràn quá 256 MiB vẫn là giới hạn tài nguyên của chương trình (docs/KNOWN_LIMITATIONS.md).
 const GRIT_THREAD_STACK_BYTES: usize = 256 << 20;
+const MAIN_THREAD_STACK_FAILURE_EXIT_CODE: i32 = 71;
 
-#[unsafe(no_mangle)]
-pub extern "C" fn gritrt_start(main: extern "C" fn()) -> i32 {
-    match std::thread::Builder::new()
+fn spawn_main_thread(main: extern "C" fn()) -> std::io::Result<std::thread::JoinHandle<()>> {
+    #[cfg(test)]
+    if std::env::var_os("GRITRT_TEST_FORCE_MAIN_STACK_FAILURE").is_some() {
+        return Err(std::io::Error::other("forced test failure"));
+    }
+    std::thread::Builder::new()
         .name("grit-main".to_string())
         .stack_size(GRIT_THREAD_STACK_BYTES)
         .spawn(move || main())
-    {
+}
+
+fn main_stack_failure() -> ! {
+    let mut err = std::io::stderr().lock();
+    let _ = writeln!(
+        err,
+        "gritrt_start: cannot create main thread with {GRIT_THREAD_STACK_BYTES}-byte stack"
+    );
+    let _ = err.flush();
+    std::process::exit(MAIN_THREAD_STACK_FAILURE_EXIT_CODE)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_start(main: extern "C" fn()) -> i32 {
+    match spawn_main_thread(main) {
         // `panic = "abort"` nên `join` chỉ Err khi luồng chết bất thường; không để lỗi đó thành "thành công"
         Ok(h) => match h.join() {
             Ok(()) => 0,
             Err(_) => gritrt_abort(ABORT_KINDS.len().try_into().unwrap_or(i32::MAX)),
         },
-        // không giữ chỗ được 256 MiB (giới hạn bộ nhớ ảo của môi trường): lùi về ngăn xếp tiến trình thay vì không chạy được
-        Err(_) => {
-            main();
-            0
-        }
+        // Không được âm thầm chạy trên stack nhỏ của luồng hiện tại.
+        Err(_) => main_stack_failure(),
     }
 }
 
@@ -721,6 +736,32 @@ mod tests {
         }
         assert_eq!(gritrt_start(m), 0);
         assert_eq!(HIT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn start_stack_failure_exits_with_dedicated_code() {
+        const ENV: &str = "GRITRT_TEST_FORCE_MAIN_STACK_FAILURE";
+        if std::env::var_os(ENV).is_some() {
+            extern "C" fn unused_main() {}
+            gritrt_start(unused_main);
+            panic!("gritrt_start must exit on main-stack creation failure");
+        }
+        let output = std::process::Command::new(std::env::current_exe().expect("test exe"))
+            .args([
+                "--exact",
+                "tests::start_stack_failure_exits_with_dedicated_code",
+            ])
+            .env(ENV, "1")
+            .output()
+            .expect("spawn child test");
+        assert_eq!(
+            output.status.code(),
+            Some(MAIN_THREAD_STACK_FAILURE_EXIT_CODE)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("cannot create main thread with 268435456-byte stack")
+        );
     }
 
     /// Nhiều luồng thật tăng một bộ đếm dưới khoá thật: tổng phải đúng (không mất cập nhật).

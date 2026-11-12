@@ -1,5 +1,12 @@
 # RUN_REPORTS — báo cáo ngắn sau MỖI mục của RUNLIST (số THẬT; cái gì chưa kiểm)
 
+## G2.0 — ĐANG LÀM (2026-11-12)
+- **G2.0.a:** bỏ theo lệnh mới; `main` là tổ tiên của `integration`, nhưng gate xanh gần nhất là `c5aa45b`, không phải đầu `integration` hiện tại `9359db8`; không fast-forward/merge `main`.
+- **G2.0.b:** `D:/Grit_backup` từ chối ghi. Theo lệnh mới, thêm `/.backup/` vào `.gitignore`; `tools/backup_bundle.sh D:/Grit D:/Grit/.backup` tạo và verify `grit-9359db8.bundle` (3332 KB). Cảnh báo: cùng ổ D, không bảo vệ khỏi hỏng ổ.
+- **G2.0.c:** thay đổi hai test G1.6 được liệt kê trong `docs/PROGRESS.md` kèm trước/sau/lý do và lý do không yếu kiểm tra.
+- **G2.0.d:** `gritrt_start` chạy entry `main` của Grit trên luồng riêng 256 MiB; khi tạo luồng thất bại, bỏ fallback âm thầm, ghi stderr và thoát 71. Test subprocess ép `GRITRT_TEST_FORCE_MAIN_STACK_FAILURE`, xác nhận mã 71/thông báo. `cargo test --manifest-path runtime/gt-rt/Cargo.toml`: 8/8; preflight và fmt xanh.
+- **G2.0.e:** `tools/authorship_report.py` đã tạo nhưng chưa chạy/đối chiếu; `docs/AUTHORSHIP.md` chưa tạo. Chưa kết thúc G2.0.
+
 Quy ước: mỗi mục một tiểu mục `## R<n> — <trạng thái> (ngày)`; nêu việc đã làm, số liệu thật, lỗi thật tìm được (FB-n), cái KHÔNG làm/chưa kiểm, chỗ lệnh sai kỹ thuật + phương án fail-closed đã chọn.
 
 ## Ghi chú kỹ thuật về lệnh (không phải mục)

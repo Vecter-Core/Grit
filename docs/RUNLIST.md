@@ -5,6 +5,12 @@
 **Cổng liền mạch ở:** sau R1, R3, R6, R8, R10 và cuối. Sau mỗi cổng xanh: `bash tools/backup_bundle.sh D:/Grit`.
 **Môi trường:** không hai cargo cùng lúc, `CARGO_BUILD_JOBS=2`, `--test-threads=2`.
 
+## Gói 2
+| Giai đoạn | Trạng thái | Bằng chứng / việc mở |
+|---|---|---|
+| G2.0 | ĐANG LÀM | G2.0.a bỏ theo lệnh mới, chưa đụng `main`; bundle `grit-9359db8.bundle` đã verify ở `.backup`; G2.0.c ghi hai test G1.6; G2.0.d fallback `gritrt_start` fail-closed, runtime 8/8; G2.0.e authorship report còn làm. |
+| G2.1–G2.7 | CHƯA KIỂM | Chưa bắt đầu. |
+
 | ID | Việc | Trạng thái | Lệnh chạy lại / bằng chứng | Commit |
 |---|---|---|---|---|
 | R1 | Toàn vẹn kho: `tools/preflight.sh`, giai đoạn `nul` của cổng, 4 tệp NUL, quan hệ git, sao lưu bundle, KNOWN_LIMITATIONS | XONG | `python tools/test_preflight.py`, `python tools/test_nul_check.py`, `bash tools/nul_check.sh D:/Grit`, `bash tools/backup_bundle.sh D:/Grit`; cổng sau R1 XANH 943/0/185 + `NUL_OK (1399 tệp quét)` | 824ec22 |

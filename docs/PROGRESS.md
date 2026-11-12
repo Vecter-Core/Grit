@@ -1,5 +1,9 @@
 # PROGRESS
 
+## G1.6 test-oracle corrections (2026-11-12; recorded for G2.0.c)
+- `crates/gt-driver/tests/io_intrinsics.rs::fs_write_matches_the_model_and_reports_errors`: before, directory-write failure was hard-coded as Unix `Other` (`err 3`); after, the oracle obtains the host OS `ErrorKind` from `std::fs::write` and maps `NotFound`→`err 0`, `PermissionDenied`→`err 1`, other kinds→`err 3`. Reason: Windows reports `PermissionDenied` while Unix commonly reports `Other`. This does not weaken coverage: it requires the Grit result to match the same host's actual `ErrorKind`; the missing-parent case remains specifically `NotFound`.
+- `crates/gt-driver/tests/contract_via_value.rs::precondition_is_not_used_to_delete_checks_on_the_indirect_path` (renamed/split): before, expected an indirect function carrying `⊳` to run and preserve its checks; after, asserts E0901 for escaped preconditioned functions, matching fail-closed FB-C6, and separately checks that precondition-free indirect calls still abort on out-of-bounds and return the expected value in-bounds. Reason: policy already rejects functions with `⊳` escaping as values. This does not weaken coverage: it checks rejection across local, mixed, parameter, division and shift cases, while retaining a positive runtime bounds-check control.
+
 ## M0 — Đặc tả & nền móng — **HOÀN THÀNH (đặc tả FINAL, Q1–Q14 đóng)**; commit "M0: finalize spec — close Q7-Q14"
 Cập nhật: 2026-10-05 (sau khi Giang trả lời Q1–Q6).
 
