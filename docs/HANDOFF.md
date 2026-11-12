@@ -1,12 +1,14 @@
 # HANDOFF — TRẠNG THÁI HIỆN TẠI (đọc tệp này đầu tiên; lịch sử ở `docs/HANDOFF_ARCHIVE.md`)
 
-**Cập nhật tại commit 53e9e55, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit fbeb861, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
 **WIP R5 (2026-11-12):** `docs/FLAKE_LLVM_SORT.jsonl` ghi 100 lần xanh cũ nhưng chạy song song 2 tiến trình, chỉ có 50 timestamp khác nhau, cùng executable và test dùng seed cố định `20261014`; các dòng này không phải 100 mẫu độc lập và không dùng làm kết luận thống kê. Chưa có lần chạy tuần tự với seed thay đổi.
 
 **G1.1 bảo toàn (2026-11-12; HEAD 53e9e55):** G1.0 commit `3a94c5e`, WIP hai tệp flake commit `53e9e55`; `git push origin HEAD:refs/heads/windows-work` THÀNH CÔNG, `origin/windows-work` trỏ tới `53e9e55`, không push `main`. `git bundle create D:/Grit_backup/grit-53e9e55.bundle --all` CHƯA THÀNH CÔNG: Windows trả `Permission denied` khi tạo `.bundle.lock`; ACL `D:\Grit_backup` chỉ cho `Users`/`Authenticated Users` đọc. Ba bundle cũ còn nguyên; retention chưa chạy. Đã hết rủi ro 58 commit chỉ có trên máy đối với HEAD 53e9e55 nhờ nhánh remote; vẫn cần bundle local sau khi cấp quyền thư mục backup.
+
+**G1.2 baseline (2026-11-12, trên HEAD fbeb861):** gate liền mạch `bash tools/gate.sh D:/Grit` ⇒ `GATE_RESULT=GREEN`, `TEST_PASSED=961 FAILED=0 SUITES=189`; NUL `1431` tệp; gt-rt fmt/clippy/release build/tests xanh (6/6); fmt `FMT_OK`; clippy `CLIPPY_EXIT=0`; audit `AUDIT_EXIT=0` (50 dependency); expectations 913 `.gt` (463 fail, 13 warn, 411 pass, 8 lexer), 72 mã/246 tham chiếu; các unittest expectations/mut_guard/preflight/nul/gate xanh; `DELETIONS_OK` (6), `TRACK_OK`. Test `random_arrays_with_duplicates_match_stable_sort` xanh trong 92.18 giây ở baseline. Sau cổng, bundle chưa thể tạo do ACL `D:\Grit_backup`; không gọi cổng này là đã bundle.
 
 ## 1. Dự án trong 5 dòng
 1. **Grit**: ngôn ngữ (`.gt`) thiết kế cho AI viết code; ký hiệu toán/logic ngắn (có bí danh ASCII). Chủ dự án **Giang** — trả lời bằng TIẾNG VIỆT.

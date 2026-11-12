@@ -37,3 +37,9 @@ Quy ước: mỗi mục một tiểu mục `## R<n> — <trạng thái> (ngày)`
 - G1.1b: preflight xanh. Tạo bundle tại `D:/Grit_backup/grit-53e9e55.bundle` thất bại với `fatal: Unable to create 'D:/Grit_backup/grit-53e9e55.bundle.lock': Permission denied`; ACL thư mục backup còn ReadAndExecute cho Users/Authenticated Users. Ba bundle cũ giữ nguyên, retention chưa chạy.
 - G1.1c: `git push origin HEAD:refs/heads/windows-work` thành công; `origin/windows-work` trỏ `53e9e55`. Không push main. Vì push thành công, 58 commit cũ không còn chỉ tồn tại trên máy; việc bundle vẫn mở.
 - CHƯA KIỂM: baseline G1.2, fetch/merge G1.3, R5 làm lại tuần tự với seed khác, audit đối kháng G1.5, cập nhật readiness/cổng cuối G1.6.
+
+## G1.2 — BASELINE GATE XANH (2026-11-12)
+- Trên commit `fbeb861`, sau preflight `PREFLIGHT_OK`, chạy liền mạch `C:\Program Files\Git\bin\bash.exe tools/gate.sh D:/Grit` ⇒ **`GATE_RESULT=GREEN`**, exit 0. Số thật: `NUL_OK (1431 tệp quét)`; gt-rt fmt/clippy/release build/tests xanh (6/6); `FMT_OK`; `CLIPPY_EXIT=0`; `AUDIT_EXIT=0` (50 dependencies); test workspace **961 đạt / 0 lỗi / 189 suite**; expectations **913 `.gt`: 463 fail, 13 warn, 411 pass, 8 lexer; 72 mã, 246 tham chiếu test**; unittest tool groups 9, 4, 3, 6, 4, 19, tất cả OK; `DELETIONS_OK (6)`; `TRACK_OK`.
+- `llvm_sort::random_arrays_with_duplicates_match_stable_sort` đạt ở gate trong 92.18 giây. Đây chỉ là lần chạy seed mặc định, không thay thế R5 thử seed độc lập.
+- Bundle hậu gate CHƯA TẠO: ACL của `D:\Grit_backup` từ chối tạo `.bundle.lock`. Gate xanh không được hiểu là bundle đã xong.
+- CHƯA KIỂM: nhánh Claude/merge và các F-01..F-08; flake tuần tự ≥100 seed; audit G1.5; cổng cuối G1.6.
