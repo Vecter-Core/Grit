@@ -220,3 +220,6 @@ Phát hiện bởi đọc mã đối kháng nhóm D (D10): `■ A ≔ f(); ■ Z
 
 ### FB-C27 — IR Guard: địa chỉ của khai báo ngoài không phải `gritrt_*` (vd `@system`) có thể lưu rồi gọi gián tiếp (kiểu (a), phòng thủ; cần lỗi codegen khác để có IR như vậy) — ĐÃ SỬA
 Luật "địa chỉ chỉ làm đích gọi trực tiếp" chỉ áp cho `gritrt_*`. Sửa: áp cho MỌI hàm chỉ khai báo trừ `llvm.*`. Test ĐỎ trước: `gt-guard/tests/guard.rs::external_declarations_may_only_be_called_directly_fb_c27`. Không có chương trình Grit nào sinh được IR như vậy (Guard là lớp thứ hai).
+
+### FB-C28 — đường dẫn rỗng `null + 0` thành Rust slice không hợp lệ trong I/O (UB ở ranh giới FFI) — ĐÃ SỬA
+`Text::new(&arena).as_str()` có thể là `{ptr: null, len: 0}`; `gritrt_fs_read/open/write` trước đây gọi `slice::from_raw_parts` trực tiếp. Rust yêu cầu con trỏ khác null cả khi độ dài bằng 0. **Đo đỏ trước sửa:** unit test gọi `gritrt_fs_open(null, 0)` dừng ở thông báo tiền điều kiện `slice::from_raw_parts requires the pointer to be aligned and non-null` (Windows status `0xc0000409`). Sửa: dùng `ffi_bytes`, trả `&[]` cho độ dài 0 và từ chối độ dài không thể biểu diễn thành Rust slice; cả ba đường dẫn và dữ liệu ghi cùng dùng helper. Test `gt-rt::tests::fs_empty_paths_accept_null_zero_ffi_slices` xanh sau sửa; kiểm nguồn cho thấy Grit truyền nguyên cặp `{ptr,len}`.

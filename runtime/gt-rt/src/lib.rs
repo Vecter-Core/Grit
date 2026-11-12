@@ -241,13 +241,35 @@ fn read_file_checked(path: &str) -> std::io::Result<Vec<u8>> {
     read_checked(f, meta.len())
 }
 
+/// Build a borrowed slice from the runtime ABI without constructing a Rust
+/// slice from a null pointer for the valid empty case.
+///
+/// # Safety
+/// For `n > 0`, `p` must point to `n` readable bytes. A zero length accepts a
+/// null pointer. Lengths Rust cannot represent as a slice are rejected.
+unsafe fn ffi_bytes<'a>(p: *const u8, n: u64) -> Option<&'a [u8]> {
+    let n = usize::try_from(n).ok()?;
+    if n == 0 {
+        return Some(&[]);
+    }
+    if n > isize::MAX as usize {
+        return None;
+    }
+    // SAFETY: required by this function's caller contract; length is now in
+    // the range accepted by Rust slices and is nonzero.
+    Some(unsafe { std::slice::from_raw_parts(p, n) })
+}
+
 /// Đọc NGUYÊN tệp vào bộ nhớ (rò rỉ có chủ đích, sống tới hết tiến trình); trả tay cầm. Lỗi (không có tệp, quyền, đường dẫn không UTF-8) ⇒ abort `io_error`.
 ///
 /// # Safety
-/// `p` trỏ tới `n` byte đọc được.
+/// `n > 0`: `p` trỏ tới `n` byte đọc được. `n = 0`: `p` có thể null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gritrt_fs_read(p: *const u8, n: u64) -> i32 {
-    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let Some(bytes) = (unsafe { ffi_bytes(p, n) }) else {
+        eprintln!("io_error: độ dài đường dẫn không hợp lệ");
+        gritrt_abort(14)
+    };
     let Ok(path) = std::str::from_utf8(bytes) else {
         eprintln!("io_error: đường dẫn không phải UTF-8");
         gritrt_abort(14)
@@ -269,10 +291,12 @@ pub unsafe extern "C" fn gritrt_fs_read(p: *const u8, n: u64) -> i32 {
 /// Như `gritrt_fs_read` nhưng KHÔNG abort: trả tay cầm (≥ 0) hoặc mã lỗi âm: -1 không có tệp, -2 bị từ chối quyền, -3 đường dẫn không hợp lệ (không UTF-8), -4 lỗi khác.
 ///
 /// # Safety
-/// `p` trỏ tới `n` byte đọc được.
+/// `n > 0`: `p` trỏ tới `n` byte đọc được. `n = 0`: `p` có thể null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gritrt_fs_open(p: *const u8, n: u64) -> i32 {
-    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let Some(bytes) = (unsafe { ffi_bytes(p, n) }) else {
+        return -4;
+    };
     let Ok(path) = std::str::from_utf8(bytes) else {
         return -3;
     };
@@ -318,17 +342,17 @@ pub extern "C" fn gritrt_stdin_read() -> i32 {
 /// `Cap<Fs>::write`: ghi NGUYÊN `d[0..dn)` vào tệp `p[0..n)` (tạo mới hoặc cắt cụt); 0 nếu được, ngược lại mã lỗi âm (xem [`io_code`]; -3 đường dẫn không UTF-8).
 ///
 /// # Safety
-/// `p` trỏ tới `n` byte đọc được và `d` trỏ tới `dn` byte đọc được (`dn = 0`: `d` có thể null).
+/// `n > 0`: `p` trỏ tới `n` byte đọc được; `n = 0`: `p` có thể null. `dn > 0`: `d` trỏ tới `dn` byte đọc được; `dn = 0`: `d` có thể null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gritrt_fs_write(p: *const u8, n: u64, d: *const u8, dn: u64) -> i32 {
-    let pb = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let Some(pb) = (unsafe { ffi_bytes(p, n) }) else {
+        return -4;
+    };
     let Ok(path) = std::str::from_utf8(pb) else {
         return -3;
     };
-    let data: &[u8] = if dn == 0 {
-        &[] // lát rỗng của `Vec` có thể mang con trỏ null: không dựng `&[u8]` từ null (UB)
-    } else {
-        unsafe { std::slice::from_raw_parts(d, usize::try_from(dn).unwrap_or(0)) }
+    let Some(data) = (unsafe { ffi_bytes(d, dn) }) else {
+        return -4;
     };
     match std::fs::write(path, data) {
         Ok(()) => 0,
@@ -676,6 +700,16 @@ pub unsafe extern "C" fn gritrt_spawn(f: extern "C" fn(*mut u8), arg: *mut u8) {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
+
+    /// A Grit empty string may cross the ABI as null + zero. Rust slices still
+    /// require a non-null pointer at length zero, so these entry points must
+    /// normalize the empty case before calling `from_raw_parts`.
+    #[test]
+    fn fs_empty_paths_accept_null_zero_ffi_slices() {
+        let null = std::ptr::null();
+        assert!(unsafe { gritrt_fs_open(null, 0) } < 0);
+        assert!(unsafe { gritrt_fs_write(null, 0, null, 0) } < 0);
+    }
 
     #[test]
     fn start_returns_zero_and_runs_main() {
