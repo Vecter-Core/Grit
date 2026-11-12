@@ -169,7 +169,9 @@ fn boundary_shapes_match_stable_sort() {
 /// 60 mảng ngẫu nhiên có nhiều khoá trùng (kiểm TÍNH ỔN ĐỊNH qua chỉ số gốc) và độ dài 0..=200; 20 mảng đầu cũng chạy ở thông dịch
 #[test]
 fn random_arrays_with_duplicates_match_stable_sort() {
-    let mut seed = 20261014u64;
+    let mut seed = std::env::var("GT_SORT_SEED")
+        .map(|s| s.parse::<u64>().expect("GT_SORT_SEED must be an unsigned integer"))
+        .unwrap_or(20261014u64);
     for case in 0..60 {
         let n = (lcg(&mut seed) % 201) as usize;
         let range = [3u64, 10, 50, 1000, u64::from(u32::MAX)][(lcg(&mut seed) % 5) as usize];

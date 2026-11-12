@@ -2,15 +2,16 @@
 """R5: điều tra flake `llvm_sort::random_arrays_with_duplicates_match_stable_sort` (lệnh Giang 2026-10-17).
 
 Chạy trực tiếp tệp test đã dựng (KHÔNG gọi cargo) và ghi MỖI lần chạy một dòng vào `docs/FLAKE_LLVM_SORT.jsonl`:
-thời điểm, kết quả (xanh/đỏ), thời gian, bộ nhớ vật lý còn trống, số tiến trình chạy song song, và TOÀN BỘ thông điệp khi đỏ.
+thời điểm, seed, kết quả (xanh/đỏ), thời gian, bộ nhớ vật lý còn trống, parallel=1, và TOÀN BỘ thông điệp khi đỏ.
 
-  python tools/flake_llvm_sort.py --runs 8 --parallel 2 --max-seconds 470
+  python tools/flake_llvm_sort.py --runs 12 --seed-start 1 --max-seconds 500
 
-`--parallel P`: chạy P tiến trình test CÙNG LÚC (tạo tải giống cổng, nơi test chạy cạnh test khác). Dừng nhận lần mới khi quá `--max-seconds`.
+Mỗi lần chạy dùng một seed khác nhau (`seed-start` trở đi), TUẦN TỰ; cấm tiến trình song song. Dừng nhận lần mới khi quá `--max-seconds`.
 Không phải bằng chứng "đã sửa": kết luận thống kê ở docs/RUN_REPORTS.md (0/N ⇒ giới hạn trên ≈ 3/N ở tin cậy 95%).
 """
 import argparse
 import ctypes
+from datetime import datetime
 import glob
 import json
 import os
@@ -56,10 +57,14 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=8)
-    ap.add_argument("--parallel", type=int, default=1)
+    ap.add_argument("--seed-start", type=int, default=1)
     ap.add_argument("--max-seconds", type=int, default=470)
     ap.add_argument("--timeout", type=int, default=420)
     a = ap.parse_args()
+    if a.runs < 1:
+        ap.error("--runs phải ≥ 1")
+    if a.seed_start < 0 or a.seed_start + a.runs - 1 > (1 << 64) - 1:
+        ap.error("dải seed phải nằm trong 0..2^64-1")
     exe = newest_exe()
     env = dict(os.environ)
     env["PATH"] = "D:/Tools/llvm-20.1.8/bin;" + env.get("PATH", "")
@@ -67,44 +72,45 @@ def main():
     done = 0
     red = 0
     while done < a.runs and time.time() - start < a.max_seconds:
-        k = min(a.parallel, a.runs - done)
+        seed = a.seed_start + done
         mem = free_mem_mb()
         t0 = time.time()
-        procs = []
-        for _ in range(k):
-            procs.append(
-                subprocess.Popen(
-                    [exe, TEST, "--exact", "--test-threads=2"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    env=env,
-                    cwd=os.path.join(ROOT, "crates", "gt-driver"),
-                )
+        env["GT_SORT_SEED"] = str(seed)
+        try:
+            p = subprocess.Popen(
+                [exe, TEST, "--exact", "--test-threads=2"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env,
+                cwd=os.path.join(ROOT, "crates", "gt-driver"),
             )
-        for p in procs:
-            try:
-                out, _ = p.communicate(timeout=max(10, a.timeout - (time.time() - t0)))
-                ok = p.returncode == 0
-                text = out.decode("utf-8", "replace")
-            except subprocess.TimeoutExpired:
-                p.kill()
-                out, _ = p.communicate()
-                ok = False
-                text = "TIMEOUT sau %d s\n" % a.timeout + out.decode("utf-8", "replace")
-            rec = {
-                "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "result": "xanh" if ok else "do",
-                "seconds": round(time.time() - t0, 1),
-                "free_mem_mb": mem,
-                "parallel": k,
-                "exe": os.path.basename(exe),
-            }
-            if not ok:
-                rec["message"] = text
-                red += 1
-            with open(LEDGER, "a", encoding="utf-8", newline="\n") as f:
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-            done += 1
+            out, _ = p.communicate(timeout=a.timeout)
+            ok = p.returncode == 0
+            text = out.decode("utf-8", "replace")
+        except subprocess.TimeoutExpired:
+            p.kill()
+            out, _ = p.communicate()
+            ok = False
+            text = "TIMEOUT sau %d s\n" % a.timeout + out.decode("utf-8", "replace")
+        except OSError as e:
+            ok = False
+            text = f"SPAWN ERROR: {type(e).__name__}: {e}"
+        rec = {
+            "time": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "method": "serial_unique_seed_v1",
+            "seed": seed,
+            "result": "xanh" if ok else "do",
+            "seconds": round(time.time() - t0, 1),
+            "free_mem_mb": mem,
+            "parallel": 1,
+            "exe": os.path.basename(exe),
+        }
+        if not ok:
+            rec["message"] = text
+            red += 1
+        with open(LEDGER, "a", encoding="utf-8", newline="\n") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        done += 1
     print(f"đã chạy {done} lần, đỏ {red}, {round(time.time() - start)} s")
     sys.exit(0 if red == 0 else 1)
 
