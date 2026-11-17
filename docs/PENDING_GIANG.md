@@ -1,5 +1,7 @@
 # PENDING_GIANG — việc CHỜ GIANG (lập 2026-11-17; agent KHÔNG tự đánh dấu thay Giang)
 
+> **CẬP NHẬT 2026-11-18 (GÓI 3, S0b) — REMOTE:** `git ls-remote origin` (URL cũ `https://github.com/Vecter-Core/Grit.git`) trả nguyên văn `remote: Repository not found.` / `fatal: repository 'https://github.com/Vecter-Core/Grit.git/' not found`. `gh auth status`: đăng nhập `gn3305970-lang`, scopes `repo, workflow, read:org, gist, codespace`. Theo lệnh Giang, kho đúng là `https://github.com/gn3305970-lang/Grit.git` (`gh repo view`: **PRIVATE, ban đầu rỗng**). Đã đẩy `windows-work` tới URL này bằng `git push <url> HEAD:refs/heads/windows-work` (KHÔNG đổi cấu hình `origin`, KHÔNG đẩy thẻ). **Giang làm nếu muốn `origin` trỏ kho mới:** `git remote set-url origin https://github.com/gn3305970-lang/Grit.git` (agent không tự đổi). Kho cũ `Vecter-Core/Grit` có thể đã bị xoá/đổi tên/mất quyền: Giang tự kiểm trên trình duyệt. Sao lưu: bundle ở `D:\Grit\.backup`, bản thứ hai ở `C:\Users\PC\GritBackup`, bản thứ ba là kho GitHub riêng tư.
+
 Mỗi mục: đề xuất của kiến trúc sư/agent và **hành vi mặc định trong lúc chờ**. Agent làm tiếp mọi việc không phụ thuộc mục này.
 
 | # | CHỜ GIANG | Đề xuất | Mặc định trong lúc chờ |
