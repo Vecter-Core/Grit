@@ -105,3 +105,9 @@ Cả ba nhóm đều là CHƯƠNG TRÌNH ĐÚNG mà đột biến chặn nhầm;
 ---
 ## QUYẾT ĐỊNH (2026-10-15, kiến trúc sư được Giang ủy quyền)
 **CHẤP NHẬN có điều kiện** lập luận đơn điệu cho 361/591/554 (điều kiện cứng #9). Căn cứ: kiểm bằng máy trên 24 143 chương trình, 0 vi phạm tiền đề "chỉ thêm cạnh", (i) = 0, oracle không thấy vi phạm ở tập chênh (3 657 chương trình), đối chứng dương bắt được 238. **Điều kiện mở lại:** (i) một luật ĐỎ mới của M6 được thêm ⇒ cập nhật kiểm kê A.1 và đo lại `probe_diff`; (ii) `probe_diff` bản đủ ngưỡng chạy trước mỗi lần đóng milestone. Cột "người duyệt" của H9 (`Cell`) được duyệt nhờ quyết định này.
+
+**Cập nhật G2.1.c (2026-11-17) — luật vùng MỚI từ nhánh Linux (đọc diff `gt-borrowck/src` giữa merge-base và `c3ba7de^2`: chỉ hai commit `1f0aab0` và `d7f5939`):**
+| mã / điểm phát | điều kiện kích hoạt | phụ thuộc tập điểm vùng | đơn điệu? |
+|---|---|---|---|
+| Ràng buộc WF/implied bound của `&'b T` (`regions.rs`, ngay sau `relate` ở `Rvalue::Ref`; FB-C9): `self.outl(flat(pslots), [region])` | THÊM cạnh outlives: mọi region BÊN TRONG kiểu được mượn phải sống ít nhất bằng khoản vay | CÓ nhưng chỉ THÊM CẠNH (không phát chẩn đoán trực tiếp) | **TĂNG** (thêm ràng buộc ⇒ vùng lớn hơn ⇒ nhiều chẩn đoán hơn): cùng loại với 361/591/554, không phải luật dạng phủ định |
+Đo: `probe_diff` ở HEAD sau hợp nhất (G2.1.a): 20 000 seed, 0 vi phạm (i) cho 361/591/554, đối chứng 238 có (i)=277. Đối chứng dương cho chính luật WF: đột biến `MNoWf` (feature `mutant-probe`, tắt luật) — `cargo test -p gt-borrowck --features mutant-probe --test oracle shared_arena_wf` ⇒ trên 3028 chương trình `shared_arena`/`arena_vec`: bản gốc chấp nhận+vi phạm = 0; đột biến chấp nhận chương trình oracle thấy vi phạm = 9 (≥ 5 yêu cầu). Điều kiện #9 vẫn **đạt có điều kiện** (lập luận đơn điệu + đo), không phải chứng minh hình thức.
