@@ -2,6 +2,8 @@
 
 > **Muốn nắm toàn cảnh trong một lượt (dự án là gì, có mấy phần, đã tới đâu, cái gì cần Giang duyệt): đọc `docs/PROJECT_STATUS.md`.** Tệp này chỉ giữ luật làm việc, trạng thái từng gói gần nhất và môi trường; phần lịch sử tháng 10 đã chuyển sang `HANDOFF_ARCHIVE.md` (2026-11-17).
 
+> **Kho git (2026-11-17):** nhánh làm việc = `integration`; `main` CHƯA đụng (không push `main`); `integration` đã push lên `origin/windows-work`. Lệnh hiện hành: P0–P4 trong `docs/RUNLIST.md`; việc chờ Giang: `docs/PENDING_GIANG.md`; mục lục giới hạn: `docs/KNOWN_LIMITATIONS_DIGEST.md`; báo cáo toàn cảnh: `docs/PROJECT_STATUS.md`.
+
 ## Gói 2 tiếp tục — checkpoint G2.1 (2026-11-12)
 - Nhánh `integration`; `main` chưa đụng. `windows-work` đã push tới `a9dcd24`; mutation follow-up + regression mới chưa commit.
 - probe_diff: 20.000 seed độc lập theo range 0..19999, 5 lô tuần tự; edge violations=0; mutant 361/591/554 mỗi mutant `i=0`; đối chứng 238 `i=277`; xem `docs/PROBE_DIFF_RESULTS.jsonl`.
