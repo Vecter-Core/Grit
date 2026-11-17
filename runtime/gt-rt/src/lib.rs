@@ -413,7 +413,9 @@ pub unsafe extern "C" fn gritrt_ewrite_str(p: *const u8, n: u64) {
     if n == 0 {
         return; // lát rỗng của `Vec` có thể mang con trỏ null: không dựng `&[u8]` từ null (UB)
     }
-    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let Some(bytes) = (unsafe { ffi_bytes(p, n) }) else {
+        gritrt_abort(14)
+    };
     let mut o = std::io::stderr().lock();
     if o.write_all(bytes).and_then(|()| o.flush()).is_err() {
         gritrt_abort(14);
@@ -430,7 +432,10 @@ pub unsafe extern "C" fn gritrt_utf8_valid(p: *const u8, n: u64) -> i32 {
     if n == 0 {
         return 1;
     }
-    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    // độ dài không biểu diễn được thành lát Rust ⇒ KHÔNG hợp lệ (đóng); không bao giờ tới `from_raw_parts` (FB-C31)
+    let Some(bytes) = (unsafe { ffi_bytes(p, n) }) else {
+        return 0;
+    };
     i32::from(std::str::from_utf8(bytes).is_ok())
 }
 
@@ -446,12 +451,9 @@ pub unsafe extern "C" fn gritrt_bytes_eq(a: *const u8, an: u64, b: *const u8, bn
     if an == 0 {
         return 1;
     }
-    let n = usize::try_from(an).unwrap_or(0);
-    let (x, y) = unsafe {
-        (
-            std::slice::from_raw_parts(a, n),
-            std::slice::from_raw_parts(b, n),
-        )
+    // độ dài không biểu diễn được thành lát Rust (> isize::MAX) ⇒ coi là KHÁC (không thể có lát như vậy; FB-C31)
+    let (Some(x), Some(y)) = (unsafe { ffi_bytes(a, an) }, unsafe { ffi_bytes(b, bn) }) else {
+        return 0;
     };
     i32::from(x == y)
 }
@@ -463,7 +465,9 @@ pub unsafe extern "C" fn gritrt_write_str(p: *const u8, n: u64) {
     if n == 0 {
         return; // lát rỗng của `Vec` có thể mang con trỏ null: không dựng `&[u8]` từ null (UB)
     }
-    let bytes = unsafe { std::slice::from_raw_parts(p, usize::try_from(n).unwrap_or(0)) };
+    let Some(bytes) = (unsafe { ffi_bytes(p, n) }) else {
+        gritrt_abort(14)
+    };
     let mut o = std::io::stdout().lock();
     if o.write_all(bytes).and_then(|()| o.flush()).is_err() {
         gritrt_abort(14);
