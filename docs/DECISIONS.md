@@ -1125,7 +1125,7 @@ Guard-post chạy SAU tối ưu với bộ luật nhỏ, và PHẢI kiểm: (1) 
 ### Cập nhật
 `GRIT_PLAN.md` §7 #2 đã sửa theo ADR này. Trạng thái READINESS #2 vẫn **chưa** cho tới khi lexer và parser đủ 24 giờ.
 
-## ADR-038 — Thư viện và ngôn ngữ cho các khoảng trống CHẶN: Arena, map, Option/Result, I/O, API (DỰ THẢO viết TRƯỚC khi code, 2026-10-14; CHỜ GIANG DUYỆT — CHƯA CÓ DÒNG MÃ NÀO CHO ADR NÀY)
+## ADR-038 — Thư viện và ngôn ngữ cho các khoảng trống CHẶN: Arena, map, Option/Result, I/O, API (DỰ THẢO viết TRƯỚC khi code, 2026-10-14. **TRẠNG THÁI 2026-11-18:** Giang duyệt theo từng bước — Q83–Q86, Q85 hoãn (`HANDOFF.md` mục "Đã QUYẾT"); Arena chia sẻ đã cài (ADR-C03), `HashMap`/`std` đã cài. Tiêu đề gốc "CHỜ GIANG DUYỆT — CHƯA CÓ DÒNG MÃ NÀO" giữ làm lịch sử.)
 Nguồn: lệnh Giang 2026-10-14 mục 6; khoảng trống thật đo ở `docs/READINESS.md` mục b. Không cần cú pháp hay từ khoá mới NGOẠI TRỪ toán tử lan truyền lỗi (mục c), chỉ đề xuất.
 
 ### Sự thật nền (đọc từ mã, ảnh hưởng mọi lựa chọn)
