@@ -96,6 +96,7 @@ E0403_q87_bind_unique_then_read_root | E0403 | `(*p).x` | [khoản mượn bắt
 E0403_read_through_origin_while_reborrowed | E0403 | `*p` | [khoản mượn bắt đầu ở đây @ `&!*p`] | dùng/mượn chung `p` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_read_while_unique | E0403 | `x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_reborrow_shared_then_unique | E0403 | `&!*u` | [khoản mượn bắt đầu ở đây @ `&*u`] | mượn duy nhất `&!` `u` trong khi còn khoản mượn chung `&` đang được dùng về sau
+E0403_sa_slice_of_a_held_across_push_to_a | E0403 | `a.push(2u64)` | [khoản mượn bắt đầu ở đây @ `a.as_slice()`] | mượn duy nhất `&!` `a` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_shared_held_over_loop_unique_inside | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_shared_live_then_unique | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_struct_field_read_while_unique | E0403 | `w.n` | [khoản mượn bắt đầu ở đây @ `&!w`] | dùng/mượn chung `w` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
@@ -145,6 +146,7 @@ E0404_returns_holder_of_unnamed_param | E0404 | `Hs { r: y }` | [] | tham chiế
 E0404_returns_param_as_static | E0404 | `x` | [] | tham chiếu có region (vị trí tham chiếu ẩn #0) bị dùng ở nơi cần 'static: chữ ký không hứa (vị trí tham chiếu ẩn #0) sống lâu hơn 'static (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
 E0404_returns_unnamed_second_param | E0404 | `y` | [] | tham chiếu có region (vị trí tham chiếu ẩn #0) bị dùng ở nơi cần 'a: chữ ký không hứa (vị trí tham chiếu ẩn #0) sống lâu hơn 'a (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
 E0404_returns_wrong_param_region | E0404 | `y` | [] | tham chiếu có region 'b bị dùng ở nơi cần 'a: chữ ký không hứa 'b sống lâu hơn 'a (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
+E0404_sa_vec_holds_ref_to_dead_local | E0404 | `{⏎    x ≔ 5u64;⏎    v.push(&x);⏎  }` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_static_return_of_local | E0404 | `x ≔ 1;` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_store_param_ref_into_wrong_holder | E0404 | `h.r ← x;` | [] | tham chiếu có region 'b bị dùng ở nơi cần 'a: chữ ký không hứa 'b sống lâu hơn 'a (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
 E0405_alloc_in_loop_outer_ref | E0405 | `{ a ≔ Arena::new(); p ← a.alloc(i); }` | [khoản mượn bắt đầu ở đây @ `a.alloc(i)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
@@ -181,6 +183,14 @@ E0405_return_alloc_ref | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt 
 E0405_return_struct_holding_arena_ref | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
 E0405_return_tuple_with_arena_ref | E0405 | `a ≔ Arena::new();` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
 E0405_return_via_let | E0405 | `p ≔ a.alloc(1);` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tham chiếu thoát khỏi Arena `a`: Arena bị drop/hết phạm vi trong khi tham chiếu cấp từ nó còn được dùng
+E0405_sa_alias_arena_ref_then_reset | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_sa_alloc_ref_into_vec_then_reset | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `ar.alloc(5u64)`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_sa_move_arena_while_vec_alive | E0405 | `eat(ar)` | [khoản mượn bắt đầu ở đây @ `&ar`] | gán/move Arena `ar` làm vô hiệu các tham chiếu đã cấp từ nó, mà chúng còn được dùng về sau
+E0405_sa_reset_through_fn_value_with_vec_alive | E0405 | `&!ar` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_sa_slice_pushed_into_outer_vec_then_reset | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_sa_slice_pushed_into_outer_vec_then_reset | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_sa_text_view_then_reset_other_text_alive | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
+E0405_sa_vec_in_struct_then_reset | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
 E0405_text_reset_while_text_alive | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
 E0405_two_allocs_reset_between | E0405 | `a.reset()` | [khoản mượn bắt đầu ở đây @ `a.alloc(1)`] | tạo `&!` trên Arena `a` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
 E0405_vec_reset_while_vec_alive | E0405 | `ar.reset()` | [khoản mượn bắt đầu ở đây @ `&ar`] | tạo `&!` trên Arena `ar` (reset/clear) trong khi còn tham chiếu cấp từ phiên bản hiện tại: các tham chiếu đó sẽ bị vô hiệu
