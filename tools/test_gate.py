@@ -258,5 +258,63 @@ class NulStage(unittest.TestCase):
         self.assertIn("GATE_RESULT=RED", out)
 
 
+class SavepointTreeHash(unittest.TestCase):
+    """GÓI 3 S2.d: điểm lưu của cổng gắn với BĂM CÂY (HEAD + diff theo dõi + NỘI DUNG tệp mới không ignore). Đổi nội dung (kể cả tệp chưa theo dõi
+    giữ nguyên tên) giữa hai lần chạy ⇒ làm lại từ đầu; GATE_TREE và băm từng giai đoạn được in."""
+
+    def setUp(self):
+        self.repo = tracked_repo()
+        self.addCleanup(shutil.rmtree, self.repo, True)
+
+    def run_gate(self):
+        env = dict(os.environ, GATE_STAGES="nul", PYTHONIOENCODING="utf-8")
+        script = os.path.join(ROOT, "tools", "gate.sh").replace(chr(92), "/")
+        p = subprocess.run(["bash", script, self.repo.replace(chr(92), "/")], cwd=self.repo, env=env, capture_output=True,
+                           text=True, encoding="utf-8", errors="replace")
+        return p.returncode, p.stdout
+
+    def write(self, rel, text):
+        with open(os.path.join(self.repo, rel), "w", encoding="utf-8", newline=NL) as f:
+            f.write(text)
+
+    @staticmethod
+    def tree_of(out):
+        for line in out.splitlines():
+            if line.startswith("GATE_TREE="):
+                return line.split("=", 1)[1].strip()
+        return None
+
+    def test_prints_tree_hash_and_stage_hash_equal_to_it(self):
+        rc, out = self.run_gate()
+        self.assertEqual(rc, 0, out)
+        tree = self.tree_of(out)
+        self.assertTrue(tree and len(tree) == 64, out)
+        self.assertIn("GATE_STAGE_TREE nul " + tree, out)
+
+    def test_unchanged_tree_reuses_savepoint_and_keeps_hash(self):
+        rc, out1 = self.run_gate()
+        rc, out2 = self.run_gate()
+        self.assertEqual(rc, 0, out2)
+        self.assertIn("ĐÃ ĐẠT", out2)
+        self.assertEqual(self.tree_of(out1), self.tree_of(out2))
+
+    def test_changed_untracked_content_with_same_name_forces_full_rerun(self):
+        self.write("moi.txt", "một" + NL)
+        rc, out1 = self.run_gate()
+        self.write("moi.txt", "hai" + NL)
+        rc, out2 = self.run_gate()
+        self.assertEqual(rc, 0, out2)
+        self.assertIn("làm lại từ đầu", out2)
+        self.assertNotIn("ĐÃ ĐẠT", out2)
+        self.assertNotEqual(self.tree_of(out1), self.tree_of(out2))
+
+    def test_changed_tracked_file_forces_full_rerun(self):
+        rc, out1 = self.run_gate()
+        self.write("tracked.txt", "đã sửa" + NL)
+        rc, out2 = self.run_gate()
+        self.assertIn("làm lại từ đầu", out2)
+        self.assertNotIn("ĐÃ ĐẠT", out2)
+
+
 if __name__ == "__main__":
     unittest.main()

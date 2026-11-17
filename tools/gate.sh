@@ -47,14 +47,17 @@ over_budget() { [ "$BUDGET" -gt 0 ] && [ $(( $(date +%s) - START )) -ge "$BUDGET
 
 # ---- điểm lưu -------------------------------------------------------------------------------------------------------------------------------
 STATE_DIR="$ROOT/target/gate_state"
-KEY="$( { git rev-parse HEAD 2>/dev/null; git diff HEAD 2>/dev/null | sha256sum | cut -d' ' -f1; git ls-files --others --exclude-standard 2>/dev/null | sort | sha256sum | cut -d' ' -f1; } | tr '\n' ' ' | sha256sum | cut -d' ' -f1)"
+# BĂM CÂY (GÓI 3 S2.d): HEAD + diff tệp theo dõi (kể cả nhị phân) + NỘI DUNG từng tệp mới không bị ignore (không chỉ tên). Điểm lưu chỉ hợp lệ khi băm này khớp.
+tree_hash() { { git rev-parse HEAD 2>/dev/null; git diff HEAD --binary 2>/dev/null | sha256sum | cut -d' ' -f1; git ls-files --others --exclude-standard -z 2>/dev/null | sort -z | xargs -0 -r sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1; } | tr '\n' ' ' | sha256sum | cut -d' ' -f1; }
+KEY="$(tree_hash)"
+echo "GATE_TREE=$KEY"
 mkdir -p "$STATE_DIR"
 [ -n "$GATE_RESET" ] && rm -f "$STATE_DIR"/*.tsv
 STATE="$STATE_DIR/state.tsv"
 if [ -f "$STATE" ] && [ "$(head -1 "$STATE")" != "KEY	$KEY" ]; then echo "GATE_STATE: mã đã đổi so với điểm lưu ⇒ làm lại từ đầu"; rm -f "$STATE"; fi
 [ -f "$STATE" ] || printf 'KEY\t%s\n' "$KEY" > "$STATE"
 done_unit() { awk -F'\t' -v u="$1" '$1==u && $2=="PASS" {f=1} END {exit !f}' "$STATE"; }
-mark_unit() { printf '%s\t%s\t%s\t%s\n' "$1" "$2" "${3:-0}" "${4:-0}" >> "$STATE"; }   # đơn-vị, PASS|FAIL, đạt, bộ
+mark_unit() { printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "${3:-0}" "${4:-0}" "$(tree_hash)" >> "$STATE"; }   # đơn-vị, PASS|FAIL, đạt, bộ
 
 # Giai đoạn `track` (lệnh Giang 2026-10-16): TỆP ĐÃ THEO DÕI KHÔNG ĐƯỢC ĐỔI trong lúc cổng chạy. Ảnh chụp TRƯỚC mọi giai đoạn và SAU tất cả; so sánh
 # từng đường dẫn (tệp theo dõi bị sửa/xoá — băm `git diff HEAD` của riêng tệp — hoặc tệp mới KHÔNG bị ignore xuất hiện) ⇒ ĐỎ nêu tên tệp.
@@ -69,6 +72,7 @@ unit() {
   if over_budget; then INCOMPLETE=1; echo "== $name: hoãn (hết ngân sách ${BUDGET}s)"; return 2; fi
   echo "== $name"
   "$@"; local c=$?
+  if [ $c = 0 ] && [ "$(tree_hash)" != "$KEY" ]; then echo "GATE_TREE_CHANGED: cây đổi trong giai đoạn $name (băm lúc bắt đầu $KEY) ⇒ KHÔNG hợp lệ"; c=1; fi
   if [ $c = 0 ]; then mark_unit "$name" PASS; else mark_unit "$name" FAIL; red "$name"; fi
   return $c
 }
@@ -124,7 +128,7 @@ test_unit() { # $1 = gói
   [ "$c" = 0 ] || return 1
   [ "$n" != 0 ] || { echo "TEST_STAGE_INVALID: $pkg không có dòng \`test result\` — KHÔNG được coi là xanh"; return 1; }
   [ "$f" = 0 ] || return 1
-  printf '%s\t%s\t%s\t%s\n' "TESTSUM:$pkg" "PASS" "$p" "$n" >> "$STATE"
+  printf '%s\t%s\t%s\t%s\t%s\n' "TESTSUM:$pkg" "PASS" "$p" "$n" "$KEY" >> "$STATE"
   return 0
 }
 if has test; then
@@ -159,6 +163,10 @@ if has track; then
   if bash "$GUARD" verify "$TRACK_SNAP" .; then :; else red "tệp đã theo dõi bị đổi trong lúc cổng chạy"; fi
   rm -f "$TRACK_SNAP"
 fi
+# băm từng giai đoạn đã đạt (mỗi giai đoạn ghi băm cây LÚC XONG; xanh liền mạch ⇔ tất cả bằng GATE_TREE)
+awk -F'\t' '$2=="PASS" && $1 !~ /^TESTSUM:/ {print "GATE_STAGE_TREE " $1 " " $5}' "$STATE"
+if awk -F'\t' -v k="$KEY" '$2=="PASS" && $5!="" && $5!=k {bad=1} END {exit !bad}' "$STATE"; then red "băm giai đoạn khác băm cây (điểm lưu lệch mã)"; fi
+echo "GATE_TREE=$KEY"
 echo "GATE_PLATFORM=$PLAT"
 if [ "$rc" != 0 ]; then echo "GATE_RESULT=RED"; exit 1; fi
 if [ "$INCOMPLETE" != 0 ]; then echo "GATE_RESULT=INCOMPLETE"; exit 3; fi
