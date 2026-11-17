@@ -47,4 +47,6 @@ python3 tools/check_expectations.py            # corpus tests/{pass,fail,warn} k
 
 ## Tài liệu
 
+**Muốn nắm toàn cảnh (dự án là gì, có mấy phần, đã tới đâu, cái gì cần duyệt): đọc `docs/PROJECT_STATUS.md`.**
+
 `GRIT_PLAN.md` (kế hoạch), `docs/spec/` (ngữ pháp, ngữ nghĩa, bảng ký hiệu, mã lỗi), `docs/errors/<mã>.md` (từng mã lỗi), `docs/DECISIONS.md` (ADR), `docs/KNOWN_LIMITATIONS.md`, `docs/READINESS.md`, `examples/` (6 công cụ viết bằng Grit: wc, sha256, sortlines, stats, wordfreq, json).

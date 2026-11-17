@@ -1,6 +1,6 @@
 # FREEZE — những gì Seed 1.0 ĐÓNG BĂNG (và những gì KHÔNG)
 
-Phiên bản: `gritc --version` ⇒ `1.0.0-rc2` (nhãn `1.0.0-seed` CHỈ khi đạt cả sáu điều kiện của `docs/SEED_PLAN.md`; điều kiện còn thiếu liệt kê ở `docs/READINESS.md` mục "Seed 1.0" và `docs/RUN_REPORTS.md` S8). Nền đã kiểm: Linux x86_64; Windows: CHƯA kiểm. Quyết định đóng băng: ADR-C04.
+Phiên bản: `gritc --version` ⇒ `1.0.0-rc2` (nhãn `1.0.0-seed` CHỈ khi đạt cả sáu điều kiện của `docs/archive/SEED_PLAN.md`; điều kiện còn thiếu liệt kê ở `docs/READINESS.md` mục "Seed 1.0" và `docs/RUN_REPORTS.md` S8). Nền đã kiểm: Linux x86_64; Windows: CHƯA kiểm. Quyết định đóng băng: ADR-C04.
 
 Quy tắc chung: một mục ĐÓNG BĂNG chỉ được đổi bằng (1) một ADR mới (`docs/DECISIONS.md`, tiền tố ADR-C hoặc kế tiếp), (2) tăng phiên bản thích hợp, (3) cập nhật `CHANGELOG.md` và các test khoá liên quan. "Thêm" tương thích được phép khi ghi rõ bên dưới; "đổi tên/xoá/đổi nghĩa" thì không.
 

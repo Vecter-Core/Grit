@@ -10,7 +10,7 @@ Nhãn là **RC**, không phải `1.0.0-seed`: danh sách điều kiện còn thi
 - **Công cụ:** `gritc doctor`, `gritc lsp` (chẩn đoán UTF-16 + định dạng; `editors/vscode` khung), `rig new` tự thêm phụ thuộc std, `tools/setup_cloud.sh`, `tools/install.sh/.ps1`, CI Linux/Windows (`.github/workflows/ci.yml`; Windows chỉ viết, CHƯA chạy).
 - **Tài liệu máy kiểm:** QUICKSTART, QUICKSTART_CLOUD, GRIT_BOOK, LANGUAGE_REFERENCE, AI_GUIDE (≤ 12 000 token proxy), STD_REFERENCE (sinh), SAFETY_CLAIMS; mọi khối ```` ```grit ```` được `tools/doc_test.py` biên dịch/chạy trong cổng.
 - **Cổng:** giai đoạn `failopen` (quét mẫu im lặng-chấp-nhận, baseline), `tools/fuzz_loop.sh` + fuzz chuỗi kiểm đầy đủ (`crates/gt-driver/fuzz`), `docs/FUZZ_LOG.jsonl` tích luỹ.
-- **Bằng chứng:** `docs/M7_DANGER_MUTANTS.md` (đột biến nhóm nguy hiểm của bộ giải M7), `docs/FAIL_OPEN_AUDIT.md` §8–9 (471 vị trí đã đọc; 5 nhóm TCB đọc đối kháng), `docs/adversarial/`.
+- **Bằng chứng:** `docs/M7_DANGER_MUTANTS.md` (đột biến nhóm nguy hiểm của bộ giải M7), `docs/FAIL_OPEN_AUDIT.md` §8–9 (471 vị trí đã đọc; 5 nhóm TCB đọc đối kháng), `docs/archive/adversarial/`.
 
 ### Sửa (lỗ hổng thật, mỗi cái có test ĐỎ trước ở commit riêng; chi tiết `docs/FIELD_BUGS.md`)
 - FB-C1…C9 (kiểm toán ngoài 2026-10-20/21), FB-C10 (`Copy` generic dưới `K: Copy`), FB-C12 (thông dịch ghi qua lát), FB-C13 (`==` trên `&str`/tuple), FB-C14 (`as` số thực suy diễn).

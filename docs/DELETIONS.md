@@ -200,3 +200,5 @@ Tệp này biến mất khỏi cây làm việc (không qua commit) ngày 2026-1
 | tests/fail/E0310_call_through_fn_value.gt | cc51dea | đổi mã kỳ vọng sang E0313 vì quy tắc intrinsic không làm giá trị chặn root_out trước khi kiểm tra E0310 |
 | tests/fail/E0901_pre_fn_value_intrinsic_shl.gt | cc51dea | đổi mã kỳ vọng sang E0313 vì intrinsic không làm giá trị; giữ E0901 cho lời gọi trực tiếp |
 | tests/fail/E0901_pre_fn_value_option_unwrap.gt | cc51dea | đổi mã kỳ vọng sang E0313 vì intrinsic không làm giá trị; giữ E0901 cho lời gọi trực tiếp |
+| {} | (commit dọn dẹp 2026-11-17) | tệp RỖNG tên `{}` ở thư mục gốc, tạo nhầm bởi một lệnh shell (2026-10-18); không chứa gì, không được tham chiếu |
+| tiến trình dự án.md | (chưa commit) | báo cáo chưa theo dõi, đổi tên không dấu thành docs/PROJECT_STATUS.md (lệnh P0b); không có commit xoá |
