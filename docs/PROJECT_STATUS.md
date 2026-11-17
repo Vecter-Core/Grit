@@ -1,6 +1,88 @@
-cparser 2,00 h, typechecker chưa có) · #6 Giang đọc `KNOWN_LIMITATIONS` + `PROGRESS` · #7 ADR đóng băng Obligation IR _(xem Phần 5 mục C — có thể đã đạt nhưng bảng chưa cập nhật)_ · #8 LSP đầy đủ + schema JSON đóng băng _(cũng cần rà lại)_ |
+# Tiến trình dự án Grit — đọc một lượt là hiểu
 
-**Nhãn "Seed 1.0"** chỉ được đặt khi đủ **sáu mục A1–A6** (`docs/archive/SEED_PLAN.md`): dùng được · an toàn · cổng xanh liền mạch · tái lập & di động · tài liệu kiểm được · đóng băng. Hiện đã có bản **`1.0.0-rc2`** (kèm danh sách mục thiếu). Không được tuyên bố "Phase 1 xong".
+> Viết cho **Giang** (chủ dự án). Ngày lập: **2026-11-17** (cập nhật 2026-11-18), nhánh `integration`.
+> Nguồn: đọc lại toàn bộ tài liệu của kho (HANDOFF, RUNLIST, RUN_REPORTS, READINESS, GRIT_PLAN, CAPSTONE, SEED_*, TCB_*, OPEN_QUESTIONS, FIELD_BUGS…).
+> Số liệu là số **đã ghi trong tài liệu của dự án** (ngày ghi kèm theo) trừ khi nói rõ là đo lại; chỗ tài liệu tự mâu thuẫn được nêu rõ.
+
+> **CẬP NHẬT 2026-11-18 (sau lệnh P0–P4)** — nội dung bên dưới là ảnh chụp 2026-11-17. Thay đổi chính: cổng liền mạch **XANH 1023/0/204** trên `13e2df9` (bundle `.backup`, thẻ cục bộ `seed-1.0-rc2`); **R11b XONG** (`docs/TCB_CODE_AUDIT_CLAUDE.md`: 17 mục, 1 xác nhận FB-C31, 9 bác bỏ, 7 chưa kiểm); G2.1 **XONG** (đột biến gt-term tương đương CÓ ĐO; rà fail-open CHƯA RÀ = 0; bằng chứng Arena chia sẻ đủ — `RUN_REPORTS` G2.1.c); LSP có hover/definition/symbol (CHƯA thử VS Code thật, không inlay hint ⇒ M13 chưa đủ); `tools/fuzz_loop.sh <giờ>` qua đêm; READINESS #7 ⇒ đạt, thêm bảng Seed A1–A6 (A3 đạt, A2 chưa ⇒ vẫn `1.0.0-rc2`); các chữ "Windows chưa kiểm" đã sửa. **Còn CHỜ GIANG:** `docs/PENDING_GIANG.md` (12 mục; quan trọng nhất #11: push remote báo "Repository not found").
+
+---
+
+## 0. Tóm tắt 30 giây
+
+- **Grit** = ngôn ngữ lập trình "an toàn theo thiết kế", viết cho **AI** viết code. Trình biên dịch tên `gritc` (viết bằng Rust). Nếu `gritc` **không chứng minh được** chương trình an toàn thì **từ chối** (báo ĐỎ) và **không tạo ra chương trình chạy**.
+- **Giai đoạn 1 ("Seed")** có **15 mốc** (M0 → M13, kèm M4.5). **Có mã cho cả 15**: 9 mốc "đạt", 4 mốc "đạt có điều kiện" (M6, M7, M8, M10), M12 (thư viện + chương trình thật) phần lớn có nhưng cổng Seed 1.0 chưa đạt, M13 (LSP) mới ở mức tối thiểu+. Chi tiết Phần 3.
+- **Giai đoạn 2 ("Ascend")** có **9 hướng** (8.A → 8.I): **chưa bắt đầu** (cố ý, theo kế hoạch).
+- Bản hiện tại là **`1.0.0-rc2`** (ứng viên phát hành), **chưa** gắn nhãn `1.0.0-seed`: còn thiếu điều kiện (Phần 3–5).
+- **Cổng kiểm thử liền mạch gần nhất (Windows): XANH — 1023 test đạt / 0 lỗi / 204 bộ** (2026-11-18, commit `13e2df9`).
+- **Việc cần BẠN** (Phần 5 và `docs/PENDING_GIANG.md`): các quyết định/duyệt, hai phiên cần bạn mở (phiên sạch viết capstone; phiên model khác họ đọc lại TCB), vài chỗ tài liệu lỗi thời.
+
+---
+
+## 1. Dự án là gì
+
+**Ý tưởng:** các ngôn ngữ cũ để con người viết; Grit để **AI viết** và **máy kiểm chặt** trước khi chạy. Ký hiệu toán/logic ngắn (mỗi ký hiệu có bí danh ASCII), hệ thống kiểu và kiểm tra rất nghiêm.
+
+**Cách hoạt động (đường ống của `gritc`):**
+```
+mã .gt → đọc ký tự → đọc cú pháp → giải tên → kiểm kiểu → dạng trung gian (MIR)
+       → kiểm mượn/sở hữu → kiểm hiệu ứng + đa luồng → kiểm tràn số/chia 0/chỉ số mảng
+       → kiểm dừng (vòng lặp/đệ quy có kết thúc không) → quét bí mật (secret)
+       → PHÁN QUYẾT:  ĐỎ (lỗi E…) hoặc lỗi nội bộ ⇒ DỪNG, không tạo chương trình
+                      VÀNG (cảnh báo S…) ⇒ vẫn chạy + in cảnh báo
+       → sinh mã LLVM → IR Guard (bộ kiểm độc lập kiểm lại IR) → chạy
+```
+
+**Nguyên tắc sống còn — "fail-closed" (đóng khi không chắc):** "không biết" = "chưa chứng minh" = **không cho qua**. Lỗi giả-an-toàn (compiler nói an toàn mà thực ra không — *false negative*) là lỗi nghiêm trọng nhất; mỗi lỗi tìm ra phải có test ĐỎ trước khi sửa, ghi vào `docs/FIELD_BUGS.md` và vào bộ test vĩnh viễn.
+
+**Quy mô:** khoảng **90 000 dòng Rust**; **22 crate** + `runtime/gt-rt`; **~980 chương trình mẫu `.gt`**; **72 mã lỗi** (mỗi mã có tài liệu + ≥3 mẫu sai + ≥3 mẫu đúng); **42 ADR** + ADR-C (dòng Linux); nhật ký lỗi thật `FIELD_BUGS.md` (FB-1…FB-19, FB-C1…FB-C31).
+
+**Ai làm gì:** Giang = chủ dự án. Claude = kiến trúc sư (và viết phần lớn mã). Codex/GPT-6 = thực thi gói lệnh trên Windows. Hai dòng làm việc đã hợp nhất (Windows và Linux đám mây) ở commit `c3ba7de` trên nhánh `integration`.
+
+---
+
+## 2. Dự án có bao nhiêu phần
+
+### Phần A — Giai đoạn 1 "Seed" (đã có mã): **15 mốc**
+M0 · M1 · M2 · M3 · M4 · **M4.5** · M5 · M6 · M7 · M8 · M9 · M10 · M11 · M12 · M13
+
+### Phần B — Giai đoạn 2 "Ascend" (CHƯA làm): **9 hướng**
+8.A bộ giải SMT · 8.B kernel kiểm chứng bằng chứng · 8.C `unsafe` có bằng chứng · 8.D đa luồng nâng cao · 8.E giao thức AI · 8.F Rig đầy đủ (kho gói) · 8.G tối ưu/hiệu năng · 8.H tự biên dịch · 8.I thực thi tất định/cận tài nguyên
+
+### Phần C — Sản phẩm đi kèm
+`gritc` (check/run/build/fmt/explain/doctor/lsp) · `rig` (quản lý gói) · `lib/core` + `lib/std` (thư viện viết bằng Grit: Vec, Text, HashMap, sắp xếp, I/O) · 6 công cụ dogfood (`examples/`) · 4 capstone (`capstone/`: csvstat, calc, kvstore, grep-lite) · bộ tài liệu cho người/AI dùng Grit · hệ thống kiểm chứng (corpus, oracle động, đột biến, so ba nguồn, fuzz).
+
+---
+
+## 3. Đã tới đâu — từng mốc của Giai đoạn 1
+
+| Mốc | Làm gì | Trạng thái | Ghi chú / điều kiện còn lại |
+|---|---|---|---|
+| M0 | Đặc tả, ký hiệu, ngữ pháp | **đạt** | đã đóng băng (`spec/FREEZE.md`) |
+| M1 | Lexer | **đạt** | fuzz mới ~1,2 giờ (cần 24) |
+| M2 | Parser, AST, `fmt` | **đạt** | fuzz parser mới ~2,0 giờ (cần 24) |
+| M3 | Giải tên, module | **đạt** | |
+| M4 | Hệ thống kiểu | **đạt** | đột biến chỉ cho 4 kiểm tra an toàn chọn lọc |
+| M4.5 | Kiểu vùng nhớ (`Arena`) + kiểu quyền (`Cap<…>`) | **đạt** | |
+| M5 | MIR + khung dataflow | **đạt** | |
+| M6 | Sở hữu & mượn (borrow checker) | **đạt có điều kiện** | 3 đột biến (361/591/554) chấp nhận bằng LẬP LUẬN + đo máy, không phải chứng minh hình thức; Arena chia sẻ (ADR-C03) có bảng bằng chứng ở `RUN_REPORTS` G2.1.c |
+| M7 | Biên số học (miền khoảng + zone) | **đạt có điều kiện** | 191 đột biến nhóm nguy hiểm: 60 sống → 30 giết bằng test, 30 chỉ có lập luận tương đương |
+| M8 | Dừng, hiệu ứng, đa luồng | **đạt có điều kiện** | giới hạn 24 biến/thân; không TSan/loom |
+| M9 | `gritc` + quét secret + phán quyết | **đạt** | quét secret là heuristic (cảnh báo VÀNG) |
+| M10 | Sinh mã LLVM + IR Guard + runtime | **đạt có điều kiện** | release/release-o2 chỉ có bằng chứng thực nghiệm; TCB chưa có model khác họ đọc độc lập đủ |
+| M11 | Rig | **đạt** | chưa có kho gói |
+| M12 | Thư viện + chương trình thật + cổng Seed 1.0 | **phần lớn có; cổng Seed 1.0 CHƯA đạt** | 6 dogfood + 4 capstone; xem bảng Seed A1–A6 ở `READINESS.md` |
+| M13 | LSP | **mức tối thiểu+** | chẩn đoán, định dạng, hover, đi tới định nghĩa cấp item, ký hiệu; không inlay hint; VS Code CHƯA thử thật |
+
+**Cổng chuyển giai đoạn `GRIT_PLAN.md` §7 — 12 điều kiện** (bảng đầy đủ `docs/READINESS.md`, cập nhật 2026-11-18):
+
+| Kết quả | Điều kiện |
+|---|---|
+| **đạt** (4) | #4 mọi mã lỗi có tài liệu+test · #7 Obligation IR đóng băng · #11 E0601/E0307 · #12 mô hình capability |
+| **đạt có điều kiện** (5) | #1 test xanh / không còn false-negative đã biết · #3 chương trình thật + benchmark · #5 build tái lập · #9 mutability bên trong · #10 đột biến M7 |
+| **chưa** (3) | #2 fuzz ≥24 giờ mỗi cái (lexer 1,2 h, parser 2,0 h) · #6 Giang đọc `KNOWN_LIMITATIONS` + `PROGRESS` · #8 LSP đầy đủ (schema JSON đã khoá) |
+
+**Nhãn "Seed 1.0"** chỉ khi đủ **sáu mục A1–A6** (`docs/archive/SEED_PLAN.md`). Hiện: A3 đạt; A1, A4, A6 có điều kiện; **A2 (an toàn) chưa** ⇒ giữ `1.0.0-rc2`. Không được tuyên bố "Phase 1 xong".
 
 ---
 
