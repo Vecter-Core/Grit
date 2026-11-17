@@ -2,11 +2,36 @@
 """Tổng fuzz TÍCH LUỸ từ docs/FUZZ_LOG.jsonl (ADR-037). Dùng: python tools/fuzz_total.py [--json]
 Chỉ tính các dòng status=ok (phiên chạy hết giờ, không lỗi) và status=historical (số liệu cũ ghi tay từ PROGRESS.md, gắn nhãn riêng).
 Phiên `fail` KHÔNG được tính vào giờ nhưng được báo (và phải được điều tra); `skipped_busy` chỉ đếm số lần bỏ qua."""
-import json, os, sys
+import hashlib, json, os, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG = os.path.join(ROOT, "docs", "FUZZ_LOG.jsonl")
 TARGET_HOURS = 24.0  # GRIT_PLAN §7 #2 (sửa bởi ADR-037): mỗi loại (lexer, parser)
+
+
+SRC_DIRS = {
+    "lex": ["crates/gt-lexer/src", "crates/gt-lexer/fuzz/fuzz_targets"],
+    "parse": ["crates/gt-parser/src", "crates/gt-parser/fuzz/fuzz_targets", "crates/gt-lexer/src", "crates/gt-ast/src", "crates/gt-span/src", "crates/gt-diag/src"],
+}
+
+
+def current_hash(target):
+    """Băm NGUỒN hiện tại (cùng công thức `tools/fuzz_session.sh`: sha1 của `git ls-files -s <thư mục>` , 12 ký tự đầu)."""
+    out = subprocess.run(["git", "ls-files", "-s", *SRC_DIRS[target]], cwd=ROOT, capture_output=True).stdout
+    return hashlib.sha1(out).hexdigest()[:12]
+
+
+def seconds_on_hash(target, h, path=LOG):
+    """Tổng giây phiên `ok` của `target` có `src == h` (dòng cũ không có `src` KHÔNG được tính)."""
+    t = 0
+    if os.path.exists(path):
+        for ln in open(path, encoding="utf-8"):
+            ln = ln.strip()
+            if ln.startswith("{"):
+                d = json.loads(ln)
+                if d.get("target") == target and d.get("status") == "ok" and d.get("src") == h:
+                    t += d["seconds"]
+    return t
 
 
 def totals(path=LOG):
@@ -38,6 +63,9 @@ def totals(path=LOG):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
+    if "--done-on-current-hash" in sys.argv:
+        ok = all(seconds_on_hash(k, current_hash(k)) >= TARGET_HOURS * 3600 for k in ("lex", "parse"))
+        sys.exit(0 if ok else 1)
     t = totals()
     if "--json" in sys.argv:
         print(json.dumps(t, sort_keys=True))
@@ -49,6 +77,9 @@ def main():
             f"{target}: {h:.2f} giờ tích luỹ / {TARGET_HOURS:.0f} giờ ({100 * h / TARGET_HOURS:.1f}%), {k['sessions']} phiên "
             f"(trong đó {k['historical_seconds'] / 3600:.2f} giờ là số liệu cũ ghi tay), {k['runs']} lượt, phiên lỗi {k['fail']}, bỏ qua do máy bận {k['skipped_busy']}"
         )
+    for target in ("lex", "parse"):
+        h = current_hash(target)
+        print(f"  {target}: trên BĂM NGUỒN HIỆN TẠI {h}: {seconds_on_hash(target, h) / 3600:.2f} giờ / {TARGET_HOURS:.0f}")
 
 
 if __name__ == "__main__":

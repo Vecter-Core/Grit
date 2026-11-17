@@ -4,6 +4,8 @@
 
 > **Kho git (2026-11-17):** nhánh làm việc = `integration`; `main` CHƯA đụng (không push `main`); `integration` đã push lên `origin/windows-work`. Lệnh hiện hành: P0–P4 trong `docs/RUNLIST.md`; việc chờ Giang: `docs/PENDING_GIANG.md`; mục lục giới hạn: `docs/KNOWN_LIMITATIONS_DIGEST.md`; báo cáo toàn cảnh: `docs/PROJECT_STATUS.md`.
 
+> **Fuzz qua đêm (điều kiện #2) — MỘT lệnh Giang gõ (Git Bash, máy rảnh, không chạy cargo khác):** `cd /d/Grit && bash tools/fuzz_loop.sh 10` (10 = tổng giờ tối đa; Ctrl+C an toàn, chạy lại để tiếp tục). Tự đặt PATH ASan DLL, dựng một lần, phiên 10 phút xen kẽ lexer/parser, ghi `docs/FUZZ_LOG.jsonl` kèm băm nguồn; in tổng tích luỹ. Đạt 24 giờ/loại trên băm hiện tại cần ≈ 48 giờ chạy (24 × 2 loại) ⇒ nhiều đêm. Hiện: `python tools/fuzz_total.py`.
+
 ## Gói 2 tiếp tục — checkpoint G2.1 (2026-11-12)
 - Nhánh `integration`; `main` chưa đụng. `windows-work` đã push tới `a9dcd24`; mutation follow-up + regression mới chưa commit.
 - probe_diff: 20.000 seed độc lập theo range 0..19999, 5 lô tuần tự; edge violations=0; mutant 361/591/554 mỗi mutant `i=0`; đối chứng 238 `i=277`; xem `docs/PROBE_DIFF_RESULTS.jsonl`.

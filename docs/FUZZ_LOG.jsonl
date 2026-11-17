@@ -2,3 +2,7 @@
 {"ts":"2026-10 (ngày không rõ)","target":"parse","status":"historical","sessions":6,"seconds":3600,"runs":276703,"note":"M3: 6 phiên x 10 phút, một phần chạy song song với đột biến gt-fmt (PROGRESS.md dòng 113)"}
 {"ts":"2026-10 (ngày không rõ)","target":"parse","status":"historical","sessions":6,"seconds":3600,"runs":877830,"note":"M3 sau Q16c: 6 phiên x 10 phút, máy rảnh (PROGRESS.md dòng 131)"}
 {"ts":"2026-10-14T17:59:58Z","target":"lex","status":"ok","seconds":600,"runs":1430063,"exit":0}
+{"ts":"2026-11-17T10:42:36Z","target":"lex","status":"ok","seconds":60,"runs":21600,"exit":0,"src":"be37297c8d7b"}
+{"ts":"2026-11-17T10:44:56Z","target":"lex","status":"ok","seconds":60,"runs":77065,"exit":0,"src":"be37297c8d7b"}
+{"ts":"2026-11-17T10:47:53Z","target":"parse","status":"ok","seconds":60,"runs":10174,"exit":0,"src":"68ba24a71fef"}
+{"ts":"2026-11-17T10:49:09Z","target":"lex","status":"ok","seconds":60,"runs":64835,"exit":0,"src":"be37297c8d7b"}
