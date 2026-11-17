@@ -18,7 +18,7 @@ use std::io::Write;
 pub const ABORT_EXIT_CODE: i32 = 70;
 
 /// Loại abort; số thứ tự là hợp đồng với codegen; TÊN trùng `AssertKind::name` của MIR (đối chiếu với thông dịch).
-pub const ABORT_KINDS: [&str; 19] = [
+pub const ABORT_KINDS: [&str; 20] = [
     "unknown",
     "overflow",
     "index_out_of_bounds",
@@ -38,6 +38,7 @@ pub const ABORT_KINDS: [&str; 19] = [
     "fuel_exhausted",
     "arena_exhausted",
     "arena_overlap",
+    "spawn_failed",
 ];
 
 #[unsafe(no_mangle)]
@@ -708,15 +709,34 @@ pub extern "C" fn gritrt_alloc(size: u64) -> *mut u8 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gritrt_spawn(f: extern "C" fn(*mut u8), arg: *mut u8) {
     let a = Arg(arg);
-    let r = std::thread::Builder::new()
-        .stack_size(GRIT_THREAD_STACK_BYTES)
-        .spawn(move || {
-            let a = a;
-            f(a.0);
-        });
+    // Tạo luồng thất bại (hết tài nguyên, stack 256 MiB không giữ chỗ được) ⇒ abort TÊN `spawn_failed`, mã 70; KHÔNG chạy tiếp lặng lẽ (hợp đồng H8).
+    let r = if force_spawn_failure() {
+        Err(std::io::Error::other("forced test failure"))
+    } else {
+        std::thread::Builder::new()
+            .stack_size(GRIT_THREAD_STACK_BYTES)
+            .spawn(move || {
+                let a = a;
+                f(a.0);
+            })
+    };
     if r.is_err() {
-        gritrt_abort(0);
+        gritrt_abort(SPAWN_FAILED);
     }
+}
+
+/// Loại abort `spawn_failed`; số thứ tự khớp `ABORT_KINDS` (chỉ runtime phát, codegen không).
+const SPAWN_FAILED: i32 = 19;
+
+/// CHỈ để kiểm thử (test của gt-rt hoặc bản dựng `--features test-fault`): `GRITRT_TEST_FORCE_SPAWN_FAILURE` ép `gritrt_spawn` thất bại.
+/// Bản dựng sản xuất (không feature) KHÔNG có đường này: hàm luôn trả `false` và biến môi trường bị bỏ qua (có test chứng minh).
+#[cfg(any(test, feature = "test-fault"))]
+fn force_spawn_failure() -> bool {
+    std::env::var_os("GRITRT_TEST_FORCE_SPAWN_FAILURE").is_some()
+}
+#[cfg(not(any(test, feature = "test-fault")))]
+fn force_spawn_failure() -> bool {
+    false
 }
 
 #[cfg(test)]

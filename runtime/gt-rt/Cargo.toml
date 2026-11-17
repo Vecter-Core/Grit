@@ -6,6 +6,10 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 publish = false
 
+[features]
+# CHỈ kiểm thử: bật đường ép lỗi (GRITRT_TEST_FORCE_SPAWN_FAILURE). KHÔNG bao giờ bật trong bản dựng gritc/cổng; xem crates/gt-driver/tests/spawn_failed.rs.
+test-fault = []
+
 [lib]
 crate-type = ["staticlib", "rlib"]
 
