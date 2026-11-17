@@ -531,7 +531,8 @@ impl<'e, 'a> Checker<'e, 'a> {
                     }
                     seen.push(*d);
                     let Some(adt) = db.adts.get(d) else {
-                        return false;
+                        // ADT không có trong db (không nhất quán): KHÔNG được coi là "không phải capability" (E0310 sẽ bị bỏ qua) ⇒ bảo thủ (FAIL_OPEN_AUDIT G2.1.b)
+                        return true;
                     };
                     let fields: Vec<Ty> = match &adt.kind {
                         crate::collect::AdtKind::Struct(fs) => {

@@ -939,7 +939,8 @@ impl<'a> Env<'a> {
                         return false;
                     }
                     let Some(a) = db.adts.get(d) else {
-                        return false;
+                        // ADT không có trong db: không biết ⇒ coi là chứa chính nó (E0301, bảo thủ), không im lặng cho qua (FAIL_OPEN_AUDIT G2.1.b)
+                        return true;
                     };
                     let sub = |t: &Ty| crate::traits::subst_with(t, &a.generics, args);
                     match &a.kind {
