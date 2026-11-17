@@ -15,7 +15,7 @@
 | G2.4 | XONG | Kiểm kê đủ 11 mục; tất cả CÓ, xem `docs/INVENTORY.md`. |
 | G2.5 | XONG CÓ GIỚI HẠN | ADR-C06: K3 234 dòng, một Arena caller; giữ HashMap hiện hành, không cần dừng. 1.500 input HashMap riêng vẫn chưa đạt. |
 | G2.6 | XONG | Inventory đủ 11/11; doc-test sau cập nhật 207 khối/0 sai; sửa glossary stale và tạo prompt Claude/ADR cần thiết. |
-| G2.7 | XONG PHẦN CHUẨN BỊ | `docs/G2_CLEAN_SESSION.md` có handoff; chưa author capstone; G2.1/G2.2 còn mở để phiên hiện hành tiếp tục. |
+| G2.7 | CHỜ PHIÊN SẠCH (GIANG MỞ) | `docs/CAPSTONE_PROMPTS.md` + `tools/capstone_check.sh` sẵn sàng; self-check fib check/run xanh, trả 55. Không author capstone trong phiên này. |
 
 ### G2 checkpoint (2026-11-12)
 - G2.1.a: probe_diff 20.000 seed/5 lô; GT_FULL8 bốn test; sáu suite codegen dev/release-o2 có log tại `docs/*CODEGEN*RESULTS.jsonl`, 0 mismatch (xem RUN_REPORTS để biết số chương trình và nhóm đỏ kỳ vọng).
@@ -24,43 +24,31 @@
 - G2.2 H10: hai test Windows mới xanh; sổ 13 nghi vấn, authorship tại 9e9b54c (503/64.768 TCB, 0,78%), prompt `docs/E_PROMPT_CLAUDE.md` sẵn sàng. R11b CHỜ Claude; Codex-authored TCB chưa được tính review độc lập.
 - G2.5: K3 capstone có 234 dòng, một Arena caller; ADR-C06 giữ HashMap địa chỉ mở hiện hành. Điều kiện 1.500 seed HashMap riêng còn thiếu.
 
-| ID | Việc | Trạng thái | Lệnh chạy lại / bằng chứng | Commit |
-|---|---|---|---|---|
-| R1 | Toàn vẹn kho: `tools/preflight.sh`, giai đoạn `nul` của cổng, 4 tệp NUL, quan hệ git, sao lưu bundle, KNOWN_LIMITATIONS | XONG | `python tools/test_preflight.py`, `python tools/test_nul_check.py`, `bash tools/nul_check.sh D:/Grit`, `bash tools/backup_bundle.sh D:/Grit`; cổng sau R1 XANH 943/0/185 + `NUL_OK (1399 tệp quét)` | 824ec22 |
-| R2 | Hàm-làm-giá-trị: M6/M7 progen/obgen + vùng qua kiểu hàm; ⊳/⊲ qua giá trị hàm; bảng ĐO vs SUY RA + cờ test; hiệu ứng qua kiểu hàm | XONG (cổng kế tiếp ở R3) | `cargo test -p gt-borrowck --test oracle random_programs`, `--test fn_value_regions`; `cargo test -p gt-oblig --test oracle pruned_programs_with_function`; `cargo test -p gt-driver --test contract_via_value`; feature đo `--features gt-types/allow-intrinsic-values` | b80dffc |
-| R3 | FAIL_OPEN_AUDIT rà hết phần còn lại (`tools/fail_open_scan.py`, dấu vân tay) | XONG | `python tools/fail_open_scan.py check` (CHƯA RÀ 0; nghi vấn 0); `cargo test -p gt-types --test copy_impl_bounds`, `-p gt-mir --test interp_u128`, `-p gt-driver --test llvm_vec`; cổng liền mạch XANH 961/0/189 | 36ac79d, 2fa3b1b, 93aa345, 932a99f, cc3ba41, b97338d |
-| R4 | GRITRT_ARENA_CHECK không tắt được ở dev; grit-contract §3.3 hai luật | XONG | `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml` rồi `cargo test -p gt-driver --test arena_dynamic` (6/6; cần LLVM trên PATH) | bcec465 |
-| R5 | Chạy nặng theo lô: flake llvm_sort ≥100, std release/release-o2, Ord kiểu ghép, sortlines 5 lần | XONG (2026-11-12, G1.4) | `docs/FLAKE_LLVM_SORT.jsonl`: 100/100 seed 1..100 tuần tự xanh; `std_lib` dev/release/release-o2 0 lỗi, 35 chương trình/mục; 4 kiểu Ord ghép × 35 chương trình × 346 phép; `docs/SORTLINES_BENCHMARK.jsonl`: 5 lần mỗi bản, đầu ra khớp | faddecc |
-| R6 | Arena chia sẻ (ADR-038 Q83): phụ lục ADR trước, tấn công, oracle shared_arena, TCB H1–H6 | CHƯA | | |
-| R7 | HashMap (Q86 iii) trong gói std | CHƯA | | |
-| R8 | Hai intrinsic I/O (Q86 iv): `Cap<In>::read_all`, `Cap<Fs>::write` | CHƯA | | |
-| R9 | `tools/fuzz_loop.sh` + tích luỹ ≤ 2 giờ | CHƯA | | |
-| R10 | 69 đột biến nguy hiểm của M7 (điều kiện #10) | CHƯA | | |
-| R11 | Mục E: đọc mã H1–H10, IR Guard, `gt-rt`; ghi thí nghiệm và giới hạn ở `docs/TCB_CODE_AUDIT.md` | CHƯA ĐẠT, G1.5 | Đọc mã/thí nghiệm và FB-C28/C29/C30 đã ghi; reader GPT-6 cùng họ với Codex, nên điều kiện model khác chưa đạt. Cần review khác họ; H10 không có thí nghiệm riêng |  |
-| R12 | Kết thúc: cổng cuối liền mạch, READINESS bảng §7 từng điều kiện, HANDOFF, bundle, push, báo cáo cuối | ĐANG, G1.6 | Gate GREEN (1.017/0/202), READINESS cập nhật, push `windows-work` thành công; bundle bị ACL `D:\Grit_backup` chặn, còn mở tới khi cấp quyền ghi và verify bundle |  |
+## Bảng R1–R12 HỢP NHẤT (2026-11-17; thay hai bảng cũ của dòng Windows và dòng Linux)
+Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuyên bố. "bằng chứng ghi" = đã chạy ở thời điểm ghi, CHƯA chạy lại ở đầu hiện tại (cổng liền mạch P1.e sẽ chạy lại tất cả test liệt kê). Dòng Windows = nhánh `windows-work`; dòng Linux = `claude/gallant-darwin-m251cq` (đã hợp nhất ở `c3ba7de`).
 
----
-
-## Imported Claude branch record: RUNLIST — danh sách việc chạy (tạo mới 2026-10-21 trên nhánh `claude/gallant-darwin-m251cq`)
-
-Trước đây tham chiếu "RUNLIST" nằm ở bản Windows chưa lên origin; tệp này dựng lại từ lệnh Seed 1.0 (bản sửa) và HANDOFF §6. Trạng thái: XONG / ĐANG / CHƯA / KHÔNG XONG (kèm phần đã làm). Cập nhật sau mỗi mục.
-
-| Mã | Việc | Trạng thái | Ghi chú |
+| ID | Việc | Trạng thái | Bằng chứng (test / tệp / commit) |
 |---|---|---|---|
-| R1 | preflight + quét NUL chạy được Linux và Windows; bundle sao lưu | ĐANG | `tools/preflight.sh`, `tools/nul_scan.py` (+ test), giai đoạn `nul` của `gate.sh`: XONG phần Linux; Windows chưa kiểm (`preflight.sh` có nhánh PowerShell cho RAM); bundle: làm ở mốc rc1 |
-| R2 | hàm-làm-giá-trị: M6 qua giá trị, `⊳` qua giá trị, hiệu ứng, bảng INTRINSIC_AS_VALUE | XONG (2026-10-21, Linux) | bảng ĐO trước/sau; FB-C5, FB-C6 đã sửa (đỏ trước); M6 qua giá trị: bộ sinh `fn_value_ref` + 7 mẫu; ADR-C01/C02 |
-| R3 | FAIL_OPEN_AUDIT rà hết bằng `tools/fail_open_scan.py` | CHƯA | S7.a |
-| R4 | `GRITRT_ARENA_CHECK` chỉ bật thêm, không tắt được ở dev | XONG (2026-10-21, Linux) | test đảo `dev_check_cannot_be_switched_off_by_environment` (đỏ trước `963da34`, xanh `53bfb4d`); arena_dynamic 6/6, gt-rt 6/6 |
-| R5 | flake `llvm_sort` ≥ 100 lần; std ở release/release-o2; Ord kiểu ghép; đo sortlines 5 lần | CHƯA | S7.b |
-| R6 | Arena chia sẻ `&'a Arena` (ADR-038 / Q83) | XONG (2026-10-21, Linux) | ADR-C03; oracle `arena_vec`; FB-C9 tìm thấy và sửa |
-| R7 | HashMap | XONG (std::HashMap trong lib/std bằng Grit; std2_lib 3 hồ sơ) | S2 |
-| R8 | READINESS: bảng §7 và sáu mục SEED 1.0 | CHƯA | S8.d |
-| R9 | `tools/fuzz_loop.sh` tích luỹ có giới hạn (tối đa 2 giờ tổng; điều kiện #2 ghi "ĐANG TÍCH LUỸ") | CHƯA | S7.d |
-| R10 | 69 đột biến "xoá thêm check" của M7 (`analysis.rs` 62, `driver.rs` 7) | CHƯA | S7.c |
-| R11 | đọc mã đối kháng nhóm CAO bằng subagent (E_PROMPT.md; trạng thái TCB: "đã qua đọc mã đối kháng bằng subagent cùng họ model") | CHƯA | S7.e |
+| R1 | Toàn vẹn kho: preflight, quét NUL, sao lưu | XONG (trừ bundle ở `D:\Grit_backup`) | `tools/preflight.sh`, `tools/nul_check.sh`+`nul_scan.py`, `tools/test_preflight.py`, `test_nul_check.py`; cổng G1.6: NUL 0/1925; commit 824ec22. Bundle: `D:\Grit_backup` bị ACL chặn ⇒ dùng `D:\Grit\.backup` (G2.0.b) |
+| R2 | Hàm-làm-giá-trị: M6/M7 qua giá trị, `⊳/⊲`, hiệu ứng, bảng ĐO | XONG | Windows: `gt-borrowck --test fn_value_regions`, `gt-oblig --test oracle`, `gt-driver --test contract_via_value`, `--test fn_value_gen`; Linux: progen `fn_value_ref` 764/734 (`2f8fc92`), FB-C5 `fdce836`, FB-C6 `f000546`; `docs/INTRINSIC_AS_VALUE.md`; commit b80dffc |
+| R3 | FAIL_OPEN_AUDIT rà hết | ĐANG (P1.b) | Windows: sổ 1292/1292 (`36ac79d`…`b97338d`, FB-17/18/19). Dòng Linux: 471 vị trí + `docs/fail_open_classification.tsv`. Bộ quét hợp nhất hiện báo CHƯA RÀ 95 ⇒ phải rà hết |
+| R4 | `GRITRT_ARENA_CHECK` chỉ THÊM, không tắt được ở dev | XONG | `gt-driver --test arena_dynamic` 6/6 (`dev_check_cannot_be_switched_off_by_environment`); Windows `bcec465`, Linux `963da34→53bfb4d` |
+| R5 | Flake llvm_sort, std release/release-o2, Ord kiểu ghép, sortlines | XONG | G1.4: `docs/FLAKE_LLVM_SORT.jsonl` (seed 1..100, 0/100 đỏ ⇒ giới hạn trên ≈3%, KHÔNG kết luận hết flake), `docs/STD_TEST_RESULTS.jsonl`, `docs/SORTLINES_BENCHMARK.jsonl`; commit faddecc |
+| R6 | Arena chia sẻ `&'a Arena` (ADR-C03) | CÀI XONG; BẰNG CHỨNG CÓ ĐIỀU KIỆN (P1.c) | `lib/core/prelude.gt` `Vec<'a,T>{arena:&'a Arena}`; ADR-C03/C07; oracle `arena_vec` + FB-C9 (`d7f5939`); dòng TCB H1–H6 để CÓ ĐIỀU KIỆN tới khi bảng điều kiện R6 đủ |
+| R7 | HashMap trong `lib/std` | XONG (ngưỡng riêng: P1.d) | `gt-driver --test std2_lib` (35 seed/hồ sơ), K3 20/20, ADR-C06; ngưỡng ≥1.500 là toàn cục (ghi ở DECISIONS, P1.d) |
+| R8 | Hai intrinsic I/O: `Cap<In>::read_all`, `Cap<Fs>::write` | XONG | `gt-driver --test io_intrinsics` (6/6 sau sửa Windows G1.6), `fs_read_io_error`; CAPSTONE G5/G6/G7; hợp đồng ở `docs/TCB_INTRINSICS.md` |
+| R9 | `tools/fuzz_loop.sh` + fuzz tích luỹ | ĐANG TÍCH LUỸ | `tools/fuzz_total.py` (2026-11-17): lexer 1,17 h / 24, parser 2,00 h / 24, 0 phiên lỗi; nâng cấp một-lệnh-qua-đêm: P3.a |
+| R10 | Đột biến nguy hiểm của M7 | XONG CÓ ĐIỀU KIỆN | `docs/M7_DANGER_MUTANTS.md`: 191 đột biến, 60 sống, 30 giết bằng `gt-oblig --test danger_decisions`, 30 chỉ có lập luận tương đương (KHÔNG chứng minh). Số 69 cũ không ánh xạ 1-1 |
+| R11 | Đọc mã đối kháng nhóm CAO H1–H10, Guard, gt-rt | ĐANG | `docs/TCB_CODE_AUDIT.md` (sổ 13 nghi vấn, H10 tests); subagent cùng họ model ở S7 (`docs/archive/adversarial/`); GPT-6 đọc phần Claude. Chưa có model KHÁC HỌ độc lập cho phần Codex-viết |
+| R11b | Claude đọc diff TCB do Codex viết (`docs/E_PROMPT_CLAUDE.md`) | P2.a | kết quả vào `docs/TCB_CODE_AUDIT_CLAUDE.md` |
+| R12 | Cổng cuối + READINESS + bundle + push + báo cáo | ĐANG | cổng GREEN 1017/0/202 (`c5aa45b`, `ed529c6`, 2026-11-12); push `windows-work` OK; cổng mới sau P1/P3: P1.e; READINESS: P4 |
+| CAPSTONE WINDOWS | K1–K4 bằng phiên sạch trên Windows | CHỜ PHIÊN SẠCH (Giang mở) | `docs/CAPSTONE_PROMPTS.md`, `tools/capstone_check.sh`; Linux 8/8 (`capstone/verify.py`) |
 
-## Đã XONG trước nhánh này (giữ nguyên, từ HANDOFF)
-M0–M11 có mã; std (47 hàm, 35 chương trình ba nguồn mỗi hàm); 6 công cụ dogfood; B1/B2-B3/D1; đột biến G1+FB-9.
-
-## Đã XONG trên nhánh này (kiểm toán ngoài, xem FIELD_BUGS FB-C1…FB-C8)
-F-01…F-08, port Linux, ngăn xếp 256 MiB, clippy sạch, CI/deny (chưa chạy trên GitHub).
+## Lệnh P0–P4 (2026-11-17)
+| Giai đoạn | Trạng thái |
+|---|---|
+| P0 đồng bộ + tài liệu | ĐANG (P0a–P0f) |
+| P1 G2.1, Arena chia sẻ, HashMap, cổng, bundle, thẻ | CHƯA |
+| P2 R11b, capstone | CHƯA |
+| P3 fuzz_loop, LSP, tái lập, BufOut | CHƯA |
+| P4 READINESS + chữ "Windows chưa kiểm" + HANDOFF | CHƯA |
