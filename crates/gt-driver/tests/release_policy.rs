@@ -84,6 +84,34 @@ fn defaults_are_all_checks_and_dev_profile_without_the_experimental_note() {
     assert!(!out_text(&o2).contains("N0606"));
 }
 
+/// (2b) GÓI 3 S2.e / B2: hồ sơ `release` và `release-o2` MẶC ĐỊNH cũng giữ MỌI check (`--checks=all`), không có N0606.
+/// (Cặp với `release_profiles_refuse_proven_mode`: proven bị từ chối cùng release*.)
+#[test]
+fn release_profiles_default_to_all_checks() {
+    let dir = scratch("reldef");
+    let f = prog(&dir);
+    for prof in ["release", "release-o2"] {
+        let exe = dir.join(format!("{prof}.exe"));
+        let o = gritc()
+            .args(["build", "--json", &format!("--profile={prof}"), "-o"])
+            .arg(&exe)
+            .arg(&f)
+            .output()
+            .expect("chạy");
+        assert_eq!(o.status.code(), Some(0), "{prof}: {}", out_text(&o));
+        let t = out_text(&o);
+        assert!(!t.contains("N0606"), "{prof}: mặc định không có N0606: {t}");
+        let line = String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .rev()
+            .find(|l| l.starts_with('{'))
+            .unwrap_or("")
+            .to_string();
+        let v: serde_json::Value = serde_json::from_str(&line).expect("JSON");
+        assert_eq!(v["checks"]["mode"], "all", "{prof}: {line}");
+    }
+}
+
 /// (3) `--checks=proven` in ghi chú N0606 MỖI lần chạy (check, build, run) và ghi chế độ "proven" trong báo cáo
 #[test]
 fn proven_mode_prints_the_note_every_time() {
