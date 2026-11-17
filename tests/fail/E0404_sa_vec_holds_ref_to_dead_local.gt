@@ -1,0 +1,11 @@
+// expect: fail E0404
+// note: G2.1.c(ii) T: 'a — đẩy tham chiếu tới local chết sớm vào Vec sống lâu hơn
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&ar);
+  ⎇ true {
+    x ≔ 5u64;
+    v.push(&x);
+  } ⇝ { }
+  v.len() as u64
+}

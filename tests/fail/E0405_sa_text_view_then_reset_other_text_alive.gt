@@ -1,0 +1,11 @@
+// expect: fail E0405
+// note: G2.1.c(ii) hai Text chung Arena; reset trong khi một Text còn dùng sau đó
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μa ≔ Text::new(&ar);
+  μb ≔ Text::new(&ar);
+  a.push_str("x");
+  b.push_str("y");
+  ar.reset();
+  b.len() as u64
+}

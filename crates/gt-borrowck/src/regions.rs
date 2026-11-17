@@ -78,6 +78,8 @@ pub enum Mutant {
     M591,
     /// 554: `&self` khai báo như `&!self` (CHẶT hơn)
     M554,
+    /// G2.1.c: BỎ ràng buộc WF/implied bound của `&'b T` (FB-C9, R6) — LỎNG hơn: đối chứng dương, bộ sinh `shared_arena`/`arena_vec` phải TỰ bắt
+    MNoWf,
 }
 
 macro_rules! probe {
@@ -441,7 +443,7 @@ impl<'a> Gen<'a> {
                 // ràng buộc đúng-đắn (WF/implied bound) của `&'b T`: mọi region BÊN TRONG kiểu được mượn phải sống ít nhất bằng `'b`.
                 // Thiếu nó thì `s ≔ v.as_slice()` (v: Vec<'a, T> giữ `&'a Arena`) không giữ khoản vay Arena sống tới lần dùng `s` cuối ⇒ `reset`
                 // rồi đọc `s` bị chấp nhận (FB-C9, dùng-sau-reset).
-                {
+                if !probe!(self, MNoWf) {
                     let inner_regions = flat(&pslots);
                     self.outl(&inner_regions, &[region]);
                 }

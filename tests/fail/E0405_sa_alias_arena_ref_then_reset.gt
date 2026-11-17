@@ -1,0 +1,10 @@
+// expect: fail E0405
+// note: G2.1.c(ii) Vec dựng từ tham chiếu chung bí danh tới Arena, reset trong khi Vec sống
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  r ≔ &ar;
+  μv ≔ Vec::new(r);
+  v.push(1u64);
+  ar.reset();
+  v.len() as u64
+}

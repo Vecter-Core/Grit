@@ -1,0 +1,10 @@
+// expect: fail E0405
+// note: G2.1.c(ii) kết quả alloc cất vào Vec cùng Arena, reset, rồi đọc
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  x ≔ ar.alloc(5u64);
+  μv ≔ Vec::new(&ar);
+  v.push(*x);
+  ar.reset();
+  *x
+}

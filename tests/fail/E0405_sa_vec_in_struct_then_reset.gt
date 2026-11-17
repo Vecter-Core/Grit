@@ -1,0 +1,10 @@
+// expect: fail E0405
+// note: G2.1.c(ii) Vec nằm trong struct còn sống, rồi reset Arena
+▢ H<'a> { v: Vec<'a, u64> }
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μh ≔ H { v: Vec::new(&ar) };
+  h.v.push(1u64);
+  ar.reset();
+  h.v.len() as u64
+}

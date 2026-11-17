@@ -62,7 +62,7 @@ pub const PRELUDE: &str = "\
 ";
 
 /// Loại cấu trúc cần đo độ phủ (ADR-024 §2).
-pub const KINDS: [&str; 21] = [
+pub const KINDS: [&str; 22] = [
     "move",
     "reborrow",
     "borrow_in_loop",
@@ -84,6 +84,7 @@ pub const KINDS: [&str; 21] = [
     "fn_value_call",
     "fn_value_ref",
     "arena_vec",
+    "shared_arena",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -284,7 +285,8 @@ impl Gen {
             95..=99 => self.flow(),
             100..=111 => self.ref_pattern(),
             112..=123 => self.calls_via_value(),
-            _ => self.arena_vec(),
+            124..=129 => self.arena_vec(),
+            _ => self.shared_arena(),
         }
     }
 
@@ -945,6 +947,57 @@ impl Gen {
                 }
                 6 if has_q => raw(format!("use_i(*{q});")),
                 _ => raw(format!("use_i({v}.as_slice()[0]);")),
+            };
+            out.push(st);
+        }
+        out
+    }
+
+    /// G2.1.c (ADR-C03/C07): HAI `Vec` cùng sống trên MỘT Arena chia sẻ + lát của từng Vec + `alloc` + `reset` xen kẽ ngẫu nhiên. Cột đối chiếu:
+    /// lát giữ qua `reset` (dùng-sau-reset), lát giữ qua `push` CHÍNH Vec đó (E0403) nhưng KHÔNG qua `push` Vec kia (hợp lệ), `alloc` qua `reset`.
+    fn shared_arena(&mut self) -> Vec<St> {
+        self.tags.insert("shared_arena");
+        let a = self.fresh("a");
+        let v = self.fresh("v");
+        let w = self.fresh("w");
+        let s = self.fresh("s");
+        let t = self.fresh("t");
+        let q = self.fresh("q");
+        let (k0, k1) = (self.k(), self.k());
+        let mut out = vec![
+            raw(format!("μ{a} ≔ Arena::new();")),
+            raw(format!("μ{v} ≔ Vec::new(&{a});")),
+            raw(format!("μ{w} ≔ Vec::new(&{a});")),
+            raw(format!("{v}.push({k0});")),
+            raw(format!("{w}.push({k1});")),
+        ];
+        let (mut has_s, mut has_t, mut has_q) = (false, false, false);
+        for _ in 0..1 + self.rng.below(6) {
+            let k = self.k();
+            let st = match self.rng.below(11) {
+                0 if !has_s => {
+                    has_s = true;
+                    raw(format!("{s} ≔ {v}.as_slice();"))
+                }
+                1 if !has_t => {
+                    has_t = true;
+                    raw(format!("{t} ≔ {w}.as_slice();"))
+                }
+                2 if has_s => raw(format!("use_i({s}[0]);")),
+                3 if has_t => raw(format!("use_i({t}[0]);")),
+                4 => raw(format!("{v}.push({k});")),
+                5 => raw(format!("{w}.push({k});")),
+                6 => {
+                    self.tags.insert("arena_reset");
+                    raw(format!("{a}.reset();"))
+                }
+                7 if !has_q => {
+                    has_q = true;
+                    raw(format!("{q} ≔ {a}.alloc({k});"))
+                }
+                8 if has_q => raw(format!("use_i(*{q});")),
+                9 => raw(format!("use_i({v}.as_slice()[0]);")),
+                _ => raw(format!("use_i({w}.as_slice()[0]);")),
             };
             out.push(st);
         }

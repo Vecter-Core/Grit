@@ -1,0 +1,11 @@
+// expect: fail E0405
+// note: G2.1.c(ii) Vec lồng (Vec<&[u64]>): lát của Vec trong đẩy vào Vec ngoài rồi reset
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μsrc ≔ Vec::new(&ar);
+  src.push(7u64);
+  μout ≔ Vec::new(&ar);
+  out.push(src.as_slice());
+  ar.reset();
+  out.len() as u64
+}

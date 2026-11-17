@@ -1,0 +1,10 @@
+// expect: fail E0405
+// note: G2.1.c(ii) chuyển (move) Arena đi trong khi Vec giữ &Arena
+ƒ eat(a: Arena) ! {mem} { }
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&ar);
+  v.push(1u64);
+  eat(ar);
+  v.len() as u64
+}

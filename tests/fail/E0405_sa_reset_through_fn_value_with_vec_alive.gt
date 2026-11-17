@@ -1,0 +1,11 @@
+// expect: fail E0405
+// note: G2.1.c(ii) reset Arena qua giá trị hàm trong khi Vec còn sống
+ƒ wipe(a: &!Arena) ! {mem} { a.reset(); }
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μv ≔ Vec::new(&ar);
+  v.push(1u64);
+  f ≔ wipe;
+  f(&!ar);
+  v.len() as u64
+}

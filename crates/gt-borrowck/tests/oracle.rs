@@ -512,6 +512,56 @@ fn random_programs_agree_between_borrowck_and_the_dynamic_oracle() {
     }
 }
 
+/// G2.1.c (ĐỐI CHỨNG DƯƠNG, ADR-C07): TẮT bản sửa FB-C9 (ràng buộc WF của `&'b T`, đột biến `MNoWf`, CHỈ có khi bật feature `mutant-probe`):
+/// bộ sinh `shared_arena`/`arena_vec` PHẢI TỰ bắt (chương trình mà đột biến chấp nhận nhưng oracle thấy vi phạm), còn bản GỐC không được chấp nhận
+/// chương trình vi phạm nào. Chạy: `cargo test -p gt-borrowck --features mutant-probe --test oracle shared_arena_wf -- --nocapture`.
+#[cfg(feature = "mutant-probe")]
+#[test]
+fn shared_arena_wf_rule_switched_off_is_caught_by_the_generator() {
+    let (mut tried, mut orig_accepts_violation, mut mutant_accepts_violation) =
+        (0usize, 0usize, 0usize);
+    let mut sample: Option<String> = None;
+    for seed in 1..=8000u64 {
+        let mut g = Gen::new(seed);
+        let prog = g.program();
+        if !(prog.tags.contains("shared_arena") || prog.tags.contains("arena_vec")) {
+            continue;
+        }
+        let src = prog.source();
+        let Ok(e) = entry(&src) else { continue };
+        if e.bug().is_some() {
+            continue;
+        }
+        let t = one(&src);
+        let m = gt_mir::lower_program(&t);
+        let mutant_accepts = gt_borrowck::check_program_probe(&t, &m, gt_borrowck::Mutant::MNoWf)
+            .diagnostics
+            .is_empty();
+        tried += 1;
+        if e.violation().is_some() {
+            if e.accepted() {
+                orig_accepts_violation += 1;
+            }
+            if mutant_accepts {
+                mutant_accepts_violation += 1;
+                sample.get_or_insert(src);
+            }
+        }
+    }
+    eprintln!(
+        "MNoWf: {tried} chương trình shared_arena/arena_vec; gốc chấp nhận+vi phạm = {orig_accepts_violation}; ĐỘT BIẾN chấp nhận+vi phạm = {mutant_accepts_violation}"
+    );
+    assert_eq!(
+        orig_accepts_violation, 0,
+        "bản gốc chấp nhận chương trình vi phạm"
+    );
+    assert!(
+        mutant_accepts_violation >= 5,
+        "bộ sinh chỉ bắt {mutant_accepts_violation} chương trình khi TẮT bản sửa FB-C9 (< 5) — bộ sinh không còn nhạy"
+    );
+    assert!(sample.is_some());
+}
+
 // ===================================================================== (4) tấn công
 
 #[test]

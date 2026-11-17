@@ -1,0 +1,10 @@
+// expect: pass
+// note: G2.1.c(ii) hai Vec xen kẽ push trên MỘT Arena (hợp lệ)
+ƒ main() → u64 ! {mem} {
+  μar ≔ Arena::new();
+  μa ≔ Vec::new(&ar);
+  μb ≔ Vec::new(&ar);
+  μi ≔ 0u64;
+  ⟳ i < 50u64 ↓ 50u64 - i { a.push(i); b.push(i +% 100u64); i ← i + 1u64; }
+  a.len() as u64 +% b.len() as u64
+}

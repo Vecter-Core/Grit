@@ -1,0 +1,10 @@
+{"kind":"two_vec","profile":"dev","programs":32,"match":32,"mismatch":0}
+{"kind":"vec_text","profile":"dev","programs":32,"match":32,"mismatch":0}
+{"kind":"alloc_mix","profile":"dev","programs":32,"match":32,"mismatch":0}
+{"kind":"struct_fn","profile":"dev","programs":32,"match":32,"mismatch":0}
+{"kind":"reset_reuse","profile":"dev","programs":32,"match":32,"mismatch":0}
+{"kind":"two_vec","profile":"release-o2","programs":32,"match":32,"mismatch":0}
+{"kind":"vec_text","profile":"release-o2","programs":32,"match":32,"mismatch":0}
+{"kind":"alloc_mix","profile":"release-o2","programs":32,"match":32,"mismatch":0}
+{"kind":"struct_fn","profile":"release-o2","programs":32,"match":32,"mismatch":0}
+{"kind":"reset_reuse","profile":"release-o2","programs":32,"match":32,"mismatch":0}
