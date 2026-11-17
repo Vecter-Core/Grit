@@ -405,6 +405,11 @@ fn cmd_run(cli: &Cli) -> i32 {
     exit
 }
 
+/// tài liệu `gritc explain <mã>` (dùng chung với LSP hover)
+pub(crate) fn explain_text(code: &str) -> Option<&'static str> {
+    EXPLAIN.iter().find(|(c, _)| *c == code).map(|(_, d)| *d)
+}
+
 fn cmd_explain(cli: &Cli) -> i32 {
     let Some(code) = &cli.path else {
         return usage_err("thiếu mã (vd `gritc explain E0601`)");

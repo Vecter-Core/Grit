@@ -1,6 +1,7 @@
 //! `gritc lsp` (Seed 1.0 S6): máy chủ LSP TỐI THIỂU qua stdio (JSON-RPC, khung `Content-Length`).
 //! Có: `initialize`/`shutdown`/`exit`, đồng bộ TOÀN VĂN (`didOpen`/`didChange`/`didSave`/`didClose`), `publishDiagnostics` (mỗi chẩn đoán gritc = một chẩn đoán LSP; chỉ MÃ và vị trí
-//! là giao diện đóng băng), `textDocument/formatting` (gt-fmt, toàn tài liệu). KHÔNG có: hover, đi tới định nghĩa, hoàn thành mã, đổi tên, sửa nhanh.
+//! là giao diện đóng băng), `textDocument/formatting` (gt-fmt, toàn tài liệu). `textDocument/hover` (trên chẩn đoán: thông điệp + tài liệu `gritc explain`), `definition` (định nghĩa cấp ITEM từ `gt-resolve`, theo TÊN), `documentSymbol`. KHÔNG có: hoàn thành mã, đổi tên, sửa nhanh, định nghĩa của biến cục bộ.
+//! LSP CHỈ HIỂN THỊ: dữ liệu lấy từ `check`/`resolve` của gritc; không có đường nào đổi phán quyết.
 //! Nguồn kiểm: tài liệu đang mở (bộ đệm) + các tệp `.gt` cùng thư mục trên đĩa (gói Rig: `src/`) + gói `std` nếu tìm thấy (`GRIT_STD` hoặc `lib/std` cạnh `gritc`).
 //! Vị trí LSP là (dòng 0-based, cột UTF-16) tính từ offset BYTE của gritc.
 use crate::pipeline::{Options, check};
@@ -127,11 +128,12 @@ fn add_dir(
     }
 }
 
-/// Kiểm tài liệu `uri` (văn bản `docs[uri]`): trả các chẩn đoán LSP của CHÍNH tài liệu đó.
-fn diagnostics_for(uri: &str, docs: &BTreeMap<String, String>) -> Vec<Value> {
-    let Some(path) = uri_to_path(uri) else {
-        return Vec::new();
-    };
+/// Dựng đầu vào kiểm cho tài liệu `uri`: (tên tệp, văn bản, danh sách đầu vào).
+fn build_inputs(
+    uri: &str,
+    docs: &BTreeMap<String, String>,
+) -> Option<(String, String, Vec<SourceInput>)> {
+    let path = uri_to_path(uri)?;
     let me = file_name(&path);
     let mut inputs: Vec<SourceInput> = Vec::new();
     let mut seen = std::collections::BTreeSet::new();
@@ -159,18 +161,50 @@ fn diagnostics_for(uri: &str, docs: &BTreeMap<String, String>) -> Vec<Value> {
     if let Some(std_dir) = find_std() {
         add_dir(&std_dir, &mut inputs, &mut seen);
     }
-    let Ok(res) = check(&inputs, &Options::default()) else {
+    Some((me, text, inputs))
+}
+
+type RawDiag = (usize, usize, Level, String, String);
+
+/// Chẩn đoán THÔ của chính tài liệu. Lỗi nội bộ của `check` KHÔNG được nuốt: thành chẩn đoán E9901 (FAIL_OPEN_AUDIT G2.1.b).
+fn raw_diagnostics(me: &str, inputs: &[SourceInput]) -> Vec<RawDiag> {
+    match check(inputs, &Options::default()) {
+        Ok(res) => res
+            .report
+            .diagnostics
+            .iter()
+            .filter(|d| d.file == me)
+            .map(|d| {
+                (
+                    d.span.start as usize,
+                    d.span.end as usize,
+                    d.level,
+                    d.code.as_str().to_string(),
+                    d.message.clone(),
+                )
+            })
+            .collect(),
+        Err(e) => vec![(
+            0,
+            0,
+            Level::Error,
+            "E9901".to_string(),
+            format!("gritc không kiểm được tài liệu này: {e}"),
+        )],
+    }
+}
+
+/// Kiểm tài liệu `uri` (văn bản `docs[uri]`): trả các chẩn đoán LSP của CHÍNH tài liệu đó.
+fn diagnostics_for(uri: &str, docs: &BTreeMap<String, String>) -> Vec<Value> {
+    let Some((me, text, inputs)) = build_inputs(uri, docs) else {
         return Vec::new();
     };
-    res.report
-        .diagnostics
-        .iter()
-        .filter(|d| d.file == me)
-        .map(|d| {
-            let (s, e) = (d.span.start as usize, d.span.end as usize);
+    raw_diagnostics(&me, &inputs)
+        .into_iter()
+        .map(|(s, e, level, code, message)| {
             let (sl, sc) = position(&text, s);
             let (el, ec) = position(&text, e);
-            let sev = match d.level {
+            let sev = match level {
                 Level::Error => 1,
                 Level::Warn => 2,
                 Level::Note => 3,
@@ -178,12 +212,205 @@ fn diagnostics_for(uri: &str, docs: &BTreeMap<String, String>) -> Vec<Value> {
             json!({
                 "range": {"start": {"line": sl, "character": sc}, "end": {"line": el, "character": ec}},
                 "severity": sev,
-                "code": d.code.as_str(),
+                "code": code,
                 "source": "gritc",
-                "message": d.message,
+                "message": message,
             })
         })
         .collect()
+}
+
+/// offset byte của (dòng 0-based, cột UTF-16); `None` nếu ngoài văn bản
+fn offset_of(text: &str, line: usize, col16: usize) -> Option<usize> {
+    let mut start = 0usize;
+    for _ in 0..line {
+        start += text[start..].find('\n')? + 1;
+    }
+    let mut c = 0usize;
+    for (i, ch) in text[start..].char_indices() {
+        if ch == '\n' || c >= col16 {
+            return (c >= col16).then_some(start + i);
+        }
+        c += ch.len_utf16();
+    }
+    (c >= col16).then_some(text.len())
+}
+
+/// định danh chứa offset (chữ/số/`_` Unicode): (đầu, cuối)
+fn ident_at(text: &str, off: usize) -> Option<(usize, usize)> {
+    let is_id = |c: char| c.is_alphanumeric() || c == '_';
+    let mut lo = off.min(text.len());
+    while lo > 0 {
+        let prev = text[..lo].chars().next_back()?;
+        if is_id(prev) {
+            lo -= prev.len_utf8();
+        } else {
+            break;
+        }
+    }
+    let mut hi = lo;
+    for ch in text[lo..].chars() {
+        if is_id(ch) {
+            hi += ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+    (hi > lo && off <= hi).then_some((lo, hi))
+}
+
+/// `textDocument/hover`: vị trí nằm trong một chẩn đoán ⇒ thông điệp + tài liệu `gritc explain <mã>`; ngược lại `null`. CHỈ HIỂN THỊ.
+fn hover_for(uri: &str, docs: &BTreeMap<String, String>, line: usize, col: usize) -> Value {
+    let Some((me, text, inputs)) = build_inputs(uri, docs) else {
+        return Value::Null;
+    };
+    let Some(off) = offset_of(&text, line, col) else {
+        return Value::Null;
+    };
+    let hits: Vec<RawDiag> = raw_diagnostics(&me, &inputs)
+        .into_iter()
+        .filter(|(s, e, ..)| *s <= off && (off < *e || (*s == *e && off == *s)))
+        .collect();
+    if hits.is_empty() {
+        return Value::Null;
+    }
+    let mut md = String::new();
+    for (_, _, _, code, msg) in &hits {
+        md.push_str(&format!("**{code}** — {msg}\n\n"));
+        match crate::cli::explain_text(code) {
+            Some(doc) => md.push_str(doc),
+            None => md.push_str(&format!("(chưa có tài liệu `gritc explain {code}`)")),
+        }
+        md.push_str("\n\n---\n");
+    }
+    json!({"contents": {"kind": "markdown", "value": md}})
+}
+
+fn path_to_uri(p: &Path) -> String {
+    let s = p.to_string_lossy().replace('\\', "/");
+    let mut out = String::from("file://");
+    if !s.starts_with('/') {
+        out.push('/');
+    }
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || b"/-_.~:".contains(&b) {
+            out.push(char::from(b));
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+/// Chạy `gt-resolve` trên đầu vào (tên tệp qua cùng phép ánh xạ module của cli): (kết quả, tên module theo chỉ số đầu vào).
+fn resolve_inputs(inputs: &[SourceInput]) -> Option<(gt_resolve::ResolveOutput, Vec<String>)> {
+    let prelude = gt_resolve::Prelude::from_source(&crate::pipeline::prelude_text()).ok()?;
+    let mapped: Vec<SourceInput> = inputs
+        .iter()
+        .map(|i| SourceInput {
+            name: gt_resolve::module_file_name_for(&i.name),
+            text: i.text.clone(),
+        })
+        .collect();
+    let mods: Vec<String> = mapped
+        .iter()
+        .map(|i| i.name.strip_suffix(".gt").unwrap_or(&i.name).to_string())
+        .collect();
+    let out = gt_resolve::resolve_program(&mapped, &prelude).ok()?;
+    Some((out, mods))
+}
+
+fn range_json(text: &str, s: usize, e: usize) -> Value {
+    let (sl, sc) = position(text, s);
+    let (el, ec) = position(text, e);
+    json!({"start": {"line": sl, "character": sc}, "end": {"line": el, "character": ec}})
+}
+
+/// `textDocument/definition`: định danh dưới con trỏ ⇒ mọi định nghĩa CẤP ITEM trùng tên trong chương trình (từ `gt-resolve`).
+fn definition_for(uri: &str, docs: &BTreeMap<String, String>, line: usize, col: usize) -> Value {
+    let Some((me, text, inputs)) = build_inputs(uri, docs) else {
+        return Value::Null;
+    };
+    let Some(off) = offset_of(&text, line, col) else {
+        return Value::Null;
+    };
+    let Some((lo, hi)) = ident_at(&text, off) else {
+        return Value::Null;
+    };
+    let name = &text[lo..hi];
+    let Some((out, mods)) = resolve_inputs(&inputs) else {
+        return Value::Null;
+    };
+    let dir = uri_to_path(uri).and_then(|p| p.parent().map(Path::to_path_buf));
+    let std_dir = find_std();
+    let mut locs = Vec::new();
+    for d in &out.defs {
+        let last = d.path.rsplit("::").next().unwrap_or("");
+        if last != name || d.path.starts_with("$prelude") {
+            continue;
+        }
+        let Some(modname) = out.module_names.get(d.file.index()) else {
+            continue;
+        };
+        let Some(k) = mods.iter().position(|m| m == modname) else {
+            continue;
+        };
+        let duri = if inputs[k].name == me {
+            uri.to_string()
+        } else {
+            let found = [dir.as_ref(), std_dir.as_ref()]
+                .into_iter()
+                .flatten()
+                .map(|d| d.join(&inputs[k].name))
+                .find(|p| p.is_file());
+            match found {
+                Some(p) => path_to_uri(&p),
+                None => continue,
+            }
+        };
+        let r = range_json(
+            &inputs[k].text,
+            d.name_span.start as usize,
+            d.name_span.end as usize,
+        );
+        locs.push(json!({"uri": duri, "range": r}));
+    }
+    if locs.is_empty() {
+        Value::Null
+    } else {
+        Value::Array(locs)
+    }
+}
+
+/// `textDocument/documentSymbol`: item của CHÍNH tài liệu (từ `gt-resolve`).
+fn symbols_for(uri: &str, docs: &BTreeMap<String, String>) -> Value {
+    let Some((me, text, inputs)) = build_inputs(uri, docs) else {
+        return Value::Array(Vec::new());
+    };
+    let Some((out, mods)) = resolve_inputs(&inputs) else {
+        return Value::Array(Vec::new());
+    };
+    let my_mod = mods.first().cloned().unwrap_or_default();
+    let _ = me;
+    let mut syms = Vec::new();
+    for d in &out.defs {
+        if d.path.starts_with("$prelude") || out.module_names.get(d.file.index()) != Some(&my_mod) {
+            continue;
+        }
+        let kind = match d.kind {
+            gt_resolve::DefKind::Module => 2,
+            gt_resolve::DefKind::Fn => 12,
+            gt_resolve::DefKind::Struct => 23,
+            gt_resolve::DefKind::Enum => 10,
+            gt_resolve::DefKind::Trait => 11,
+            gt_resolve::DefKind::TypeAlias => 26,
+            gt_resolve::DefKind::Const | gt_resolve::DefKind::Static => 14,
+            gt_resolve::DefKind::Variant => 22,
+        };
+        let r = range_json(&text, d.name_span.start as usize, d.name_span.end as usize);
+        syms.push(json!({"name": d.path.rsplit("::").next().unwrap_or(""), "kind": kind, "range": r, "selectionRange": r}));
+    }
+    Value::Array(syms)
 }
 
 fn publish(w: &mut impl Write, uri: &str, docs: &BTreeMap<String, String>) -> std::io::Result<()> {
@@ -224,7 +451,7 @@ pub fn run() -> i32 {
             "initialize" => send(
                 &mut w,
                 &json!({"jsonrpc": "2.0", "id": id, "result": {
-                    "capabilities": {"textDocumentSync": 1, "documentFormattingProvider": true},
+                    "capabilities": {"textDocumentSync": 1, "documentFormattingProvider": true, "hoverProvider": true, "definitionProvider": true, "documentSymbolProvider": true},
                     "serverInfo": {"name": "gritc", "version": env!("CARGO_PKG_VERSION")}}}),
             ),
             "shutdown" => {
@@ -260,6 +487,32 @@ pub fn run() -> i32 {
             "textDocument/didClose" => {
                 docs.remove(&uri);
                 publish(&mut w, &uri, &docs)
+            }
+            "textDocument/hover" | "textDocument/definition" => {
+                let line = params
+                    .pointer("/position/line")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0) as usize;
+                let col = params
+                    .pointer("/position/character")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0) as usize;
+                let result = if method == "textDocument/hover" {
+                    hover_for(&uri, &docs, line, col)
+                } else {
+                    definition_for(&uri, &docs, line, col)
+                };
+                send(
+                    &mut w,
+                    &json!({"jsonrpc": "2.0", "id": id, "result": result}),
+                )
+            }
+            "textDocument/documentSymbol" => {
+                let result = symbols_for(&uri, &docs);
+                send(
+                    &mut w,
+                    &json!({"jsonrpc": "2.0", "id": id, "result": result}),
+                )
             }
             "textDocument/formatting" => {
                 let result = match docs.get(&uri) {

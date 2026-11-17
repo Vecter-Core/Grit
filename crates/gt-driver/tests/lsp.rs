@@ -122,7 +122,7 @@ fn lsp_session_diagnostics_formatting_and_exit() {
     assert!(s.recv()["result"].is_null());
 
     // phương thức lạ có id ⇒ lỗi -32601; đóng tài liệu ⇒ xoá chẩn đoán
-    s.send(&json!({"jsonrpc":"2.0","id":4,"method":"textDocument/hover","params":{}}));
+    s.send(&json!({"jsonrpc":"2.0","id":4,"method":"textDocument/completion","params":{}}));
     assert_eq!(s.recv()["error"]["code"], -32601);
     s.send(&json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":uri}}}));
     assert!(
@@ -146,4 +146,130 @@ fn exit_without_shutdown_is_nonzero() {
     let mut s = Server::start();
     s.send(&json!({"jsonrpc":"2.0","method":"exit"}));
     assert_eq!(s.child.wait().expect("chờ").code(), Some(1));
+}
+
+/// M13 (P3.b): hover trên chẩn đoán = thông điệp + `gritc explain`; định nghĩa cấp item; ký hiệu tài liệu; và LSP KHÔNG đổi phán quyết:
+/// tập MÃ chẩn đoán LSP == tập mã của `gritc check --json` trên cùng tệp (LSP chỉ hiển thị).
+#[test]
+fn lsp_hover_definition_symbols_and_it_never_changes_the_verdict() {
+    let dir = std::env::temp_dir().join(format!("gt-lsp2-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("tạo thư mục");
+    // `helper` định nghĩa ở dòng 0; `main` gọi `helper` ở dòng 1 và có lỗi kiểu (trả bool cho u32)
+    let src = "ƒ helper() → u32 ! ∅ { 1u32 }
+ƒ main() → u32 ! ∅ { x ≔ helper(); true }
+";
+    let path = dir.join("main.gt");
+    std::fs::write(&path, src).expect("ghi");
+    let uri = format!("file://{}/main.gt", dir.display());
+    let mut s = Server::start();
+    s.send(&json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}));
+    let init = s.recv();
+    for k in [
+        "hoverProvider",
+        "definitionProvider",
+        "documentSymbolProvider",
+    ] {
+        assert_eq!(init["result"]["capabilities"][k], true, "{k}");
+    }
+    let p = s.open(&uri, src);
+    let lsp_codes: std::collections::BTreeSet<String> = p["params"]["diagnostics"]
+        .as_array()
+        .expect("mảng")
+        .iter()
+        .map(|d| d["code"].as_str().expect("mã").to_string())
+        .collect();
+    // phán quyết gốc từ CLI
+    let o = std::process::Command::new(env!("CARGO_BIN_EXE_gritc"))
+        .args(["check", "--json"])
+        .arg(&path)
+        .output()
+        .expect("chạy gritc");
+    let v: Value = serde_json::from_slice(&o.stdout).expect("JSON của gritc check");
+    let cli_codes: std::collections::BTreeSet<String> = v["diagnostics"]
+        .as_array()
+        .expect("mảng")
+        .iter()
+        .map(|d| d["code"].as_str().expect("mã").to_string())
+        .collect();
+    assert_eq!(lsp_codes, cli_codes, "LSP và gritc check phải cùng tập mã");
+    assert!(lsp_codes.contains("E0301"), "{lsp_codes:?}");
+
+    // hover tại đầu chẩn đoán E0301 ⇒ markdown có mã và nội dung explain
+    let e = p["params"]["diagnostics"]
+        .as_array()
+        .expect("mảng")
+        .iter()
+        .find(|d| d["code"] == "E0301")
+        .expect("E0301")
+        .clone();
+    let (hl, hc) = (
+        e["range"]["start"]["line"].clone(),
+        e["range"]["start"]["character"].clone(),
+    );
+    s.send(&json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":hl,"character":hc}}}));
+    let h = s.recv();
+    let md = h["result"]["contents"]["value"].as_str().expect("markdown");
+    assert!(md.contains("E0301"), "{h}");
+    assert!(md.len() > 80, "thiếu nội dung explain: {h}");
+    // hover ở vị trí không có chẩn đoán ⇒ null
+    s.send(&json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":0}}}));
+    assert!(s.recv()["result"].is_null());
+
+    // định nghĩa: `helper` ở dòng 1 (gọi) ⇒ dòng 0
+    let call_col = "ƒ main() → u32 ! ∅ { x ≔ ".encode_utf16().count() + 2;
+    s.send(&json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":call_col}}}));
+    let d = s.recv();
+    let locs = d["result"].as_array().unwrap_or_else(|| panic!("{d}"));
+    assert_eq!(locs.len(), 1, "{d}");
+    assert_eq!(locs[0]["uri"], uri.as_str());
+    assert_eq!(locs[0]["range"]["start"]["line"], 0);
+    // định danh không phải item ⇒ null
+    s.send(&json!({"jsonrpc":"2.0","id":5,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":0}}}));
+    assert!(s.recv()["result"].is_null());
+
+    // ký hiệu tài liệu: helper, main
+    s.send(&json!({"jsonrpc":"2.0","id":6,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":uri}}}));
+    let sy = s.recv();
+    let names: Vec<&str> = sy["result"]
+        .as_array()
+        .expect("mảng")
+        .iter()
+        .map(|x| x["name"].as_str().expect("tên"))
+        .collect();
+    assert!(names.contains(&"helper") && names.contains(&"main"), "{sy}");
+
+    s.send(&json!({"jsonrpc":"2.0","id":7,"method":"shutdown"}));
+    let _ = s.recv();
+    s.send(&json!({"jsonrpc":"2.0","method":"exit"}));
+    let _ = s.child.wait();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// P3.b: bản kê khai `editors/vscode` hợp lệ BẰNG MÁY (JSON đúng, mọi tệp được tham chiếu tồn tại, sự kiện kích hoạt khớp ngôn ngữ). CHƯA THỬ trong VS Code thật.
+#[test]
+fn vscode_manifest_is_valid_and_references_existing_files() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../editors/vscode");
+    let pkg: Value =
+        serde_json::from_slice(&std::fs::read(root.join("package.json")).expect("đọc"))
+            .expect("JSON hợp lệ");
+    assert_eq!(pkg["contributes"]["languages"][0]["id"], "grit");
+    assert_eq!(pkg["activationEvents"][0], "onLanguage:grit");
+    for rel in [
+        pkg["main"].as_str().expect("main"),
+        pkg["contributes"]["languages"][0]["configuration"]
+            .as_str()
+            .expect("configuration"),
+        pkg["contributes"]["grammars"][0]["path"]
+            .as_str()
+            .expect("grammar"),
+    ] {
+        assert!(root.join(rel).is_file(), "thiếu {rel}");
+    }
+    for rel in [
+        "language-configuration.json",
+        "syntaxes/grit.tmLanguage.json",
+    ] {
+        serde_json::from_slice::<Value>(&std::fs::read(root.join(rel)).expect("đọc"))
+            .unwrap_or_else(|e| panic!("{rel}: {e}"));
+    }
 }
