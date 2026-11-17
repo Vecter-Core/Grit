@@ -14,3 +14,5 @@ Mỗi mục: đề xuất của kiến trúc sư/agent và **hành vi mặc đ�
 | 8 | Phiên Claude/model khác họ đọc mã TCB do Codex viết (R11b), nếu agent hiện tại không phải Claude | mở phiên Claude theo `docs/E_PROMPT_CLAUDE.md` | RUNLIST "R11b CHỜ PHIÊN CLAUDE" |
 | 9 | Phiên sạch viết capstone K1–K4 trên Windows | mở phiên mới chỉ đọc `AI_GUIDE` + `STD_REFERENCE` + đề (`docs/CAPSTONE_PROMPTS.md`) | RUNLIST "CAPSTONE WINDOWS: CHỜ PHIÊN SẠCH" |
 | 10 | Chạy `tools/fuzz_loop.sh <giờ>` qua đêm để đạt 24 giờ/mục tiêu (điều kiện #2) | lệnh ghi ở HANDOFF sau P3.a | #2 ghi "ĐANG TÍCH LUỸ" kèm số thật |
+| 11 | **Đẩy lên remote**: `git push origin HEAD:refs/heads/windows-work` (và thẻ `seed-1.0-rc2`) báo `remote: Repository not found` (https://github.com/Vecter-Core/Grit.git) | kiểm repo còn tồn tại/đổi tên/quyền, đăng nhập lại `gh auth login` hoặc cấp lại token; cho biết URL đúng nếu đổi | sao lưu chỉ ở `D:\Grit\.backup` (bundle verified); KHÔNG có bản trên remote ⇒ rủi ro mất dữ liệu nếu ổ hỏng |
+| 12 | Thử `editors/vscode` trong VS Code thật (5 bước `docs/QUICKSTART_VSCODE.md`) | Giang tự thử, báo kết quả | LSP/VS Code ghi "CHƯA THỬ" |

@@ -3,7 +3,7 @@
 Tài liệu cho NGƯỜI DÙNG (và AI viết Grit). Chi tiết kỹ thuật, bằng chứng và lịch sử: `docs/KNOWN_LIMITATIONS.md`. Cái Grit đảm bảo/không đảm bảo: `docs/SAFETY_CLAIMS.md`.
 
 ## Nền tảng và môi trường
-- **Chỉ Linux x86_64 đã kiểm.** Windows (MSVC): chưa kiểm sau các thay đổi của nhánh Seed; CI Windows chỉ viết, chưa chạy. `gritc` nhớ đường dẫn tuyệt đối của kho (runtime `libgt_rt.a`): đừng di chuyển kho sau khi dựng.
+- **Linux x86_64 (dòng Seed, 2026-10-23) và Windows x86_64 MSVC (cổng `13e2df9`, 2026-11-18: GREEN 1023/0/204) đã kiểm.** Chưa kiểm: CI GitHub (chưa chạy), capstone K1/K2/K4 trên Windows, VS Code thật. `gritc` nhớ đường dẫn tuyệt đối của kho (runtime `libgt_rt.a`): đừng di chuyển kho sau khi dựng.
 - Mỗi lần sửa mã gói Rig phải `rig lock`. `rig new` ghi đường dẫn tuyệt đối `lib/std` vào `rig.toml`.
 - Hồ sơ `release`/`release-o2` có bằng chứng THỰC NGHIỆM tương đương `dev` (so ba nguồn, capstone ở dev và release-o2), không phải chứng minh.
 

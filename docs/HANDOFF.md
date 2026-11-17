@@ -6,6 +6,9 @@
 
 > **Fuzz qua đêm (điều kiện #2) — MỘT lệnh Giang gõ (Git Bash, máy rảnh, không chạy cargo khác):** `cd /d/Grit && bash tools/fuzz_loop.sh 10` (10 = tổng giờ tối đa; Ctrl+C an toàn, chạy lại để tiếp tục). Tự đặt PATH ASan DLL, dựng một lần, phiên 10 phút xen kẽ lexer/parser, ghi `docs/FUZZ_LOG.jsonl` kèm băm nguồn; in tổng tích luỹ. Đạt 24 giờ/loại trên băm hiện tại cần ≈ 48 giờ chạy (24 × 2 loại) ⇒ nhiều đêm. Hiện: `python tools/fuzz_total.py`.
 
+> **TRẠNG THÁI 2026-11-18:** cổng liền mạch XANH trên `13e2df9` (1023/0/204); thẻ cục bộ `seed-1.0-rc2`; bundle `D:\Grit\.backup\grit-13e2df9.bundle`; PUSH THẤT BẠI "Repository not found" (PENDING_GIANG #11). P0–P4 của lệnh 2026-11-17 XONG (xem RUNLIST/RUN_REPORTS "P1.e–P4"); R11b XONG (`docs/TCB_CODE_AUDIT_CLAUDE.md`). Việc kế: chờ Giang (PENDING_GIANG); phiên sạch capstone; fuzz qua đêm; M13 chưa đủ (không inlay hint); không Giai đoạn 2.
+> **Môi trường — CHẠY CỔNG:** KHÔNG chạy `gate.sh` bằng WMI/detached (HĐH làm chậm: test `gt-fmt comments` treo hơn 2 giờ); chạy dưới harness (`run_in_background`) bằng `bash target/tmp/run_gate.sh` (đặt `GRIT_RT_LIB`, `GRIT_LLVM_DIR`, PATH LLVM, `CARGO_BUILD_JOBS=2`, `PYTHONIOENCODING=utf-8`). Cổng ≈ 2 giờ; `gt-fmt comments` một mình 17 phút. `preflight` hay in FAIL khi bộ nhớ ảo trống < 4 GB (ứng dụng khác của người dùng): chạy lại tới khi OK. Mọi commit có `Author-Model: <model>`.
+
 ## Gói 2 tiếp tục — checkpoint G2.1 (2026-11-12)
 - Nhánh `integration`; `main` chưa đụng. `windows-work` đã push tới `a9dcd24`; mutation follow-up + regression mới chưa commit.
 - probe_diff: 20.000 seed độc lập theo range 0..19999, 5 lô tuần tự; edge violations=0; mutant 361/591/554 mỗi mutant `i=0`; đối chứng 238 `i=277`; xem `docs/PROBE_DIFF_RESULTS.jsonl`.
@@ -17,7 +20,7 @@
 - G2.6/G2.7: kiểm kê docs đủ 11/11, doc-test sau cập nhật 207 khối/0 sai; `docs/G2_CLEAN_SESSION.md` chuẩn bị handoff, không sửa/author capstone. G2.1 còn cần xác nhận đúng phạm vi scan E04xx/A.1; mutation survivor có lập luận tương đương; G2.2 R11b đang chờ reviewer Claude khác họ.
 - G2.1.c: sáu bộ ở dev/release-o2 có mismatch 0; chi tiết mới ở `docs/G2_CODEGEN_DIFF_RESULTS.jsonl`, `docs/CODEGEN_DIFF_RESULTS.jsonl`, `docs/RELEASE_O2_DIFF_RESULTS.jsonl`. G2.1.d còn survivor mutation và E04xx/A.1 scan.
 
-**Cập nhật tại commit faddecc, ngày 2026-11-12.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit 13e2df9, ngày 2026-11-18.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 

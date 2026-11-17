@@ -31,10 +31,10 @@ Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuy�
 |---|---|---|---|
 | R1 | Toàn vẹn kho: preflight, quét NUL, sao lưu | XONG (trừ bundle ở `D:\Grit_backup`) | `tools/preflight.sh`, `tools/nul_check.sh`+`nul_scan.py`, `tools/test_preflight.py`, `test_nul_check.py`; cổng G1.6: NUL 0/1925; commit 824ec22. Bundle: `D:\Grit_backup` bị ACL chặn ⇒ dùng `D:\Grit\.backup` (G2.0.b) |
 | R2 | Hàm-làm-giá-trị: M6/M7 qua giá trị, `⊳/⊲`, hiệu ứng, bảng ĐO | XONG | Windows: `gt-borrowck --test fn_value_regions`, `gt-oblig --test oracle`, `gt-driver --test contract_via_value`, `--test fn_value_gen`; Linux: progen `fn_value_ref` 764/734 (`2f8fc92`), FB-C5 `fdce836`, FB-C6 `f000546`; `docs/INTRINSIC_AS_VALUE.md`; commit b80dffc |
-| R3 | FAIL_OPEN_AUDIT rà hết | ĐANG (P1.b) | Windows: sổ 1292/1292 (`36ac79d`…`b97338d`, FB-17/18/19). Dòng Linux: 471 vị trí + `docs/fail_open_classification.tsv`. Bộ quét hợp nhất hiện báo CHƯA RÀ 95 ⇒ phải rà hết |
+| R3 | FAIL_OPEN_AUDIT rà hết | XONG (sổ cái `check` CHƯA RÀ 0; gate failopen 0 mới) | Windows: sổ 1292/1292 (`36ac79d`…`b97338d`, FB-17/18/19). Dòng Linux: 471 vị trí + `docs/fail_open_classification.tsv`. Bộ quét hợp nhất hiện báo CHƯA RÀ 95 ⇒ phải rà hết |
 | R4 | `GRITRT_ARENA_CHECK` chỉ THÊM, không tắt được ở dev | XONG | `gt-driver --test arena_dynamic` 6/6 (`dev_check_cannot_be_switched_off_by_environment`); Windows `bcec465`, Linux `963da34→53bfb4d` |
 | R5 | Flake llvm_sort, std release/release-o2, Ord kiểu ghép, sortlines | XONG | G1.4: `docs/FLAKE_LLVM_SORT.jsonl` (seed 1..100, 0/100 đỏ ⇒ giới hạn trên ≈3%, KHÔNG kết luận hết flake), `docs/STD_TEST_RESULTS.jsonl`, `docs/SORTLINES_BENCHMARK.jsonl`; commit faddecc |
-| R6 | Arena chia sẻ `&'a Arena` (ADR-C03) | CÀI XONG; BẰNG CHỨNG CÓ ĐIỀU KIỆN (P1.c) | `lib/core/prelude.gt` `Vec<'a,T>{arena:&'a Arena}`; ADR-C03/C07; oracle `arena_vec` + FB-C9 (`d7f5939`); dòng TCB H1–H6 để CÓ ĐIỀU KIỆN tới khi bảng điều kiện R6 đủ |
+| R6 | Arena chia sẻ `&'a Arena` (ADR-C03) | XONG CÓ ĐIỀU KIỆN (bảng bằng chứng đủ ở RUN_REPORTS G2.1.c; cổng xanh; dòng TCB H1–H6 ở CÓ ĐIỀU KIỆN cho tới khi Giang/đọc mã khác họ xác nhận) | `lib/core/prelude.gt` `Vec<'a,T>{arena:&'a Arena}`; ADR-C03/C07; oracle `arena_vec` + FB-C9 (`d7f5939`); dòng TCB H1–H6 để CÓ ĐIỀU KIỆN tới khi bảng điều kiện R6 đủ |
 | R7 | HashMap trong `lib/std` | XONG (ngưỡng riêng: P1.d) | `gt-driver --test std2_lib` (35 seed/hồ sơ), K3 20/20, ADR-C06; ngưỡng ≥1.500 là toàn cục (ghi ở DECISIONS, P1.d) |
 | R8 | Hai intrinsic I/O: `Cap<In>::read_all`, `Cap<Fs>::write` | XONG | `gt-driver --test io_intrinsics` (6/6 sau sửa Windows G1.6), `fs_read_io_error`; CAPSTONE G5/G6/G7; hợp đồng ở `docs/TCB_INTRINSICS.md` |
 | R9 | `tools/fuzz_loop.sh` + fuzz tích luỹ | ĐANG TÍCH LUỸ | `tools/fuzz_total.py` (2026-11-17): lexer 1,17 h / 24, parser 2,00 h / 24, 0 phiên lỗi; `tools/fuzz_loop.sh <giờ>` MỘT lệnh qua đêm (P3.a XONG, thử 2+ phiên 1 phút: lex/parse ok; tổng theo băm nguồn); cần ≈ 48 giờ chạy để đạt 24 h/loại |
@@ -47,8 +47,8 @@ Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuy�
 ## Lệnh P0–P4 (2026-11-17)
 | Giai đoạn | Trạng thái |
 |---|---|
-| P0 đồng bộ + tài liệu | ĐANG (P0a–P0f) |
-| P1 G2.1, Arena chia sẻ, HashMap, cổng, bundle, thẻ | CHƯA |
-| P2 R11b, capstone | CHƯA |
-| P3 fuzz_loop, LSP, tái lập, BufOut | CHƯA |
-| P4 READINESS + chữ "Windows chưa kiểm" + HANDOFF | CHƯA |
+| P0 đồng bộ + tài liệu | XONG (2026-11-17) |
+| P1 G2.1, Arena chia sẻ, HashMap, cổng, bundle, thẻ | XONG (cổng XANH `13e2df9` 1023/0/204; bundle `.backup`; thẻ cục bộ; push THẤT BẠI "Repository not found") |
+| P2 R11b, capstone | R11b XONG; CAPSTONE WINDOWS CHỜ PHIÊN SẠCH (Giang mở) |
+| P3 fuzz_loop, LSP, tái lập, BufOut | a, b (mức tối thiểu+, VS Code chưa thử), c XONG; d KHÔNG làm |
+| P4 READINESS + chữ "Windows chưa kiểm" + HANDOFF | XONG (2026-11-18) |

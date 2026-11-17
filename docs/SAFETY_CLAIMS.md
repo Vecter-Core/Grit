@@ -1,6 +1,6 @@
 # SAFETY_CLAIMS — Grit đảm bảo gì và KHÔNG đảm bảo gì
 
-Tài liệu này nói đúng mức tin cậy mà dự án có bằng chứng. Nó không phải lời quảng cáo. Nền đã kiểm: **Linux x86_64** (LLVM 20.1.x, `cc`). **Windows: chưa kiểm** sau các thay đổi của nhánh Seed 1.0.
+Tài liệu này nói đúng mức tin cậy mà dự án có bằng chứng. Nó không phải lời quảng cáo. Nền đã kiểm: **Linux x86_64** (LLVM 20.1.x, `cc`). **Windows** đã kiểm bằng cổng liền mạch `13e2df9` (2026-11-18, GREEN 1023/0/204); CI GitHub, capstone K1/K2/K4 trên Windows và VS Code thật vẫn CHƯA kiểm.
 
 ## 1. Bản chất của đảm bảo
 - An toàn của Grit đến từ **KIỂM TRA TĨNH có thể sai** + **bằng chứng thực nghiệm**: corpus chương trình đúng/sai, oracle động (chạy chương trình thật rồi so với kết luận của bộ kiểm), đột biến (cố ý làm hỏng chính bộ kiểm và đếm xem test có bắt được không), so sánh ba nguồn (mô hình Rust độc lập ≡ thông dịch ≡ exe LLVM) và fuzz.
@@ -27,7 +27,7 @@ Tài liệu này nói đúng mức tin cậy mà dự án có bằng chứng. N�
 - **Data race không có oracle động**: mô hình đa luồng mới chỉ được kiểm bằng corpus + lặp; không có bộ sinh/oracle động đầy đủ cho mọi mẫu truy cập.
 - **Hạ tầng bên ngoài TCB**: bug của LLVM, trình liên kết, hệ điều hành, phần cứng, thư viện C chuẩn; kênh phụ (thời gian, bộ nhớ đệm); tệp/đường dẫn bị đổi giữa lúc kiểm và lúc dùng; tính nguyên tử của ghi tệp (`Cap<Fs>::write` có thể để lại tệp cụt).
 - **Đặc tả sai / thiếu**: kiểm tra chỉ so với những gì được nêu; thông dịch MIR là công cụ đối chiếu NGOÀI TCB.
-- **Windows**: chưa kiểm sau các thay đổi Seed 1.0 (Linux là nền duy nhất có số liệu).
+- **Windows**: Windows x86_64 (MSVC) đã kiểm bằng cổng liền mạch `13e2df9` (2026-11-18): GREEN 1023/0/204. **Vẫn CHƯA kiểm:** CI GitHub (chưa chạy), capstone K1/K2/K4 trên Windows, VS Code thật, `u128` nhân/chia ở backend LLVM (bị từ chối có chủ ý). Linux: số liệu dòng Seed 2026-10-22/23 (cổng 958/0).
 
 ## 4. Cơ sở tin cậy (TCB): phần nếu sai thì mọi đảm bảo trên mất giá trị
 1. Chính các bộ kiểm: `gt-types`, `gt-mir`, `gt-borrowck`, `gt-oblig`, `gt-term`/effects/conc, `gt-secrets`, bộ xác minh verdict.

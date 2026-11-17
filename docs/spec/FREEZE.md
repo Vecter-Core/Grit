@@ -1,6 +1,6 @@
 # FREEZE — những gì Seed 1.0 ĐÓNG BĂNG (và những gì KHÔNG)
 
-Phiên bản: `gritc --version` ⇒ `1.0.0-rc2` (nhãn `1.0.0-seed` CHỈ khi đạt cả sáu điều kiện của `docs/archive/SEED_PLAN.md`; điều kiện còn thiếu liệt kê ở `docs/READINESS.md` mục "Seed 1.0" và `docs/RUN_REPORTS.md` S8). Nền đã kiểm: Linux x86_64; Windows: CHƯA kiểm. Quyết định đóng băng: ADR-C04.
+Phiên bản: `gritc --version` ⇒ `1.0.0-rc2` (nhãn `1.0.0-seed` CHỈ khi đạt cả sáu điều kiện của `docs/archive/SEED_PLAN.md`; điều kiện còn thiếu liệt kê ở `docs/READINESS.md` mục "Seed 1.0" và `docs/RUN_REPORTS.md` S8). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng `13e2df9`, 2026-11-18); CI GitHub/VS Code thật CHƯA kiểm. Quyết định đóng băng: ADR-C04.
 
 Quy tắc chung: một mục ĐÓNG BĂNG chỉ được đổi bằng (1) một ADR mới (`docs/DECISIONS.md`, tiền tố ADR-C hoặc kế tiếp), (2) tăng phiên bản thích hợp, (3) cập nhật `CHANGELOG.md` và các test khoá liên quan. "Thêm" tương thích được phép khi ghi rõ bên dưới; "đổi tên/xoá/đổi nghĩa" thì không.
 
@@ -24,5 +24,5 @@ Quy tắc chung: một mục ĐÓNG BĂNG chỉ được đổi bằng (1) một
 - Chi tiết triển khai các pass (M4…M10), cách đặt tên local `_N` trong MIR, thứ tự ghi chú `N…`, nội dung thông báo lỗi (chỉ MÃ được đóng băng), định dạng văn bản cho người của `gritc` (JSON mới là giao diện máy).
 - Hiệu năng (thời gian dựng/chạy), kích thước nhị phân, hồ sơ tối ưu `release*` (đã có bằng chứng thực nghiệm dev≡release, KHÔNG phải chứng minh).
 - Tập đột biến/corpus (chỉ được TĂNG).
-- Windows: chưa kiểm ⇒ không có cam kết.
+- Windows: đã chạy cổng liền mạch xanh ở `13e2df9` (2026-11-18); CI GitHub, capstone K1/K2/K4 trên Windows, VS Code thật CHƯA kiểm ⇒ không có cam kết cho các phần đó.
 - Mọi tính năng ghi ở `docs/SEED_LIMITATIONS.md` là "chưa có" (closure, `?`, phân rã tuple, `unwrap`, …): có thể thêm sau, KHÔNG phải thay đổi phá vỡ.
