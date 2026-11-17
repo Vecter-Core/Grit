@@ -832,6 +832,31 @@ mod tests {
         );
     }
 
+    /// GÓI 3 S2.b (hợp đồng H8): tạo luồng worker thất bại ⇒ abort có TÊN `spawn_failed`, mã thoát 70, KHÔNG chạy tiếp.
+    #[test]
+    fn spawn_failure_aborts_with_named_kind() {
+        const ENV: &str = "GRITRT_TEST_FORCE_SPAWN_FAILURE";
+        if std::env::var_os(ENV).is_some() {
+            extern "C" fn worker(_: *mut u8) {}
+            unsafe { gritrt_spawn(worker, std::ptr::null_mut()) };
+            panic!("gritrt_spawn must abort when thread creation fails");
+        }
+        let output = std::process::Command::new(std::env::current_exe().expect("test exe"))
+            .args(["--exact", "tests::spawn_failure_aborts_with_named_kind"])
+            .env(ENV, "1")
+            .output()
+            .expect("spawn child test");
+        assert_eq!(output.status.code(), Some(ABORT_EXIT_CODE));
+        let err = String::from_utf8_lossy(&output.stderr);
+        assert!(err.contains("abort: spawn_failed"), "stderr: {err}");
+    }
+
+    /// `spawn_failed` có số thứ tự 19 trong `ABORT_KINDS`, tên đúng.
+    #[test]
+    fn spawn_failed_is_kind_19() {
+        assert_eq!(ABORT_KINDS.get(19).copied(), Some("spawn_failed"));
+    }
+
     /// Nhiều luồng thật tăng một bộ đếm dưới khoá thật: tổng phải đúng (không mất cập nhật).
     #[test]
     fn mutex_serializes_real_threads() {
