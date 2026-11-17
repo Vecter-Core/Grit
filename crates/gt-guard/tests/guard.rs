@@ -1074,3 +1074,99 @@ fn external_declarations_may_only_be_called_directly_fb_c27() {
         "địa chỉ của khai báo ngoài bị dùng gián tiếp mà được CHẤP NHẬN: {v:?}"
     );
 }
+
+/// R11b (GUARD-01, 2026-11-17): danh sách trắng intrinsic LLVM phải ĐÓNG với MỌI họ có thể sinh poison/UB hoặc đổi ngữ nghĩa mà `verifier` vẫn chấp nhận:
+/// `ctlz/cttz` với cờ `is_zero_poison`, `abs`, `bswap`, `ctpop`, `bitreverse`, `fabs`, `minnum`, `memset`, `memmove`, `expect`, `trap`, `ptrmask`, `objectsize`, `is.constant`,
+/// `umul.fix`, `smul.fix.sat`, `sdiv.fix`. Mỗi họ ở một module riêng; Guard phải báo "LLVM intrinsic ngoài danh sách cho phép" (HOẶC luật chuyên biệt như `assume`).
+#[test]
+fn every_unlisted_llvm_intrinsic_family_is_rejected() {
+    let cases: [(&str, &str, &str); 16] = [
+        (
+            "llvm.ctlz.i32",
+            "i32 (i32, i1)",
+            "i32 @llvm.ctlz.i32(i32 0, i1 true)",
+        ),
+        (
+            "llvm.cttz.i32",
+            "i32 (i32, i1)",
+            "i32 @llvm.cttz.i32(i32 0, i1 true)",
+        ),
+        (
+            "llvm.abs.i32",
+            "i32 (i32, i1)",
+            "i32 @llvm.abs.i32(i32 -2147483648, i1 true)",
+        ),
+        ("llvm.bswap.i32", "i32 (i32)", "i32 @llvm.bswap.i32(i32 1)"),
+        ("llvm.ctpop.i32", "i32 (i32)", "i32 @llvm.ctpop.i32(i32 1)"),
+        (
+            "llvm.bitreverse.i32",
+            "i32 (i32)",
+            "i32 @llvm.bitreverse.i32(i32 1)",
+        ),
+        (
+            "llvm.fabs.f64",
+            "double (double)",
+            "double @llvm.fabs.f64(double 1.0)",
+        ),
+        (
+            "llvm.minnum.f64",
+            "double (double, double)",
+            "double @llvm.minnum.f64(double 1.0, double 2.0)",
+        ),
+        (
+            "llvm.memset.p0.i64",
+            "void (ptr, i8, i64, i1)",
+            "void @llvm.memset.p0.i64(ptr null, i8 0, i64 0, i1 false)",
+        ),
+        (
+            "llvm.memmove.p0.p0.i64",
+            "void (ptr, ptr, i64, i1)",
+            "void @llvm.memmove.p0.p0.i64(ptr null, ptr null, i64 0, i1 false)",
+        ),
+        (
+            "llvm.expect.i32",
+            "i32 (i32, i32)",
+            "i32 @llvm.expect.i32(i32 1, i32 1)",
+        ),
+        ("llvm.trap", "void ()", "void @llvm.trap()"),
+        (
+            "llvm.ptrmask.p0.i64",
+            "ptr (ptr, i64)",
+            "ptr @llvm.ptrmask.p0.i64(ptr null, i64 -1)",
+        ),
+        (
+            "llvm.is.constant.i32",
+            "i1 (i32)",
+            "i1 @llvm.is.constant.i32(i32 1)",
+        ),
+        (
+            "llvm.umul.fix.i32",
+            "i32 (i32, i32, i32)",
+            "i32 @llvm.umul.fix.i32(i32 1, i32 1, i32 0)",
+        ),
+        (
+            "llvm.smul.fix.sat.i32",
+            "i32 (i32, i32, i32)",
+            "i32 @llvm.smul.fix.sat.i32(i32 1, i32 1, i32 0)",
+        ),
+    ];
+    for (name, sig, call) in cases {
+        let ctx = Context::create();
+        let (ret, args) = sig.split_once(" (").expect("chữ ký");
+        let text = format!(
+            "declare void @gritrt_abort(i32) noreturn\ndeclare {ret} @{name}({})\ndefine void @f() {{\nbb0:\n  %r = call {call}\n  ret void\n}}\n",
+            args.trim_end_matches(')')
+        );
+        let text = if ret == "void" {
+            text.replace("%r = call", "call")
+        } else {
+            text
+        };
+        let w = world_from_text(&ctx, &text);
+        let v = w.check();
+        assert!(
+            has(&v, "LLVM intrinsic ngoài danh sách cho phép"),
+            "{name}: {v:?}\n{text}"
+        );
+    }
+}

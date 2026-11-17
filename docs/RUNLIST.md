@@ -40,7 +40,7 @@ Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuy�
 | R9 | `tools/fuzz_loop.sh` + fuzz tích luỹ | ĐANG TÍCH LUỸ | `tools/fuzz_total.py` (2026-11-17): lexer 1,17 h / 24, parser 2,00 h / 24, 0 phiên lỗi; nâng cấp một-lệnh-qua-đêm: P3.a |
 | R10 | Đột biến nguy hiểm của M7 | XONG CÓ ĐIỀU KIỆN | `docs/M7_DANGER_MUTANTS.md`: 191 đột biến, 60 sống, 30 giết bằng `gt-oblig --test danger_decisions`, 30 chỉ có lập luận tương đương (KHÔNG chứng minh). Số 69 cũ không ánh xạ 1-1 |
 | R11 | Đọc mã đối kháng nhóm CAO H1–H10, Guard, gt-rt | ĐANG | `docs/TCB_CODE_AUDIT.md` (sổ 13 nghi vấn, H10 tests); subagent cùng họ model ở S7 (`docs/archive/adversarial/`); GPT-6 đọc phần Claude. Chưa có model KHÁC HỌ độc lập cho phần Codex-viết |
-| R11b | Claude đọc diff TCB do Codex viết (`docs/E_PROMPT_CLAUDE.md`) | P2.a | kết quả vào `docs/TCB_CODE_AUDIT_CLAUDE.md` |
+| R11b | Claude đọc diff TCB do Codex viết (`docs/E_PROMPT_CLAUDE.md`) | XONG 2026-11-17 (Claude Sonnet 5.5, HEAD f9f0f78) | `docs/TCB_CODE_AUDIT_CLAUDE.md`: 17 mục, 1 xác nhận (FB-C31), 9 bác bỏ trong phạm vi, 7 chưa kiểm; chưa nâng dòng TCB nào |
 | R12 | Cổng cuối + READINESS + bundle + push + báo cáo | ĐANG | cổng GREEN 1017/0/202 (`c5aa45b`, `ed529c6`, 2026-11-12); push `windows-work` OK; cổng mới sau P1/P3: P1.e; READINESS: P4 |
 | CAPSTONE WINDOWS | K1–K4 bằng phiên sạch trên Windows | CHỜ PHIÊN SẠCH (Giang mở) | `docs/CAPSTONE_PROMPTS.md`, `tools/capstone_check.sh`; Linux 8/8 (`capstone/verify.py`) |
 
