@@ -772,6 +772,16 @@ mod tests {
         assert_eq!(std::str::from_utf8(&encoded[0]).unwrap(), "a�b");
     }
 
+    /// R11b (FB-C31): MỌI đường nhận (con trỏ, độ dài) từ ABI phải từ chối độ dài > isize::MAX TRƯỚC `slice::from_raw_parts` (tiền điều kiện của Rust;
+    /// vi phạm là UB — bản debug tự dừng bằng "unsafe precondition(s) violated" ⇒ `panic = "abort"` giết tiến trình). Trước sửa chỉ `fs_*` dùng `ffi_bytes`.
+    #[test]
+    fn oversized_ffi_lengths_are_rejected_before_from_raw_parts() {
+        let p = b"abc".as_ptr();
+        let huge = 1u64 << 63;
+        assert_eq!(unsafe { gritrt_utf8_valid(p, huge) }, 0);
+        assert_eq!(unsafe { gritrt_bytes_eq(p, huge, p, huge) }, 0);
+    }
+
     /// A Grit empty string may cross the ABI as null + zero. Rust slices still
     /// require a non-null pointer at length zero, so these entry points must
     /// normalize the empty case before calling `from_raw_parts`.
