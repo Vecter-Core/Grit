@@ -18,12 +18,22 @@ fn build(profile: &str) -> PathBuf {
     std::fs::write(&src, PROG).expect("ghi");
     let exe = d.join("argv.exe");
     let o = Command::new(env!("CARGO_BIN_EXE_gritc"))
-        .args(["build", "--backend=llvm", &format!("--profile={profile}"), "-o"])
+        .args([
+            "build",
+            "--backend=llvm",
+            &format!("--profile={profile}"),
+            "-o",
+        ])
         .arg(&exe)
         .arg(&src)
         .output()
         .expect("chạy gritc");
-    assert!(o.status.success(), "{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr));
+    assert!(
+        o.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&o.stdout),
+        String::from_utf8_lossy(&o.stderr)
+    );
     std::thread::sleep(std::time::Duration::from_secs(3)); // Defender quét exe mới (WinError 5)
     exe
 }
@@ -52,7 +62,11 @@ fn arguments_reach_the_program_byte_for_byte_in_dev_and_release_o2() {
         for (name, args) in &cases {
             let o = Command::new(&exe).args(args).output().expect("chạy exe");
             assert_eq!(o.status.code(), Some(0), "{profile}/{name}");
-            assert_eq!(o.stdout, expected(args), "{profile}/{name}: byte đối số khác");
+            assert_eq!(
+                o.stdout,
+                expected(args),
+                "{profile}/{name}: byte đối số khác"
+            );
         }
         #[cfg(windows)]
         {
@@ -62,7 +76,11 @@ fn arguments_reach_the_program_byte_for_byte_in_dev_and_release_o2() {
             let o = Command::new(&exe).arg(&lone).output().expect("chạy exe");
             assert_eq!(o.status.code(), Some(0), "{profile}/surrogate");
             // 'a' + U+FFFD (EF BF BD) + 'b' = 5 byte; luôn UTF-8 hợp lệ
-            assert_eq!(o.stdout, b"2\n5:a\xEF\xBF\xBDb\n".to_vec(), "{profile}/surrogate lẻ");
+            assert_eq!(
+                o.stdout,
+                b"2\n5:a\xEF\xBF\xBDb\n".to_vec(),
+                "{profile}/surrogate lẻ"
+            );
             assert!(std::str::from_utf8(&o.stdout).is_ok());
         }
     }

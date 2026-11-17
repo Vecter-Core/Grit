@@ -25,7 +25,13 @@ fn scratch(name: &str) -> PathBuf {
 fn build_fault_runtime() -> PathBuf {
     let target = scratch("rtfault");
     let st = Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()))
-        .args(["build", "--release", "--features", "test-fault", "--manifest-path"])
+        .args([
+            "build",
+            "--release",
+            "--features",
+            "test-fault",
+            "--manifest-path",
+        ])
         .arg(root().join("runtime/gt-rt/Cargo.toml"))
         .env("CARGO_TARGET_DIR", &target)
         .env_remove("CARGO_BUILD_TARGET")
@@ -38,12 +44,16 @@ fn build_fault_runtime() -> PathBuf {
             return p;
         }
     }
-    panic!("không thấy thư viện runtime test-fault trong {}", target.display());
+    panic!(
+        "không thấy thư viện runtime test-fault trong {}",
+        target.display()
+    );
 }
 
 fn run(src: &Path, profile: &str, rt: Option<&Path>, force: bool) -> (Option<i32>, String) {
     let mut c = Command::new(env!("CARGO_BIN_EXE_gritc"));
-    c.args(["run", "--backend=llvm", &format!("--profile={profile}")]).arg(src);
+    c.args(["run", "--backend=llvm", &format!("--profile={profile}")])
+        .arg(src);
     if let Some(rt) = rt {
         c.env("GRIT_RT_LIB", rt);
     }
@@ -53,12 +63,17 @@ fn run(src: &Path, profile: &str, rt: Option<&Path>, force: bool) -> (Option<i32
     let o = c.output().expect("chạy gritc");
     (
         o.status.code(),
-        format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr)),
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&o.stdout),
+            String::from_utf8_lossy(&o.stderr)
+        ),
     )
 }
 
 #[test]
-fn forced_spawn_failure_aborts_with_spawn_failed_in_dev_and_release_o2_and_production_runtime_ignores_the_switch() {
+fn forced_spawn_failure_aborts_with_spawn_failed_in_dev_and_release_o2_and_production_runtime_ignores_the_switch()
+ {
     let dir = scratch("prog");
     let src = dir.join("main.gt");
     std::fs::write(&src, PROG).expect("ghi");
@@ -71,12 +86,22 @@ fn forced_spawn_failure_aborts_with_spawn_failed_in_dev_and_release_o2_and_produ
         // ép lỗi + runtime test-fault ⇒ abort có tên, mã 70 (gritc báo mã của exe hoặc 70)
         let (code, out) = run(&src, profile, Some(&fault_rt), true);
         assert!(out.contains("abort: spawn_failed"), "{profile} (ép): {out}");
-        assert_ne!(code, Some(0), "{profile} (ép): không được chạy tiếp thành công: {out}");
-        assert!(!out.contains("main trả về 7"), "{profile} (ép): chạy tiếp lặng lẽ! {out}");
+        assert_ne!(
+            code,
+            Some(0),
+            "{profile} (ép): không được chạy tiếp thành công: {out}"
+        );
+        assert!(
+            !out.contains("main trả về 7"),
+            "{profile} (ép): chạy tiếp lặng lẽ! {out}"
+        );
         // ĐỐI CHỨNG: runtime sản xuất mặc định bỏ qua biến ⇒ không abort
         let (code, out) = run(&src, profile, None, true);
         assert_eq!(code, Some(0), "{profile} (sản xuất, có biến): {out}");
-        assert!(!out.contains("spawn_failed"), "{profile} (sản xuất): đường ép lỗi lọt vào bản sản xuất! {out}");
+        assert!(
+            !out.contains("spawn_failed"),
+            "{profile} (sản xuất): đường ép lỗi lọt vào bản sản xuất! {out}"
+        );
     }
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -67,6 +67,20 @@ pub extern "C" fn gritrt_exit(code: u32) -> ! {
 const GRIT_THREAD_STACK_BYTES: usize = 256 << 20;
 const MAIN_THREAD_STACK_FAILURE_EXIT_CODE: i32 = 71;
 
+/// Cỡ stack của luồng Grit. Bản sản xuất: HẰNG `GRIT_THREAD_STACK_BYTES`. CHỈ bản dựng `--features test-fault` cho phép `GRITRT_TEST_STACK_BYTES=<byte>`
+/// ghi đè (để ĐO nhu cầu stack thực của chương trình, GÓI 3 S2.b(iv)); bản sản xuất bỏ qua biến này.
+#[cfg(feature = "test-fault")]
+fn thread_stack_bytes() -> usize {
+    std::env::var("GRITRT_TEST_STACK_BYTES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(GRIT_THREAD_STACK_BYTES)
+}
+#[cfg(not(feature = "test-fault"))]
+fn thread_stack_bytes() -> usize {
+    GRIT_THREAD_STACK_BYTES
+}
+
 fn spawn_main_thread(main: extern "C" fn()) -> std::io::Result<std::thread::JoinHandle<()>> {
     #[cfg(test)]
     if std::env::var_os("GRITRT_TEST_FORCE_MAIN_STACK_FAILURE").is_some() {
@@ -74,7 +88,7 @@ fn spawn_main_thread(main: extern "C" fn()) -> std::io::Result<std::thread::Join
     }
     std::thread::Builder::new()
         .name("grit-main".to_string())
-        .stack_size(GRIT_THREAD_STACK_BYTES)
+        .stack_size(thread_stack_bytes())
         .spawn(move || main())
 }
 
@@ -714,7 +728,7 @@ pub unsafe extern "C" fn gritrt_spawn(f: extern "C" fn(*mut u8), arg: *mut u8) {
         Err(std::io::Error::other("forced test failure"))
     } else {
         std::thread::Builder::new()
-            .stack_size(GRIT_THREAD_STACK_BYTES)
+            .stack_size(thread_stack_bytes())
             .spawn(move || {
                 let a = a;
                 f(a.0);
@@ -878,7 +892,22 @@ mod tests {
     fn arena_random_allocation_sequences_are_aligned_disjoint_and_intact() {
         gritrt_dev_checks();
         let sizes: [u64; 16] = [
-            0, 1, 2, 3, 7, 8, 15, 16, 17, 63, 100, 4095, 4096, 4097, 65_536, (1 << 20) + 1,
+            0,
+            1,
+            2,
+            3,
+            7,
+            8,
+            15,
+            16,
+            17,
+            63,
+            100,
+            4095,
+            4096,
+            4097,
+            65_536,
+            (1 << 20) + 1,
         ];
         let aligns: [u64; 8] = [1, 2, 4, 8, 16, 64, 256, 4096];
         let mut seed = 0x9E37_79B9_7F4A_7C15u64;
@@ -901,7 +930,11 @@ mod tests {
                     };
                     let align = aligns[(next() % 8) as usize];
                     let p = gritrt_arena_alloc(h, size, align) as usize;
-                    assert_eq!(p % align as usize, 0, "lệch căn lề (size {size}, align {align})");
+                    assert_eq!(
+                        p % align as usize,
+                        0,
+                        "lệch căn lề (size {size}, align {align})"
+                    );
                     let tag = (k % 251) as u8 + 1;
                     if size > 0 {
                         unsafe { std::ptr::write_bytes(p as *mut u8, tag, size as usize) };
@@ -909,15 +942,27 @@ mod tests {
                     live.push((p, size as usize, tag));
                     allocs_total += 1;
                 }
-                let mut regions: Vec<(usize, usize)> = live.iter().filter(|r| r.1 > 0).map(|r| (r.0, r.0 + r.1)).collect();
+                let mut regions: Vec<(usize, usize)> = live
+                    .iter()
+                    .filter(|r| r.1 > 0)
+                    .map(|r| (r.0, r.0 + r.1))
+                    .collect();
                 regions.sort_unstable();
                 for w in regions.windows(2) {
-                    assert!(w[0].1 <= w[1].0, "hai vùng chồng lấn: {:?} và {:?}", w[0], w[1]);
+                    assert!(
+                        w[0].1 <= w[1].0,
+                        "hai vùng chồng lấn: {:?} và {:?}",
+                        w[0],
+                        w[1]
+                    );
                 }
                 for (p, size, tag) in &live {
                     if *size > 0 {
                         let s = unsafe { std::slice::from_raw_parts(*p as *const u8, *size) };
-                        assert!(s.iter().all(|b| b == tag), "nội dung vùng bị ghi đè (tag {tag})");
+                        assert!(
+                            s.iter().all(|b| b == tag),
+                            "nội dung vùng bị ghi đè (tag {tag})"
+                        );
                     }
                 }
                 gritrt_arena_reset(h);

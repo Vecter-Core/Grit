@@ -809,19 +809,16 @@ fn known_limitation_guard02_post_counts_abort_calls_not_reachable_ones() {
     let c0 = Context::create();
     let w0 = world(&c0, true, Some(ATT));
     let f0 = w0.func("f");
-    let cond_g = w0
-        .m
-        .add_global(c0.bool_type(), None, "cond");
+    let cond_g = w0.m.add_global(c0.bool_type(), None, "cond");
     cond_g.set_initializer(&c0.bool_type().const_int(1, false));
     let ok0 = c0.append_basic_block(f0, "ok");
     trap_kind(&w0, f0, "trap.0", 1);
     let trap0 = f0.get_last_basic_block().expect("trap");
     w0.b.position_at_end(f0.get_first_basic_block().expect("entry"));
-    let c = w0
-        .b
-        .build_load(c0.bool_type(), cond_g.as_pointer_value(), "c")
-        .expect("load")
-        .into_int_value();
+    let c =
+        w0.b.build_load(c0.bool_type(), cond_g.as_pointer_value(), "c")
+            .expect("load")
+            .into_int_value();
     w0.b.build_conditional_branch(c, ok0, trap0).expect("br");
     w0.b.position_at_end(ok0);
     w0.b.build_return(None).expect("ret");
@@ -836,8 +833,7 @@ fn known_limitation_guard02_post_counts_abort_calls_not_reachable_ones() {
     trap_kind(&w1, f1, "trap.0", 1);
     let trap1 = f1.get_last_basic_block().expect("trap");
     w1.b.position_at_end(f1.get_first_basic_block().expect("entry"));
-    w1.b
-        .build_conditional_branch(c1.bool_type().const_int(1, false), ok1, trap1)
+    w1.b.build_conditional_branch(c1.bool_type().const_int(1, false), ok1, trap1)
         .expect("br");
     w1.b.position_at_end(ok1);
     w1.b.build_return(None).expect("ret");
