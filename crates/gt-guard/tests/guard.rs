@@ -798,6 +798,57 @@ fn post_rejects_fewer_aborts_of_a_kind_even_if_another_kind_compensates() {
     );
 }
 
+/// GUARD-02 (R11b, GÓI 3 S2.a) — GIỚI HẠN THIẾT KẾ ĐÃ XÁC NHẬN bằng IR dựng tay: Guard-post đếm LỜI GỌI `gritrt_abort` theo (hàm, loại), KHÔNG xét khả năng
+/// tới được. Nếu bộ tối ưu gập điều kiện kiểm thành hằng (`br i1 true`) mà để lại khối trap không còn ai nhảy tới, số lời gọi không đổi ⇒ Guard-post chấp nhận
+/// dù kiểm tra đã vô hiệu. Với danh sách pass hiện hành (`mem2reg,sroa,early-cse`: không pass nào xoá cạnh tới trap một cách sai) và bằng chứng hành vi
+/// dev≡release (`release_traps`, bẫy abort ba hồ sơ) đây KHÔNG đạt tới được từ `gritc`; test này KHOÁ hành vi hiện tại làm tài liệu sống. Nếu Guard được
+/// siết (đòi mỗi trap còn cạnh tới) thì test này PHẢI được đổi sang chiều ngược lại, kèm FB.
+#[test]
+fn known_limitation_guard02_post_counts_abort_calls_not_reachable_ones() {
+    // trước tối ưu: entry rẽ nhánh theo một điều kiện chưa biết; nhánh sai đi vào trap
+    let c0 = Context::create();
+    let w0 = world(&c0, true, Some(ATT));
+    let f0 = w0.func("f");
+    let cond_g = w0
+        .m
+        .add_global(c0.bool_type(), None, "cond");
+    cond_g.set_initializer(&c0.bool_type().const_int(1, false));
+    let ok0 = c0.append_basic_block(f0, "ok");
+    trap_kind(&w0, f0, "trap.0", 1);
+    let trap0 = f0.get_last_basic_block().expect("trap");
+    w0.b.position_at_end(f0.get_first_basic_block().expect("entry"));
+    let c = w0
+        .b
+        .build_load(c0.bool_type(), cond_g.as_pointer_value(), "c")
+        .expect("load")
+        .into_int_value();
+    w0.b.build_conditional_branch(c, ok0, trap0).expect("br");
+    w0.b.position_at_end(ok0);
+    w0.b.build_return(None).expect("ret");
+    add_instances(&w0);
+    let pre = pre_facts(&w0.m);
+    assert_eq!(post(&w0, &pre), Vec::<String>::new());
+    // sau "tối ưu": điều kiện bị gập thành hằng true ⇒ trap KHÔNG còn tới được, nhưng vẫn còn trong hàm
+    let c1 = Context::create();
+    let w1 = world(&c1, true, Some(ATT));
+    let f1 = w1.func("f");
+    let ok1 = c1.append_basic_block(f1, "ok");
+    trap_kind(&w1, f1, "trap.0", 1);
+    let trap1 = f1.get_last_basic_block().expect("trap");
+    w1.b.position_at_end(f1.get_first_basic_block().expect("entry"));
+    w1.b
+        .build_conditional_branch(c1.bool_type().const_int(1, false), ok1, trap1)
+        .expect("br");
+    w1.b.position_at_end(ok1);
+    w1.b.build_return(None).expect("ret");
+    add_instances(&w1);
+    assert_eq!(
+        post(&w1, &pre),
+        Vec::<String>::new(),
+        "GUARD-02: hành vi hiện tại — số lời gọi abort không đổi nên Guard-post chấp nhận dù trap không còn tới được"
+    );
+}
+
 #[test]
 fn post_rejects_fma_fp_attributes_and_contract_flags() {
     for intr in ["llvm.fma.f64", "llvm.fmuladd.f64"] {

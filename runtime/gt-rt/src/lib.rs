@@ -871,6 +871,61 @@ mod tests {
         assert!(err.contains("abort: spawn_failed"), "stderr: {err}");
     }
 
+    /// ARENA-01 (R11b, GÓI 3 S2.a): chuỗi cấp phát NGẪU NHIÊN (cỡ 0…3 MiB, căn lề 1…4096, có `reset` giữa chừng) với oracle ĐỘC LẬP với `arena_verify`:
+    /// mỗi con trỏ đúng căn lề, mọi vùng cùng thế hệ đôi một rời nhau, và nội dung ghi vào (mẫu byte riêng mỗi vùng) còn nguyên khi đọc lại ở cuối thế hệ.
+    /// Kiểm động của runtime được BẬT (nếu nó tự thấy sai sẽ abort tiến trình ⇒ test hỏng). Bằng chứng thực nghiệm, KHÔNG phải chứng minh.
+    #[test]
+    fn arena_random_allocation_sequences_are_aligned_disjoint_and_intact() {
+        gritrt_dev_checks();
+        let sizes: [u64; 16] = [
+            0, 1, 2, 3, 7, 8, 15, 16, 17, 63, 100, 4095, 4096, 4097, 65_536, (1 << 20) + 1,
+        ];
+        let aligns: [u64; 8] = [1, 2, 4, 8, 16, 64, 256, 4096];
+        let mut seed = 0x9E37_79B9_7F4A_7C15u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let mut allocs_total = 0usize;
+        for _ in 0..30 {
+            let h = gritrt_arena_new();
+            for _gen in 0..3 {
+                let mut live: Vec<(usize, usize, u8)> = Vec::new();
+                for k in 0..120usize {
+                    let size = if next().is_multiple_of(40) {
+                        3 << 20
+                    } else {
+                        sizes[(next() % 16) as usize]
+                    };
+                    let align = aligns[(next() % 8) as usize];
+                    let p = gritrt_arena_alloc(h, size, align) as usize;
+                    assert_eq!(p % align as usize, 0, "lệch căn lề (size {size}, align {align})");
+                    let tag = (k % 251) as u8 + 1;
+                    if size > 0 {
+                        unsafe { std::ptr::write_bytes(p as *mut u8, tag, size as usize) };
+                    }
+                    live.push((p, size as usize, tag));
+                    allocs_total += 1;
+                }
+                let mut regions: Vec<(usize, usize)> = live.iter().filter(|r| r.1 > 0).map(|r| (r.0, r.0 + r.1)).collect();
+                regions.sort_unstable();
+                for w in regions.windows(2) {
+                    assert!(w[0].1 <= w[1].0, "hai vùng chồng lấn: {:?} và {:?}", w[0], w[1]);
+                }
+                for (p, size, tag) in &live {
+                    if *size > 0 {
+                        let s = unsafe { std::slice::from_raw_parts(*p as *const u8, *size) };
+                        assert!(s.iter().all(|b| b == tag), "nội dung vùng bị ghi đè (tag {tag})");
+                    }
+                }
+                gritrt_arena_reset(h);
+            }
+        }
+        assert_eq!(allocs_total, 30 * 3 * 120);
+    }
+
     /// `spawn_failed` có số thứ tự 19 trong `ABORT_KINDS`, tên đúng.
     #[test]
     fn spawn_failed_is_kind_19() {
