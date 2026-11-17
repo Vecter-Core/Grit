@@ -52,3 +52,18 @@ Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuy�
 | P2 R11b, capstone | R11b XONG; CAPSTONE WINDOWS CHỜ PHIÊN SẠCH (Giang mở) |
 | P3 fuzz_loop, LSP, tái lập, BufOut | a, b (mức tối thiểu+, VS Code chưa thử), c XONG; d KHÔNG làm |
 | P4 READINESS + chữ "Windows chưa kiểm" + HANDOFF | XONG (2026-11-18) |
+
+## GÓI 3 (2026-11-18; ủy quyền theo `docs/GIANG_DECISIONS_2026-11-18.md`)
+| Mục | Trạng thái | Ghi chú |
+|---|---|---|
+| S0 sao lưu + chẩn đoán remote | XONG | bundle `D:\Grit\.backup` + `C:\Users\PC\GritBackup` (verify OK); `origin` cũ "Repository not found"; đã đẩy `windows-work` lên `gn3305970-lang/Grit` (riêng tư) bằng URL trực tiếp; thẻ KHÔNG đẩy |
+| S1 nhãn quyết định A1–A5 | XONG | bằng chứng trích dẫn có đủ trong kho; nhãn sửa ở 5 tệp; `GIANG_DECISIONS_2026-11-18.md` |
+| S2.a bảy nghi vấn R11b | XONG | ARENA-01, VEC-01, argv bác bỏ trong phạm vi; GUARD-02, ATTEST-01, UNSAFE-01 xác nhận (giới hạn/tài liệu); ATOMIC-01 KHÔNG KIỂM ĐƯỢC; FB-C mới: không |
+| S2.b `spawn_failed` + stack + stress | XONG | hợp đồng, test đỏ→xanh, đầu-cuối dev + release-o2; stack GIỮ 256 MiB (đo); `tools/stress_spawn.sh` thủ công (tới K=100) |
+| S2.c preflight tự từ chối | XONG | `tools/require_preflight.sh` + 5 test |
+| S2.d điểm lưu cổng theo băm cây | XONG | `GATE_TREE`, `GATE_STAGE_TREE`, 4 test |
+| S2.e khoá `--checks` mặc định release* | XONG | `release_profiles_default_to_all_checks` (mới) + `release_profiles_refuse_proven_mode`; lật mặc định trong bản sao tạm ⇒ 3 test ĐỎ |
+| S3 đọc chéo | XONG | `CROSS_REVIEW_COVERAGE.md` (≈ 3,8 % dòng TCB đọc chéo), `E_PROMPT_GPT.md`; **R11c CHỜ PHIÊN GPT (Giang mở)** |
+| S4.a–e | XONG | CAPSTONE_PROMPTS trung lập + LOG_TEMPLATE; PR bản thảo; GIANG_DOC6_READING; TSAN_FEASIBILITY; fuzz số thật (HANDOFF) |
+| S4.f HashMap chuỗi thao tác ngẫu nhiên | KHÔNG làm (tuỳ chọn) | |
+| S5 rc3 + cổng + sao lưu | xem `RUN_REPORTS` mục GÓI 3 |

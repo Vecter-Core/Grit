@@ -13,7 +13,7 @@
 - **Grit** = ngôn ngữ lập trình "an toàn theo thiết kế", viết cho **AI** viết code. Trình biên dịch tên `gritc` (viết bằng Rust). Nếu `gritc` **không chứng minh được** chương trình an toàn thì **từ chối** (báo ĐỎ) và **không tạo ra chương trình chạy**.
 - **Giai đoạn 1 ("Seed")** có **15 mốc** (M0 → M13, kèm M4.5). **Có mã cho cả 15**: 9 mốc "đạt", 4 mốc "đạt có điều kiện" (M6, M7, M8, M10), M12 (thư viện + chương trình thật) phần lớn có nhưng cổng Seed 1.0 chưa đạt, M13 (LSP) mới ở mức tối thiểu+. Chi tiết Phần 3.
 - **Giai đoạn 2 ("Ascend")** có **9 hướng** (8.A → 8.I): **chưa bắt đầu** (cố ý, theo kế hoạch).
-- Bản hiện tại là **`1.0.0-rc2`** (ứng viên phát hành), **chưa** gắn nhãn `1.0.0-seed`: còn thiếu điều kiện (Phần 3–5).
+- Bản hiện tại là **`1.0.0-rc3`** (ứng viên phát hành; tài liệu cũ ghi rc2 nhưng mã báo rc1 — đã sửa ở rc3), **chưa** gắn nhãn `1.0.0-seed`: còn thiếu điều kiện (Phần 3–5).
 - **Cổng kiểm thử liền mạch gần nhất (Windows): XANH — 1023 test đạt / 0 lỗi / 204 bộ** (2026-11-18, commit `13e2df9`).
 - **Việc cần BẠN** (Phần 5 và `docs/PENDING_GIANG.md`): các quyết định/duyệt, hai phiên cần bạn mở (phiên sạch viết capstone; phiên model khác họ đọc lại TCB), vài chỗ tài liệu lỗi thời.
 
@@ -82,7 +82,7 @@ M0 · M1 · M2 · M3 · M4 · **M4.5** · M5 · M6 · M7 · M8 · M9 · M10 · M
 | **đạt có điều kiện** (5) | #1 test xanh / không còn false-negative đã biết · #3 chương trình thật + benchmark · #5 build tái lập · #9 mutability bên trong · #10 đột biến M7 |
 | **chưa** (3) | #2 fuzz ≥24 giờ mỗi cái (lexer 1,2 h, parser 2,0 h) · #6 Giang đọc `KNOWN_LIMITATIONS` + `PROGRESS` · #8 LSP đầy đủ (schema JSON đã khoá) |
 
-**Nhãn "Seed 1.0"** chỉ khi đủ **sáu mục A1–A6** (`docs/archive/SEED_PLAN.md`). Hiện: A3 đạt; A1, A4, A6 có điều kiện; **A2 (an toàn) chưa** ⇒ giữ `1.0.0-rc2`. Không được tuyên bố "Phase 1 xong".
+**Nhãn "Seed 1.0"** chỉ khi đủ **sáu mục A1–A6** (`docs/archive/SEED_PLAN.md`). Hiện: A3 đạt; A1, A4, A6 có điều kiện; **A2 (an toàn) chưa** ⇒ giữ `1.0.0-rc3`. Không được tuyên bố "Phase 1 xong".
 
 ---
 

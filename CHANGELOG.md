@@ -1,6 +1,13 @@
 # CHANGELOG
 
-Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64; Windows CHƯA kiểm.
+Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng 2026-11-18, xem `docs/RUN_REPORTS.md`).
+
+## 1.0.0-rc3 — hợp nhất hai dòng, Arena chia sẻ, kiểm chứng Windows (nhánh `integration`, 2026-11-18)
+Nhãn vẫn là **RC**, không phải `1.0.0-seed` (A2 an toàn chưa đạt: `docs/READINESS.md` mục "Seed 1.0"). **Sửa nhãn:** các tài liệu cũ ghi `gritc --version` là `1.0.0-rc2`, nhưng `crates/gt-driver/Cargo.toml` thực tế ở `1.0.0-rc1` (bản đổi rc2 không vào mã); rc3 là lần đầu số phiên bản KHỚP với mã. Thẻ cục bộ `seed-1.0-rc2` đã đổi tên `seed-1.0-rc2-old` (chưa từng đẩy).
+- **Thay đổi hành vi:** `spawn` thất bại ⇒ abort `spawn_failed` (mã 70) thay vì `abort: unknown` (hợp đồng H8); runtime `gt-rt` có feature `test-fault` CHỈ cho kiểm thử.
+- **Công cụ/cổng:** điểm lưu của `tools/gate.sh` gắn BĂM CÂY (nội dung tệp mới), in `GATE_TREE`/`GATE_STAGE_TREE`; công cụ nặng (`run_guarded`, `mut_batch`, `mut.py run`, cổng đầy đủ) tự từ chối khi preflight FAIL; `tools/unsafe_inventory.py` + `docs/unsafe_baseline.json` trong cổng; `tools/stress_spawn.sh` (thủ công).
+- **Golden:** `tests/golden_ll/{checked_add,slice_sum,static_atomic}.ll` chỉ đổi BĂM CHỨNG THỰC (6 dòng) do chuỗi phiên bản nằm trong băm.
+- Chi tiết các giai đoạn: `docs/RUN_REPORTS.md` (P1.e–P4, GÓI 3).
 
 ## 1.0.0-rc2 — Seed 1.0 (nhánh `claude/gallant-darwin-m251cq`, 2026-10-23)
 Nhãn là **RC**, không phải `1.0.0-seed`: danh sách điều kiện còn thiếu ở `docs/READINESS.md` (mục "Seed 1.0") và `docs/RUN_REPORTS.md` (S8).

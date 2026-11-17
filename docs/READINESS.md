@@ -70,7 +70,7 @@ DỪNG ở đây, chờ Giang duyệt trước khi làm bất cứ việc nào t
 - **G1.6 cổng đã qua; Phase 1 chưa được tuyên bố sẵn sàng.** Các điều kiện §7 chưa đạt/đạt có điều kiện giữ nguyên: gate cuối chỉ xác nhận trạng thái kiểm thử của cây mã trên Windows, không tự đóng fuzz, mutation, TSan/loom hay các việc kiến trúc đang mở. R11 còn chờ model khác họ; bundle còn chờ quyền ghi `D:\Grit_backup`.
 
 ## Seed 1.0 — sáu mục A1–A6 của nhãn `1.0.0-seed` (P4.a, 2026-11-18; định nghĩa ở `docs/archive/SEED_PLAN.md`)
-Nhãn hiện hành: **`1.0.0-rc2`** (tag cục bộ `seed-1.0-rc2` trên `13e2df9`; mã đã đổi sau rc2 gốc nhưng KHÔNG đổi số phiên bản để khỏi làm lệch băm chứng thực/golden IR). KHÔNG dùng `1.0.0-seed` vì còn mục chưa đạt.
+Nhãn hiện hành: **`1.0.0-rc3`** (đổi ở GÓI 3 S5.a; trước đó mã báo `1.0.0-rc1` dù tài liệu ghi rc2; thẻ cục bộ cũ `seed-1.0-rc2` đã đổi tên `seed-1.0-rc2-old`, chưa từng đẩy; thẻ mới `seed-1.0-rc3` đặt sau cổng xanh). KHÔNG dùng `1.0.0-seed` vì còn mục chưa đạt.
 | mục | trạng thái | bằng chứng / còn thiếu |
 |---|---|---|
 | A1 dùng được | **đạt có điều kiện** | 6 dogfood + 4 capstone chạy đúng (Linux 8/8; Windows: K3 20/20 dev và release-o2, `hashmap_collide`, `shared_arena_diff`); capstone K1/K2/K4 trên Windows và phiên sạch viết lại CHƯA (`docs/PENDING_GIANG.md` #9) |
@@ -79,4 +79,4 @@ Nhãn hiện hành: **`1.0.0-rc2`** (tag cục bộ `seed-1.0-rc2` trên `13e2df
 | A4 tái lập & di động | **đạt có điều kiện** | exe Grit dựng hai lần ở HAI thư mục khác nhau cho cùng SHA-256 ở dev, release, release-o2 (2026-11-18, mẫu kvstore). CHƯA đo: tái lập của chính `gritc`; di động Linux sau các thay đổi Windows; CI GitHub chưa chạy (đẩy lên remote bị `Repository not found`) |
 | A5 tài liệu kiểm được | **đạt** | `doc_test` 207 khối/0 sai và `STD_REFERENCE` khoá byte trong cổng; còn vài chỗ tài liệu lỗi thời đã nêu ở `docs/PROJECT_STATUS.md` |
 | A6 đóng băng | **đạt có điều kiện** | `docs/spec/FREEZE.md` + ADR-C04; hai điểm (Obligation IR, schema JSON) có test khoá; M13 chưa đủ ⇒ phần "LSP" của bảng đóng băng chưa tuyên bố |
-**Kết luận:** A3 đạt; A1, A4, A6 có điều kiện; **A2 chưa**; ⇒ nhãn `1.0.0-rc2`, KHÔNG `1.0.0-seed`.
+**Kết luận:** A3 đạt; A1, A4, A6 có điều kiện; **A2 chưa**; ⇒ nhãn `1.0.0-rc3`, KHÔNG `1.0.0-seed`.
