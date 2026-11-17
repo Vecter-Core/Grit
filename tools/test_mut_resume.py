@@ -39,7 +39,7 @@ class MutResume(unittest.TestCase):
         w("Cargo.lock", "")
         w(".gitignore", "target/\n")
         os.makedirs(os.path.join(self.d, "tools"))
-        for n in ("mut.py", "track_guard.sh"):
+        for n in ("mut.py", "track_guard.sh", "require_preflight.sh", "preflight.sh"):  # S2.c: mut.py run gọi require_preflight.sh
             shutil.copy(os.path.join(ROOT, "tools", n), os.path.join(self.d, "tools", n))
 
         def git(*a):
@@ -53,7 +53,8 @@ class MutResume(unittest.TestCase):
 
     def run_mut(self, *args, sleep="0"):
         env = dict(os.environ, GRIT_MUT_DIR=self.work.replace("\\", "/"), GRIT_MUT_TEST=f"{sys.executable} tests/check.py",
-                   GRIT_MUT_TIMEOUT="60", PYTHONIOENCODING="utf-8", MUT_TEST_SLEEP=sleep)
+                   GRIT_MUT_TIMEOUT="60", PYTHONIOENCODING="utf-8", MUT_TEST_SLEEP=sleep,
+                   PREFLIGHT_SKIP_RESOURCES="1", PREFLIGHT_TRIES="1", PREFLIGHT_SLEEP="0")
         return subprocess.run([sys.executable, os.path.join(self.d, "tools", "mut.py"), *args], cwd=self.d, env=env, capture_output=True,
                               text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
 

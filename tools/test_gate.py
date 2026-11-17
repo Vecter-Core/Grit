@@ -267,7 +267,8 @@ class SavepointTreeHash(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.repo, True)
 
     def run_gate(self):
-        env = dict(os.environ, GATE_STAGES="nul", PYTHONIOENCODING="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in ("GATE_RESET", "GATE_BUDGET_SEC", "GATE_FORCE_PREFLIGHT", "GATE_TEST_CMD")}
+        env.update(GATE_STAGES="nul", PYTHONIOENCODING="utf-8")  # cổng ngoài có thể đặt GATE_RESET/GATE_STAGES: không được rò vào cổng lồng
         script = os.path.join(ROOT, "tools", "gate.sh").replace(chr(92), "/")
         p = subprocess.run(["bash", script, self.repo.replace(chr(92), "/")], cwd=self.repo, env=env, capture_output=True,
                            text=True, encoding="utf-8", errors="replace")

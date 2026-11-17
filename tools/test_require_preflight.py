@@ -25,7 +25,8 @@ class RefuseOnPreflightFail(unittest.TestCase):
         return d
 
     def env(self, d):
-        return dict(os.environ, GRIT_PREFLIGHT_DIR=P(d), PREFLIGHT_SKIP_RESOURCES="1", PREFLIGHT_TRIES="1", PREFLIGHT_SLEEP="0", PYTHONIOENCODING="utf-8")
+        base = {k: v for k, v in os.environ.items() if k not in ("GATE_STAGES", "GATE_RESET", "GATE_FORCE_PREFLIGHT")}  # không để cổng ngoài rò vào
+        return dict(base, GRIT_PREFLIGHT_DIR=P(d), PREFLIGHT_SKIP_RESOURCES="1", PREFLIGHT_TRIES="1", PREFLIGHT_SLEEP="0", PYTHONIOENCODING="utf-8")
 
     def run_cmd(self, argv, d):
         return subprocess.run(argv, cwd=ROOT, env=self.env(d), capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
