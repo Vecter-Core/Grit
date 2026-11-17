@@ -39,6 +39,8 @@ fn cb(v: &[u8]) -> u64 {
     })
 }
 
+type Gen = fn(&mut Rng) -> Prog;
+
 struct Prog {
     src: String,
     want: u64,
@@ -215,7 +217,7 @@ fn run_exe(src: &str, profile: &str, tag: &str) -> Result<String, String> {
 #[test]
 fn shared_arena_programs_match_the_independent_rust_model_on_the_binary() {
     let profile = std::env::var("GT_PROFILE").unwrap_or_else(|_| "dev".to_string());
-    let kinds: [(&str, fn(&mut Rng) -> Prog); 5] = [
+    let kinds: [(&str, Gen); 5] = [
         ("two_vec", two_vec),
         ("vec_text", vec_text),
         ("alloc_mix", alloc_mix),

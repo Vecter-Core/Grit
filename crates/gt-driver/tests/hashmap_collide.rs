@@ -46,8 +46,7 @@ fn prog(seed: u64) -> Prog {
     let mut acc = 0u64;
     let mut used: BTreeMap<&'static str, u64> = BTreeMap::new();
     let mut body = String::new();
-    let mut bump =
-        |u: &mut BTreeMap<&'static str, u64>, n: &'static str| *u.entry(n).or_default() += 1;
+    let bump = |u: &mut BTreeMap<&'static str, u64>, n: &'static str| *u.entry(n).or_default() += 1;
     for _ in 0..nops {
         let k = if r.chance(8) {
             [0u64, u64::MAX][r.below(2) as usize]
