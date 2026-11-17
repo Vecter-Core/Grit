@@ -30,6 +30,8 @@ mkdir -p "$TMPD"
 export CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-$JOBS}"
 [ -n "$2" ] && export CARGO_TARGET_DIR="$2"
 # runtime gt-rt có workspace riêng ⇒ KHÔNG dùng chung CARGO_TARGET_DIR (gritc tìm bản dựng cạnh mã nguồn)
+# S2.c (GÓI 3): cổng ĐẦY ĐỦ (không đặt GATE_STAGES) tự từ chối khi preflight FAIL; GATE_STAGES chỉ dành cho kiểm thử cổng/chạy một phần
+if [ -z "${GATE_STAGES:-}" ] || [ -n "${GATE_FORCE_PREFLIGHT:-}" ]; then bash "$TOOL_DIR/require_preflight.sh" || { echo "GATE_RESULT=RED"; exit 2; }; fi
 bash "$(dirname "$0")/handoff_check.sh" "$1" || true   # chỉ cảnh báo, KHÔNG làm cổng đỏ
 if [ -f tools/pre-commit.hook ] && ! cmp -s tools/pre-commit.hook .git/hooks/pre-commit 2>/dev/null; then
   echo "HOOK_WARN: .git/hooks/pre-commit chưa cài hoặc khác tools/pre-commit.hook — chạy: bash tools/install_hooks.sh"
@@ -84,7 +86,7 @@ stage_audit() { cargo audit 2>&1 | tail -3; local c=${PIPESTATUS[0]}; echo "AUDI
 stage_expect() {
   local r=0
   $PY tools/check_expectations.py | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: check_expectations"; r=1; }
-  for t in test_check_expectations test_mut_guard test_mut_resume test_preflight test_nul_check test_gate test_nul_scan test_doc_test test_ai_guide test_gen_docs; do
+  for t in test_check_expectations test_mut_guard test_mut_resume test_preflight test_nul_check test_gate test_require_preflight test_nul_scan test_doc_test test_ai_guide test_gen_docs; do
     if [ -f "tools/$t.py" ]; then
       $PY -m unittest "tools/$t.py" 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: unittest $t"; r=1; }
     fi

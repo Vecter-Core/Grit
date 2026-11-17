@@ -392,6 +392,11 @@ def main():
         args.files = [os.path.abspath(f) for f in args.files]
         cmd_list(args)
     elif args.cmd == "run":
+        # S2.c (GÓI 3): lô nặng tự từ chối khi preflight FAIL
+        rp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "require_preflight.sh")
+        if subprocess.run(["bash", rp.replace("\\", "/")], stdin=subprocess.DEVNULL).returncode != 0:
+            print("PREFLIGHT FAIL: mut.py run từ chối chạy", file=sys.stderr)
+            sys.exit(2)
         args.files = [os.path.abspath(f) for f in args.files]
         cmd_run(args)
     else:
