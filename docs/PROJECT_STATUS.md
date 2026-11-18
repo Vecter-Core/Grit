@@ -4,6 +4,7 @@
 > Nguồn: đọc lại toàn bộ tài liệu của kho (HANDOFF, RUNLIST, RUN_REPORTS, READINESS, GRIT_PLAN, CAPSTONE, SEED_*, TCB_*, OPEN_QUESTIONS, FIELD_BUGS…).
 > Số liệu là số **đã ghi trong tài liệu của dự án** (ngày ghi kèm theo) trừ khi nói rõ là đo lại; chỗ tài liệu tự mâu thuẫn được nêu rõ.
 
+> **CẬP NHẬT 2026-11-18 (GÓI 3, sau ủy quyền "Giang quyết"):** nhãn **`1.0.0-rc3`**, cổng XANH `89438fd` (1027/0/206); đã đẩy `windows-work` + thẻ `seed-1.0-rc3` lên `gn3305970-lang/Grit` (riêng tư), bundle ở `D:\Grit\.backup` và `C:\Users\PC\GritBackup`; chỉ ≈ 3,8 % dòng TCB được đọc chéo (`docs/CROSS_REVIEW_COVERAGE.md`); việc chờ Giang: `docs/PENDING_GIANG.md`, quyết định đã ủy quyền: `docs/GIANG_DECISIONS_2026-11-18.md`.
 > **CẬP NHẬT 2026-11-18 (sau lệnh P0–P4)** — nội dung bên dưới là ảnh chụp 2026-11-17. Thay đổi chính: cổng liền mạch **XANH 1023/0/204** trên `13e2df9` (bundle `.backup`, thẻ cục bộ `seed-1.0-rc2`); **R11b XONG** (`docs/TCB_CODE_AUDIT_CLAUDE.md`: 17 mục, 1 xác nhận FB-C31, 9 bác bỏ, 7 chưa kiểm); G2.1 **XONG** (đột biến gt-term tương đương CÓ ĐO; rà fail-open CHƯA RÀ = 0; bằng chứng Arena chia sẻ đủ — `RUN_REPORTS` G2.1.c); LSP có hover/definition/symbol (CHƯA thử VS Code thật, không inlay hint ⇒ M13 chưa đủ); `tools/fuzz_loop.sh <giờ>` qua đêm; READINESS #7 ⇒ đạt, thêm bảng Seed A1–A6 (A3 đạt, A2 chưa ⇒ vẫn `1.0.0-rc2`); các chữ "Windows chưa kiểm" đã sửa. **Còn CHỜ GIANG:** `docs/PENDING_GIANG.md` (12 mục; quan trọng nhất #11: push remote báo "Repository not found").
 
 ---
@@ -14,7 +15,7 @@
 - **Giai đoạn 1 ("Seed")** có **15 mốc** (M0 → M13, kèm M4.5). **Có mã cho cả 15**: 9 mốc "đạt", 4 mốc "đạt có điều kiện" (M6, M7, M8, M10), M12 (thư viện + chương trình thật) phần lớn có nhưng cổng Seed 1.0 chưa đạt, M13 (LSP) mới ở mức tối thiểu+. Chi tiết Phần 3.
 - **Giai đoạn 2 ("Ascend")** có **9 hướng** (8.A → 8.I): **chưa bắt đầu** (cố ý, theo kế hoạch).
 - Bản hiện tại là **`1.0.0-rc3`** (ứng viên phát hành; tài liệu cũ ghi rc2 nhưng mã báo rc1 — đã sửa ở rc3), **chưa** gắn nhãn `1.0.0-seed`: còn thiếu điều kiện (Phần 3–5).
-- **Cổng kiểm thử liền mạch gần nhất (Windows): XANH — 1023 test đạt / 0 lỗi / 204 bộ** (2026-11-18, commit `13e2df9`).
+- **Cổng kiểm thử liền mạch gần nhất (Windows): XANH — 1027 test đạt / 0 lỗi / 206 bộ** (2026-11-18, commit `89438fd` = `1.0.0-rc3`; thẻ cục bộ và trên kho GitHub riêng tư `seed-1.0-rc3`).
 - **Việc cần BẠN** (Phần 5 và `docs/PENDING_GIANG.md`): các quyết định/duyệt, hai phiên cần bạn mở (phiên sạch viết capstone; phiên model khác họ đọc lại TCB), vài chỗ tài liệu lỗi thời.
 
 ---

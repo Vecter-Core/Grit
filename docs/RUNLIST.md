@@ -66,4 +66,4 @@ Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuy�
 | S3 đọc chéo | XONG | `CROSS_REVIEW_COVERAGE.md` (≈ 3,8 % dòng TCB đọc chéo), `E_PROMPT_GPT.md`; **R11c CHỜ PHIÊN GPT (Giang mở)** |
 | S4.a–e | XONG | CAPSTONE_PROMPTS trung lập + LOG_TEMPLATE; PR bản thảo; GIANG_DOC6_READING; TSAN_FEASIBILITY; fuzz số thật (HANDOFF) |
 | S4.f HashMap chuỗi thao tác ngẫu nhiên | KHÔNG làm (tuỳ chọn) | |
-| S5 rc3 + cổng + sao lưu | xem `RUN_REPORTS` mục GÓI 3 |
+| S5 rc3 + cổng + sao lưu | XONG: `1.0.0-rc3`; cổng XANH `89438fd` (1027/0/206); bundle D: + C:; đã đẩy `windows-work` + thẻ `seed-1.0-rc3` lên kho mới |

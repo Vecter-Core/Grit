@@ -24,5 +24,5 @@ Quy tắc chung: một mục ĐÓNG BĂNG chỉ được đổi bằng (1) một
 - Chi tiết triển khai các pass (M4…M10), cách đặt tên local `_N` trong MIR, thứ tự ghi chú `N…`, nội dung thông báo lỗi (chỉ MÃ được đóng băng), định dạng văn bản cho người của `gritc` (JSON mới là giao diện máy).
 - Hiệu năng (thời gian dựng/chạy), kích thước nhị phân, hồ sơ tối ưu `release*` (đã có bằng chứng thực nghiệm dev≡release, KHÔNG phải chứng minh).
 - Tập đột biến/corpus (chỉ được TĂNG).
-- Windows: đã chạy cổng liền mạch xanh ở `13e2df9` (2026-11-18); CI GitHub, capstone K1/K2/K4 trên Windows, VS Code thật CHƯA kiểm ⇒ không có cam kết cho các phần đó.
+- Windows: đã chạy cổng liền mạch xanh ở `89438fd` (rc3, 2026-11-18); CI GitHub, capstone K1/K2/K4 trên Windows, VS Code thật CHƯA kiểm ⇒ không có cam kết cho các phần đó.
 - Mọi tính năng ghi ở `docs/SEED_LIMITATIONS.md` là "chưa có" (closure, `?`, phân rã tuple, `unwrap`, …): có thể thêm sau, KHÔNG phải thay đổi phá vỡ.
