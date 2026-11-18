@@ -1,0 +1,9 @@
+// expect: fail E0301
+// note: GÓI 6 S1: pattern khoảng char trên giá trị u32
+ƒ main() → u32 ! ∅ {
+  x ≔ 5u32;
+  ⌥ x {
+    'a'..='z' ↦ 1u32,
+    _ ↦ 0u32,
+  }
+}

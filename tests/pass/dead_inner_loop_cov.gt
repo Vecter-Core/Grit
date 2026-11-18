@@ -1,0 +1,14 @@
+// expect: pass
+// note: GÓI 6 S1: vòng lặp lồng trong nhánh không tới được
+ƒ main() → u32 ! ∅ {
+  μi ≔ 0u32;
+  ⟳ i < 3 ↓ 3 - i {
+    ⎇ i > 5u32 {
+      ⟳ i < 2 ↓ 2 - i {
+        i ← i + 1;
+      }
+    } ⇝ { }
+    i ← i + 1;
+  }
+  i
+}

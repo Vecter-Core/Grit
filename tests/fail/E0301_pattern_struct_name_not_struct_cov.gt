@@ -1,0 +1,11 @@
+// expect: fail E0301
+// note: GÓI 6 S1: pattern { … } trên tên hàm (không phải struct)
+ƒ f() → u32 ! ∅ { 1u32 }
+
+ƒ main() → u32 ! ∅ {
+  x ≔ 1u32;
+  ⌥ x {
+    f { a: b } ↦ 1u32,
+    _ ↦ 0u32,
+  }
+}

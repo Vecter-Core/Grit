@@ -1,0 +1,11 @@
+// expect: pass
+// note: GÓI 6 S1: vòng lặp trong nhánh luôn sai (môi trường chết khi nới)
+ƒ main() → u32 ! ∅ {
+  μi ≔ 0u32;
+  ⎇ 1u32 > 2u32 {
+    ⟳ i < 3 ↓ 3 - i {
+      i ← i + 1;
+    }
+  } ⇝ { }
+  i
+}

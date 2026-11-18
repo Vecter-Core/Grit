@@ -1,0 +1,7 @@
+// expect: fail E0309
+// note: GÓI 6 S1: Trait::tên với tên không có trong trait
+⊏ T {
+  ƒ f(&self) → u32 ! ∅;
+}
+
+ƒ main() → u32 ! ∅ { T::nope(1u32) }

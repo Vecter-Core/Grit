@@ -1,0 +1,5 @@
+// expect: fail E0311
+// note: GÓI 6 S1: ⊐ Copy for u32 (kiểu không do người dùng định nghĩa)
+⊐ Copy for u32 { }
+
+ƒ main() → u32 ! ∅ { 0u32 }

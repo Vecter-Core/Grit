@@ -1,0 +1,9 @@
+// expect: fail E0301
+// note: GÓI 6 S1: pattern khoảng trên f64
+ƒ main() → u32 ! ∅ {
+  x ≔ 1.5f64;
+  ⌥ x {
+    1.0f64..=2.0f64 ↦ 1u32,
+    _ ↦ 0u32,
+  }
+}

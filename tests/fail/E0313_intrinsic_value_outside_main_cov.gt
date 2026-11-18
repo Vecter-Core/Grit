@@ -1,0 +1,8 @@
+// expect: fail E0313
+// note: GÓI 6 S1 (capability/intrinsic): shl dùng làm giá trị hàm NGOÀI main (nhánh không-entry của reject_intrinsic_value)
+ƒ helper() → u32 ! ∅ {
+  f: ƒ(u32, u32) → u32 ! ∅ ≔ shl;
+  f(1u32, 40u32)
+}
+
+ƒ main() → u32 ! ∅ { helper() }

@@ -1,0 +1,14 @@
+// expect: fail E0902
+// note: GÓI 6 S1: hậu điều kiện nhắc tham số bị mượn &! (nhánh aliased của judge_posts), không chỉ bị gán lại
+ƒ bump(v: &!i32) ! ∅ {
+  *v ← *v +% 1i32;
+}
+
+ƒ f(μx: i32) → i32 ! ∅
+  ⊲ result ≥ x
+{
+  bump(&!x);
+  5i32
+}
+
+ƒ main() → i32 ! ∅ { f(1i32) }

@@ -1,0 +1,9 @@
+// expect: pass
+// note: GÓI 6 S1: vòng lặp giảm i64 (cận dưới bị nới thành vô hạn, check được giữ)
+ƒ main() → i64 ! ∅ {
+  μi ≔ 0i64;
+  ⟳ i > -1000i64 ↓ 1000 + i {
+    i ← i - 1i64;
+  }
+  i
+}

@@ -1,0 +1,13 @@
+// expect: fail E0301
+// note: GÓI 6 S1: pattern biến thể có đường dẫn của enum khác kiểu giá trị (Option)
+⊔ M {
+  A(u32),
+}
+
+ƒ main() → u32 ! ∅ {
+  o ≔ Some(1u32);
+  ⌥ o {
+    M::A(x) ↦ x,
+    _ ↦ 0u32,
+  }
+}

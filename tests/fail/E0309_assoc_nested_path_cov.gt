@@ -1,0 +1,5 @@
+// expect: fail E0309
+// note: GÓI 6 S1: Kiểu::a::b không phải hàm kết hợp
+▢ S { }
+
+ƒ main() → u32 ! ∅ { S::a::b(1u32) }
