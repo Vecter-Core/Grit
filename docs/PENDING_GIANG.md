@@ -6,7 +6,7 @@ Mỗi mục: đề xuất của kiến trúc sư/agent và **hành vi mặc đ�
 
 | # | CHỜ GIANG | Đề xuất | Mặc định trong lúc chờ |
 |---|---|---|---|
-| 1 | Hợp nhất `integration` vào `main` (B7) | `main` là tổ tiên của `integration` ⇒ fast-forward được; bản thảo PR ở `docs/PR_integration_to_main.md` (165 commit, KHÔNG squash). Điều kiện: (1) repo đẩy được — đã đẩy `windows-work` lên kho mới; (2) CI GitHub chạy xanh một lần Linux + Windows — CHƯA; (3) nhãn loại A — đã sửa | KHÔNG làm; không push `main`; không mở PR |
+| 1 | ~~Hợp nhất `integration` vào `main` (B7)~~ **ĐÓNG (GÓI 5, 2026-11-19): main = e450c69, đẩy fast-forward 1 lần lên origin (không PR vì remote mới chưa có main; commit [skip ci], không kích CI; CI xanh gần nhất ở 884af7c, sau đó chỉ đổi tài liệu).** Việc của Giang còn lại: đổi nhánh mặc định GitHub sang `main` khi sẵn sàng | — | — |
 | 2 | Quyền ghi `D:\Grit_backup` (ACL chỉ cho đọc) | cấp quyền ghi cho tài khoản chạy agent | bundle ở `D:\Grit\.backup` (có `git bundle verify`) + push `origin/windows-work` |
 | 3 | Đọc các mục rủi ro (điều kiện #6, B6) | đọc `docs/GIANG_DOC6_READING.md` (≈ 60–90 phút; có dự thảo ADR-C10, chỉ có hiệu lực khi bạn xác nhận đã đọc) | #6 giữ "CHƯA"; agent KHÔNG tự đánh dấu |
 | 4 | ~~Xác nhận Q23 và Q35–Q42~~ — **ĐÃ DUYỆT từ trước (2026-10-06/07); nhãn đã sửa 2026-11-18** (`GIANG_DECISIONS_2026-11-18.md` A1–A3) | không cần làm gì thêm (đảo được bằng một tin nhắn) | xong |
