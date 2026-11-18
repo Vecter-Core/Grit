@@ -2,6 +2,10 @@
 
 Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng 2026-11-18, xem `docs/RUN_REPORTS.md`).
 
+## 1.0.0-rc5 — GÓI 7: FB-C32 (vòng không dừng được chấp nhận khi hết 24 biến bóng), kho công khai, fuzz CI (2026-11-19)
+- **Sửa soundness (FB-C32):** `gt-oblig` `judge_variant_edge`: vòng thiếu biến bóng riêng không còn được chứng minh bằng biến bóng cũ ⇒ E0702. Test đỏ trước (`ghost_limit_soundness`), oracle hàm rộng (`ghost_wide_oracle`), mẫu corpus `E0702_ghost_limit_stale_ghost`.
+- Công cụ/tài liệu: `tools/secret_scan_history.py`, SECURITY.md, issue template, workflow `fuzz.yml` (chỉ dispatch), `tools/fuzz_ingest.py`, `docs/AI_PITFALLS.md`, `tools/limits_probe.py` + LIMITS_AUDIT cập nhật.
+
 ## 1.0.0-rc4 — GÓI 5/6: kiểm chứng CI, độ phủ nhánh, giới hạn kích cỡ (nhánh `integration`, 2026-11-19)
 Nhãn vẫn là **RC**, không phải `1.0.0-seed` (A2 chưa đạt; `docs/SEED_FINISH_LINE.md`).
 - **Thay đổi mã sản phẩm duy nhất:** `gt-term` — thông báo E0702 của vòng lặp nêu nguyên nhân và gợi ý tách hàm khi hàm vượt giới hạn 24 biến/vòng lặp của bộ chứng minh (test ĐỎ trước `crates/gt-term/tests/limit_hint.rs`). KHÔNG đổi phán quyết nào.
