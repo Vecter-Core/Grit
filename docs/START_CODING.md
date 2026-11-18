@@ -39,4 +39,9 @@ Mỗi chương trình: chạy `rig check` (phải XANH), `rig run`, rồi chạy
 `docs/USER_BUGS.md`: "chấp nhận sai" (nghiêm trọng, nghi false negative) hay "từ chối oan" (phiền, an toàn). Đếm: `python tools/triage_user_bugs.py`.
 
 ## Kiểm các lệnh trong tệp này (ghi thật, GÓI 5)
-(điền ở cuối gói; lệnh chưa chạy ghi CHƯA THỬ)
+* `bash tools/setup_cloud.sh` — ĐÃ CHẠY THẬT trên Linux CI (Ubuntu 24.04), thoát 0 (các job `linux-gate`/`tsan`).
+* Windows: `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml` và `cargo build --release -p gt-driver -p rig` — ĐÃ CHẠY THẬT ở các gói trước (cổng `89438fd`); tại gói này chỉ dùng bản debug.
+* `rig new` / `rig lock` / `rig check` / `rig run` trong `apps/` (bản debug, Windows, 2026-11-19): ĐÃ CHẠY, đều thoát 0 (`rig check`: green, 0 lỗi); gói thử đã xoá.
+* Ba chương trình mẫu (đếm từ, CSV→JSON, máy tính) và so với Python: CHƯA THỬ (chưa viết; đây là việc của phiên viết ứng dụng). `examples/wordfreq` (đã có) đối chiếu với Rust trong test dogfood của nó.
+* `gritc check` / `gritc run` trực tiếp trên một tệp: ĐÃ CHẠY (`gritc run --backend=llvm tests/tsan/narrow_droplock.gt` ⇒ "main trả về 2", thoát 0).
+* Mở Claude Code trên repo và dán câu lệnh mẫu: CHƯA THỬ (cần Giang).
