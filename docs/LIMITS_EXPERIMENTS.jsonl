@@ -1,0 +1,16 @@
+{"exp": "term_bad", "n": 8191, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0702"], "budget_note": false, "seconds": 8.9}
+{"exp": "term_ok", "n": 8191, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0702", "N0601", "N0605"], "budget_note": true, "seconds": 7.5}
+{"exp": "borrow_bad", "n": 8191, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0402"], "budget_note": false, "seconds": 8.5}
+{"exp": "borrow_ok", "n": 8191, "status": "done", "exit": 0, "verdict": "green", "codes": [], "budget_note": false, "seconds": 8.6}
+{"exp": "effect_bad", "n": 8191, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0801"], "budget_note": false, "seconds": 8.8}
+{"exp": "effect_ok", "n": 8191, "status": "done", "exit": 0, "verdict": "green", "codes": [], "budget_note": false, "seconds": 9.0}
+{"exp": "send_bad", "n": 8191, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0501"], "budget_note": false, "seconds": 0.1}
+{"exp": "div_checked", "n": 8191, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0602"], "budget_note": false, "seconds": 8.8}
+{"exp": "term_bad", "n": 8192, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0702", "N0601", "N0605"], "budget_note": true, "seconds": 7.7}
+{"exp": "term_ok", "n": 8192, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0702", "N0601", "N0605"], "budget_note": true, "seconds": 8.2}
+{"exp": "borrow_bad", "n": 8192, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0402", "N0601", "N0605"], "budget_note": true, "seconds": 8.2}
+{"exp": "borrow_ok", "n": 8192, "status": "done", "exit": 0, "verdict": "green", "codes": ["N0601", "N0605"], "budget_note": true, "seconds": 8.1}
+{"exp": "effect_bad", "n": 8192, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0801", "N0601", "N0605"], "budget_note": true, "seconds": 8.2}
+{"exp": "effect_ok", "n": 8192, "status": "done", "exit": 0, "verdict": "green", "codes": ["N0601", "N0605"], "budget_note": true, "seconds": 8.3}
+{"exp": "send_bad", "n": 8192, "status": "done", "exit": 1, "verdict": "red", "codes": ["E0501"], "budget_note": false, "seconds": 0.1}
+{"exp": "div_checked", "n": 8192, "status": "done", "exit": 0, "verdict": "green", "codes": ["N0601", "N0605"], "budget_note": true, "seconds": 8.3}
