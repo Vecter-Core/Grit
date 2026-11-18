@@ -7,6 +7,12 @@ on:
   push:
     branches: ['**']
   workflow_dispatch:
+    inputs:
+      only:
+        description: "all = mọi job; tsan = chỉ job tsan (lặp nhanh, tiết kiệm phút)"
+        default: "all"
+        type: choice
+        options: [all, tsan]
 
 permissions:
   contents: read
@@ -20,6 +26,7 @@ env:
 
 jobs:
   linux-gate:
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     # cổng đầy đủ (fmt, clippy -D warnings, audit, mọi test, doc_test, nul, deletions, track)
     runs-on: ubuntu-24.04
     timeout-minutes: 240
@@ -48,6 +55,7 @@ jobs:
           GRITC=$PWD/target/debug/gritc python3 capstone/verify.py
 
   linux-nollvm:
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     # gritc dựng KHÔNG có backend llvm (chỉ thông dịch)
     runs-on: ubuntu-24.04
     steps:
@@ -55,12 +63,14 @@ jobs:
       - run: cargo test --locked -p gt-driver --no-default-features -- --test-threads=2
 
   deny:
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: EmbarkStudios/cargo-deny-action@70f81531115945ba6eb6b941ec9d39d063438eb9 # v2
 
   determinism:
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     # D9: dựng gritc hai lần từ cùng nguồn (cùng đường dẫn), so sha256
     runs-on: ubuntu-24.04
     steps:
@@ -108,6 +118,7 @@ jobs:
         run: bash tools/tsan_check.sh 50 2>&1 | tee tsan_out.txt
 
   windows-core:
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     # BẢN RÚT GỌN (windows-2022, phút tính gấp đôi): dựng, doctor, các giai đoạn cổng nhẹ (fmt, clippy, expect, doc, deletions, nul, failopen, track) và test lõi.
     # KHÔNG chạy: audit, test toàn bộ workspace (gt-fmt riêng ≈ 17 phút, gt-driver ≈ 20 phút trên máy chính) — đã chạy trên máy Windows chính (docs/RUN_REPORTS.md).
     runs-on: windows-2022
