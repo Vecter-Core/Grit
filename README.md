@@ -2,7 +2,7 @@
 
 **Trạng thái: `1.0.0-rc3` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
 
-**Nhánh:** `main` = commit cuối có cổng (`tools/gate.sh`) xanh liền mạch VÀ CI xanh, chỉ nhận fast-forward (không force, không squash). `windows-work` = nhánh làm việc (mặc định trên GitHub; đề xuất đổi sang `main` khi sẵn sàng).
+**Nhánh:** `main` = commit có CI xanh, hoặc commit CHỈ-TÀI-LIỆU (hay công cụ/test/CI, không đổi hành vi sản phẩm) ngay sau đó — kiểm bằng `bash tools/main_check.sh <commit CI xanh> <đầu main>`; chỉ fast-forward (không force, không squash). `windows-work` = nhánh làm việc (mặc định trên GitHub; đề xuất đổi sang `main` khi sẵn sàng).
 
 Grit là ngôn ngữ lập trình an toàn theo thiết kế (Phase 1 — Seed): trình biên dịch **`gritc`** kiểm tra sở hữu/mượn, nghĩa vụ chứng minh (tràn số, chia 0, chỉ số mảng), hiệu ứng, capability, tính dừng của đệ quy/vòng lặp và rò rỉ bí mật **trước khi** sinh mã; trình quản lý gói **`rig`**. Chương trình bị ĐỎ thì không có output.
 

@@ -11,7 +11,7 @@
 - Không chạy hai Cargo cùng lúc. Dùng `CARGO_BUILD_JOBS=2`, `--test-threads=2`. Lô nặng tối đa 15 phút; chạy preflight trước mỗi lô và ghi kết quả sau từng đơn vị.
 - Đột biến M6/M7/M8/Guard: ít nhất một nửa tự động qua `tools/mut.py`; ghi nguồn từng kết quả là `tự động` hoặc `tay`.
 - Duyệt hợp đồng TCB không phải kiểm toán mã. Chỉ đổi trạng thái TCB/READINESS khi có bằng chứng và gate liền mạch xanh trên đúng mã đó.
-- Nhánh (GÓI 5): `main` = commit cuối có cổng xanh liền mạch VÀ CI xanh, CHỈ fast-forward (không force/squash); `windows-work` = nhánh làm việc. Chỉ Giang (hoặc gói lệnh nêu rõ) được đẩy `main`; đẩy `main` lần đầu: `git push origin <C>:refs/heads/main` (fast-forward).
+- Nhánh (GÓI 6): `main` = commit có CI xanh, hoặc commit CHỈ-TÀI-LIỆU (hay công cụ/test/CI, không đổi hành vi sản phẩm) ngay sau đó — kiểm bằng `bash tools/main_check.sh <commit CI xanh> <đầu main>`; chỉ fast-forward (không force, không squash). `windows-work` = nhánh làm việc. Chỉ Giang (hoặc gói lệnh nêu rõ) được đẩy `main`: `git push origin <commit>:refs/heads/main`.
 - Phiên Claude được giao VIẾT CHƯƠNG TRÌNH GRIT cho người dùng (`docs/START_CODING.md`) KHÔNG được sửa compiler (`crates/`, `runtime/`), test, spec (`docs/spec/`) hay tài liệu ngoài phạm vi: chỉ viết ứng dụng trong `apps/` (hoặc `examples/`) và ghi lỗi vào `docs/USER_BUGS.md`. `gritc` từ chối chương trình bạn tin là đúng, hoặc chấp nhận chương trình bạn tin là sai: DỪNG và ghi `docs/USER_BUGS.md`; không nới/tắt kiểm tra.
 - Không thêm cú pháp/từ khóa hoặc đổi ngữ nghĩa nếu chưa có quyết định kiến trúc. Intrinsic mới cần hợp đồng TCB trước.
 
