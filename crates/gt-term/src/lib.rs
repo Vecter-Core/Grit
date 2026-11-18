@@ -897,14 +897,22 @@ pub fn check_termination(
                 "không chứng minh được biến thể tự suy từ điều kiện giảm nghiêm ngặt qua mỗi vòng (thêm `↓` hoặc đổi thân vòng lặp)".to_string(),
             ));
         } else {
-            bag.push(mk(
-                t,
-                "E0702",
-                *node,
-                Span::new(span.start, span.end),
-                "biến thể `↓` không giảm nghiêm ngặt qua mỗi vòng hoặc không bị chặn dưới (≥ 0)"
-                    .to_string(),
-            ));
+            // GÓI 6 S2/S3: hàm vượt giới hạn của bộ chứng minh (biến biến-thể-vòng-lặp hoặc biến theo dõi > 24) bỏ quan hệ giữa các biến nên vòng ĐÚNG cũng bị từ chối (fail-closed):
+            // nói rõ nguyên nhân thay vì để người dùng tưởng chương trình sai.
+            let need: usize = info
+                .loops
+                .get(key)
+                .map_or(0, |v| v.iter().map(|sp| sp.vars.len()).sum());
+            let dropped = rep.is_some_and(|r| !r.zone_dropped.is_empty());
+            let mut msg = "biến thể `↓` không giảm nghiêm ngặt qua mỗi vòng hoặc không bị chặn dưới (≥ 0)".to_string();
+            if need > gt_oblig::analysis::GHOST_MAX_VARS || dropped {
+                msg.push_str(&format!(
+                    "; lưu ý: hàm này vượt giới hạn của bộ chứng minh (tối đa {} biến theo dõi và {} biến biến-thể vòng lặp mỗi hàm) nên quan hệ giữa các biến bị bỏ và vòng đúng cũng có thể bị từ chối — tách các vòng lặp/phần thân thành hàm nhỏ hơn (docs/LIMITS_AUDIT.md)",
+                    gt_oblig::analysis::ZONE_MAX_VARS,
+                    gt_oblig::analysis::GHOST_MAX_VARS
+                ));
+            }
+            bag.push(mk(t, "E0702", *node, Span::new(span.start, span.end), msg));
         }
     }
     // lời gọi đệ quy
