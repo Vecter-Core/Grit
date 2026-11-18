@@ -17,9 +17,14 @@ if command -v python3 >/dev/null 2>&1; then PY=python3; else PY=python; fi
 export PYTHONIOENCODING=utf-8
 if [ "$PLAT" = windows ]; then
   # nền chính của dự án (docs/ENVIRONMENT.md): TEMP ở ổ D:, LLVM 20.1.8 bản dựng sẵn
-  export TEMP='D:\Grit\target\tmp' TMP='D:\Grit\target\tmp' TMPDIR=/d/Grit/target/tmp
+  if [ -d /d/Grit ]; then
+    export TEMP='D:\Grit\target\tmp' TMP='D:\Grit\target\tmp' TMPDIR=/d/Grit/target/tmp
+    TMPD=/d/Grit/target/tmp
+  else   # máy khác (vd runner CI): TEMP trong cây dự án
+    TMPD="$ROOT/target/tmp"; mkdir -p "$TMPD"
+    export TEMP="$(cygpath -w "$TMPD")" TMP="$(cygpath -w "$TMPD")" TMPDIR="$TMPD"
+  fi
   export GRIT_LLVM_DIR="${GRIT_LLVM_DIR:-D:/Tools/llvm-20.1.8}"; export PATH="$(cygpath -u "$GRIT_LLVM_DIR")/bin:$PATH"
-  TMPD=/d/Grit/target/tmp
   JOBS=2
 else
   TMPD="$ROOT/target/tmp"

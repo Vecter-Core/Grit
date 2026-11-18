@@ -23,6 +23,8 @@ confidence-threshold = 0.9
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Phụ thuộc PATH giữa các crate trong workspace (publish = false) không phải wildcard của registry; wildcard của crates.io vẫn bị CẤM (GÓI 4 S0.d)
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"

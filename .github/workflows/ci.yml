@@ -102,7 +102,8 @@ jobs:
         if: steps.llvmcache.outputs.cache-hit != 'true'
         run: |
           curl -sSfL -o llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/clang+llvm-20.1.8-x86_64-pc-windows-msvc.tar.xz
-          mkdir -p "$RUNNER_TEMP/llvm" && tar -xJf llvm.tar.xz -C "$RUNNER_TEMP/llvm" --strip-components=1
+          L="$(cygpath -u "$RUNNER_TEMP")/llvm"
+          mkdir -p "$L" && tar --force-local -xJf llvm.tar.xz -C "$L" --strip-components=1
       - name: Đặt biến LLVM
         run: |
           echo "GRIT_LLVM_DIR=$(cygpath -w "$RUNNER_TEMP/llvm")" >> "$GITHUB_ENV"
