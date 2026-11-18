@@ -3,7 +3,7 @@
 Nền đã kiểm: container Linux x86_64. Windows: chưa kiểm. **origin (GitHub) là nguồn sự thật duy nhất**: container tạm thời, mọi thứ cần giữ phải `git push`.
 
 ```text
-1. Mở phiên Claude Code đám mây trên repo Grit (nhánh claude/gallant-darwin-m251cq hoặc nhánh bạn chọn).
+1. Mở phiên Claude Code đám mây trên repo Grit (`https://github.com/gn3305970-lang/Grit.git`, nhánh `windows-work` hoặc nhánh bạn chọn; kho này riêng tư, cần quyền).
 2. Lần đầu mỗi phiên mới:  bash tools/setup_cloud.sh   (≈ 25 phút nếu dựng từ đầu; xem mục thời gian ở docs/RUN_REPORTS.md)
 3. export PATH="$PWD/target/release:$PATH"; export GRIT_LLVM_LIB_DIR=/usr/lib/x86_64-linux-gnu; gritc doctor
 4. Dặn AI (mẫu câu bên dưới). AI đọc docs/AI_GUIDE.md rồi tạo gói bằng `rig new`.

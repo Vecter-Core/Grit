@@ -1,6 +1,6 @@
 # TSAN_FEASIBILITY — đánh giá khả thi kiểm động đua dữ liệu cho Grit (GÓI 3 S4.e, 2026-11-18)
 
-**Trạng thái: CHỈ ĐÁNH GIÁ, KHÔNG cài đặt.** Chưa chạy thí nghiệm nào ở đây; mọi ước lượng công sức là phán đoán của tác giả (`CHƯA KIỂM`). Bối cảnh: điều kiện rủi ro H7/H8 (`Atomic`, `Mutex`, `spawn`) đang được chấp nhận bằng kiểu (`Send`/`Sync`, E0501/E0502/E0503) + corpus + chạy lặp 300 lần ở dev và release-o2; **chưa có kiểm động đua dữ liệu** (`docs/GIANG_DECISIONS_2026-11-18.md` B4).
+**Trạng thái: bản đánh giá ban đầu (GÓI 3); ĐÃ CÀI ĐẶT đường (b) ở GÓI 4 — xem `docs/TSAN_RESULTS.md`, `tools/tsan_check.sh`, job CI `tsan`.** Chưa chạy thí nghiệm nào ở đây; mọi ước lượng công sức là phán đoán của tác giả (`CHƯA KIỂM`). Bối cảnh: điều kiện rủi ro H7/H8 (`Atomic`, `Mutex`, `spawn`) đang được chấp nhận bằng kiểu (`Send`/`Sync`, E0501/E0502/E0503) + corpus + chạy lặp 300 lần ở dev và release-o2; **chưa có kiểm động đua dữ liệu** (`docs/GIANG_DECISIONS_2026-11-18.md` B4).
 
 ## ThreadSanitizer (TSan) cần gì
 1. **Nền Linux (hoặc macOS).** Runtime TSan (`libclang_rt.tsan`) không có cho Windows/MSVC; bản LLVM 20.1.8 dựng sẵn ở `D:\Tools` không kèm nó. ⇒ chạy trên máy Linux đám mây (dòng Linux của dự án đã có `docs/QUICKSTART_CLOUD.md`).

@@ -49,4 +49,4 @@ Tái lập: hai lần dựng cùng mã cho cùng SHA-256 (xem `BUILDING.md`).
 Dự án không dùng các cụm "bất tử", "vĩnh cửu", "an toàn tuyệt đối" hay "đã chứng minh hình thức" để mô tả Grit. Nếu bạn thấy cụm như vậy ở đâu đó trong repo, đó là lỗi tài liệu: hãy báo.
 
 ## Mức bằng chứng về đọc mã (GÓI 4 S1.a, 2026-11-19)
-**An toàn được kiểm bằng corpus, oracle, đột biến và đọc mã cùng họ model; chưa có đọc mã độc lập khác họ ngoài hai vùng nhỏ (`runtime/gt-rt` và `crates/gt-guard`, ≈ 2 650 dòng, tại hash G1.5 `c5aa45b`).** Không có đánh giá an toàn độc lập của con người; không dùng chữ "kiểm toán".
+**TSan (Linux, build phân tích): không phát hiện đua dữ liệu trong 8 mẫu × 50 lần (không phải "không có đua dữ liệu"; bộ nhớ yếu và Windows chưa kiểm). An toàn được kiểm bằng corpus, oracle, đột biến và đọc mã cùng họ model; chưa có đọc mã độc lập khác họ ngoài hai vùng nhỏ (`runtime/gt-rt` và `crates/gt-guard`, ≈ 2 650 dòng, tại hash G1.5 `c5aa45b`).** Không có đánh giá an toàn độc lập của con người; không dùng chữ "kiểm toán".

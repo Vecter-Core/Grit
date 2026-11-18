@@ -75,3 +75,12 @@ Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuy�
 | S1 cách nói + đọc chéo | XONG (tài liệu) | `CROSS_REVIEW_COVERAGE`, `TCB_REVIEW_GUIDE`, `TCB_CODE_AUDIT*`, `READINESS`, `SAFETY_CLAIMS`; ADR-C11 |
 | **R11c** | **CHỜ PHIÊN OPUS (Giang mở)** | `docs/E_PROMPT_OPUS.md` (CÙNG HỌ, ĐỘC LẬP YẾU); `E_PROMPT_GPT.md` ghi KHÔNG DÙNG |
 | CAPSTONE | CHỜ PHIÊN SẠCH (Giang mở) | hai phiên Claude: Haiku 5.5 và Sonnet 5.5 |
+
+| S0 (kết quả) | XONG | `origin` mới; CI Linux ✓ (74 phút) / Windows rút gọn ✓ (26 phút) / deny ✓ / determinism ✓; 3 vòng sửa; không lỗi thật của Grit; xem `docs/CI_REPORT.md` |
+| S2.a stack | XONG | 10 chương trình × dev/release-o2 đạt ở 4 MiB; giữ 256 MiB: `docs/STACK_PROBE.md` |
+| S2.b phiên bản tài liệu | XONG | `tools/version_docs.py` + 5 test (lệch ⇒ đỏ) trong giai đoạn expect |
+| S2.c HashMap 100 chuỗi ngẫu nhiên | XONG | 100 chuỗi × {dev, release-o2}: 0 bất đồng (băm phân tán, 50–700 khoá, tăng dung lượng nhiều lần) |
+| S3 TSan | XONG (mức nêu) | đối chứng dương BẮT (pthread 3/3; `gritrt_spawn` 2/3), âm không báo; 8 mẫu × 50: không phát hiện; `docs/TSAN_RESULTS.md`; job CI `tsan` |
+| S4 độ phủ nhánh | CHƯA CHẠY | `tools/coverage.sh` + `docs/DECISION_COVERAGE.md` |
+| S5 fuzz | CHUẨN BỊ XONG (Giang chạy) | đóng băng lexer/parser; `fuzz_loop.sh --parallel` (kiểm RAM) + test; lệnh ở HANDOFF |
+| S6 phiên bản/cổng | GIỮ rc3 | không đổi mã sản phẩm (`crates/`, `runtime/` chỉ thêm test/công cụ); chạy giai đoạn công cụ + tài liệu của cổng |
