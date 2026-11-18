@@ -903,8 +903,14 @@ pub fn check_termination(
                 .loops
                 .get(key)
                 .map_or(0, |v| v.iter().map(|sp| sp.vars.len()).sum());
-            let dropped = rep.is_some_and(|r| !r.zone_dropped.is_empty());
-            let mut msg = "biến thể `↓` không giảm nghiêm ngặt qua mỗi vòng hoặc không bị chặn dưới (≥ 0)".to_string();
+            // chỉ để quyết định lời nhắc (không ảnh hưởng phán quyết): thiếu báo cáo thân ⇒ không nhắc
+            let dropped = match rep {
+                Some(r) => !r.zone_dropped.is_empty(),
+                None => false,
+            };
+            let mut msg =
+                "biến thể `↓` không giảm nghiêm ngặt qua mỗi vòng hoặc không bị chặn dưới (≥ 0)"
+                    .to_string();
             if need > gt_oblig::analysis::GHOST_MAX_VARS || dropped {
                 msg.push_str(&format!(
                     "; lưu ý: hàm này vượt giới hạn của bộ chứng minh (tối đa {} biến theo dõi và {} biến biến-thể vòng lặp mỗi hàm) nên quan hệ giữa các biến bị bỏ và vòng đúng cũng có thể bị từ chối — tách các vòng lặp/phần thân thành hàm nhỏ hơn (docs/LIMITS_AUDIT.md)",

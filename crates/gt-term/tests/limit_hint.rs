@@ -8,7 +8,11 @@ use gt_term::check_termination;
 
 fn messages(src: &str) -> Vec<(String, String)> {
     let (t, m) = common::mir(src);
-    assert!(m.report.diagnostics.is_empty(), "{:?}\n{src}", common::mir_codes(&m));
+    assert!(
+        m.report.diagnostics.is_empty(),
+        "{:?}\n{src}",
+        common::mir_codes(&m)
+    );
     let info = build_prog_info(&t, &m);
     let o = check_termination(&t, &m, &info, &mut ZoneProver::new(24));
     o.report
@@ -22,7 +26,9 @@ fn messages(src: &str) -> Vec<(String, String)> {
 fn loops(n: usize) -> String {
     let mut body = String::new();
     for k in 1..=n {
-        body.push_str(&format!("  μi{k} ≔ 0u32; ⟳ i{k} < 3 ↓ 3 - i{k} {{ i{k} ← i{k} + 1; }}\n"));
+        body.push_str(&format!(
+            "  μi{k} ≔ 0u32; ⟳ i{k} < 3 ↓ 3 - i{k} {{ i{k} ← i{k} + 1; }}\n"
+        ));
     }
     format!("ƒ f() → () ! ∅ {{\n{body}}}\n")
 }
@@ -35,10 +41,16 @@ fn up_to_the_limit_is_accepted() {
 #[test]
 fn past_the_limit_is_rejected_with_a_message_that_names_the_cause() {
     let m = messages(&loops(26));
-    assert!(!m.is_empty(), "26 vòng đúng bị từ chối oan (fail-closed) — nếu đã nâng giới hạn, cập nhật test và docs/LIMITS_AUDIT.md");
+    assert!(
+        !m.is_empty(),
+        "26 vòng đúng bị từ chối oan (fail-closed) — nếu đã nâng giới hạn, cập nhật test và docs/LIMITS_AUDIT.md"
+    );
     for (code, msg) in &m {
         assert_eq!(code, "E0702");
-        assert!(msg.contains("tách") && msg.contains("24"), "thiếu lời nhắc giới hạn/gợi ý tách hàm: {msg}");
+        assert!(
+            msg.contains("tách") && msg.contains("24"),
+            "thiếu lời nhắc giới hạn/gợi ý tách hàm: {msg}"
+        );
     }
 }
 
@@ -47,5 +59,9 @@ fn a_genuinely_bad_loop_in_a_small_function_gets_no_limit_hint() {
     let m = messages("ƒ f() → () ! ∅ { μi ≔ 0u32; ⟳ i < 3 ↓ 3 - i { } }\n");
     assert_eq!(m.len(), 1);
     assert_eq!(m[0].0, "E0702");
-    assert!(!m[0].1.contains("tách"), "lời nhắc giới hạn không được xuất hiện ở hàm nhỏ: {}", m[0].1);
+    assert!(
+        !m[0].1.contains("tách"),
+        "lời nhắc giới hạn không được xuất hiện ở hàm nhỏ: {}",
+        m[0].1
+    );
 }
