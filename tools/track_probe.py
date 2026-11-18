@@ -21,7 +21,7 @@ os.environ["TRACK_IGNORE"] = "docs/TRACK_PROBE.jsonl"  # tệp kết quả của
 
 
 def guard(mode, snap):
-    r = subprocess.run(["bash", GUARD, mode, snap, ROOT], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    r = subprocess.run([__import__("shutil").which("bash") or "bash", GUARD, mode, snap, ROOT], capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.returncode, r.stdout.strip()
 
 
