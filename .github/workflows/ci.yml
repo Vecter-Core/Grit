@@ -113,9 +113,14 @@ jobs:
         with:
           fetch-depth: 0
       - id: d
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ONLY: ${{ inputs.only }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then if [ "${{ inputs.only }}" = "coverage" ]; then echo "tsan=false" >> "$GITHUB_OUTPUT"; else echo "tsan=true" >> "$GITHUB_OUTPUT"; fi; exit 0; fi
-          B="${{ github.event.before }}"; A="${{ github.sha }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then if [ "$INPUT_ONLY" = "coverage" ]; then echo "tsan=false" >> "$GITHUB_OUTPUT"; else echo "tsan=true" >> "$GITHUB_OUTPUT"; fi; exit 0; fi
+          B="$EVENT_BEFORE"; A="$EVENT_SHA"
           if [ -z "$B" ] || [ "$B" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$B^{commit}" 2>/dev/null; then echo "tsan=true" >> "$GITHUB_OUTPUT"; echo "không có commit trước ⇒ chạy"; exit 0; fi
           git diff --name-only "$B" "$A" > changed.txt; cat changed.txt
           if grep -Eq '^(runtime/|crates/gt-codegen-llvm/|crates/gt-guard/|lib/core/prelude\.gt$|tools/tsan|tests/tsan/|tests/samples/(threads|two_locks)\.gt$|\.github/workflows/ci\.yml$)' changed.txt; then echo "tsan=true" >> "$GITHUB_OUTPUT"; else echo "tsan=false" >> "$GITHUB_OUTPUT"; fi

@@ -43,3 +43,16 @@ Trạng thái Billing thật; CI trên Windows cho phần test lớn (gt-driver,
 
 ## GÓI 6 (2026-11-19): CI bị khoá
 Run kiểm cuối `44379290084` (commit `d1e36b7`) KHÔNG còn: `gh run list` rỗng, `GET /actions/runs` ⇒ `total_count: 0`, và `gh workflow run` ⇒ HTTP 422 "Actions has been disabled for this user". Dừng việc CI (điều kiện dừng e). Bằng chứng CI cuối còn lại là run `44365492150` (commit `1793b7f`): `linux-gate` GREEN (cổng đầy đủ, 1028/0/207, `GATE_TREE=19dc2326…`), `windows-core`, `determinism`, `deny`, `linux-nollvm` xanh; bước diff `--list` đỏ đúng (danh sách cũ) rồi đã sửa. **Việc của Giang:** vào GitHub → Settings → Billing and plans / Actions: xem vì sao Actions bị tắt cho tài khoản (hết phút? chính sách?), bật lại nếu cần, kiểm Spending limit = 0 USD.
+
+## GÓI 7 S0e — rà workflow cho kho CÔNG KHAI (2026-11-19)
+| tiêu chí | `ci.yml` | kết quả |
+|---|---|---|
+| `pull_request_target` / `workflow_run` chạy mã từ PR | không dùng; trigger chỉ `push` và `workflow_dispatch` | đạt |
+| `permissions` tối thiểu | cấp workflow `contents: read`, không job nào nâng quyền | đạt |
+| secret | không dùng `secrets.*` | đạt |
+| action ghim SHA | checkout, cache, upload-artifact, cargo-deny-action đều ghim SHA 40 ký tự | đạt |
+| chèn `${{ github.event.* }}`/`inputs.*` vào shell | **LỆCH**: job `changes` nội suy `github.event.before`, `github.sha`, `inputs.only` thẳng vào `run:` | **đã sửa**: truyền qua `env:` (`EVENT_BEFORE`, `EVENT_SHA`, `INPUT_ONLY`, `EVENT_NAME`), shell chỉ đọc biến môi trường |
+| runner tự host | chỉ `ubuntu-24.04`, `windows-2022` | đạt |
+| cron / schedule | không có | đạt |
+| còn nội suy trong `run:` | chỉ trong khoá cache/`env:`/`if:` (không phải script) | đạt |
+Ghi chú: `cargo install cargo-audit/cargo-deny/cargo-llvm-cov --locked` chưa ghim phiên bản công cụ (rủi ro chuỗi cung ứng nhỏ; ghi nhận, chưa đổi).

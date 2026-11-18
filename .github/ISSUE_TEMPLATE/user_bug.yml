@@ -1,0 +1,39 @@
+name: Lỗi khi dùng Grit (user_bug)
+description: Báo chương trình bị chấp nhận sai hoặc từ chối oan (theo mẫu docs/USER_BUGS.md). Lỗi NGHIÊM TRỌNG về an toàn: dùng báo cáo riêng, xem SECURITY.md.
+labels: ["user-bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Nếu `gritc` CHẤP NHẬN một chương trình mà theo spec phải bị từ chối (false negative), hãy báo riêng theo SECURITY.md thay vì issue công khai."
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Loại
+      options: ["từ chối oan (đúng nhưng bị đỏ)", "chấp nhận sai (nghiêm trọng; ưu tiên báo riêng)", "khác"]
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes: {label: "gritc --version và hệ điều hành"}
+    validations: {required: true}
+  - type: textarea
+    id: repro
+    attributes:
+      label: Tệp tái hiện tối thiểu (.gt)
+      render: text
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes: {label: Hành vi mong đợi (theo spec/tài liệu nào)}
+    validations: {required: true}
+  - type: textarea
+    id: actual
+    attributes: {label: "Hành vi thực tế (lệnh, mã thoát, đầu ra rút gọn)"}
+    validations: {required: true}
+  - type: input
+    id: code
+    attributes: {label: "Mã lỗi (E…) hoặc 'không có'"}
+  - type: dropdown
+    id: annoy
+    attributes:
+      label: Mức phiền (chỉ từ chối oan)
+      options: ["chặn việc", "có cách né", "hiếm"]

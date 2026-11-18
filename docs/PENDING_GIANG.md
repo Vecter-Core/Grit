@@ -1,5 +1,25 @@
 # PENDING_GIANG — việc CHỜ GIANG (lập 2026-11-17; agent KHÔNG tự đánh dấu thay Giang)
 
+## KHẨN / AN TOÀN KHO CÔNG KHAI (GÓI 7 S0, 2026-11-19)
+`gh repo view`: **visibility = PUBLIC**, nhánh mặc định `windows-work`, chưa có giấy phép (`licenseInfo = null`), không phải fork. Quét `python tools/secret_scan_history.py` trên **542 commit, 2 391 tệp (mọi nhánh cục bộ + từ xa, 3 thẻ)**; mẫu đã quét: token GitHub/AWS/Google/Slack/sk-, khối khoá riêng, URL có mật khẩu, `authorization: bearer`, gán `password/secret/token/api_key`, chuỗi entropy cao, tên tệp nguy hiểm (`.env`, `*.pem`, `*.key`, `*.pfx`, `*.p12`, `id_rsa*`, `.git-credentials`, `credentials*`, `*.bundle`, `*.sqlite`, hộp thư). KHÔNG phải bằng chứng "không có".
+* **Bí mật thật: KHÔNG thấy.** Các phát hiện mẫu khoá (AWS 17, GitHub 5, Slack 3, Google 2, khối khoá riêng 5 trong tổng 49) đều nằm trong fixture của bộ quét S101 của Grit (`crates/gt-secrets/tests/`, `tests/warn/S101_*`, `audit/probes/secret_*`, `docs/errors/S101.md`, `docs/LANGUAGE_REFERENCE.md`). Tệp ghi nhãn "GIẢ"; khoá AWS có dấu `EXAMPLE`; token GitHub/Slack/Google trong fixture có entropy cao nên KHÔNG chứng minh được là giả chỉ bằng đọc (agent không được và không có cách kiểm bằng cách dùng thử). **Việc Giang (1 phút):** mở `tests/warn/S101_github_token.gt` và `crates/gt-secrets/tests/secrets.rs`, xem các chuỗi `ghp_…`, `xoxb-…`, `AIza…` có phải bạn tự gõ bừa không; nếu từng là khoá thật thì THU HỒI ngay (gỡ khỏi lịch sử không đủ vì kho đã công khai).
+* **Tên tệp nguy hiểm đã từng thêm:** 0 (4 tệp `*.db` trong `--help/kvstore/…` là dữ liệu test).
+* **Thông tin cá nhân (chỉ liệt kê; KHÔNG sửa lịch sử):** (1) email trong metadata commit: 439 commit `Nguyen Truong Giang <ngu****@gamil.com>` (tên miền gõ sai `gamil`), 1 commit `Vecter <ngu****@gmail.com>`, 2 commit `gn3305970@gmail.com` (qua GitHub), 93 commit `Claude <noreply@anthropic.com>`, 7 commit `Codex <codex@local>`. Email thật nay công khai vĩnh viễn trong lịch sử. **Đề xuất:** bật G5 bên dưới và đặt `git config user.email <id>+<tên>@users.noreply.github.com` cho commit MỚI; xoá email cũ khỏi lịch sử là việc viết lại lịch sử, quyết định của Giang, agent không làm. (2) Đường dẫn `C:\Users\PC` (tên tài khoản Windows chung chung) 7 dòng trong 4 commit tài liệu: rủi ro thấp. (3) 3 chuỗi giống số điện thoại là số giả trong test/PROGRESS. (4) Không thấy từ khoá tài chính/đầu tư/ngân hàng/TCBS nào trong dòng thêm vào ở mọi commit.
+* **Gói 7 đã làm:** `SECURITY.md`, `.github/ISSUE_TEMPLATE/user_bug.yml`, README nói thẳng mức tin cậy, workflow không còn nội suy `${{ github.event.* }}` vào shell (`docs/CI_REPORT.md`).
+
+## Cài đặt GitHub Giang nên chỉnh (agent KHÔNG tự làm; GÓI 7 S0g)
+| # | cài đặt | vì sao |
+|---|---|---|
+| G1 | Settings → Code security: bật **Secret scanning** và **Push protection** | chặn đẩy nhầm khoá thật |
+| G2 | Settings → Actions → General → Fork pull request workflows: **Require approval for all outside collaborators** | repo công khai: người ngoài không tự chạy workflow |
+| G3 | Settings → Actions → General → Workflow permissions: **Read repository contents** | mặc định chỉ đọc (workflow đã khai `contents: read`) |
+| G4 | Settings → Code security: bật **Private vulnerability reporting** | `SECURITY.md` dựa vào mục này |
+| G5 | Settings → Emails: Keep my email addresses private + Block command line pushes that expose my email | xem thông tin cá nhân ở trên |
+
+## Giấy phép (GÓI 7 S0f) — quyết định của Giang
+Hiện CHƯA có LICENSE ⇒ theo mặc định **mọi quyền được bảo lưu** (người khác xem được mã nhưng không có quyền dùng lại, sửa, phân phối). Agent không chọn thay. Ba hướng: (a) **giữ bảo lưu**: an toàn pháp lý, không ai được dùng, không có cộng đồng; (b) **cho phép dùng lại** như MIT/Apache-2.0: ai cũng dùng/sửa/bán kể cả đóng mã (Apache-2.0 có thêm điều khoản bằng sáng chế); (c) **copyleft** như AGPL-3.0: ai dùng/sửa phải mở mã bản sửa, kể cả khi chạy dịch vụ mạng, cản dùng thương mại đóng. **Mặc định khi chờ:** giữ nguyên, chưa cấp phép.
+
+
 > **CẬP NHẬT 2026-11-18 (GÓI 3, S0b) — REMOTE:** `git ls-remote origin` (URL cũ `https://github.com/Vecter-Core/Grit.git`) trả nguyên văn `remote: Repository not found.` / `fatal: repository 'https://github.com/Vecter-Core/Grit.git/' not found`. `gh auth status`: đăng nhập `gn3305970-lang`, scopes `repo, workflow, read:org, gist, codespace`. Theo lệnh Giang, kho đúng là `https://github.com/gn3305970-lang/Grit.git` (`gh repo view`: **PRIVATE, ban đầu rỗng**). Đã đẩy `windows-work` tới URL này bằng `git push <url> HEAD:refs/heads/windows-work` (KHÔNG đổi cấu hình `origin`, KHÔNG đẩy thẻ). **Giang làm nếu muốn `origin` trỏ kho mới:** `git remote set-url origin https://github.com/gn3305970-lang/Grit.git` (agent không tự đổi). Kho cũ `Vecter-Core/Grit` có thể đã bị xoá/đổi tên/mất quyền: Giang tự kiểm trên trình duyệt. Sao lưu: bundle ở `D:\Grit\.backup`, bản thứ hai ở `C:\Users\PC\GritBackup`, bản thứ ba là kho GitHub riêng tư.
 
 Mỗi mục: đề xuất của kiến trúc sư/agent và **hành vi mặc định trong lúc chờ**. Agent làm tiếp mọi việc không phụ thuộc mục này.
