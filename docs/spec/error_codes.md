@@ -13,7 +13,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0203 | Truy cập item private | M3 | E0203_private_across_files, E0203_private_import, E0203_private_item, E0203_private_module_member, E0203_private_nested_sibling |
 | E0204 | Vòng phụ thuộc module | M3 | E0204_cycle_via_imports, E0204_three_files_cycle, E0204_two_files_cycle |
 | E0205 | Shadowing (D7) | M3 | E0205_shadow_import, E0205_shadow_loop_var, E0205_shadow_param, E0205_shadow_prelude, E0205_shadowing |
-| E0301 | Sai kiểu / biểu thức chưa có ngữ nghĩa ở Phase 1 (vd range mở độc lập) | M4 | E0301_break_outside_loop, E0301_if_condition_not_bool, E0301_open_range_standalone, E0301_return_type_mismatch, E0301_type_mismatch, E0301_wrong_arity, E0301_q87_binding_is_a_reference, E0301_q87_literal_on_reference, E0301_q87_nested_reference, E0301_pattern_struct_on_int_cov, E0301_pattern_wrong_struct_cov, E0301_pattern_range_float_cov, E0301_pattern_range_char_on_int_cov, E0301_pattern_qualified_wrong_enum_cov, E0301_pattern_struct_name_not_struct_cov |
+| E0301 | Sai kiểu / biểu thức chưa có ngữ nghĩa ở Phase 1 (vd range mở độc lập) | M4 | E0301_break_outside_loop, E0301_if_condition_not_bool, E0301_open_range_standalone, E0301_return_type_mismatch, E0301_type_mismatch, E0301_wrong_arity, E0301_q87_binding_is_a_reference, E0301_q87_literal_on_reference, E0301_q87_nested_reference, E0301_pattern_struct_on_int_cov, E0301_pattern_wrong_struct_cov, E0301_pattern_range_float_cov, E0301_pattern_range_char_on_int_cov, E0301_pattern_qualified_wrong_enum_cov, E0301_pattern_struct_name_not_struct_cov, E0301_pattern_variant_on_int_cov |
 | E0302 | Ép kiểu ngầm số (D1) | M4 | E0302_implicit_cast, E0302_int_to_float, E0302_mixed_operands, E0302_narrowing_argument |
 | E0303 | `==` trên số thực (D4) | M4 | E0303_float_eq, E0303_float_literal_eq, E0303_float_ne |
 | E0304 | Trường struct/biến thể/pattern sai: thiếu, thừa, không tồn tại hoặc trùng (literal `P { … }`, pattern `P { … }`, truy cập `.x`) — Q20 | M4 | E0304_duplicate_field, E0304_missing_field, E0304_pattern_missing_field, E0304_tuple_index_out_of_range, E0304_unknown_field, E0304_pattern_duplicate_field_cov, E0304_pattern_unknown_field_cov |
@@ -41,7 +41,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0501 | Chia sẻ không `Send`/`Sync` qua luồng (gồm `■` static không Sync) | M8 | E0501_spawn_shared_ref, E0501_spawn_unique_ref, E0501_static_cell |
 | E0502 | Vi phạm thứ tự khoá (khoá không lấy theo cấp tăng nghiêm ngặt, cấp thiếu `#level`) | M8 | E0502_inverted_order, E0502_same_level_twice, E0502_inverted_through_calls |
 | E0503 | Memory ordering của atomic không hợp lệ hoặc không viết thẳng | M8 | E0503_load_release, E0503_store_acquire, E0503_cas_failure_release |
-| E0601 | Obligation biên chắc chắn sai (tràn hằng) | M7 | E0601_const_overflow, E0601_literal_out_of_range |
+| E0601 | Obligation biên chắc chắn sai (tràn hằng) | M7 | E0601_const_overflow, E0601_literal_out_of_range, E0601_literal_negative_out_of_range_cov |
 | E0602 | Chia 0 chắc chắn | M7 | E0602_const_div_zero |
 | E0603 | Chỉ số ngoài biên chắc chắn | M7 | E0603_const_oob |
 | E0604 | Ép kiểu mất thông tin chắc chắn | M7 | — |

@@ -1,0 +1,6 @@
+// expect: fail E0601
+// note: GÓI 6 S1: literal ÂM ngoài phạm vi i8 (nhánh dấu âm của thông báo cận)
+ƒ main() → i8 ! ∅ {
+  x: i8 ≔ -129i8;
+  x
+}

@@ -1,0 +1,19 @@
+// expect: pass
+// note: GÓI 6 S1: bốn hàm đệ quy tương hỗ vòng (đồ thị lời gọi cần nén đường trong union-find của gt-term)
+ƒ a(n: u32) → u32 ! ∅
+  ↓ n
+{ ⎇ n == 0 { 0u32 } ⇝ { b(n - 1u32) } }
+
+ƒ b(n: u32) → u32 ! ∅
+  ↓ n
+{ ⎇ n == 0 { 0u32 } ⇝ { c(n - 1u32) } }
+
+ƒ c(n: u32) → u32 ! ∅
+  ↓ n
+{ ⎇ n == 0 { 0u32 } ⇝ { d(n - 1u32) } }
+
+ƒ d(n: u32) → u32 ! ∅
+  ↓ n
+{ ⎇ n == 0 { 0u32 } ⇝ { a(n - 1u32) } }
+
+ƒ main() → u32 ! ∅ { a(10u32) }

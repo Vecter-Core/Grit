@@ -1,0 +1,8 @@
+// expect: fail E0301
+// note: GÓI 6 S1: pattern biến thể không có đường dẫn trên giá trị u32 (shadow_hint với kiểu cần không phải ADT)
+ƒ main() → u32 ! ∅ {
+  ⌥ 5u32 {
+    Some(x) ↦ 1u32,
+    _ ↦ 0u32,
+  }
+}
