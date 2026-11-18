@@ -81,11 +81,12 @@ class Preflight(unittest.TestCase):
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
 
     def test_low_disk_threshold_is_enforced(self):
-        env = dict(os.environ, PREFLIGHT_TRIES="1", PREFLIGHT_SLEEP="0", PREFLIGHT_MIN_D_GB="99999")
+        # Windows kiểm ổ D:/C: (PREFLIGHT_MIN_D_GB); Linux kiểm ổ chứa kho (PREFLIGHT_MIN_DISK_KB) — GÓI 4: test chạy được trên cả hai nền
+        env = dict(os.environ, PREFLIGHT_TRIES="1", PREFLIGHT_SLEEP="0", PREFLIGHT_MIN_D_GB="99999", PREFLIGHT_MIN_DISK_KB="99999999999999")
         r = subprocess.run(["bash", SCRIPT, self.d.replace("\\", "/")], capture_output=True, text=True, encoding="utf-8", errors="replace",
                            env=env, stdin=subprocess.DEVNULL)
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
-        self.assertIn("D:", r.stdout)
+        self.assertTrue("D:" in r.stdout or "ổ chứa kho" in r.stdout, r.stdout)
 
 
 if __name__ == "__main__":

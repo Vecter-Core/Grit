@@ -61,7 +61,7 @@ check_once() {
       *)
         local avail_kb mem_kb others
         avail_kb=$(df -Pk "$dir" 2>/dev/null | awk 'NR==2 {print $4}')
-        [ -n "$avail_kb" ] && [ "$avail_kb" -ge 5242880 ] || { echo "PREFLIGHT: ổ chứa kho còn $(( ${avail_kb:-0}/1024 )) MB < 5120 MB"; return 1; }
+        [ -n "$avail_kb" ] && [ "$avail_kb" -ge "${PREFLIGHT_MIN_DISK_KB:-5242880}" ] || { echo "PREFLIGHT: ổ chứa kho còn $(( ${avail_kb:-0}/1024 )) MB < 5120 MB"; return 1; }
         mem_kb=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo 2>/dev/null)
         [ -n "$mem_kb" ] && [ "$mem_kb" -ge 2097152 ] || { echo "PREFLIGHT: RAM khả dụng ${mem_kb:-?} KB < 2097152 KB"; return 1; }
         others=$(ps -eo pid=,comm= 2>/dev/null | awk '$2=="cargo" || $2=="rustc" || $2=="link" || $2=="cl" {print $1}' | tr '\n' ' ')
