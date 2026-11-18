@@ -1,5 +1,6 @@
-<!-- TOKEN_PROXY: ~8761 (ước lượng = số byte UTF-8 / 3; giới hạn 12000; kiểm bởi tools/test_ai_guide.py) -->
+<!-- TOKEN_PROXY: ~8960 (ước lượng = số byte UTF-8 / 3; giới hạn 12000; kiểm bởi tools/test_ai_guide.py) -->
 # AI_GUIDE — viết chương trình Grit (gói ngữ cảnh TỰ CHỨA cho AI)
+Gặp lỗi `E0702`/`E0902`/`E0301`/`E0403` mà logic có vẻ đúng? Xem `docs/AI_PITFALLS.md` (mẫu hay viết sai, xếp theo tần suất, có TRƯỚC/SAU chạy thật).
 
 Grit là ngôn ngữ biên dịch (`gritc`, qua LLVM) **fail-closed**: chương trình chỉ chạy khi mọi kiểm tra an toàn đều qua. Mục tiêu của bạn: viết `src/main.gt` sao cho `rig check` XANH rồi `rig run` cho đúng kết quả. **KHÔNG BAO GIỜ nới kiểm tra** (không `--checks=proven`, không `#allow` để lách, không đổi đề bài); lỗi `E…` là thông tin để sửa MÃ của bạn. Danh sách hàm thư viện: `docs/STD_REFERENCE.md`. Nền đã kiểm: Linux x86_64 (Windows: chưa kiểm).
 
