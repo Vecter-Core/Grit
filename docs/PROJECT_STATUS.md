@@ -4,6 +4,8 @@
 > Nguồn: đọc lại toàn bộ tài liệu của kho (HANDOFF, RUNLIST, RUN_REPORTS, READINESS, GRIT_PLAN, CAPSTONE, SEED_*, TCB_*, OPEN_QUESTIONS, FIELD_BUGS…).
 > Số liệu là số **đã ghi trong tài liệu của dự án** (ngày ghi kèm theo) trừ khi nói rõ là đo lại; chỗ tài liệu tự mâu thuẫn được nêu rõ.
 
+> **CẬP NHẬT 2026-11-19 (GÓI 6):** nhãn `1.0.0-rc4` (E0702 nêu nguyên nhân khi hàm quá lớn); cổng đầy đủ Linux GREEN trên rc4; 90 nhánh quyết định chưa chạy (bảng từng nhánh); `docs/LIMITS_AUDIT.md`; ba app mẫu `apps/`; `docs/SEED_FINISH_LINE.md` liệt kê đích tới Seed. **GitHub Actions đang bị khoá** (Giang kiểm Billing).
+
 > **CẬP NHẬT 2026-11-19 (GÓI 5):** `main` = `e450c69` (fast-forward 1 lần); TSan có đối chứng QUA pipeline Grit (tỉ lệ phát hiện yếu nhất 13/30; 0 báo cáo ở 400 lần chạy); độ phủ nhánh các hàm quyết định đã đo (730 nhánh, 100 chưa chạy; `docs/DECISION_COVERAGE.md`); `docs/START_CODING.md` để bắt đầu viết Grit thật. Vẫn rc3; A2 vẫn chưa.
 
 > **CẬP NHẬT 2026-11-19 (GÓI 4, Giang chỉ dùng Claude):** `origin` đổi sang kho mới; **CI GitHub chạy XANH** (Linux đầy đủ + Windows rút gọn: `docs/CI_REPORT.md`); TSan: không phát hiện trong 8 mẫu × 50 lần (`docs/TSAN_RESULTS.md`); stack nhỏ nhất ≤ 4 MiB; đọc chéo khác họ chỉ ở `gt-rt` + `gt-guard`; vẫn `1.0.0-rc3`; A2 vẫn chưa.

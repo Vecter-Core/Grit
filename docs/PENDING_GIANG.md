@@ -20,3 +20,6 @@ Mỗi mục: đề xuất của kiến trúc sư/agent và **hành vi mặc đ�
 | 12 | Thử `editors/vscode` trong VS Code thật (5 bước `docs/QUICKSTART_VSCODE.md`) | Giang tự thử, báo kết quả | LSP/VS Code ghi "CHƯA THỬ" |
 | 13 | Kiểm Billing (phút Actions còn lại, kho riêng tư ≈ 2 000 phút/tháng; Windows ×2); CI đã dùng ≈ 624 phút ước tính (`docs/CI_REPORT.md`) | vào Settings ▸ Billing, báo agent số còn lại | mỗi push đầy đủ tốn ≈ 130 phút: dùng `[skip ci]` cho commit tài liệu |
 | 14 | Chạy fuzz: `bash tools/fuzz_loop.sh 26 --parallel` (lexer và parser đồng thời, ≈ 24 giờ nếu bộ nhớ ảo trống ≥ 10 GB), xem `docs/HANDOFF.md` | lexer/parser ĐÃ ĐÓNG BĂNG (`docs/spec/FREEZE.md`) | điều kiện #2 ghi "ĐANG TÍCH LUỸ" |
+
+| 15 | **GitHub Actions bị tắt cho tài khoản** (GÓI 6): `Actions has been disabled for this user`; mọi run cũ biến mất | kiểm Settings → Billing and plans / Actions; bật lại; xem `docs/CI_REPORT.md` mục GÓI 6; sau đó chạy cổng đầy đủ rc4 (`only=all`, `full=true`) | không có CI mới cho `d1e36b7` trở đi |
+| 16 | Đọc `docs/SEED_FINISH_LINE.md` (đích của nhãn Seed: cái gì CHẶN Seed, cái gì chỉ chặn Giai đoạn 2) | đọc rồi quyết ưu tiên | — |

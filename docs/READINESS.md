@@ -92,3 +92,6 @@ Nhãn hiện hành: **`1.0.0-rc4`** (GÓI 6 S5, 2026-11-19: đổi vì `gt-term`
 
 ## GÓI 5 (2026-11-19)
 Không đổi trạng thái TCB, không đánh dấu #6, A2 vẫn **chưa**. Bằng chứng thêm: TSan có đối chứng qua pipeline Grit (tỉ lệ phát hiện 13–30/30, đối chứng âm 0/30) — vẫn chỉ "không phát hiện trong các mẫu đã chạy"; độ phủ nhánh hàm quyết định đã đo (nhóm D còn CHƯA thí nghiệm, `docs/DECISION_COVERAGE.md`). `main` = `e450c69`.
+
+## GÓI 6 (2026-11-19)
+Nhãn `1.0.0-rc4`. Không đổi trạng thái TCB, không đánh dấu #6, A2 vẫn **chưa**. Bằng chứng thêm: cổng đầy đủ Linux GREEN trên rc4 (`GATE_TREE=19dc2326…`; 1028/0/207); độ phủ nhánh hàm quyết định (90 nhánh chưa chạy, bảng từng nhánh); `docs/LIMITS_AUDIT.md` (17 giới hạn, không vượt-mà-chấp-nhận-lặng-lẽ trong thí nghiệm; một số mục chỉ đọc mã). Ba app thử đường dùng thật khớp bản tham chiếu (phiên không sạch; không thay capstone). CI hiện bị khoá (Giang kiểm). Đích còn lại tới Seed: `docs/SEED_FINISH_LINE.md`.

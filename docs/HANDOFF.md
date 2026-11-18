@@ -11,6 +11,8 @@
 
 > **GÓI 5 (2026-11-19):** `main` = `e450c69`. Chạy thủ công: TSan `gh workflow run ci.yml --ref windows-work -f only=tsan`; độ phủ nhánh `-f only=coverage` (≈ 55 phút); Windows đầy đủ trước thẻ phát hành: GitHub → Actions → ci → Run workflow → `only=all`, `full=true` (≈ 74 phút tính phí thêm). Viết Grit thật: `docs/START_CODING.md`, lỗi gặp: `docs/USER_BUGS.md` (`python tools/triage_user_bugs.py`). Kết quả: `docs/RUN_REPORTS.md` mục GÓI 5.
 
+> **GÓI 6 (2026-11-19) — TRẠNG THÁI:** nhãn `1.0.0-rc4`; cổng đầy đủ Linux GREEN (CI run `44365492150`, commit `1793b7f`, `GATE_TREE=19dc2326d629c2a033fea3380580266a360bbc7dcdbbddbcb14ae7fc3256e5f2`, 1028/0/207); cổng nhẹ Windows GREEN cùng cây. **GitHub Actions bị KHOÁ cho tài khoản** (HTTP 422; Giang kiểm Billing: `docs/CI_REPORT.md` mục GÓI 6, `docs/PENDING_GIANG.md` #15). Đích tới Seed: `docs/SEED_FINISH_LINE.md`. Giới hạn kích cỡ hàm: `docs/LIMITS_AUDIT.md`. Ba app mẫu: `apps/` (`python apps/check_app.py <tên>`). Độ phủ nhánh: `docs/DECISION_COVERAGE_BRANCHES.md`. Chi tiết: `docs/RUN_REPORTS.md` GÓI 6. Thẻ cục bộ `seed-1.0-rc4` ở `1793b7f`.
+
 > **Nhánh (GÓI 6, 2026-11-19):** `main` = commit có CI xanh, hoặc commit CHỈ-TÀI-LIỆU (hay công cụ/test/CI, không đổi hành vi sản phẩm) ngay sau đó — kiểm bằng `bash tools/main_check.sh <commit CI xanh> <đầu main>`; chỉ fast-forward (không force, không squash). `windows-work` = nhánh làm việc. Nhánh mặc định GitHub vẫn `windows-work` (Giang đổi).
 
 > **GÓI 4 (2026-11-19, Giang CHỈ dùng Claude; người thực thi Claude Sonnet 5.5):** `origin` = `https://github.com/gn3305970-lang/Grit.git` (kho cũ giữ ở `old-origin`; đảo lại: `git remote remove origin && git remote rename old-origin origin`; PENDING #11 XONG). CI GitHub CHẠY XANH (run `44233333186`, `15fe834`): Linux cổng đầy đủ + capstone, Windows BẢN RÚT GỌN, deny, determinism, TSan: `docs/CI_REPORT.md`, `docs/TSAN_RESULTS.md`. Stack nhỏ nhất của 10 chương trình ≤ 4 MiB: `docs/STACK_PROBE.md`. Phiên bản giữ `1.0.0-rc3` (không đổi mã sản phẩm). Đọc chéo: chỉ `gt-rt` + `gt-guard` tại `c5aa45b` khác họ; R11c CHỜ PHIÊN OPUS (`docs/E_PROMPT_OPUS.md`). Dùng `[skip ci]` cho commit tài liệu (mỗi push đầy đủ ≈ 130 phút Actions).
@@ -27,7 +29,7 @@
 - G2.6/G2.7: kiểm kê docs đủ 11/11, doc-test sau cập nhật 207 khối/0 sai; `docs/G2_CLEAN_SESSION.md` chuẩn bị handoff, không sửa/author capstone. G2.1 còn cần xác nhận đúng phạm vi scan E04xx/A.1; mutation survivor có lập luận tương đương; G2.2 R11b đang chờ reviewer Claude khác họ.
 - G2.1.c: sáu bộ ở dev/release-o2 có mismatch 0; chi tiết mới ở `docs/G2_CODEGEN_DIFF_RESULTS.jsonl`, `docs/CODEGEN_DIFF_RESULTS.jsonl`, `docs/RELEASE_O2_DIFF_RESULTS.jsonl`. G2.1.d còn survivor mutation và E04xx/A.1 scan.
 
-**Cập nhật tại commit 1cbf3e5, ngày 2026-11-19.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit d1e36b7, ngày 2026-11-19.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (cập nhật 2026-11-19, GÓI 4):** người thực thi = Claude Sonnet 5.5; kiến trúc sư = Claude; Giang CHỈ dùng Claude (không GPT/Codex). Giang đã ủy quyền không chờ duyệt trong phạm vi gói. (Dòng gốc 2026-11-12 ghi Codex thực thi: giữ làm lịch sử.) Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
