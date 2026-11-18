@@ -12,7 +12,7 @@ on:
         description: "all = mọi job; tsan = chỉ job tsan; coverage = chỉ job độ phủ nhánh (GÓI 5 S3)"
         default: "all"
         type: choice
-        options: [all, tsan, coverage]
+        options: [all, tsan, coverage, deny]
       full:
         description: "true = Windows chạy THÊM audit + test toàn workspace (≈ 74 phút tính phí; chạy thủ công trước mỗi thẻ phát hành)"
         default: false
@@ -74,7 +74,7 @@ jobs:
       - run: cargo test --locked -p gt-driver --no-default-features -- --test-threads=2
 
   deny:
-    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all' || inputs.only == 'deny'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

@@ -24,7 +24,7 @@ def make(deps):
 
 
 def deny(d):
-    r = subprocess.run(["cargo", "deny", "--manifest-path", os.path.join(d, "Cargo.toml"), "check", "--config", os.path.join(ROOT, "deny.toml"), "bans"],
+    r = subprocess.run(["cargo", "deny", "--manifest-path", os.path.join(d, "Cargo.toml"), "--config", os.path.join(ROOT, "deny.toml"), "check", "bans"],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.returncode, r.stdout + r.stderr
 
