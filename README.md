@@ -1,6 +1,6 @@
 # Grit
 
-**Trạng thái: `1.0.0-rc3` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
+**Trạng thái: `1.0.0-rc4` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
 
 **Nhánh:** `main` = commit có CI xanh, hoặc commit CHỈ-TÀI-LIỆU (hay công cụ/test/CI, không đổi hành vi sản phẩm) ngay sau đó — kiểm bằng `bash tools/main_check.sh <commit CI xanh> <đầu main>`; chỉ fast-forward (không force, không squash). `windows-work` = nhánh làm việc (mặc định trên GitHub; đề xuất đổi sang `main` khi sẵn sàng).
 

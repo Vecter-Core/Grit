@@ -2,6 +2,12 @@
 
 Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng 2026-11-18, xem `docs/RUN_REPORTS.md`).
 
+## 1.0.0-rc4 — GÓI 5/6: kiểm chứng CI, độ phủ nhánh, giới hạn kích cỡ (nhánh `integration`, 2026-11-19)
+Nhãn vẫn là **RC**, không phải `1.0.0-seed` (A2 chưa đạt; `docs/SEED_FINISH_LINE.md`).
+- **Thay đổi mã sản phẩm duy nhất:** `gt-term` — thông báo E0702 của vòng lặp nêu nguyên nhân và gợi ý tách hàm khi hàm vượt giới hạn 24 biến/vòng lặp của bộ chứng minh (test ĐỎ trước `crates/gt-term/tests/limit_hint.rs`). KHÔNG đổi phán quyết nào.
+- **Golden:** `tests/golden_ll/{checked_add,slice_sum,static_atomic}.ll` chỉ đổi BĂM CHỨNG THỰC (6 dòng) do chuỗi phiên bản nằm trong băm.
+- Công cụ/tài liệu: `tools/{main_check.sh,coverage_branches.py,scale_probe.py,platform_tests.py,...}`, `apps/{csv2json,todo,difflite}`, `docs/{LIMITS_AUDIT,APPS_LOG,SEED_FINISH_LINE,PLATFORM_TESTS,DECISION_COVERAGE}.md`.
+
 ## 1.0.0-rc3 — hợp nhất hai dòng, Arena chia sẻ, kiểm chứng Windows (nhánh `integration`, 2026-11-18)
 Nhãn vẫn là **RC**, không phải `1.0.0-seed` (A2 an toàn chưa đạt: `docs/READINESS.md` mục "Seed 1.0"). **Sửa nhãn:** các tài liệu cũ ghi `gritc --version` là `1.0.0-rc2`, nhưng `crates/gt-driver/Cargo.toml` thực tế ở `1.0.0-rc1` (bản đổi rc2 không vào mã); rc3 là lần đầu số phiên bản KHỚP với mã. Thẻ cục bộ `seed-1.0-rc2` đã đổi tên `seed-1.0-rc2-old` (chưa từng đẩy).
 - **Thay đổi hành vi:** `spawn` thất bại ⇒ abort `spawn_failed` (mã 70) thay vì `abort: unknown` (hợp đồng H8); runtime `gt-rt` có feature `test-fault` CHỈ cho kiểm thử.
