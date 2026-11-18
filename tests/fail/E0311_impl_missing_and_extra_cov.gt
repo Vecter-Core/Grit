@@ -1,0 +1,13 @@
+// expect: fail E0311
+// note: GÓI 5 S3: impl thiếu hàm của trait và có hàm thừa
+⊏ T {
+  ƒ f(&self) → u32 ! ∅;
+}
+
+▢ S { }
+
+⊐ T for S {
+  ƒ g(&self) → u32 ! ∅ { 1u32 }
+}
+
+ƒ main() → u32 ! ∅ { 0u32 }

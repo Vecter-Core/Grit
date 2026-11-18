@@ -1,0 +1,16 @@
+// expect: fail E0301
+// note: GÓI 5 S3: pattern struct khác kiểu với giá trị
+▢ P {
+  x: u32,
+}
+
+▢ Q {
+  x: u32,
+}
+
+ƒ main() → u32 ! ∅ {
+  p ≔ P { x: 1u32 };
+  ⌥ p {
+    Q { x: a } ↦ a,
+  }
+}

@@ -1,0 +1,13 @@
+// expect: fail E0304
+// note: GÓI 5 S3: trường trùng trong pattern struct (nhánh seen.contains của check_struct_pat)
+▢ P {
+  x: u32,
+  y: u32,
+}
+
+ƒ main() → u32 ! ∅ {
+  p ≔ P { x: 1u32, y: 2u32 };
+  ⌥ p {
+    P { x: a, x: b, y: c } ↦ a + c,
+  }
+}
