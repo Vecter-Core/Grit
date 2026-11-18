@@ -21,6 +21,20 @@ def current_hash(target):
     return hashlib.sha1(out).hexdigest()[:12]
 
 
+def seconds_on_hash_by_source(target, h, path=LOG):
+    """Như `seconds_on_hash` nhưng tách theo nguồn (`source`; dòng không có trường này = "windows"). Trả dict nguồn -> giây ĐỒNG HỒ."""
+    t = {}
+    if os.path.exists(path):
+        for ln in open(path, encoding="utf-8"):
+            ln = ln.strip()
+            if ln.startswith("{"):
+                d = json.loads(ln)
+                if d.get("target") == target and d.get("status") == "ok" and d.get("src") == h:
+                    k = d.get("source", "windows")
+                    t[k] = t.get(k, 0) + d["seconds"]
+    return t
+
+
 def seconds_on_hash(target, h, path=LOG):
     """Tổng giây phiên `ok` của `target` có `src == h` (dòng cũ không có `src` KHÔNG được tính)."""
     t = 0
@@ -72,6 +86,9 @@ def main():
     if "--kind-done" in sys.argv:
         k = sys.argv[sys.argv.index("--kind-done") + 1]
         sys.exit(0 if seconds_on_hash(k, current_hash(k)) >= TARGET_HOURS * 3600 else 1)
+    if "--hash" in sys.argv:
+        print(current_hash(sys.argv[sys.argv.index("--hash") + 1]))
+        return
     if "--list-files" in sys.argv:
         for target in ("lex", "parse"):
             print(f"{target}: {len(hashed_files(target))} tệp được băm (băm {current_hash(target)}):")
@@ -94,6 +111,8 @@ def main():
         )
     for target in ("lex", "parse"):
         h = current_hash(target)
+        by = seconds_on_hash_by_source(target, h)
+        print(f"  {target}: theo nguồn trên băm {h}: " + (", ".join(f"{k} {v / 3600:.2f} giờ" for k, v in sorted(by.items())) or "chưa có") + " (đồng hồ treo tường)")
         print(f"  {target}: GIỜ TRÊN BĂM HIỆN TẠI {h}: {seconds_on_hash(target, h) / 3600:.2f} giờ / {TARGET_HOURS:.0f}  ({len(hashed_files(target))} tệp được băm; `python tools/fuzz_total.py --list-files` để xem)")
 
 

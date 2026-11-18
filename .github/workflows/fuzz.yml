@@ -1,0 +1,97 @@
+# Fuzz lexer/parser trên Linux (GÓI 7 S4). CHỈ chạy thủ công (workflow_dispatch): KHÔNG cron, KHÔNG tự gọi lại; quyền chỉ đọc; không secret; action ghim SHA.
+# Mỗi lần bấm chạy `minutes` phút (mặc định 330) cho CẢ HAI mục tiêu song song. Cần ≈ 5 lần để đủ 24 giờ mỗi mục tiêu trên băm nguồn hiện tại.
+# Kết quả: artifact `fuzz-<mục tiêu>` chứa fuzz-log.jsonl (đồng hồ treo tường, số lượt, băm nguồn, runner, ngày, mã thoát) và mọi crash.
+# Nạp vào docs/FUZZ_LOG.jsonl: `gh run download <run-id> -D /tmp/fz && python tools/fuzz_ingest.py /tmp/fz` (xem docs/HANDOFF.md).
+name: fuzz
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Số phút fuzz MỖI mục tiêu (1..330; thử đường đi: 10)"
+        default: "330"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [lex, parse]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Kiểm đầu vào
+        env:
+          MINUTES: ${{ inputs.minutes }}
+        run: |
+          case "$MINUTES" in (*[!0-9]*|"") echo "minutes phải là số nguyên"; exit 2;; esac
+          if [ "$MINUTES" -lt 1 ] || [ "$MINUTES" -gt 330 ]; then echo "minutes ngoài 1..330"; exit 2; fi
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            crates/gt-lexer/fuzz/corpus
+            crates/gt-parser/fuzz/corpus
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+      - name: Công cụ (nightly và cargo-fuzz GHIM phiên bản)
+        run: |
+          rustup toolchain install nightly-2026-10-04 --profile minimal --component rust-src
+          rustup default nightly-2026-10-04
+          cargo install cargo-fuzz --version 0.13.2 --locked
+      - name: Fuzz
+        env:
+          MINUTES: ${{ inputs.minutes }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -u
+          if [ "$TARGET" = "lex" ]; then DIR=crates/gt-lexer; MAXLEN=512; EXTRA="-rss_limit_mb=2048"; else DIR=crates/gt-parser; MAXLEN=1024; EXTRA="-timeout=10 -rss_limit_mb=3072"; fi
+          SRC=$(python3 tools/fuzz_total.py --hash "$TARGET")
+          mkdir -p "$DIR/fuzz/corpus/$TARGET" out
+          for d in pass fail warn lexer; do cp tests/$d/*.gt "$DIR/fuzz/corpus/$TARGET/" 2>/dev/null || true; done
+          T0=$(date +%s)
+          set +e
+          (cd "$DIR" && cargo fuzz run "$TARGET" -- -max_total_time=$((MINUTES * 60)) -max_len=$MAXLEN $EXTRA -print_final_stats=1) > out/fuzz.log 2>&1
+          CODE=$?
+          set -e
+          T1=$(date +%s)
+          RUNS=$(grep -o 'number_of_executed_units: [0-9]*' out/fuzz.log | tail -1 | grep -o '[0-9]*$' || echo 0)
+          STATUS=ok; if [ "$CODE" -ne 0 ]; then STATUS=fail; fi
+          TARGET="$TARGET" SRC="$SRC" CODE="$CODE" RUNS="${RUNS:-0}" SECS=$((T1 - T0)) STATUS="$STATUS" python3 - <<'PY'
+          import json, os, datetime
+          row = {
+              "ts": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "target": os.environ["TARGET"], "status": os.environ["STATUS"],
+              "seconds": int(os.environ["SECS"]), "runs": int(os.environ["RUNS"] or 0),
+              "exit": int(os.environ["CODE"]), "src": os.environ["SRC"],
+              "source": "ci-linux", "runner": os.environ.get("RUNNER_NAME", "") + "/" + os.environ.get("RUNNER_OS", ""),
+              "ci_run": os.environ.get("GITHUB_RUN_ID", ""), "ci_sha": os.environ.get("GITHUB_SHA", ""),
+          }
+          open("out/fuzz-log.jsonl", "w").write(json.dumps(row) + "\n")
+          PY
+          tail -5 out/fuzz.log
+          exit 0
+      - name: Gom crash
+        if: always()
+        run: |
+          mkdir -p out/crashes
+          cp -r crates/gt-lexer/fuzz/artifacts out/crashes/lexer 2>/dev/null || true
+          cp -r crates/gt-parser/fuzz/artifacts out/crashes/parser 2>/dev/null || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: out
+          retention-days: 30
+      - name: Đỏ nếu fuzz tìm thấy lỗi (sau khi đã tải artifact)
+        run: |
+          if grep -q '"status": "fail"' out/fuzz-log.jsonl; then echo "FUZZ TÌM THẤY LỖI: tải artifact, tái hiện cục bộ, FB-C"; exit 1; fi
