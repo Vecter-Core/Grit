@@ -1,5 +1,9 @@
 # Grit
 
+**Trạng thái: `1.0.0-rc3` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
+
+**Nhánh:** `main` = commit cuối có cổng (`tools/gate.sh`) xanh liền mạch VÀ CI xanh, chỉ nhận fast-forward (không force, không squash). `windows-work` = nhánh làm việc (mặc định trên GitHub; đề xuất đổi sang `main` khi sẵn sàng).
+
 Grit là ngôn ngữ lập trình an toàn theo thiết kế (Phase 1 — Seed): trình biên dịch **`gritc`** kiểm tra sở hữu/mượn, nghĩa vụ chứng minh (tràn số, chia 0, chỉ số mảng), hiệu ứng, capability, tính dừng của đệ quy/vòng lặp và rò rỉ bí mật **trước khi** sinh mã; trình quản lý gói **`rig`**. Chương trình bị ĐỎ thì không có output.
 
 Mã nguồn Grit là tệp `.gt`. Mỗi ký hiệu Unicode có đúng một bí danh ASCII (`ƒ` = `\fn`, `≔` = `:=`, `→` = `->`, `∅` = `\nil`, …; bảng đầy đủ ở `docs/spec/symbols.md`) — viết bằng bí danh rồi chạy `gritc fmt` để ra dạng chuẩn.

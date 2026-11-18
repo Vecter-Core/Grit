@@ -11,6 +11,7 @@
 - Không chạy hai Cargo cùng lúc. Dùng `CARGO_BUILD_JOBS=2`, `--test-threads=2`. Lô nặng tối đa 15 phút; chạy preflight trước mỗi lô và ghi kết quả sau từng đơn vị.
 - Đột biến M6/M7/M8/Guard: ít nhất một nửa tự động qua `tools/mut.py`; ghi nguồn từng kết quả là `tự động` hoặc `tay`.
 - Duyệt hợp đồng TCB không phải kiểm toán mã. Chỉ đổi trạng thái TCB/READINESS khi có bằng chứng và gate liền mạch xanh trên đúng mã đó.
+- Nhánh (GÓI 5): `main` = commit cuối có cổng xanh liền mạch VÀ CI xanh, CHỈ fast-forward (không force/squash); `windows-work` = nhánh làm việc. Chỉ Giang (hoặc gói lệnh nêu rõ) được đẩy `main`; đẩy `main` lần đầu: `git push origin <C>:refs/heads/main` (fast-forward).
 - Không thêm cú pháp/từ khóa hoặc đổi ngữ nghĩa nếu chưa có quyết định kiến trúc. Intrinsic mới cần hợp đồng TCB trước.
 
 ## Tài liệu phải đọc trước khi làm
