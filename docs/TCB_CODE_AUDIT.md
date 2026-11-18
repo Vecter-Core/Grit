@@ -1,5 +1,7 @@
 # G1.5 — đọc mã đối kháng TCB (Windows, 2026-11-12)
 
+> **CHỈ DÙNG CLAUDE (GÓI 4, 2026-11-19):** Giang chỉ dùng Claude; không dùng GPT/Codex nữa. Đọc chéo KHÁC HỌ model chỉ tồn tại cho đúng hai vùng: `runtime/gt-rt` và `crates/gt-guard` (≈ 2 650 dòng) do GPT-6 đọc ở G1.5 tại hash `c5aa45b`; MỌI thay đổi sau hash đó (theo `git blame`) quay về "CHƯA đọc chéo". Toàn bộ phần còn lại (≈ 63 000 dòng: checker M6/M7/M8, kiểu, MIR, hiệu ứng, driver, codegen) chỉ có corpus, oracle, đột biến, bộ sinh và đọc mã CÙNG HỌ (độc lập yếu). Không dùng chữ "kiểm toán" và không dùng "khác họ" cho vùng nào ngoài hai vùng trên.
+
 ## Phạm vi và người đọc
 
 Đọc đối kháng các đường mã H1–H10 trong `docs/TCB_REVIEW_GUIDE.md`, IR Guard (`crates/gt-guard`), phần hạ LLVM liên quan và runtime `runtime/gt-rt`. Mục tiêu là tìm đường chấp nhận sai hoặc hành vi runtime không đúng hợp đồng; đây là đọc mã và thí nghiệm có mục tiêu, không phải chứng minh hình thức hay chứng nhận an toàn.

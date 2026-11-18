@@ -2,7 +2,7 @@
 
 ## Project contract
 - Trạng thái hiện tại: xem `docs/HANDOFF.md`.
-- Kiến trúc sư là Claude qua Giang. Codex thực thi gói lệnh đã được ủy quyền; không chờ duyệt lại trong phạm vi gói.
+- Kiến trúc sư là Claude qua Giang. Người thực thi là Claude Sonnet 5.5 (từ GÓI 4, 2026-11-19 Giang CHỈ dùng Claude; không dùng GPT/Codex); thực thi gói lệnh đã được ủy quyền, không chờ duyệt lại trong phạm vi gói.
 - Fail-closed: lỗi đỏ E... hoặc ICE thì không sinh binary, không chạy. Chưa chứng minh thì không được coi là an toàn. Cảnh báo vàng S... về secret vẫn cho chạy và cảnh báo.
 - Chỉ báo số liệu thật từ lệnh đã chạy. Ghi `CHƯA KIỂM` cho phần chưa kiểm; không báo xong khi chưa có bằng chứng.
 - Lỗi soundness/false negative: thêm test tái hiện ĐỎ trước, sửa sau trong commit riêng, ghi FB vào `docs/FIELD_BUGS.md`, mở rộng generator/oracle và kiểm bằng cách tắt bản sửa.

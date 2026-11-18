@@ -1,3 +1,5 @@
+> **KHÔNG DÙNG: Giang chỉ dùng Claude (GÓI 4, 2026-11-19).** Tệp này giữ nguyên làm bản ghi; phiên đọc kế tiếp là `docs/E_PROMPT_OPUS.md` (R11c CHỜ PHIÊN OPUS).
+
 # R11c — review tấn công của model KHÁC HỌ CLAUDE (GPT/Codex), tự chứa
 
 **Trạng thái: R11c CHỜ PHIÊN GPT (Giang mở).** Lời nhắc này tự chứa: người đọc KHÔNG cần biết lịch sử. Soạn 2026-11-18 (HEAD soạn `3572787` + commit sau đó; **ghi hash HEAD thật bạn đọc**). Số liệu dưới đây lấy từ `docs/CROSS_REVIEW_COVERAGE.md` (tạo bằng `python tools/cross_review_coverage.py`); chạy lại tại HEAD của bạn.

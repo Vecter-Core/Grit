@@ -14,3 +14,4 @@ Người điền: **model viết capstone** (cuối phiên). Giang kiểm bằng
 - **DANH SÁCH MỌI TỆP đã mở/đọc trong phiên** (đường dẫn đầy đủ, kể cả khi chỉ liếc; phải chỉ gồm `docs/AI_GUIDE.md`, `docs/STD_REFERENCE.md`, `docs/CAPSTONE.md`, `docs/CAPSTONE_PROMPTS.md` và tệp của chính bạn):
 - **Kết quả `tools/capstone_check.sh`** (số ca khớp / tổng ở dev và release-o2; do Giang điền):
 - **Tự đánh giá độ sạch của phiên** (có tệp nào ngoài danh sách cho phép? có tìm lời giải cũ không?):
+- **Model là Haiku 5.5 hay Sonnet 5.5?** (mỗi K chạy với CẢ HAI; ghi kết quả từng model riêng; đây là kiểm tra CÙNG họ model, tài liệu do Claude viết)

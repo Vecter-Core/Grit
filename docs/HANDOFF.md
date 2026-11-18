@@ -22,7 +22,7 @@
 
 **Cập nhật tại commit 89438fd, ngày 2026-11-18.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
-**Vai trò thực thi (2026-11-12):** Codex thực thi gói lệnh của kiến trúc sư Claude qua Giang; Giang đã ủy quyền không chờ duyệt trong phạm vi gói. Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
+**Vai trò thực thi (cập nhật 2026-11-19, GÓI 4):** người thực thi = Claude Sonnet 5.5; kiến trúc sư = Claude; Giang CHỈ dùng Claude (không GPT/Codex). Giang đã ủy quyền không chờ duyệt trong phạm vi gói. (Dòng gốc 2026-11-12 ghi Codex thực thi: giữ làm lịch sử.) Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
 **Gói 2 hiện hành:** tiếp tục trên `integration`; theo lệnh Giang, `main` chưa đụng/merge. `windows-work` đã được push. G2.0 hoàn tất: bundle ở `D:\Grit\.backup`; hai test G1.6 ghi trong PROGRESS; fallback `gritrt_start` fail-closed (mã 71, runtime 8/8); authorship report ở `docs/AUTHORSHIP.md`. Gate đầy đủ trên đúng HEAD G2.0 `ed529c6` GREEN 1017/0/202; bundle verified sau gate. G2.1 đang bắt đầu. Xem `docs/RUNLIST.md` và `docs/RUN_REPORTS.md`.
 

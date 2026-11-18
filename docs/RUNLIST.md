@@ -67,3 +67,11 @@ Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuy�
 | S4.a–e | XONG | CAPSTONE_PROMPTS trung lập + LOG_TEMPLATE; PR bản thảo; GIANG_DOC6_READING; TSAN_FEASIBILITY; fuzz số thật (HANDOFF) |
 | S4.f HashMap chuỗi thao tác ngẫu nhiên | KHÔNG làm (tuỳ chọn) | |
 | S5 rc3 + cổng + sao lưu | XONG: `1.0.0-rc3`; cổng XANH `89438fd` (1027/0/206); bundle D: + C:; đã đẩy `windows-work` + thẻ `seed-1.0-rc3` lên kho mới |
+
+## GÓI 4 (2026-11-19; Giang CHỈ dùng Claude; người thực thi Claude Sonnet 5.5)
+| Mục | Trạng thái | Ghi chú |
+|---|---|---|
+| S0 remote + CI | ĐANG | `origin` = kho mới (`old-origin` giữ kho cũ); workflow viết lại; xem `docs/CI_REPORT.md` |
+| S1 cách nói + đọc chéo | XONG (tài liệu) | `CROSS_REVIEW_COVERAGE`, `TCB_REVIEW_GUIDE`, `TCB_CODE_AUDIT*`, `READINESS`, `SAFETY_CLAIMS`; ADR-C11 |
+| **R11c** | **CHỜ PHIÊN OPUS (Giang mở)** | `docs/E_PROMPT_OPUS.md` (CÙNG HỌ, ĐỘC LẬP YẾU); `E_PROMPT_GPT.md` ghi KHÔNG DÙNG |
+| CAPSTONE | CHỜ PHIÊN SẠCH (Giang mở) | hai phiên Claude: Haiku 5.5 và Sonnet 5.5 |

@@ -65,3 +65,9 @@ Mỗi mục: (i) làm gì · (ii) chạm vào gì · (iii) nếu hợp đồng S
 - H1–H10, IR Guard và `gt-rt` đã được đọc; kết quả, thí nghiệm và giới hạn ở `docs/TCB_CODE_AUDIT.md`.
 - Người viết: GPT-6/Codex. Người đọc tách lượt: GPT-6 (subagent chỉ đọc). Cùng họ model; đây không phải đánh giá độc lập khác họ model, và không thay thế duyệt hợp đồng của kiến trúc sư.
 - 42 dòng trong `TCB_INTRINSICS.md` tiếp tục biểu thị trạng thái duyệt HỢP ĐỒNG. Đọc mã đối kháng không tự nâng/hạ trạng thái đó.
+
+---
+# CHỈ DÙNG CLAUDE (GÓI 4, 2026-11-19) — cách nói đúng về đọc mã
+- Đọc mã KHÁC HỌ model chỉ có cho `runtime/gt-rt` và `crates/gt-guard` (GPT-6, G1.5, hash `c5aa45b`). Mọi thay đổi sau hash đó chưa được đọc chéo.
+- Mọi vùng khác (≈ 63 000 dòng) chỉ có corpus, oracle, đột biến, bộ sinh và đọc mã CÙNG HỌ (Claude đọc mã Claude): độc lập yếu. Đừng gọi đó là "kiểm toán" hay "độc lập".
+- Số dòng từng vùng và phần đã đọc: `docs/CROSS_REVIEW_COVERAGE.md`. Phiên đọc kế tiếp: `docs/E_PROMPT_OPUS.md` (R11c, Claude Opus mới, chỉ đọc).

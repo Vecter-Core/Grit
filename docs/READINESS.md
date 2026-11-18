@@ -80,3 +80,6 @@ Nhãn hiện hành: **`1.0.0-rc3`** (đổi ở GÓI 3 S5.a; trước đó mã b
 | A5 tài liệu kiểm được | **đạt** | `doc_test` 207 khối/0 sai và `STD_REFERENCE` khoá byte trong cổng; còn vài chỗ tài liệu lỗi thời đã nêu ở `docs/PROJECT_STATUS.md` |
 | A6 đóng băng | **đạt có điều kiện** | `docs/spec/FREEZE.md` + ADR-C04; hai điểm (Obligation IR, schema JSON) có test khoá; M13 chưa đủ ⇒ phần "LSP" của bảng đóng băng chưa tuyên bố |
 **Kết luận:** A3 đạt; A1, A4, A6 có điều kiện; **A2 chưa**; ⇒ nhãn `1.0.0-rc3`, KHÔNG `1.0.0-seed`.
+
+## Cách nói về đọc mã (GÓI 4 S1.a, 2026-11-19; Giang chỉ dùng Claude)
+Đọc mã KHÁC HỌ: chỉ `runtime/gt-rt` + `crates/gt-guard` (≈ 2 650 dòng) tại hash G1.5 `c5aa45b` ⇒ B3 "đạt có điều kiện" CHỈ cho hai vùng đó, mọi thay đổi sau hash đó quay về "chưa đọc chéo". Phần còn lại (≈ 63 000 dòng) chỉ có corpus, oracle, đột biến, bộ sinh, đọc mã cùng họ. Điều này giữ A2 ở "chưa". Chi tiết `docs/CROSS_REVIEW_COVERAGE.md`.
