@@ -1,0 +1,9 @@
+// expect: fail E0301
+// note: GÓI 7 S2.c (call.rs fn_arg_effects/poly_param): đối số của tham số `{poly}` KHÔNG phải tên hàm (ở đây là kết quả lời gọi) bị từ chối, kể cả khi hàm thuần. Fail-closed (giới hạn đã biết: truyền tên hàm trực tiếp).
+#level("10")
+▢ Lo { }
+■ LO: Mutex<u32, Lo> ≔ Mutex::new(0u32);
+ƒ leaf(v: &!u32, n: u32) → u32 ! ∅ { *v }
+ƒ pick() → ƒ(&!u32, u32) → u32 ! ∅ ! ∅ { leaf }
+ƒ go() ! {lock(Lo)} { LO.with(pick(), 0u32); }
+ƒ main() → i32 ! ∅ { 0 }
