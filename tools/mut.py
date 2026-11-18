@@ -19,6 +19,8 @@ import os
 import re
 import shutil
 import subprocess
+import shutil
+BASH = shutil.which("bash") or "bash"  # Windows: CreateProcess ưu tiên System32\bash.exe (WSL); which() theo PATH (Git Bash đứng đầu)
 import sys
 import threading
 import time
@@ -148,12 +150,12 @@ TRACK_SNAP = os.path.join(os.environ.get("TEMP", "."), f"mut_track_{os.getpid()}
 
 def track_snapshot():
     """lưới tệp-đã-theo-dõi (lệnh Giang 2026-10-16 mục 0e): chụp kho THẬT trước lô"""
-    subprocess.run(["bash", GUARD, "snapshot", TRACK_SNAP.replace("\\", "/"), ROOT.replace("\\", "/")], check=True)
+    subprocess.run([BASH, GUARD, "snapshot", TRACK_SNAP.replace("\\", "/"), ROOT.replace("\\", "/")], check=True)
 
 
 def track_verify():
     """sau MỖI đột biến: kho thật không được đổi (mut.py chỉ ghi trong bản sao D:/Grit_mut/wN). Trả (ok, thông báo)"""
-    r = subprocess.run(["bash", GUARD, "verify", TRACK_SNAP.replace("\\", "/"), ROOT.replace("\\", "/")],
+    r = subprocess.run([BASH, GUARD, "verify", TRACK_SNAP.replace("\\", "/"), ROOT.replace("\\", "/")],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.returncode == 0, r.stdout.strip()
 
@@ -394,7 +396,7 @@ def main():
     elif args.cmd == "run":
         # S2.c (GÓI 3): lô nặng tự từ chối khi preflight FAIL
         rp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "require_preflight.sh")
-        if subprocess.run(["bash", rp.replace("\\", "/")], stdin=subprocess.DEVNULL).returncode != 0:
+        if subprocess.run([BASH, rp.replace("\\", "/")], stdin=subprocess.DEVNULL).returncode != 0:
             print("PREFLIGHT FAIL: mut.py run từ chối chạy", file=sys.stderr)
             sys.exit(2)
         args.files = [os.path.abspath(f) for f in args.files]

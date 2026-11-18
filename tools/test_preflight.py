@@ -2,6 +2,8 @@
 import os
 import shutil
 import subprocess
+import shutil
+BASH = shutil.which("bash") or "bash"  # Windows: CreateProcess ưu tiên System32\bash.exe (WSL); which() theo PATH (Git Bash đứng đầu)
 import tempfile
 import unittest
 
@@ -25,7 +27,7 @@ class Preflight(unittest.TestCase):
 
     def run_pf(self):
         env = dict(os.environ, PREFLIGHT_SKIP_RESOURCES="1", PREFLIGHT_TRIES="2", PREFLIGHT_SLEEP="0")
-        return subprocess.run(["bash", SCRIPT, self.d.replace("\\", "/")], capture_output=True, text=True, encoding="utf-8", errors="replace",
+        return subprocess.run([BASH, SCRIPT, self.d.replace("\\", "/")], capture_output=True, text=True, encoding="utf-8", errors="replace",
                               env=env, stdin=subprocess.DEVNULL)
 
     def corrupt(self, rel, data):
@@ -83,7 +85,7 @@ class Preflight(unittest.TestCase):
     def test_low_disk_threshold_is_enforced(self):
         # Windows kiểm ổ D:/C: (PREFLIGHT_MIN_D_GB); Linux kiểm ổ chứa kho (PREFLIGHT_MIN_DISK_KB) — GÓI 4: test chạy được trên cả hai nền
         env = dict(os.environ, PREFLIGHT_TRIES="1", PREFLIGHT_SLEEP="0", PREFLIGHT_MIN_D_GB="99999", PREFLIGHT_MIN_DISK_KB="99999999999999")
-        r = subprocess.run(["bash", SCRIPT, self.d.replace("\\", "/")], capture_output=True, text=True, encoding="utf-8", errors="replace",
+        r = subprocess.run([BASH, SCRIPT, self.d.replace("\\", "/")], capture_output=True, text=True, encoding="utf-8", errors="replace",
                            env=env, stdin=subprocess.DEVNULL)
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
         self.assertTrue("D:" in r.stdout or "ổ chứa kho" in r.stdout, r.stdout)

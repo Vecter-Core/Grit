@@ -5,6 +5,8 @@ Lệnh Giang 2026-10-16 (mục 0b/0c): giai đoạn `track` — tệp đã theo 
 import os
 import shutil
 import subprocess
+import shutil
+BASH = shutil.which("bash") or "bash"  # Windows: CreateProcess ưu tiên System32\bash.exe (WSL); which() theo PATH (Git Bash đứng đầu)
 import tempfile
 import unittest
 
@@ -15,7 +17,7 @@ def gate(test_cmd):
     # các cổng lồng này chạy trên thư mục THẬT: GATE_RESET/GATE_BUDGET_SEC của cổng ngoài KHÔNG được lọt vào (sẽ xoá điểm lưu thật giữa chừng)
     env = {k: v for k, v in os.environ.items() if k not in ("GATE_RESET", "GATE_BUDGET_SEC", "GATE_FORCE_PREFLIGHT")}
     env.update(GATE_STAGES="test", GATE_TEST_CMD=test_cmd, PYTHONIOENCODING="utf-8")
-    p = subprocess.run(["bash", "tools/gate.sh", ROOT.replace("\\", "/")], cwd=ROOT, env=env,
+    p = subprocess.run([BASH, "tools/gate.sh", ROOT.replace("\\", "/")], cwd=ROOT, env=env,
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     return p.returncode, p.stdout
 
@@ -71,7 +73,7 @@ def gate_in(repo, test_cmd, pre=None):
         pre(repo)
     env = dict(os.environ, GATE_STAGES="test track", GATE_TEST_CMD=test_cmd, PYTHONIOENCODING="utf-8")
     script = os.path.join(ROOT, "tools", "gate.sh").replace("\\", "/")
-    p = subprocess.run(["bash", script, repo.replace("\\", "/")], cwd=repo, env=env,
+    p = subprocess.run([BASH, script, repo.replace("\\", "/")], cwd=repo, env=env,
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     return p.returncode, p.stdout
 
@@ -150,7 +152,7 @@ class DeletionsLedger(unittest.TestCase):
     def run_gate(self):
         env = dict(os.environ, GATE_STAGES="deletions", PYTHONIOENCODING="utf-8")
         script = os.path.join(ROOT, "tools", "gate.sh").replace(chr(92), "/")
-        p = subprocess.run(["bash", script, self.repo.replace(chr(92), "/")], cwd=self.repo, env=env, capture_output=True,
+        p = subprocess.run([BASH, script, self.repo.replace(chr(92), "/")], cwd=self.repo, env=env, capture_output=True,
                            text=True, encoding="utf-8", errors="replace")
         return p.returncode, p.stdout
 
@@ -209,7 +211,7 @@ class CommitCheck(unittest.TestCase):
 
     def check(self):
         script = os.path.join(ROOT, "tools", "commit_check.sh").replace(chr(92), "/")
-        p = subprocess.run(["bash", script, self.repo.replace(chr(92), "/")], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        p = subprocess.run([BASH, script, self.repo.replace(chr(92), "/")], capture_output=True, text=True, encoding="utf-8", errors="replace")
         return p.returncode, p.stdout
 
     def test_staged_deletion_without_ledger_update_is_refused(self):
@@ -241,7 +243,7 @@ class NulStage(unittest.TestCase):
     def run_gate(self, repo):
         env = dict(os.environ, GATE_STAGES="nul", PYTHONIOENCODING="utf-8")
         script = os.path.join(ROOT, "tools", "gate.sh").replace(chr(92), "/")
-        p = subprocess.run(["bash", script, repo.replace(chr(92), "/")], cwd=repo, env=env, capture_output=True, text=True,
+        p = subprocess.run([BASH, script, repo.replace(chr(92), "/")], cwd=repo, env=env, capture_output=True, text=True,
                            encoding="utf-8", errors="replace")
         return p.returncode, p.stdout
 
@@ -272,7 +274,7 @@ class SavepointTreeHash(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if k not in ("GATE_RESET", "GATE_BUDGET_SEC", "GATE_FORCE_PREFLIGHT", "GATE_TEST_CMD")}
         env.update(GATE_STAGES="nul", PYTHONIOENCODING="utf-8")  # cổng ngoài có thể đặt GATE_RESET/GATE_STAGES: không được rò vào cổng lồng
         script = os.path.join(ROOT, "tools", "gate.sh").replace(chr(92), "/")
-        p = subprocess.run(["bash", script, self.repo.replace(chr(92), "/")], cwd=self.repo, env=env, capture_output=True,
+        p = subprocess.run([BASH, script, self.repo.replace(chr(92), "/")], cwd=self.repo, env=env, capture_output=True,
                            text=True, encoding="utf-8", errors="replace")
         return p.returncode, p.stdout
 

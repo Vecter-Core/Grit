@@ -2,6 +2,8 @@
 import os
 import shutil
 import subprocess
+import shutil
+BASH = shutil.which("bash") or "bash"  # Windows: CreateProcess ưu tiên System32\bash.exe (WSL); which() theo PATH (Git Bash đứng đầu)
 import tempfile
 import unittest
 
@@ -24,7 +26,7 @@ class NulCheck(unittest.TestCase):
             f.write(data)
 
     def run_check(self):
-        return subprocess.run(["bash", SCRIPT, self.d.replace("\\", "/")], capture_output=True, text=True, encoding="utf-8", errors="replace",
+        return subprocess.run([BASH, SCRIPT, self.d.replace("\\", "/")], capture_output=True, text=True, encoding="utf-8", errors="replace",
                               stdin=subprocess.DEVNULL)
 
     def test_clean_tree_is_ok_and_binary_files_are_ignored(self):

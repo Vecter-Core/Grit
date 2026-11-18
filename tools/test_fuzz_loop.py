@@ -1,6 +1,8 @@
 """GÓI 4 S5.b: chế độ song song của tools/fuzz_loop.sh (kế hoạch theo RAM trống) và tools/fuzz_total.py (giờ trên băm hiện tại, danh sách tệp băm)."""
 import os
 import subprocess
+import shutil
+BASH = shutil.which("bash") or "bash"  # Windows: CreateProcess ưu tiên System32\bash.exe (WSL); which() theo PATH (Git Bash đứng đầu)
 import sys
 import unittest
 
@@ -11,7 +13,7 @@ def plan(*args, free=None):
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
     if free is not None:
         env["FUZZ_FAKE_FREE_GB"] = str(free)
-    p = subprocess.run(["bash", "tools/fuzz_loop.sh", "1", *args, "--plan"], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    p = subprocess.run([BASH, "tools/fuzz_loop.sh", "1", *args, "--plan"], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return p.returncode, p.stdout
 
 
@@ -34,7 +36,7 @@ class FuzzLoopPlan(unittest.TestCase):
 
     def test_threshold_is_configurable_and_exact(self):
         env = dict(os.environ, FUZZ_FAKE_FREE_GB="6", FUZZ_PAR_MIN_GB="6")
-        p = subprocess.run(["bash", "tools/fuzz_loop.sh", "1", "--parallel", "--plan"], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8")
+        p = subprocess.run([BASH, "tools/fuzz_loop.sh", "1", "--parallel", "--plan"], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8")
         self.assertIn("MODE=parallel", p.stdout)
 
 
