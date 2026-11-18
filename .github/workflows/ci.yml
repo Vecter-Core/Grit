@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0 (đã tra qua gh api)
+        with:
+          fetch-depth: 0   # giai đoạn `deletions` cần LỊCH SỬ đầy đủ (clone nông làm nó đạt rỗng)
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
@@ -74,6 +76,37 @@ jobs:
           echo "$a" "$b"
           test "$a" = "$b"
 
+  tsan:
+    # GÓI 4 S3: ThreadSanitizer trên Linux (build PHÂN TÍCH, không phải binary đã qua Guard cuối). Job RIÊNG, nhỏ, chạy khi push (không cron). Xem tools/tsan_check.sh.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: tsan-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: tsan-cargo-
+      - name: Dựng gritc (debug) và runtime
+        run: bash tools/setup_cloud.sh
+      - name: clang + runtime TSan
+        run: |
+          apt-cache policy clang-20 libclang-rt-20-dev | head -12 || true
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang-20 libclang-rt-20-dev
+          clang-20 --version
+      - name: gt-rt dựng với ThreadSanitizer (nightly + build-std)
+        run: |
+          rustup toolchain install nightly --profile minimal --component rust-src
+          cd runtime/gt-rt
+          RUSTFLAGS="-Zsanitizer=thread" cargo +nightly build -Zbuild-std=std,panic_abort --target x86_64-unknown-linux-gnu --release
+          ls -la target/x86_64-unknown-linux-gnu/release/libgt_rt.a
+      - name: tsan_check
+        run: bash tools/tsan_check.sh 50 2>&1 | tee tsan_out.txt
+
   windows-core:
     # BẢN RÚT GỌN (windows-2022, phút tính gấp đôi): dựng, doctor, các giai đoạn cổng nhẹ (fmt, clippy, expect, doc, deletions, nul, failopen, track) và test lõi.
     # KHÔNG chạy: audit, test toàn bộ workspace (gt-fmt riêng ≈ 17 phút, gt-driver ≈ 20 phút trên máy chính) — đã chạy trên máy Windows chính (docs/RUN_REPORTS.md).
@@ -84,6 +117,11 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Git Bash lên đầu PATH (python subprocess gọi `bash`; System32 có bash.exe của WSL)
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         id: llvmcache
         with:
