@@ -1441,7 +1441,14 @@ impl<'a> Ctx<'a> {
             .iter()
             .map(|v| (*v, Term::Var(GHOST_BASE + *v)))
             .collect();
-        let goal = match Self::subst_term(&sp.term, &map) {
+        // GÓI 7 S2.a (FB-C nghiêm trọng): biến bóng chỉ được cấp tới `GHOST_MAX_VARS`. Vòng bị thiếu bóng cho một biến của biến thể sẽ so với biến bóng
+        // CŨ (chụp ở vòng trước, còn nằm trong trạng thái) ⇒ có thể "chứng minh" một vòng không dừng. Thiếu bóng riêng ⇒ KHÔNG ĐƯỢC chứng minh (Unknown ⇒ E0702).
+        let own_ghosts = self.ghosts.get(&(sp.head as usize));
+        let all_ghosted = sp
+            .vars
+            .iter()
+            .all(|v| own_ghosts.is_some_and(|g| g.iter().any(|(o, _)| o == v)));
+        let goal = match Self::subst_term(&sp.term, &map).filter(|_| all_ghosted) {
             Some(old) => Prop::And(vec![
                 Prop::Lt(sp.term.clone(), old.clone()),
                 Prop::Le(Term::int(0), old),
