@@ -193,7 +193,7 @@ jobs:
           GRIT_RT_LIB: ${{ github.workspace }}/runtime/gt-rt/target/release/gt_rt.lib
       - name: Test lõi (lexer, parser, resolve, types, mir, guard, term, effects)
         run: cargo test --locked -p gt-lexer -p gt-parser -p gt-resolve -p gt-types -p gt-mir -p gt-guard -p gt-term -p gt-effects -- --test-threads=2
-      - name: BẢN ĐẦY ĐỦ (chỉ khi dispatch full=true): audit + test toàn workspace
+      - name: "BẢN ĐẦY ĐỦ (chỉ khi dispatch full=true) - audit và test toàn workspace"
         if: github.event_name == 'workflow_dispatch' && inputs.full
         run: |
           cargo install cargo-audit --locked
