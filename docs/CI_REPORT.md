@@ -2,7 +2,9 @@
 
 Kho riêng tư; `origin` = `https://github.com/gn3305970-lang/Grit.git` (đã `git remote rename origin old-origin` rồi `git remote add origin …`; kho cũ `Vecter-Core` giữ ở `old-origin`). Nhánh mặc định của kho (đọc bằng `gh repo view`, KHÔNG đổi): **`windows-work`** (Giang quyết nếu muốn đổi). Workflow `.github/workflows/ci.yml`: `permissions: contents: read`, không `pull_request_target`, không secret, không cron, ghim SHA (`actions/checkout` `11d5960a…` v4.4.0, `actions/cache` `0057852b…` v4, `cargo-deny-action` `70f81531…` v2), kích hoạt `push` (mọi nhánh) + `workflow_dispatch` (đầu vào `only=all|tsan`), `concurrency` huỷ run cũ cùng nhánh.
 
-## Kết quả cuối (run `44233333186`, commit `15fe834`, 2026-11-18)
+## Kết quả cuối XÁC NHẬN LẠI trên commit cuối (run `44243992871`, commit `884af7c`): TẤT CẢ XANH — `linux-gate` 72 phút, `windows-core` 21 phút, `tsan` 11 phút (dựng lạnh), `determinism` 2,7, `linux-nollvm` 1, `deny` 0,5. Bảng dưới là run `44233333186` (commit `15fe834`), cùng kết quả.
+
+## Kết quả của run `44233333186` (commit `15fe834`, 2026-11-18)
 | job | nền | kết quả | thời lượng |
 |---|---|---|---|
 | `linux-gate` (cổng đầy đủ `tools/gate.sh` + capstone K1–K4 dev/release-o2) | ubuntu-24.04 | **XANH** | 74 phút |
@@ -20,10 +22,11 @@ Cổng Linux đầy đủ: 1024 test đạt / 0 lỗi / 206 bộ (Windows có 3 
 | `44227524436` (vòng 2) | `e7b82bc` | **Linux ✓ 49 phút**; Windows ✗ 6 phút (cùng nguyên nhân `bash`: sửa PATH bằng `GITHUB_PATH` KHÔNG đủ vì `CreateProcess` tìm `System32` trước PATH) | lỗi công cụ | sửa gọi `bash` qua `shutil.which` |
 | `44233333186` (vòng 3) | `15fe834` | **TẤT CẢ XANH** (Linux 74, Windows 26, ...) | — | — |
 | `44241971280` (dispatch `only=tsan`) | `e819bc2` | `tsan` ✓ 8 phút (mẫu mở rộng 8 chương trình) | — | — |
+| `44243992871` (commit cuối, đủ mọi job) | `884af7c` | **TẤT CẢ XANH** | — | — |
 Số vòng sửa: Linux 2 (preflight test; đổi `bash`), Windows 3. **Lỗi THẬT của Grit tìm được qua CI: KHÔNG** (mọi đỏ là workflow/cấu hình/test không portable). Một phát hiện thật về QUY TRÌNH: giai đoạn `deletions` đạt RỖNG trên checkout nông (đã sửa bằng `fetch-depth: 0`); chạy `docs/RUN_REPORTS` cũ trên Windows chính không bị ảnh hưởng.
 
 ## Phút đã dùng (ước tính từ thời lượng job thật qua `gh api`)
-Linux ≈ 414 phút, Windows ≈ 41 phút (×2 = 82) ⇒ **≈ 495 phút** trên ngân sách ≈ 2 000 phút/tháng của gói miễn phí repo riêng tư (CHƯA kiểm lại trong Billing; Giang kiểm). Mỗi lần push đầy đủ tốn thêm ≈ 75 (Linux) + 52 (Windows ×2) + vài phút ≈ 130 phút ⇒ chỉ nên đẩy khi cần; dùng `[skip ci]` cho commit tài liệu và `workflow_dispatch only=tsan` để lặp TSan (≈ 3–8 phút). KHÔNG có cron, không vòng tự kích hoạt.
+Tới run `44241971280`: Linux ≈ 414 phút, Windows ≈ 41 phút (×2 = 82) ⇒ ≈ 495 phút; cộng run cuối `44243992871` (Linux ≈ 87, Windows ≈ 21 ×2 = 42) ⇒ **≈ 624 phút** trên ngân sách ≈ 2 000 phút/tháng của gói miễn phí repo riêng tư (CHƯA kiểm lại trong Billing; Giang kiểm). Mỗi lần push đầy đủ tốn thêm ≈ 75 (Linux) + 52 (Windows ×2) + vài phút ≈ 130 phút ⇒ chỉ nên đẩy khi cần; dùng `[skip ci]` cho commit tài liệu và `workflow_dispatch only=tsan` để lặp TSan (≈ 3–8 phút). KHÔNG có cron, không vòng tự kích hoạt.
 
 ## CHƯA KIỂM
 Trạng thái Billing thật; CI trên Windows cho phần test lớn (gt-driver, gt-fmt, oblig, borrowck); `cargo audit` trên Windows; nhánh `main` (không đẩy).
