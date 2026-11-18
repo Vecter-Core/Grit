@@ -126,7 +126,7 @@ fn fail_cases_of_m7_give_exactly_their_code() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "công cụ gỡ lỗi: in các check được giữ trên corpus, không khẳng định gì"]
 fn dump_kept() {
     for p in entries("pass") {
         if p.extension().is_some_and(|x| x != "gt") {

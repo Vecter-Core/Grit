@@ -9,10 +9,10 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: "all = mọi job; tsan = chỉ job tsan (lặp nhanh, tiết kiệm phút)"
+        description: "all = mọi job; tsan = chỉ job tsan; coverage = chỉ job độ phủ nhánh (GÓI 5 S3)"
         default: "all"
         type: choice
-        options: [all, tsan]
+        options: [all, tsan, coverage]
       full:
         description: "true = Windows chạy THÊM audit + test toàn workspace (≈ 74 phút tính phí; chạy thủ công trước mỗi thẻ phát hành)"
         default: false
@@ -54,6 +54,12 @@ jobs:
         run: bash tools/gate.sh .
         env:
           GRIT_LLVM_LIB_DIR: /usr/lib/x86_64-linux-gnu
+      - name: "Diff danh sách test Linux và Windows (GÓI 5 S2.a)"
+        run: |
+          cargo test --workspace -- --list 2>/dev/null | grep ': test$' | sed 's/: test$//' | sort > list_linux.txt
+          wc -l list_linux.txt docs/platform_tests_windows.list
+          grep -v -E 'a_locked_file_aborts_io_error|built_exe_does_not_depend_on_llvm_dll|check_runs_without_llvm_on_path' docs/platform_tests_windows.list | sort > expected_linux.txt
+          diff expected_linux.txt list_linux.txt && echo "PLATFORM_DIFF_OK: Linux = Windows trừ 3 test chỉ-Windows"
       - name: Capstone K1–K4 (dev và release-o2) so với bản tham chiếu Rust
         run: |
           (cd capstone/reference && cargo build --release)
@@ -73,6 +79,10 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: EmbarkStudios/cargo-deny-action@70f81531115945ba6eb6b941ec9d39d063438eb9 # v2
+      - name: "Đối chứng deny (GÓI 5 S2.b) - phiên bản * từ crates.io PHẢI đỏ"
+        run: |
+          cargo install cargo-deny --locked
+          GRIT_REQUIRE_DENY=1 python3 -m unittest tools/test_deny.py -v
 
   determinism:
     if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
@@ -104,7 +114,7 @@ jobs:
           fetch-depth: 0
       - id: d
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "tsan=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then if [ "${{ inputs.only }}" = "coverage" ]; then echo "tsan=false" >> "$GITHUB_OUTPUT"; else echo "tsan=true" >> "$GITHUB_OUTPUT"; fi; exit 0; fi
           B="${{ github.event.before }}"; A="${{ github.sha }}"
           if [ -z "$B" ] || [ "$B" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$B^{commit}" 2>/dev/null; then echo "tsan=true" >> "$GITHUB_OUTPUT"; echo "không có commit trước ⇒ chạy"; exit 0; fi
           git diff --name-only "$B" "$A" > changed.txt; cat changed.txt
@@ -142,6 +152,41 @@ jobs:
           ls -la target/x86_64-unknown-linux-gnu/release/libgt_rt.a
       - name: tsan_check
         run: bash tools/tsan_check.sh 50 2>&1 | tee tsan_out.txt
+
+  coverage:
+    # GÓI 5 S3: độ phủ NHÁNH (cargo-llvm-cov, rustc nightly; KHÔNG phải LLVM 20.1.8 của gritc) cho các crate quyết định. Chỉ workflow_dispatch only=coverage (tốn phút). Xem docs/DECISION_COVERAGE.md.
+    if: github.event_name == 'workflow_dispatch' && inputs.only == 'coverage'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Cài môi trường (Rust, libllvm20, dựng runtime/gritc/rig)
+        run: bash tools/setup_cloud.sh
+      - name: nightly + llvm-tools + cargo-llvm-cov
+        run: |
+          rustup toolchain install nightly --profile minimal --component llvm-tools-preview
+          cargo install cargo-llvm-cov --locked
+      - name: Chạy test có đo độ phủ nhánh
+        env:
+          GRIT_LLVM_LIB_DIR: /usr/lib/x86_64-linux-gnu
+          CARGO_BUILD_JOBS: "2"
+        run: |
+          cargo +nightly llvm-cov clean --workspace
+          cargo +nightly llvm-cov --branch --no-report -p gt-oblig -p gt-borrowck -p gt-types -p gt-term -p gt-effects -p gt-guard -p gt-driver -- --test-threads=2
+      - name: Xuất báo cáo JSON (chỉ crate quyết định)
+        run: |
+          cargo +nightly llvm-cov report --branch --json --output-path cov.json --ignore-filename-regex '(/tests/|/\.cargo/|/rustc/)'
+          cargo +nightly llvm-cov report --branch --summary-only > cov_summary.txt || true
+          gzip -9 cov.json
+          ls -la cov.json.gz cov_summary.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: |
+            cov.json.gz
+            cov_summary.txt
 
   windows-core:
     if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'

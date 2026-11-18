@@ -425,7 +425,7 @@ fn pruned_programs_behave_exactly_like_fully_checked_ones() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "thăm dò thủ công kịch bản alias, không khẳng định gì"]
 fn probe_alias_scenario() {
     let mut shown = 0;
     let mut with = 0;

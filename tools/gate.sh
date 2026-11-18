@@ -95,7 +95,7 @@ stage_audit() { cargo audit 2>&1 | tail -3; local c=${PIPESTATUS[0]}; echo "AUDI
 stage_expect() {
   local r=0
   $PY tools/check_expectations.py | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: check_expectations"; r=1; }
-  for t in test_check_expectations test_mut_guard test_mut_resume test_preflight test_nul_check test_gate test_require_preflight test_unsafe_inventory test_version_docs test_tsan_inject test_fuzz_loop test_nul_scan test_doc_test test_ai_guide test_gen_docs; do
+  for t in test_check_expectations test_mut_guard test_mut_resume test_preflight test_nul_check test_gate test_require_preflight test_unsafe_inventory test_version_docs test_platform_tests test_triage_user_bugs test_deny test_tsan_inject test_fuzz_loop test_nul_scan test_doc_test test_ai_guide test_gen_docs; do
     if [ -f "tools/$t.py" ]; then
       $PY -m unittest "tools/$t.py" 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: unittest $t"; r=1; }
     fi

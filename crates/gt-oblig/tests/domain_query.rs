@@ -159,7 +159,7 @@ fn unreachable_points_are_none() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "công cụ gỡ lỗi: in miền cho nguồn GT_SRC, không khẳng định gì"]
 fn dump_domain() {
     let src = std::env::var("GT_SRC").expect("GT_SRC");
     let (t, m) = common::mir(&src);

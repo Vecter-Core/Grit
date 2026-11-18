@@ -577,7 +577,7 @@ fn calls_overwrite_destinations_and_unmodelled_calls_are_unknown() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "công cụ gỡ lỗi: in quyết định cho nguồn GT_SRC, không khẳng định gì"]
 fn dump_one() {
     let src = std::env::var("GT_SRC").expect("GT_SRC");
     let (t, m) = common::mir(&src);

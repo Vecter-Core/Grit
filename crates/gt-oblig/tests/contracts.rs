@@ -220,7 +220,7 @@ fn a_function_used_as_a_value_never_gets_its_precondition_assumed() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "công cụ gỡ lỗi: in hợp đồng MIR, không khẳng định gì"]
 fn dump_contract() {
     let (t, m) = common::mir(&format!("{POS}ƒ f() → i32 ! ∅ {{ pos(5) }}\n"));
     for b in &m.bodies {
