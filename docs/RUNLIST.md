@@ -87,3 +87,6 @@ Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuy�
 
 ## GÓI 5 — XONG trừ phần ghi CHƯA (2026-11-19)
 S0 xong (main=e450c69). S1 xong (TSan đối chứng qua Grit). S2 xong (PLATFORM_TESTS, test_deny; Linux diff `--list` nằm trong CI, CHƯA có kết quả run). S3 chạy 2 lần; nhóm D CHƯA thí nghiệm. S4 xong. S5: giữ rc3.
+
+## GÓI 6 (2026-11-19) — ĐANG CHẠY cổng CI trên rc4
+S0 xong (main `17beed4`, sau khi Giang tự hợp nhất hai PR trên GitHub). S1 độ phủ: 104→100→90 nhánh chưa chạy, bảng từng nhánh. S2 đo cỡ hàm + LIMITS_AUDIT + sửa thông báo E0702 (rc4). S3 ba app (csv2json/todo/difflite) khớp tham chiếu. S4 SEED_FINISH_LINE. S5: cổng Linux CI chạy trên commit này.
