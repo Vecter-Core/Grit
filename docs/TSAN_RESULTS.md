@@ -28,3 +28,19 @@ Tổng báo cáo `data race` ở mẫu thật: **0** ⇒ không có gì để ph
 
 ## Kết luận (nói đúng mức)
 **TSan: không phát hiện đua dữ liệu trong 8 mẫu × 50 lần chạy (400 lần) ở build phân tích này.** Đây KHÔNG phải "không có đua dữ liệu". Giới hạn: chỉ các lịch thực sự xảy ra; dev profile (có kiểm Arena); 8 chương trình nhỏ, 1–4 luồng; không thử bộ nhớ yếu (x86 TSO); chỉ Linux; Windows (SRWLOCK) chưa kiểm. Đối chứng cho thấy xác suất bắt một đua cố ý ≈ 70–100 % mỗi lần chạy.
+
+## GÓI 5 S1 — độ nhạy đo bằng TỈ LỆ PHÁT HIỆN (CI run 44283688809, Linux, clang 20.1.2, mỗi đối chứng 30 lần chạy)
+| đối chứng | loại | phát hiện |
+|---|---|---|
+| `race_pthread` (ghi toàn cục, 2 pthread) | dương | 30/30 |
+| `race_gritrt_spawn` (2 worker do `gritrt_spawn`) | dương | 13/30 (≈ 0,43) — YẾU NHẤT |
+| `race_narrow_ir` (cửa sổ HẸP: chỉ ghi ở vòng cuối của 200 000 vòng, qua `gritrt_spawn`) | dương | 17/30 |
+| `grit_two_locks_nolock` (`two_locks.gt` → IR của gritc → `tsan_inject --drop-locks` → TSan) | dương, QUA PIPELINE GRIT | 16/30 |
+| `grit_narrow_droplock_nolock` (`tests/tsan/narrow_droplock.gt`, một va chạm ở vòng cuối, bỏ khoá) | dương hẹp, QUA PIPELINE GRIT | 15/30 |
+| `norace_atomic_pthread`, `grit_two_locks_lock`, `grit_narrow_droplock_lock` | ÂM (cùng chương trình, KHÔNG bỏ khoá) | 0/30 mỗi cái (đúng) |
+
+* **Cơ chế bỏ khoá (S1.a) nằm ở công cụ kiểm thử**, không ở `gritc`/`gt-rt`: `tools/tsan_inject.py --drop-locks` xoá lệnh gọi `gritrt_mutex_lock/unlock` khỏi IR do gritc sinh (tương đương `Mutex::with` bỏ khoá). Làm vậy KHÔNG đổi mã sản phẩm (giữ rc3); `tools/test_tsan_inject.py` kiểm công cụ và kiểm `gt-rt`, `gt-driver`, `gt-codegen-llvm` không chứa cơ chế bỏ khoá. ĐIỂM KHÁC với đề (feature trong gt-rt): hỏi kiến trúc sư ở báo cáo cuối.
+* **Kết luận độ nhạy:** TSan CÓ bắt race do Mutex bỏ khoá qua đúng đường dựng Grit (16/30 và 15/30 lần chạy; không phải 100 %), kể cả khi chỉ có MỘT va chạm hẹp. Tỉ lệ phát hiện yếu nhất ≈ 13/30.
+* **Công thức:** nếu tỉ lệ phát hiện mỗi lần chạy là p thì xác suất bỏ sót qua n lần là (1−p)^n, CHỈ với race CÙNG DẠNG (hai luồng ghi/đọc một ô không đồng bộ). Với p = 13/30 và n = 50 lần/mẫu: (17/30)^50 ≈ 4,6·10⁻¹³; n = 400: ≈ 10⁻⁹⁹. Đây là xác suất "bỏ sót nếu mẫu có race dạng đó", KHÔNG phải xác suất mẫu không có race, và KHÔNG áp cho race tinh vi hơn (bộ nhớ yếu/thứ tự atomic, ATOMIC-01; phụ thuộc lịch luồng hiếm).
+* **"400 lần không phát hiện"** (8 mẫu × 50, 0 báo cáo, CI cùng run) nay đi kèm: tỉ lệ phát hiện yếu nhất 13/30 trên race dạng đơn giản; vẫn chỉ nghĩa "không phát hiện trong các mẫu đã chạy".
+* Còn giới hạn: chỉ Linux; build phân tích (không phải binary qua Guard cuối); gt-rt dựng TSan riêng; không kiểm bộ nhớ yếu; Windows (SRWLOCK) CHƯA KIỂM.

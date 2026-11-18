@@ -84,3 +84,6 @@ Trạng thái theo BẰNG CHỨNG trên mã hiện tại, không theo lời tuy�
 | S4 độ phủ nhánh | CHƯA CHẠY | `tools/coverage.sh` + `docs/DECISION_COVERAGE.md` |
 | S5 fuzz | CHUẨN BỊ XONG (Giang chạy) | đóng băng lexer/parser; `fuzz_loop.sh --parallel` (kiểm RAM) + test; lệnh ở HANDOFF |
 | S6 phiên bản/cổng | GIỮ rc3 | không đổi mã sản phẩm (`crates/`, `runtime/` chỉ thêm test/công cụ); chạy giai đoạn công cụ + tài liệu của cổng |
+
+## GÓI 5 — XONG trừ phần ghi CHƯA (2026-11-19)
+S0 xong (main=e450c69). S1 xong (TSan đối chứng qua Grit). S2 xong (PLATFORM_TESTS, test_deny; Linux diff `--list` nằm trong CI, CHƯA có kết quả run). S3 chạy 2 lần; nhóm D CHƯA thí nghiệm. S4 xong. S5: giữ rc3.

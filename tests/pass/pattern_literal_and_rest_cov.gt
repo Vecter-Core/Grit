@@ -1,0 +1,14 @@
+// expect: pass
+// note: GÓI 5 S3: pattern struct có literal và ..
+▢ P {
+  x: u32,
+  y: u32,
+}
+
+ƒ main() → u32 ! ∅ {
+  p ≔ P { x: 1u32, y: 2u32 };
+  ⌥ p {
+    P { x: 1u32, .. } ↦ 1u32,
+    P { x: _, .. } ↦ 2u32,
+  }
+}

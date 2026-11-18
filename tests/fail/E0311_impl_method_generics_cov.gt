@@ -1,0 +1,13 @@
+// expect: fail E0311
+// note: GÓI 5 S3: hàm trong impl khác số tham số kiểu so với trait
+⊏ T {
+  ƒ f(&self) → u32 ! ∅;
+}
+
+▢ S { }
+
+⊐ T for S {
+  ƒ f<U>(&self) → u32 ! ∅ { 1u32 }
+}
+
+ƒ main() → u32 ! ∅ { 0u32 }

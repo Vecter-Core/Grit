@@ -1,0 +1,506 @@
+| tệp | hàm | dòng | nhánh (true+false) | đã chạy | chưa chạy | ghi chú |
+|---|---|---|---:|---:|---:|---|
+| crates/gt-oblig/src/analysis.rs | judge | 1743-1763 | 0 | 0 | 0 | vùng mã 11, chưa chạy 0 |
+| crates/gt-oblig/src/analysis.rs | judge_core | 1794-1874 | 2 | 2 | 0 | vùng mã 52, chưa chạy 0 |
+| crates/gt-oblig/src/analysis.rs | judge_ob | 1766-1791 | 0 | 0 | 0 | vùng mã 13, chưa chạy 0 |
+| crates/gt-oblig/src/analysis.rs | judge_pres | 1222-1234 | 0 | 0 | 0 | vùng mã 10, chưa chạy 0 |
+| crates/gt-oblig/src/analysis.rs | judge_posts | 1312-1405 | 36 | 35 | 1 | vùng mã 103, chưa chạy 0 |
+| crates/gt-oblig/src/analysis.rs | hyps_for | 956-1012 | 14 | 12 | 2 | vùng mã 52, chưa chạy 1 |
+| crates/gt-oblig/src/analysis.rs | assign_local | 744-927 | 42 | 41 | 1 | vùng mã 177, chưa chạy 3 |
+| crates/gt-oblig/src/analysis.rs | fixpoint | 2008-2053 | 14 | 11 | 3 | vùng mã 44, chưa chạy 2 |
+| crates/gt-oblig/src/analysis.rs | narrow | 2056-2083 | 8 | 8 | 0 | vùng mã 27, chưa chạy 0 |
+| crates/gt-oblig/src/analysis.rs | widen | 291-299 | 4 | 2 | 2 | vùng mã 12, chưa chạy 2 |
+| crates/gt-oblig/src/analysis.rs | check_post_fixpoint | 2086-2106 | 6 | 6 | 0 | vùng mã 18, chưa chạy 0 |
+| crates/gt-oblig/src/driver.rs | analyze_program_with | 136-382 | 40 | 29 | 11 | vùng mã 211, chưa chạy 44 |
+| crates/gt-oblig/src/driver.rs | escaped_sites | 442-493 | 10 | 9 | 1 | vùng mã 37, chưa chạy 1 |
+| crates/gt-borrowck/src/check.rs | conflicts | 251-268 | 12 | 12 | 0 | vùng mã 23, chưa chạy 0 |
+| crates/gt-borrowck/src/check.rs | check_uses | 389-439 | 22 | 21 | 1 | vùng mã 55, chưa chạy 0 |
+| crates/gt-borrowck/src/check.rs | terminator_effect | 83-85 | 0 | 0 | 0 | vùng mã 4, chưa chạy 0 |
+| crates/gt-borrowck/src/regions.rs | outl | 163-169 | 0 | 0 | 0 | vùng mã 6, chưa chạy 0 |
+| crates/gt-borrowck/src/regions.rs | relate | 325-380 | 16 | 13 | 3 | vùng mã 82, chưa chạy 11 |
+| crates/gt-borrowck/src/solve.rs | * | 1-116 | 8 | 7 | 1 | vùng mã 84, chưa chạy 2 |
+| crates/gt-types/src/send.rs | * | 1-178 | 20 | 17 | 3 | vùng mã 143, chưa chạy 4 |
+| crates/gt-types/src/db.rs | select_impl | 125-142 | 8 | 5 | 3 | vùng mã 33, chưa chạy 13 |
+| crates/gt-types/src/check/pat.rs | * | 1-566 | 88 | 69 | 19 | vùng mã 523, chưa chạy 105 |
+| crates/gt-types/src/check/call.rs | * | 1-619 | 86 | 66 | 20 | vùng mã 513, chưa chạy 71 |
+| crates/gt-types/src/validate.rs | * | 1-335 | 54 | 47 | 7 | vùng mã 271, chưa chạy 17 |
+| crates/gt-term/src/lib.rs | check_termination | 615-933 | 56 | 52 | 4 | vùng mã 284, chưa chạy 19 |
+| crates/gt-term/src/lib.rs | instance_graph | 293-500 | 54 | 44 | 10 | vùng mã 214, chưa chạy 27 |
+| crates/gt-term/src/lib.rs | inferred_candidates | 158-179 | 4 | 4 | 0 | vùng mã 28, chưa chạy 0 |
+| crates/gt-term/src/lib.rs | sccs | 187-237 | 18 | 17 | 1 | vùng mã 64, chưa chạy 0 |
+| crates/gt-effects/src/lib.rs | check_effects | 43-226 | 22 | 16 | 6 | vùng mã 148, chưa chạy 41 |
+| crates/gt-guard/src/lib.rs | check_module | 383-517 | 42 | 42 | 0 | vùng mã 130, chưa chạy 0 |
+| crates/gt-guard/src/lib.rs | check_post | 342-379 | 10 | 10 | 0 | vùng mã 38, chưa chạy 0 |
+| crates/gt-guard/src/lib.rs | allowed_llvm_intrinsic | 126-151 | 0 | 0 | 0 | vùng mã 12, chưa chạy 0 |
+| crates/gt-guard/src/lib.rs | runtime_address_violations | 171-213 | 16 | 15 | 1 | vùng mã 33, chưa chạy 0 |
+| crates/gt-guard/src/lib.rs | abort_profile | 312-327 | 4 | 4 | 0 | vùng mã 15, chưa chạy 0 |
+| crates/gt-driver/src/verdict.rs | decide | 48-75 | 14 | 14 | 0 | vùng mã 27, chưa chạy 0 |
+
+## Nhánh chưa chạy (tệp, hàm, dòng:cột, hướng)
+
+- crates/gt-oblig/src/analysis.rs::judge_posts 1342:43 **true `if self.assigns[i] > 0 || self.aliased[i] {`**
+- crates/gt-oblig/src/analysis.rs::hyps_for 978:20 **false `if let B::Fin(lo) = iv.lo`**
+- crates/gt-oblig/src/analysis.rs::hyps_for 983:20 **false `if let B::Fin(hi) = iv.hi`**
+- crates/gt-oblig/src/analysis.rs::assign_local 907:34 **false `Val::Interval(iv) if tracked => st.env.assign_interval(dst as VarId, *iv),`**
+- crates/gt-oblig/src/analysis.rs::fixpoint 2010:8 **true `if n > UNREP_MAX_BLOCKS {`**
+- crates/gt-oblig/src/analysis.rs::fixpoint 2025:16 **true `if *steps > MAX_BLOCK_STEPS {`**
+- crates/gt-oblig/src/analysis.rs::fixpoint 2035:41 **false `if back_edge && visits[t] >= 1 {`**
+- crates/gt-oblig/src/analysis.rs::widen 292:12 **true `if self.env.is_dead() {`**
+- crates/gt-oblig/src/analysis.rs::widen 295:12 **true `if new.env.is_dead() {`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 144:8 **true `if !m.report.diagnostics.is_empty() {`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 179:17 **false `let Some(term) = &bb.terminator else { continue };`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 190:17 **false `let Some(sig) =`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 201:35 **false `.any(|mm| mm.name == sig.name && info.pre.contains_key(&mm.node))`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 203:37 **true `if sig.has_contracts || info.pre.contains_key(&sig.node) || in_impls {`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 242:27 **true `let sign = if bl.negative { "-" } else { "" };`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 268:16 **true `if let Some(e) = &rep.ice {`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 291:12 **true `if rep.budget_exhausted {`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 352:24 **false `if let Some(term) = ob.blocks[*blk as usize].terminator.as_mut()`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 353:28 **false `&& let TerminatorKind::Assert { target, .. } = &term.kind`**
+- crates/gt-oblig/src/driver.rs::analyze_program_with 359:16 **true `if let Err(errs) = gt_mir::validate::validate(&ob, &t.db) {`**
+- crates/gt-oblig/src/driver.rs::escaped_sites 469:20 **false `if let Some(t) = &bb.terminator {`**
+- crates/gt-borrowck/src/check.rs::check_uses 424:24 **false `if exact && us.contains(node) {`**
+- crates/gt-borrowck/src/regions.rs::relate 326:12 **true `if src.len() != dst.len() {`**
+- crates/gt-borrowck/src/regions.rs::relate 335:20 **true `if src.is_empty() {`**
+- crates/gt-borrowck/src/regions.rs::relate 370:24 **false `if o + n <= src.len() {`**
+- crates/gt-borrowck/src/solve.rs::* 55:16 **false `if let Some(t) = &bb.terminator {`**
+- crates/gt-types/src/send.rs::* 64:12 **true `if depth > 64 {`**
+- crates/gt-types/src/send.rs::* 122:20 **true `if seen`**
+- crates/gt-types/src/send.rs::* 124:52 **true `.any(|(sd, sa, sw)| sd == d && sa == args && *sw == which)`**
+- crates/gt-types/src/db.rs::select_impl 126:35 **true `if select_impl_fault() || ty.has_param() || ty.has_infer() {`**
+- crates/gt-types/src/db.rs::select_impl 126:53 **true `if select_impl_fault() || ty.has_param() || ty.has_infer() {`**
+- crates/gt-types/src/db.rs::select_impl 129:12 **true `if select_impl_first() {`**
+- crates/gt-types/src/check/pat.rs::* 15:39 **false `Some(Res::Def(vd)) if self.env.defs()[vd.index()].kind == DefKind::Variant`**
+- crates/gt-types/src/check/pat.rs::* 64:39 **false `Some(Res::Def(vd)) if self.env.defs()[vd.index()].kind == DefKind::Variant => {`**
+- crates/gt-types/src/check/pat.rs::* 79:39 **false `Some(Res::Def(vd)) if self.env.defs()[vd.index()].kind == DefKind::Variant => {`**
+- crates/gt-types/src/check/pat.rs::* 129:12 **true `if !unqualified {`**
+- crates/gt-types/src/check/pat.rs::* 137:13 **false `let Ty::Adt(wd, _) = self.infer.resolve(want) else {`**
+- crates/gt-types/src/check/pat.rs::* 216:16 **true `if !self.infer.unify(&lt, ty) {`**
+- crates/gt-types/src/check/pat.rs::* 222:49 **true `|| matches!(rt, Ty::Infer(i) if self.infer.kind_of(i) == crate::infer::VarKind::Int);`**
+- crates/gt-types/src/check/pat.rs::* 222:49 **false `|| matches!(rt, Ty::Infer(i) if self.infer.kind_of(i) == crate::infer::VarKind::Int);`**
+- crates/gt-types/src/check/pat.rs::* 223:16 **true `if !okty {`**
+- crates/gt-types/src/check/pat.rs::* 268:13 **false `let Some(adt) = parent.and_then(|x| self.env.db.adts.get(&x)).cloned() else {`**
+- crates/gt-types/src/check/pat.rs::* 271:13 **false `let AdtKind::Enum(vs) = &adt.kind else {`**
+- crates/gt-types/src/check/pat.rs::* 274:13 **false `let Some(vi) = vs.iter().position(|v| v.def == vd) else {`**
+- crates/gt-types/src/check/pat.rs::* 347:29 **true `Ty::Infer(_) if !has_rest => {`**
+- crates/gt-types/src/check/pat.rs::* 347:29 **false `Ty::Infer(_) if !has_rest => {`**
+- crates/gt-types/src/check/pat.rs::* 383:34 **false `Some(Res::Def(d)) if self.env.db.adts.contains_key(&d) => {`**
+- crates/gt-types/src/check/pat.rs::* 421:13 **false `let Some(adt) = self.env.db.adts.get(&d).cloned() else {`**
+- crates/gt-types/src/check/pat.rs::* 431:13 **false `let AdtKind::Struct(defs) = &adt.kind else {`**
+- crates/gt-types/src/check/pat.rs::* 473:16 **false `if !defs[i].public && !self.is_within(self.module, adt.module) {`**
+- crates/gt-types/src/check/pat.rs::* 545:19 **false `return if it.next().is_none() {`**
+- crates/gt-types/src/check/call.rs::* 9:13 **false `let ExprKind::Path(p) = &a.kind else {`**
+- crates/gt-types/src/check/call.rs::* 13:28 **false `Res::Def(d) if self.env.defs()[d.index()].kind == DefKind::Fn => {`**
+- crates/gt-types/src/check/call.rs::* 33:20 **false `&& let Some(e) = self.fn_arg_effects(a)`**
+- crates/gt-types/src/check/call.rs::* 50:13 **false `let Some(res) = self.env.res.uses.get(&p.id).cloned() else {`**
+- crates/gt-types/src/check/call.rs::* 75:21 **false `let Some((sig, _)) = self.env.db.fns.get(&d).cloned() else {`**
+- crates/gt-types/src/check/call.rs::* 116:21 **false `let Some(adt) = parent.and_then(|p| self.env.db.adts.get(&p)).cloned() else {`**
+- crates/gt-types/src/check/call.rs::* 119:21 **false `let AdtKind::Enum(vs) = &adt.kind else {`**
+- crates/gt-types/src/check/call.rs::* 122:21 **false `let Some(v) = vs.iter().find(|v| v.def == d) else {`**
+- crates/gt-types/src/check/call.rs::* 153:12 **true `if member.contains("::") {`**
+- crates/gt-types/src/check/call.rs::* 168:28 **false `Res::Def(d) if self.env.db.traits.contains_key(d) => {`**
+- crates/gt-types/src/check/call.rs::* 171:21 **false `let Some(mi) = td.members.iter().position(|m| m.name == member) else {`**
+- crates/gt-types/src/check/call.rs::* 272:12 **true `if crate::ALLOW_INTRINSIC_VALUES`**
+- crates/gt-types/src/check/call.rs::* 287:20 **false `&& let Some(sig) = self.env.db.sig_by_node(callee_node)`**
+- crates/gt-types/src/check/call.rs::* 288:16 **false `&& self.has_cap(&sig.ret)`**
+- crates/gt-types/src/check/call.rs::* 289:16 **false `&& !sig.params.iter().any(|p| self.has_cap(p))`**
+- crates/gt-types/src/check/call.rs::* 310:20 **false `&& let Some(node) = self`**
+- crates/gt-types/src/check/call.rs::* 367:30 **false `Some(effects) if effects == pick.effects => pick.effects.clone(),`**
+- crates/gt-types/src/check/call.rs::* 430:21 **false `let Some(callee) = callee else {`**
+- crates/gt-types/src/check/call.rs::* 512:41 **false `if r.has_infer() && self.infer.probe(|inf| inf.unify(&r, x)) {`**
+- crates/gt-types/src/check/call.rs::* 553:31 **true `let code = if msg.contains("chưa đủ thông tin") {`**
+- crates/gt-types/src/validate.rs::* 25:13 **false `let Some(td) = self.db.traits.get(&tr.trait_def).cloned() else {`**
+- crates/gt-types/src/validate.rs::* 112:13 **false `let (Some(ts), Some(is)) = (`**
+- crates/gt-types/src/validate.rs::* 140:12 **true `if ti.len() != ii.len() || to.len() != io.len() {`**
+- crates/gt-types/src/validate.rs::* 140:36 **true `if ti.len() != ii.len() || to.len() != io.len() {`**
+- crates/gt-types/src/validate.rs::* 202:16 **false `if !matches!(imp.self_ty, Ty::Err) {`**
+- crates/gt-types/src/validate.rs::* 212:13 **false `let Some(adt) = self.db.adts.get(d).cloned() else {`**
+- crates/gt-types/src/validate.rs::* 274:42 **true `if matches!(ty, Ty::Adt(d, _) if *d == own) {`**
+- crates/gt-term/src/lib.rs::check_termination 643:13 **false `let Some(f) = fns.get(&b.node) else { continue };`**
+- crates/gt-term/src/lib.rs::check_termination 748:12 **true `if !fns.contains_key(&b.node) {`**
+- crates/gt-term/src/lib.rs::check_termination 750:16 **true `if !b.loops.is_empty() {`**
+- crates/gt-term/src/lib.rs::check_termination 750:16 **false `if !b.loops.is_empty() {`**
+- crates/gt-term/src/lib.rs::instance_graph 323:12 **false `if by_node.contains_key(&i.node) {`**
+- crates/gt-term/src/lib.rs::instance_graph 339:13 **false `let Some(&bi) = by_node.get(&node) else {`**
+- crates/gt-term/src/lib.rs::instance_graph 368:17 **false `let Some(term) = bb.terminator.as_ref() else {`**
+- crates/gt-term/src/lib.rs::instance_graph 404:24 **true `if st.has_param() || st.has_infer() {`**
+- crates/gt-term/src/lib.rs::instance_graph 404:42 **true `if st.has_param() || st.has_infer() {`**
+- crates/gt-term/src/lib.rs::instance_graph 409:24 **false `if by_node.contains_key(&n2) {`**
+- crates/gt-term/src/lib.rs::instance_graph 411:28 **false `if !DROP_TRAIT_EDGES.load(std::sync::atomic::Ordering::SeqCst) {`**
+- crates/gt-term/src/lib.rs::instance_graph 421:11 **true `while edges.len() < n {`**
+- crates/gt-term/src/lib.rs::instance_graph 461:15 **true `while p[y] != r {`**
+- crates/gt-term/src/lib.rs::instance_graph 472:13 **false `let Some(&bi) = by_node.get(&list[k].0) else {`**
+- crates/gt-term/src/lib.rs::sccs 221:31 **false `while let Some(w) = stack.pop() {`**
+- crates/gt-effects/src/lib.rs::check_effects 91:25 **false `let Some(cs) = t.db.sig_by_node(*node) else {`**
+- crates/gt-effects/src/lib.rs::check_effects 117:25 **false `let Some(cs) = t`**
+- crates/gt-effects/src/lib.rs::check_effects 176:13 **false `let Some(td) = t.db.traits.get(&tr.trait_def) else {`**
+- crates/gt-effects/src/lib.rs::check_effects 177:20 **true `if let Some(m0) = imp.members.first() {`**
+- crates/gt-effects/src/lib.rs::check_effects 177:20 **false `if let Some(m0) = imp.members.first() {`**
+- crates/gt-effects/src/lib.rs::check_effects 190:17 **false `let Some(tm) = td.members.iter().find(|x| x.name == mem.name) else {`**
+- crates/gt-guard/src/lib.rs::runtime_address_violations 191:21 **false `callee_name(&i).as_deref() == Some(name.as_str())`**
+
+## Vùng mã (region, gồm nhánh match) chưa chạy: tệp, hàm, dòng:cột-dòng:cột, mã
+
+- crates/gt-oblig/src/analysis.rs::hyps_for 1007:32-1007:63 `Some(false) => hyps.push(Prop::Atom(*a).not()),`
+- crates/gt-oblig/src/analysis.rs::assign_local 786:30-786:42 `_ => Val::Unknown,`
+- crates/gt-oblig/src/analysis.rs::assign_local 815:37-815:49 `None => Val::Unknown,`
+- crates/gt-oblig/src/analysis.rs::assign_local 868:33-868:45 `None => Val::Unknown,`
+- crates/gt-oblig/src/analysis.rs::fixpoint 2012:9-2012:20 `return None;`
+- crates/gt-oblig/src/analysis.rs::fixpoint 2026:17-2026:28 `return None;`
+- crates/gt-oblig/src/analysis.rs::widen 293:13-293:31 `return new.clone();`
+- crates/gt-oblig/src/analysis.rs::widen 296:13-296:32 `return self.clone();`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 145:9-150:10 `return OblOutput {`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 146:21-146:33 `report: bag.finish(),`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 147:21-147:31 `bodies: Vec::new(),`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 164:33-164:36 `.map_or_else(|| "?".to_string(), |k| k.clone());`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 179:52-179:60 `let Some(term) = &bb.terminator else { continue };`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 195:17-195:25 `continue;`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 222:17-222:20 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 222:17-228:19 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 222:26-222:28 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 223:21-223:22 `t,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 224:21-224:28 `"E9901",`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 225:21-225:27 `b.node,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 226:21-226:27 `b.span,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 229:17-229:39 `bodies.push(b.clone());`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 230:17-230:25 `per_body.push(BodyReport {`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 230:17-234:19 `per_body.push(BodyReport {`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 231:26-231:39 `key: b.key.clone(),`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 235:17-235:25 `continue;`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 242:41-242:44 `let sign = if bl.negative { "-" } else { "" };`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 269:13-269:16 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 269:13-275:15 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 269:22-269:24 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 270:17-270:18 `t,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 271:17-271:24 `"E9901",`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 272:17-272:23 `b.node,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 273:17-273:23 `b.span,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 274:17-274:24 `format!("lỗi nội bộ trong `{}`: {e}", b.key),`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 292:13-292:16 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 292:13-301:15 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 292:22-292:24 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 293:17-293:18 `t,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 294:17-294:24 `"N0605",`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 295:17-295:23 `b.node,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 296:17-296:23 `b.span,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 356:17-356:18 `}`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 360:13-360:16 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 360:13-370:15 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 360:22-360:24 `bag.push(mk(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 361:17-361:18 `t,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 362:17-362:24 `"E9901",`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 363:17-363:23 `b.node,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 364:17-364:23 `b.span,`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 365:17-365:24 `format!(`
+- crates/gt-oblig/src/driver.rs::analyze_program_with 367:21-367:26 `b.key,`
+- crates/gt-oblig/src/driver.rs::escaped_sites 489:13-489:14 `}`
+- crates/gt-borrowck/src/regions.rs::relate 327:13-327:30 `RELATE_MISMATCHES.fetch_add(1, Ordering::Relaxed);`
+- crates/gt-borrowck/src/regions.rs::relate 327:13-327:62 `RELATE_MISMATCHES.fetch_add(1, Ordering::Relaxed);`
+- crates/gt-borrowck/src/regions.rs::relate 328:13-328:96 `self.defend("relate: số vị trí region của nguồn và đích không khớp");`
+- crates/gt-borrowck/src/regions.rs::relate 329:26-329:68 `let (a, b) = (flat(&src.to_vec()), flat(&dst.to_vec()));`
+- crates/gt-borrowck/src/regions.rs::relate 329:27-329:46 `let (a, b) = (flat(&src.to_vec()), flat(&dst.to_vec()));`
+- crates/gt-borrowck/src/regions.rs::relate 330:13-330:17 `self.outl(&a, &b);`
+- crates/gt-borrowck/src/regions.rs::relate 330:13-330:30 `self.outl(&a, &b);`
+- crates/gt-borrowck/src/regions.rs::relate 331:13-331:19 `return;`
+- crates/gt-borrowck/src/regions.rs::relate 336:21-336:84 `self.defend("relate: tham chiếu không có vị trí region");`
+- crates/gt-borrowck/src/regions.rs::relate 337:21-337:27 `return;`
+- crates/gt-borrowck/src/regions.rs::relate 373:25-373:96 `self.defend("relate: đối số kiểu vượt số vị trí region");`
+- crates/gt-borrowck/src/solve.rs::* 46:48-46:49 `let r = gt_dataflow::solve(&Liveness, body)?;`
+- crates/gt-borrowck/src/solve.rs::* 57:9-57:10 `}`
+- crates/gt-types/src/send.rs::* 65:13-65:75 `return Err("kiểu lồng quá sâu để kiểm".to_string());`
+- crates/gt-types/src/send.rs::* 96:29-96:73 `Ty::Infer(_) => Err("kiểu chưa xác định".to_string()),`
+- crates/gt-types/src/send.rs::* 124:66-124:78 `.any(|(sd, sa, sw)| sd == d && sa == args && *sw == which)`
+- crates/gt-types/src/send.rs::* 126:21-126:34 `return Ok(());`
+- crates/gt-types/src/db.rs::select_impl 131:21-133:24 `let i = self`
+- crates/gt-types/src/db.rs::select_impl 134:31-134:51 `.position(|m| m.trait_ref.as_ref().map(|t| t.trait_def) == Some(trait_def))?;`
+- crates/gt-types/src/db.rs::select_impl 134:60-134:61 `.position(|m| m.trait_ref.as_ref().map(|t| t.trait_def) == Some(trait_def))?;`
+- crates/gt-types/src/db.rs::select_impl 134:76-134:91 `.position(|m| m.trait_ref.as_ref().map(|t| t.trait_def) == Some(trait_def))?;`
+- crates/gt-types/src/db.rs::select_impl 134:92-134:93 `.position(|m| m.trait_ref.as_ref().map(|t| t.trait_def) == Some(trait_def))?;`
+- crates/gt-types/src/db.rs::select_impl 135:27-135:42 `let mut inf = InferCtx::new();`
+- crates/gt-types/src/db.rs::select_impl 136:24-136:34 `let args = fresh_args(&mut inf, &self.impls[i].generics);`
+- crates/gt-types/src/db.rs::select_impl 136:24-136:69 `let args = fresh_args(&mut inf, &self.impls[i].generics);`
+- crates/gt-types/src/db.rs::select_impl 136:35-136:43 `let args = fresh_args(&mut inf, &self.impls[i].generics);`
+- crates/gt-types/src/db.rs::select_impl 137:26-137:27 `return Some((i, args.iter().map(|a| inf.resolve(a)).collect()));`
+- crates/gt-types/src/db.rs::select_impl 137:29-137:40 `return Some((i, args.iter().map(|a| inf.resolve(a)).collect()));`
+- crates/gt-types/src/db.rs::select_impl 137:49-137:52 `return Some((i, args.iter().map(|a| inf.resolve(a)).collect()));`
+- crates/gt-types/src/db.rs::select_impl 137:61-137:62 `return Some((i, args.iter().map(|a| inf.resolve(a)).collect()));`
+- crates/gt-types/src/check/pat.rs::* 83:21-83:40 `self.bind_all(args);`
+- crates/gt-types/src/check/pat.rs::* 84:21-84:31 `XPat::Wild`
+- crates/gt-types/src/check/pat.rs::* 87:21-87:25 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 87:21-92:22 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 88:25-88:32 `"E0301",`
+- crates/gt-types/src/check/pat.rs::* 89:25-89:29 `p.id,`
+- crates/gt-types/src/check/pat.rs::* 93:21-93:40 `self.bind_all(args);`
+- crates/gt-types/src/check/pat.rs::* 94:21-94:31 `XPat::Wild`
+- crates/gt-types/src/check/pat.rs::* 127:18-127:30 `_ => return false,`
+- crates/gt-types/src/check/pat.rs::* 130:13-130:25 `return false;`
+- crates/gt-types/src/check/pat.rs::* 138:13-138:25 `return false;`
+- crates/gt-types/src/check/pat.rs::* 186:25-186:37 `None => XPat::Opaque,`
+- crates/gt-types/src/check/pat.rs::* 195:66-195:67 `let (v, _) = crate::collect::parse_int_literal(s)?;`
+- crates/gt-types/src/check/pat.rs::* 199:18-199:22 `_ => None,`
+- crates/gt-types/src/check/pat.rs::* 217:17-217:21 `self.pat_mismatch(p, ty, &lt);`
+- crates/gt-types/src/check/pat.rs::* 217:17-217:46 `self.pat_mismatch(p, ty, &lt);`
+- crates/gt-types/src/check/pat.rs::* 217:35-217:36 `self.pat_mismatch(p, ty, &lt);`
+- crates/gt-types/src/check/pat.rs::* 218:17-218:34 `return XPat::Wild;`
+- crates/gt-types/src/check/pat.rs::* 222:20-222:28 `|| matches!(rt, Ty::Infer(i) if self.infer.kind_of(i) == crate::infer::VarKind::Int);`
+- crates/gt-types/src/check/pat.rs::* 222:29-222:31 `|| matches!(rt, Ty::Infer(i) if self.infer.kind_of(i) == crate::infer::VarKind::Int);`
+- crates/gt-types/src/check/pat.rs::* 222:49-222:100 `|| matches!(rt, Ty::Infer(i) if self.infer.kind_of(i) == crate::infer::VarKind::Int);`
+- crates/gt-types/src/check/pat.rs::* 224:25-224:38 `let s = self.show(ty);`
+- crates/gt-types/src/check/pat.rs::* 225:17-225:21 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 225:17-230:18 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 226:21-226:28 `"E0301",`
+- crates/gt-types/src/check/pat.rs::* 227:21-227:25 `p.id,`
+- crates/gt-types/src/check/pat.rs::* 228:21-228:27 `p.span,`
+- crates/gt-types/src/check/pat.rs::* 231:17-231:34 `return XPat::Wild;`
+- crates/gt-types/src/check/pat.rs::* 259:5-259:82 `fn pat_db_fault(&mut self, p: &Pattern, args: &[Pattern], what: &str) -> XPat {`
+- crates/gt-types/src/check/pat.rs::* 260:9-260:13 `self.err("E9901", p.id, p.span, format!("pattern biến thể: {what}"));`
+- crates/gt-types/src/check/pat.rs::* 260:9-260:81 `self.err("E9901", p.id, p.span, format!("pattern biến thể: {what}"));`
+- crates/gt-types/src/check/pat.rs::* 260:18-260:25 `self.err("E9901", p.id, p.span, format!("pattern biến thể: {what}"));`
+- crates/gt-types/src/check/pat.rs::* 260:27-260:31 `self.err("E9901", p.id, p.span, format!("pattern biến thể: {what}"));`
+- crates/gt-types/src/check/pat.rs::* 260:33-260:39 `self.err("E9901", p.id, p.span, format!("pattern biến thể: {what}"));`
+- crates/gt-types/src/check/pat.rs::* 261:9-261:28 `self.bind_all(args);`
+- crates/gt-types/src/check/pat.rs::* 262:9-262:19 `XPat::Wild`
+- crates/gt-types/src/check/pat.rs::* 263:5-263:6 `}`
+- crates/gt-types/src/check/pat.rs::* 269:13-269:109 `return self.pat_db_fault(p, args, "ADT cha của biến thể không có trong cơ sở kiểu");`
+- crates/gt-types/src/check/pat.rs::* 269:20-269:24 `return self.pat_db_fault(p, args, "ADT cha của biến thể không có trong cơ sở kiểu");`
+- crates/gt-types/src/check/pat.rs::* 269:38-269:39 `return self.pat_db_fault(p, args, "ADT cha của biến thể không có trong cơ sở kiểu");`
+- crates/gt-types/src/check/pat.rs::* 272:13-272:91 `return self.pat_db_fault(p, args, "cha của biến thể không phải enum");`
+- crates/gt-types/src/check/pat.rs::* 272:20-272:24 `return self.pat_db_fault(p, args, "cha của biến thể không phải enum");`
+- crates/gt-types/src/check/pat.rs::* 272:38-272:39 `return self.pat_db_fault(p, args, "cha của biến thể không phải enum");`
+- crates/gt-types/src/check/pat.rs::* 275:13-275:88 `return self.pat_db_fault(p, args, "biến thể không có trong enum cha");`
+- crates/gt-types/src/check/pat.rs::* 275:20-275:24 `return self.pat_db_fault(p, args, "biến thể không có trong enum cha");`
+- crates/gt-types/src/check/pat.rs::* 275:38-275:39 `return self.pat_db_fault(p, args, "biến thể không có trong enum cha");`
+- crates/gt-types/src/check/pat.rs::* 335:31-335:54 `let idx = fields.len() - tail + j;`
+- crates/gt-types/src/check/pat.rs::* 336:21-336:29 `out[idx] = self.pat(a, &fields[idx]);`
+- crates/gt-types/src/check/pat.rs::* 336:21-336:57 `out[idx] = self.pat(a, &fields[idx]);`
+- crates/gt-types/src/check/pat.rs::* 336:32-336:36 `out[idx] = self.pat(a, &fields[idx]);`
+- crates/gt-types/src/check/pat.rs::* 336:41-336:42 `out[idx] = self.pat(a, &fields[idx]);`
+- crates/gt-types/src/check/pat.rs::* 347:29-347:38 `Ty::Infer(_) if !has_rest => {`
+- crates/gt-types/src/check/pat.rs::* 348:34-348:42 `let e: Vec<Ty> = v.iter().map(|_| self.fresh()).collect();`
+- crates/gt-types/src/check/pat.rs::* 348:51-348:55 `let e: Vec<Ty> = v.iter().map(|_| self.fresh()).collect();`
+- crates/gt-types/src/check/pat.rs::* 349:17-349:27 `self.infer.unify(ty, &Ty::Tuple(e.clone()));`
+- crates/gt-types/src/check/pat.rs::* 349:17-349:60 `self.infer.unify(ty, &Ty::Tuple(e.clone()));`
+- crates/gt-types/src/check/pat.rs::* 350:17-350:18 `e`
+- crates/gt-types/src/check/pat.rs::* 353:17-353:33 `self.bind_all(v);`
+- crates/gt-types/src/check/pat.rs::* 354:17-354:34 `return XPat::Wild;`
+- crates/gt-types/src/check/pat.rs::* 357:38-357:46 `let want = Ty::Tuple(v.iter().map(|_| Ty::Err).collect());`
+- crates/gt-types/src/check/pat.rs::* 358:25-358:29 `let _ = want;`
+- crates/gt-types/src/check/pat.rs::* 359:25-359:42 `let s = self.show(&other);`
+- crates/gt-types/src/check/pat.rs::* 360:17-360:21 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 360:17-365:18 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 361:21-361:28 `"E0301",`
+- crates/gt-types/src/check/pat.rs::* 362:21-362:25 `p.id,`
+- crates/gt-types/src/check/pat.rs::* 363:21-363:27 `p.span,`
+- crates/gt-types/src/check/pat.rs::* 366:17-366:33 `self.bind_all(v);`
+- crates/gt-types/src/check/pat.rs::* 367:17-367:34 `return XPat::Wild;`
+- crates/gt-types/src/check/pat.rs::* 385:52-385:56 `let args: Vec<Ty> = (0..n).map(|_| self.fresh()).collect();`
+- crates/gt-types/src/check/pat.rs::* 390:17-390:41 `self.bind_fields(fields);`
+- crates/gt-types/src/check/pat.rs::* 391:17-391:34 `return XPat::Wild;`
+- crates/gt-types/src/check/pat.rs::* 394:17-394:21 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 394:17-399:18 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 395:21-395:28 `"E0301",`
+- crates/gt-types/src/check/pat.rs::* 396:21-396:28 `path.id,`
+- crates/gt-types/src/check/pat.rs::* 400:17-400:41 `self.bind_fields(fields);`
+- crates/gt-types/src/check/pat.rs::* 401:17-401:34 `return XPat::Wild;`
+- crates/gt-types/src/check/pat.rs::* 422:13-422:17 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 422:13-427:14 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 423:17-423:24 `"E9901",`
+- crates/gt-types/src/check/pat.rs::* 424:17-424:21 `p.id,`
+- crates/gt-types/src/check/pat.rs::* 428:13-428:37 `self.bind_fields(fields);`
+- crates/gt-types/src/check/pat.rs::* 429:13-429:30 `return XPat::Wild;`
+- crates/gt-types/src/check/pat.rs::* 432:13-432:17 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 432:13-437:14 `self.err(`
+- crates/gt-types/src/check/pat.rs::* 433:17-433:24 `"E0301",`
+- crates/gt-types/src/check/pat.rs::* 434:17-434:21 `p.id,`
+- crates/gt-types/src/check/pat.rs::* 438:13-438:37 `self.bind_fields(fields);`
+- crates/gt-types/src/check/pat.rs::* 439:13-439:30 `return XPat::Wild;`
+- crates/gt-types/src/check/pat.rs::* 517:25-517:29 `None => self.declare_pat(&f.name, Ty::Err),`
+- crates/gt-types/src/check/pat.rs::* 517:25-517:59 `None => self.declare_pat(&f.name, Ty::Err),`
+- crates/gt-types/src/check/pat.rs::* 540:23-540:24 `.and_then(|x| x.strip_suffix('\''))`
+- crates/gt-types/src/check/pat.rs::* 540:38-540:42 `.and_then(|x| x.strip_suffix('\''))`
+- crates/gt-types/src/check/pat.rs::* 543:26-543:27 `let first = it.next()?;`
+- crates/gt-types/src/check/pat.rs::* 548:13-548:17 `None`
+- crates/gt-types/src/check/pat.rs::* 551:20-551:21 `match it.next()? {`
+- crates/gt-types/src/check/pat.rs::* 552:16-552:24 `'n' => Some(10),`
+- crates/gt-types/src/check/pat.rs::* 553:16-553:23 `'t' => Some(9),`
+- crates/gt-types/src/check/pat.rs::* 554:16-554:24 `'r' => Some(13),`
+- crates/gt-types/src/check/pat.rs::* 555:16-555:23 `'0' => Some(0),`
+- crates/gt-types/src/check/pat.rs::* 556:17-556:25 `'\\' => Some(92),`
+- crates/gt-types/src/check/pat.rs::* 557:17-557:25 `'\'' => Some(39),`
+- crates/gt-types/src/check/pat.rs::* 558:16-558:24 `'"' => Some(34),`
+- crates/gt-types/src/check/pat.rs::* 563:14-563:18 `_ => None,`
+- crates/gt-types/src/check/call.rs::* 10:13-10:24 `return None;`
+- crates/gt-types/src/check/call.rs::* 12:43-12:44 `match self.env.res.uses.get(&p.id)?.clone() {`
+- crates/gt-types/src/check/call.rs::* 17:25-17:44 `let t = self.locals.get(&l)?.ty.clone();`
+- crates/gt-types/src/check/call.rs::* 17:44-17:45 `let t = self.locals.get(&l)?.ty.clone();`
+- crates/gt-types/src/check/call.rs::* 18:23-18:45 `match self.infer.shallow(&t) {`
+- crates/gt-types/src/check/call.rs::* 19:40-19:47 `Ty::Fn(_, _, e) => Some(e),`
+- crates/gt-types/src/check/call.rs::* 20:26-20:30 `_ => None,`
+- crates/gt-types/src/check/call.rs::* 23:18-23:22 `_ => None,`
+- crates/gt-types/src/check/call.rs::* 51:13-51:27 `return Ty::Err;`
+- crates/gt-types/src/check/call.rs::* 54:25-54:32 `Res::Err => Ty::Err,`
+- crates/gt-types/src/check/call.rs::* 58:17-58:21 `self.err(`
+- crates/gt-types/src/check/call.rs::* 58:17-63:18 `self.err(`
+- crates/gt-types/src/check/call.rs::* 59:21-59:28 `"E0301",`
+- crates/gt-types/src/check/call.rs::* 60:21-60:25 `e.id,`
+- crates/gt-types/src/check/call.rs::* 64:17-64:24 `Ty::Err`
+- crates/gt-types/src/check/call.rs::* 76:21-76:35 `return Ty::Err;`
+- crates/gt-types/src/check/call.rs::* 117:21-117:35 `return Ty::Err;`
+- crates/gt-types/src/check/call.rs::* 120:21-120:35 `return Ty::Err;`
+- crates/gt-types/src/check/call.rs::* 123:21-123:35 `return Ty::Err;`
+- crates/gt-types/src/check/call.rs::* 139:28-139:67 `let name = self.env.defs()[d.index()].path.clone();`
+- crates/gt-types/src/check/call.rs::* 140:17-140:21 `self.err(`
+- crates/gt-types/src/check/call.rs::* 140:17-145:18 `self.err(`
+- crates/gt-types/src/check/call.rs::* 141:21-141:28 `"E0301",`
+- crates/gt-types/src/check/call.rs::* 142:21-142:25 `e.id,`
+- crates/gt-types/src/check/call.rs::* 143:21-143:27 `e.span,`
+- crates/gt-types/src/check/call.rs::* 144:21-144:28 `format!("`{name}` là {}, không phải giá trị", kind.as_str()),`
+- crates/gt-types/src/check/call.rs::* 146:17-146:24 `Ty::Err`
+- crates/gt-types/src/check/call.rs::* 154:13-154:17 `self.err(`
+- crates/gt-types/src/check/call.rs::* 154:13-159:14 `self.err(`
+- crates/gt-types/src/check/call.rs::* 155:17-155:24 `"E0309",`
+- crates/gt-types/src/check/call.rs::* 156:17-156:21 `e.id,`
+- crates/gt-types/src/check/call.rs::* 157:17-157:23 `e.span,`
+- crates/gt-types/src/check/call.rs::* 160:13-160:27 `return Ty::Err;`
+- crates/gt-types/src/check/call.rs::* 172:21-172:25 `self.err(`
+- crates/gt-types/src/check/call.rs::* 172:21-177:22 `self.err(`
+- crates/gt-types/src/check/call.rs::* 173:25-173:32 `"E0309",`
+- crates/gt-types/src/check/call.rs::* 174:25-174:29 `e.id,`
+- crates/gt-types/src/check/call.rs::* 175:25-175:31 `e.span,`
+- crates/gt-types/src/check/call.rs::* 178:21-178:35 `return Ty::Err;`
+- crates/gt-types/src/check/call.rs::* 192:21-192:25 `self.push_oblig(t, tr, e.id, e.span);`
+- crates/gt-types/src/check/call.rs::* 192:21-192:57 `self.push_oblig(t, tr, e.id, e.span);`
+- crates/gt-types/src/check/call.rs::* 192:37-192:38 `self.push_oblig(t, tr, e.id, e.span);`
+- crates/gt-types/src/check/call.rs::* 192:40-192:42 `self.push_oblig(t, tr, e.id, e.span);`
+- crates/gt-types/src/check/call.rs::* 196:46-196:70 `Some(SelfKind::Value) => ps.push(self_ty.clone()),`
+- crates/gt-types/src/check/call.rs::* 198:47-198:49 `Some(SelfKind::RefMut) => ps.push(Ty::Ref(true, Box::new(self_ty.clone()))),`
+- crates/gt-types/src/check/call.rs::* 198:47-198:96 `Some(SelfKind::RefMut) => ps.push(Ty::Ref(true, Box::new(self_ty.clone()))),`
+- crates/gt-types/src/check/call.rs::* 198:63-198:67 `Some(SelfKind::RefMut) => ps.push(Ty::Ref(true, Box::new(self_ty.clone()))),`
+- crates/gt-types/src/check/call.rs::* 199:29-199:31 `None => {}`
+- crates/gt-types/src/check/call.rs::* 244:30-244:72 `Res::SelfType => self.cx.self_ty.clone().unwrap_or(Ty::Err),`
+- crates/gt-types/src/check/call.rs::* 246:17-246:21 `self.err(`
+- crates/gt-types/src/check/call.rs::* 246:17-251:18 `self.err(`
+- crates/gt-types/src/check/call.rs::* 247:21-247:28 `"E0309",`
+- crates/gt-types/src/check/call.rs::* 248:21-248:25 `e.id,`
+- crates/gt-types/src/check/call.rs::* 249:21-249:27 `e.span,`
+- crates/gt-types/src/check/call.rs::* 252:17-252:31 `return Ty::Err;`
+- crates/gt-types/src/check/call.rs::* 262:17-262:21 `self.err("E0309", e.id, e.span, msg);`
+- crates/gt-types/src/check/call.rs::* 262:17-262:53 `self.err("E0309", e.id, e.span, msg);`
+- crates/gt-types/src/check/call.rs::* 262:26-262:33 `self.err("E0309", e.id, e.span, msg);`
+- crates/gt-types/src/check/call.rs::* 262:35-262:39 `self.err("E0309", e.id, e.span, msg);`
+- crates/gt-types/src/check/call.rs::* 263:17-263:24 `Ty::Err`
+- crates/gt-types/src/check/call.rs::* 289:43-289:47 `&& !sig.params.iter().any(|p| self.has_cap(p))`
+- crates/gt-types/src/check/call.rs::* 289:56-289:57 `&& !sig.params.iter().any(|p| self.has_cap(p))`
+- crates/gt-types/src/check/call.rs::* 297:29-297:32 `.map_or_else(|| "?".to_string(), |s| s.name.clone());`
+- crates/gt-types/src/check/call.rs::* 368:18-368:22 `_ => vec!["?unknown".to_string()],`
+- crates/gt-types/src/check/call.rs::* 368:23-368:45 `_ => vec!["?unknown".to_string()],`
+- crates/gt-types/src/check/call.rs::* 431:21-431:27 `return;`
+- crates/gt-types/src/check/call.rs::* 523:26-523:30 `for a in args {`
+- crates/gt-types/src/check/call.rs::* 524:29-524:33 `let _ = self.expr(a, None);`
+- crates/gt-types/src/check/call.rs::* 524:29-524:47 `let _ = self.expr(a, None);`
+- crates/gt-types/src/check/call.rs::* 526:17-526:24 `Ty::Err`
+- crates/gt-types/src/check/call.rs::* 554:21-554:28 `"E0301"`
+- crates/gt-types/src/validate.rs::* 27:13-27:17 `self.err(`
+- crates/gt-types/src/validate.rs::* 27:13-32:14 `self.err(`
+- crates/gt-types/src/validate.rs::* 28:17-28:24 `"E9901",`
+- crates/gt-types/src/validate.rs::* 29:17-29:25 `imp.node,`
+- crates/gt-types/src/validate.rs::* 33:13-33:19 `return;`
+- crates/gt-types/src/validate.rs::* 117:13-117:25 `return false;`
+- crates/gt-types/src/validate.rs::* 141:13-141:25 `return false;`
+- crates/gt-types/src/validate.rs::* 193:35-193:39 `.position(|g| g.id == p)`
+- crates/gt-types/src/validate.rs::* 193:43-193:44 `.position(|g| g.id == p)`
+- crates/gt-types/src/validate.rs::* 194:40-194:56 `.map(|i| Ty::Param(m.generics[i].id))`
+- crates/gt-types/src/validate.rs::* 209:13-209:14 `}`
+- crates/gt-types/src/validate.rs::* 214:13-214:17 `self.err(`
+- crates/gt-types/src/validate.rs::* 214:13-219:14 `self.err(`
+- crates/gt-types/src/validate.rs::* 215:17-215:24 `"E9901",`
+- crates/gt-types/src/validate.rs::* 216:17-216:21 `node,`
+- crates/gt-types/src/validate.rs::* 220:13-220:19 `return;`
+- crates/gt-types/src/validate.rs::* 275:13-275:24 `return true;`
+- crates/gt-term/src/lib.rs::check_termination 643:47-643:55 `let Some(f) = fns.get(&b.node) else { continue };`
+- crates/gt-term/src/lib.rs::check_termination 663:21-663:24 `None => bag.push(mk(`
+- crates/gt-term/src/lib.rs::check_termination 663:21-669:15 `None => bag.push(mk(`
+- crates/gt-term/src/lib.rs::check_termination 663:30-663:32 `None => bag.push(mk(`
+- crates/gt-term/src/lib.rs::check_termination 664:17-664:18 `t,`
+- crates/gt-term/src/lib.rs::check_termination 665:17-665:24 `"E0702",`
+- crates/gt-term/src/lib.rs::check_termination 666:17-666:21 `c.id,`
+- crates/gt-term/src/lib.rs::check_termination 667:17-667:28 `c.expr.span,`
+- crates/gt-term/src/lib.rs::check_termination 750:16-750:35 `if !b.loops.is_empty() {`
+- crates/gt-term/src/lib.rs::check_termination 751:17-751:20 `bag.push(mk(`
+- crates/gt-term/src/lib.rs::check_termination 751:17-760:19 `bag.push(mk(`
+- crates/gt-term/src/lib.rs::check_termination 751:26-751:28 `bag.push(mk(`
+- crates/gt-term/src/lib.rs::check_termination 752:21-752:22 `t,`
+- crates/gt-term/src/lib.rs::check_termination 753:21-753:28 `"E9901",`
+- crates/gt-term/src/lib.rs::check_termination 754:21-754:27 `b.node,`
+- crates/gt-term/src/lib.rs::check_termination 755:21-755:27 `b.span,`
+- crates/gt-term/src/lib.rs::check_termination 761:13-761:14 `}`
+- crates/gt-term/src/lib.rs::check_termination 762:13-762:21 `continue;`
+- crates/gt-term/src/lib.rs::check_termination 797:67-797:75 `(LoopShape::ForRange | LoopShape::ForSlice, _) => continue,`
+- crates/gt-term/src/lib.rs::instance_graph 325:9-325:10 `}`
+- crates/gt-term/src/lib.rs::instance_graph 340:13-340:21 `continue;`
+- crates/gt-term/src/lib.rs::instance_graph 369:26-369:29 `for o in ops {`
+- crates/gt-term/src/lib.rs::instance_graph 370:21-370:29 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 370:30-370:31 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 370:33-370:37 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 370:39-370:46 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 370:57-370:60 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 370:61-370:62 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 370:64-370:72 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 370:74-370:83 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 370:85-370:86 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 372:17-372:25 `continue;`
+- crates/gt-term/src/lib.rs::instance_graph 381:85-381:86 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 387:81-387:82 `discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;`
+- crates/gt-term/src/lib.rs::instance_graph 393:68-393:69 `let j = add((*n2, a2), &mut idx, &mut list)?;`
+- crates/gt-term/src/lib.rs::instance_graph 405:25-405:36 `return None;`
+- crates/gt-term/src/lib.rs::instance_graph 408:92-408:93 `let (n2, a2) = t.db.resolve_trait_method(*trait_def, *member, &st, &ga)?;`
+- crates/gt-term/src/lib.rs::instance_graph 410:67-410:68 `let j = add((n2, a2), &mut idx, &mut list)?;`
+- crates/gt-term/src/lib.rs::instance_graph 413:25-413:26 `}`
+- crates/gt-term/src/lib.rs::instance_graph 414:21-414:22 `}`
+- crates/gt-term/src/lib.rs::instance_graph 422:9-422:31 `edges.push(Vec::new());`
+- crates/gt-term/src/lib.rs::instance_graph 423:9-423:31 `value_call.push(false);`
+- crates/gt-term/src/lib.rs::instance_graph 462:22-462:26 `let nx = p[y];`
+- crates/gt-term/src/lib.rs::instance_graph 463:13-463:21 `p[y] = r;`
+- crates/gt-term/src/lib.rs::instance_graph 464:13-464:19 `y = nx;`
+- crates/gt-term/src/lib.rs::instance_graph 473:13-473:21 `continue;`
+- crates/gt-effects/src/lib.rs::check_effects 92:25-92:28 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 92:25-98:27 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 92:34-92:36 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 93:29-93:30 `t,`
+- crates/gt-effects/src/lib.rs::check_effects 94:29-94:36 `"E9901",`
+- crates/gt-effects/src/lib.rs::check_effects 95:29-95:35 `b.node,`
+- crates/gt-effects/src/lib.rs::check_effects 96:29-96:33 `span,`
+- crates/gt-effects/src/lib.rs::check_effects 99:25-99:33 `continue;`
+- crates/gt-effects/src/lib.rs::check_effects 123:25-123:28 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 123:25-129:27 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 123:34-123:36 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 124:29-124:30 `t,`
+- crates/gt-effects/src/lib.rs::check_effects 125:29-125:36 `"E9901",`
+- crates/gt-effects/src/lib.rs::check_effects 126:29-126:35 `b.node,`
+- crates/gt-effects/src/lib.rs::check_effects 127:29-127:33 `span,`
+- crates/gt-effects/src/lib.rs::check_effects 130:25-130:33 `continue;`
+- crates/gt-effects/src/lib.rs::check_effects 142:30-142:33 `other => bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 142:30-151:23 `other => bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 142:39-142:41 `other => bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 143:25-143:26 `t,`
+- crates/gt-effects/src/lib.rs::check_effects 144:25-144:32 `"E9901",`
+- crates/gt-effects/src/lib.rs::check_effects 145:25-145:31 `b.node,`
+- crates/gt-effects/src/lib.rs::check_effects 146:25-146:29 `span,`
+- crates/gt-effects/src/lib.rs::check_effects 147:25-147:32 `format!(`
+- crates/gt-effects/src/lib.rs::check_effects 177:16-177:50 `if let Some(m0) = imp.members.first() {`
+- crates/gt-effects/src/lib.rs::check_effects 178:17-178:20 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 178:17-185:19 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 178:26-178:28 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 179:21-179:22 `t,`
+- crates/gt-effects/src/lib.rs::check_effects 180:21-180:28 `"E9901",`
+- crates/gt-effects/src/lib.rs::check_effects 181:21-181:28 `m0.node,`
+- crates/gt-effects/src/lib.rs::check_effects 186:13-186:14 `}`
+- crates/gt-effects/src/lib.rs::check_effects 187:13-187:21 `continue;`
+- crates/gt-effects/src/lib.rs::check_effects 191:17-191:20 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 191:17-200:19 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 191:26-191:28 `bag.push(mk(`
+- crates/gt-effects/src/lib.rs::check_effects 192:21-192:22 `t,`
+- crates/gt-effects/src/lib.rs::check_effects 193:21-193:28 `"E9901",`
+- crates/gt-effects/src/lib.rs::check_effects 194:21-194:29 `mem.node,`
+- crates/gt-effects/src/lib.rs::check_effects 195:21-195:29 `mem.span,`
+- crates/gt-effects/src/lib.rs::check_effects 201:17-201:25 `continue;`

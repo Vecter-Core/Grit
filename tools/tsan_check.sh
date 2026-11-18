@@ -23,16 +23,45 @@ link() { "$CLANG" -fsanitize=thread -O1 -g "$1" "$RTA" $LIBS -o "$2" 2>"$2.link.
 races() { grep -c "WARNING: ThreadSanitizer: data race" "$1" 2>/dev/null || true; }
 echo "TSAN_ENV clang=$($CLANG --version | head -1) N=$N"
 ctl_fail=0
-for c in race_pthread race_gritrt_spawn norace_atomic_pthread; do
+CR="${TSAN_CTL_RUNS:-30}"   # số lần chạy MỖI đối chứng (GÓI 5 S1.b); tỉ lệ phát hiện = hits/CR
+rate_lines=""
+# run_rate EXE LABEL: chạy CR lần, đếm số lần có báo data race; đặt biến hits
+run_rate() {
+  hits=0
+  for i in $(seq 1 "$CR"); do
+    rm -f "$OUT/rate.res"
+    GRITRT_RESULT_FILE="$OUT/rate.res" timeout 120 "$1" > "$OUT/rate.out" 2>&1
+    h=$(races "$OUT/rate.out"); [ "${h:-0}" -gt 0 ] && hits=$((hits+1))
+  done
+}
+# control NAME KIND(pos|neg) EXE: ghi tỉ lệ; pos phải có hits>=1; neg phải 0
+control() {
+  run_rate "$3"
+  case "$2" in
+    neg) if [ "$hits" = 0 ]; then echo "TSAN_CONTROL $1 OK (đối chứng âm: 0/$CR báo, đúng)"; else echo "TSAN_CONTROL $1 BÁO SAI ($hits/$CR)"; ctl_fail=1; fi ;;
+    *) if [ "$hits" -ge 1 ]; then echo "TSAN_CONTROL $1 CAUGHT detection_rate=$hits/$CR"; else echo "TSAN_CONTROL $1 MISSED detection_rate=0/$CR (KHÔNG ĐỦ NHẠY)"; ctl_fail=1; fi
+       rate_lines="$rate_lines $1=$hits/$CR" ;;
+  esac
+}
+for c in race_pthread race_gritrt_spawn race_narrow_ir norace_atomic_pthread; do
   $PY tools/tsan_inject.py tests/tsan/$c.ll > "$OUT/$c.ll"
   if ! link "$OUT/$c.ll" "$OUT/$c.exe"; then echo "TSAN_CONTROL $c LINK_FAIL"; head -5 "$OUT/$c.exe.link.log"; ctl_fail=1; continue; fi
-  hits=0
-  for i in 1 2 3; do "$OUT/$c.exe" > "$OUT/$c.out.$i" 2>&1; h=$(races "$OUT/$c.out.$i"); [ "${h:-0}" -gt 0 ] && hits=$((hits+1)); done
-  case "$c" in
-    norace*) if [ "$hits" = 0 ]; then echo "TSAN_CONTROL $c OK (không báo, đúng)"; else echo "TSAN_CONTROL $c BÁO SAI ($hits/3)"; ctl_fail=1; fi ;;
-    *) if [ "$hits" -ge 1 ]; then echo "TSAN_CONTROL $c CAUGHT ($hits/3 lần chạy báo data race)"; else echo "TSAN_CONTROL $c MISSED"; ctl_fail=1; fi ;;
-  esac
+  case "$c" in norace*) control "$c" neg "$OUT/$c.exe" ;; *) control "$c" pos "$OUT/$c.exe" ;; esac
 done
+# Đối chứng qua ĐÚNG pipeline Grit (GÓI 5 S1.a/b): chương trình Grit -> IR của gritc -> (bỏ lệnh gọi khoá bằng tools/tsan_inject.py --drop-locks) -> TSan.
+# Không bỏ khoá = đối chứng âm (cùng chương trình, cùng đường, PHẢI không báo).
+grit_control() {  # NAME SRC
+  n="$1"; src="$2"
+  if ! GRITC_DUMP_IR="$OUT/$n.raw.ll" "$GRITC" build --backend=llvm --profile=dev -o "$OUT/$n.plain" "$src" > "$OUT/$n.build.log" 2>&1; then echo "TSAN_CONTROL $n BUILD_FAIL"; tail -3 "$OUT/$n.build.log"; ctl_fail=1; return; fi
+  $PY tools/tsan_inject.py --drop-locks "$OUT/$n.raw.ll" > "$OUT/$n.nolock.ll"
+  $PY tools/tsan_inject.py "$OUT/$n.raw.ll" > "$OUT/$n.lock.ll"
+  if ! link "$OUT/$n.nolock.ll" "$OUT/$n.nolock.exe" || ! link "$OUT/$n.lock.ll" "$OUT/$n.lock.exe"; then echo "TSAN_CONTROL $n LINK_FAIL"; ctl_fail=1; return; fi
+  control "grit_${n}_nolock" pos "$OUT/$n.nolock.exe"
+  control "grit_${n}_lock" neg "$OUT/$n.lock.exe"
+}
+grit_control two_locks tests/samples/two_locks.gt
+grit_control narrow_droplock tests/tsan/narrow_droplock.gt
+echo "TSAN_RATES (đối chứng dương, $CR lần/đối chứng):$rate_lines"
 if [ "$ctl_fail" != 0 ]; then echo "TSAN_RESULT KHÔNG KIỂM ĐƯỢC: đối chứng không đạt (xem TSAN_CONTROL ở trên)"; exit 4; fi
 total_reports=0
 SAMPLES="tests/samples/threads.gt tests/samples/two_locks.gt"

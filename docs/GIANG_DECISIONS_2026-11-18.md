@@ -20,7 +20,7 @@ Không có bằng chứng nào bị thiếu ⇒ không mục nào phải giữ "
 - **B4 H7/H8 không có ThreadSanitizer/loom:** chấp nhận rủi ro có ý thức cho Seed; SAFETY_CLAIMS: "an toàn theo kiểu; chưa có kiểm động đua dữ liệu". TSan chỉ ở mức đánh giá khả thi (`TSAN_FEASIBILITY.md`).
 - **B5 ADR-C09 (HashMap):** duyệt (a).
 - **B6 #6:** hiểu là Giang đọc các mục rủi ro trong danh sách rút gọn (`GIANG_DOC6_READING.md`); vẫn **CHỜ GIANG**.
-- **B7 hợp nhất `main`:** chỉ khi (1) repo đẩy được, (2) CI GitHub chạy xanh một lần trên Linux và Windows, (3) loại A đã sửa nhãn; qua PR, KHÔNG squash.
+- **B7 hợp nhất `main` — ĐÓNG: main = e450c69, đẩy fast-forward 1 lần (GÓI 5).** Điều kiện gốc: chỉ khi (1) repo đẩy được, (2) CI GitHub chạy xanh một lần trên Linux và Windows, (3) loại A đã sửa nhãn; qua PR, KHÔNG squash.
 - **B8 M13:** nhãn Seed trước; inlay hint chỉ khi Giang thử VS Code thật và thấy cần. KHÔNG sửa điều kiện #8.
 - **B9 phiên bản:** đổi lên `1.0.0-rc3` trong MỘT commit riêng ở cuối.
 ## Loại C — việc của Giang

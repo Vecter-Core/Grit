@@ -156,7 +156,7 @@ fn recursion_needs_a_decreasing_variant_or_div() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "công cụ gỡ lỗi: in kết quả chứng minh dừng cho GT_SRC, không khẳng định gì"]
 fn dump_term() {
     let src = std::env::var("GT_SRC").expect("GT_SRC");
     let (t, m) = common::mir(&src);

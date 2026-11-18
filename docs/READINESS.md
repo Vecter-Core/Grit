@@ -89,3 +89,6 @@ Nhãn hiện hành: **`1.0.0-rc3`** (đổi ở GÓI 3 S5.a; trước đó mã b
 - Điều kiện B7 (hợp nhất `main`): (1) repo đẩy được — XONG; (2) CI xanh một lần Linux + Windows — **XONG (Windows là bản rút gọn)**; (3) nhãn loại A — XONG. Việc hợp nhất vẫn là của Giang (qua PR, không squash; `docs/PR_integration_to_main.md`).
 - **A4 (tái lập & di động):** `determinism` xanh trên CI Linux (dựng `gritc` hai lần ⇒ cùng sha256); CI Linux xanh ⇒ di động Linux sau các thay đổi Windows ĐÃ kiểm (1024/0/206). Vẫn CHƯA: tái lập của `gritc` trên Windows; A4 giữ "đạt có điều kiện" vì Windows CI chỉ là bản rút gọn.
 - **A2 (an toàn) vẫn "chưa"** (không đổi): đọc chéo khác họ chỉ ở `gt-rt` + `gt-guard`; fuzz ≪ 24 giờ; TSan chỉ "không phát hiện trong 8 mẫu".
+
+## GÓI 5 (2026-11-19)
+Không đổi trạng thái TCB, không đánh dấu #6, A2 vẫn **chưa**. Bằng chứng thêm: TSan có đối chứng qua pipeline Grit (tỉ lệ phát hiện 13–30/30, đối chứng âm 0/30) — vẫn chỉ "không phát hiện trong các mẫu đã chạy"; độ phủ nhánh hàm quyết định đã đo (nhóm D còn CHƯA thí nghiệm, `docs/DECISION_COVERAGE.md`). `main` = `e450c69`.
