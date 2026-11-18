@@ -21,9 +21,9 @@
 | crates/gt-borrowck/src/solve.rs | * | 1-116 | 8 | 7 | 1 | vùng mã 84, chưa chạy 2 |
 | crates/gt-types/src/send.rs | * | 1-178 | 20 | 17 | 3 | vùng mã 143, chưa chạy 4 |
 | crates/gt-types/src/db.rs | select_impl | 125-142 | 8 | 5 | 3 | vùng mã 33, chưa chạy 13 |
-| crates/gt-types/src/check/pat.rs | * | 1-566 | 88 | 66 | 22 | vùng mã 523, chưa chạy 118 |
+| crates/gt-types/src/check/pat.rs | * | 1-566 | 88 | 69 | 19 | vùng mã 523, chưa chạy 105 |
 | crates/gt-types/src/check/call.rs | * | 1-619 | 86 | 66 | 20 | vùng mã 513, chưa chạy 71 |
-| crates/gt-types/src/validate.rs | * | 1-335 | 54 | 46 | 8 | vùng mã 271, chưa chạy 17 |
+| crates/gt-types/src/validate.rs | * | 1-335 | 54 | 47 | 7 | vùng mã 271, chưa chạy 17 |
 | crates/gt-term/src/lib.rs | check_termination | 615-933 | 56 | 52 | 4 | vùng mã 284, chưa chạy 19 |
 | crates/gt-term/src/lib.rs | instance_graph | 293-500 | 54 | 44 | 10 | vùng mã 214, chưa chạy 27 |
 | crates/gt-term/src/lib.rs | inferred_candidates | 158-179 | 4 | 4 | 0 | vùng mã 28, chưa chạy 0 |
@@ -85,11 +85,8 @@
 - crates/gt-types/src/check/pat.rs::* 347:29 **true `Ty::Infer(_) if !has_rest => {`**
 - crates/gt-types/src/check/pat.rs::* 347:29 **false `Ty::Infer(_) if !has_rest => {`**
 - crates/gt-types/src/check/pat.rs::* 383:34 **false `Some(Res::Def(d)) if self.env.db.adts.contains_key(&d) => {`**
-- crates/gt-types/src/check/pat.rs::* 404:12 **true `if !self.infer.unify(&aty, ty) {`**
 - crates/gt-types/src/check/pat.rs::* 421:13 **false `let Some(adt) = self.env.db.adts.get(&d).cloned() else {`**
 - crates/gt-types/src/check/pat.rs::* 431:13 **false `let AdtKind::Struct(defs) = &adt.kind else {`**
-- crates/gt-types/src/check/pat.rs::* 456:24 **true `if let Some(sub) = &f.pattern {`**
-- crates/gt-types/src/check/pat.rs::* 463:16 **true `if seen.contains(&f.name.name.as_str()) {`**
 - crates/gt-types/src/check/pat.rs::* 473:16 **false `if !defs[i].public && !self.is_within(self.module, adt.module) {`**
 - crates/gt-types/src/check/pat.rs::* 545:19 **false `return if it.next().is_none() {`**
 - crates/gt-types/src/check/call.rs::* 9:13 **false `let ExprKind::Path(p) = &a.kind else {`**
@@ -116,7 +113,6 @@
 - crates/gt-types/src/validate.rs::* 112:13 **false `let (Some(ts), Some(is)) = (`**
 - crates/gt-types/src/validate.rs::* 140:12 **true `if ti.len() != ii.len() || to.len() != io.len() {`**
 - crates/gt-types/src/validate.rs::* 140:36 **true `if ti.len() != ii.len() || to.len() != io.len() {`**
-- crates/gt-types/src/validate.rs::* 184:16 **true `|| t.generics.len() != m.generics.len()`**
 - crates/gt-types/src/validate.rs::* 202:16 **false `if !matches!(imp.self_ty, Ty::Err) {`**
 - crates/gt-types/src/validate.rs::* 212:13 **false `let Some(adt) = self.db.adts.get(d).cloned() else {`**
 - crates/gt-types/src/validate.rs::* 274:42 **true `if matches!(ty, Ty::Adt(d, _) if *d == own) {`**
@@ -306,11 +302,6 @@
 - crates/gt-types/src/check/pat.rs::* 396:21-396:28 `path.id,`
 - crates/gt-types/src/check/pat.rs::* 400:17-400:41 `self.bind_fields(fields);`
 - crates/gt-types/src/check/pat.rs::* 401:17-401:34 `return XPat::Wild;`
-- crates/gt-types/src/check/pat.rs::* 405:13-405:17 `self.pat_mismatch(p, ty, &aty);`
-- crates/gt-types/src/check/pat.rs::* 405:13-405:43 `self.pat_mismatch(p, ty, &aty);`
-- crates/gt-types/src/check/pat.rs::* 405:31-405:32 `self.pat_mismatch(p, ty, &aty);`
-- crates/gt-types/src/check/pat.rs::* 406:13-406:37 `self.bind_fields(fields);`
-- crates/gt-types/src/check/pat.rs::* 407:13-407:30 `return XPat::Wild;`
 - crates/gt-types/src/check/pat.rs::* 422:13-422:17 `self.err(`
 - crates/gt-types/src/check/pat.rs::* 422:13-427:14 `self.err(`
 - crates/gt-types/src/check/pat.rs::* 423:17-423:24 `"E9901",`
@@ -323,14 +314,6 @@
 - crates/gt-types/src/check/pat.rs::* 434:17-434:21 `p.id,`
 - crates/gt-types/src/check/pat.rs::* 438:13-438:37 `self.bind_fields(fields);`
 - crates/gt-types/src/check/pat.rs::* 439:13-439:30 `return XPat::Wild;`
-- crates/gt-types/src/check/pat.rs::* 457:29-457:33 `let _ = self.pat(sub, &Ty::Err);`
-- crates/gt-types/src/check/pat.rs::* 457:29-457:52 `let _ = self.pat(sub, &Ty::Err);`
-- crates/gt-types/src/check/pat.rs::* 464:17-464:21 `self.err(`
-- crates/gt-types/src/check/pat.rs::* 464:17-469:18 `self.err(`
-- crates/gt-types/src/check/pat.rs::* 465:21-465:28 `"E0304",`
-- crates/gt-types/src/check/pat.rs::* 466:21-466:30 `f.name.id,`
-- crates/gt-types/src/check/pat.rs::* 467:21-467:32 `f.name.span,`
-- crates/gt-types/src/check/pat.rs::* 470:17-470:25 `continue;`
 - crates/gt-types/src/check/pat.rs::* 517:25-517:29 `None => self.declare_pat(&f.name, Ty::Err),`
 - crates/gt-types/src/check/pat.rs::* 517:25-517:59 `None => self.declare_pat(&f.name, Ty::Err),`
 - crates/gt-types/src/check/pat.rs::* 540:23-540:24 `.and_then(|x| x.strip_suffix('\''))`

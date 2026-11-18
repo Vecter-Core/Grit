@@ -30,3 +30,13 @@ Tới run `44241971280`: Linux ≈ 414 phút, Windows ≈ 41 phút (×2 = 82) �
 
 ## CHƯA KIỂM
 Trạng thái Billing thật; CI trên Windows cho phần test lớn (gt-driver, gt-fmt, oblig, borrowck); `cargo audit` trên Windows; nhánh `main` (không đẩy).
+
+
+## GÓI 5 (2026-11-19): thay đổi workflow và phút
+* Job `changes` (≈ 0,3 phút) quyết định chạy `tsan` khi push; `tsan` ≈ 11 phút khi chạy; `concurrency` huỷ lần chạy cũ theo nhánh (`ci-<workflow>-<ref>`).
+* `workflow_dispatch`: `only` = `all` | `tsan` | `coverage`; `full=true` thêm `audit` + test toàn workspace vào Windows (≈ 74 phút tính phí; Giang bấm trước mỗi thẻ phát hành: Actions → ci → Run workflow → chọn nhánh, `only=all`, `full=true`).
+* Job `coverage` (chỉ dispatch): ≈ 55 phút Linux/lần, đã chạy 2 lần. Job `deny` thêm đối chứng wildcard (`cargo install cargo-deny` ≈ 3–5 phút).
+* **Phút ước tính tới nay ≈ 624 + tsan 11 + coverage 2×55 = ≈ 745 phút** (chưa tính run kiểm tra cuối của gói; CHƯA kiểm Billing).
+* **Workflow nào tốn phút:** `linux-gate` (≈ 72–87), `windows-core` (≈ 21 ×2 = 42 tính phí), `coverage` (≈ 55, thủ công), `tsan` (≈ 11, có điều kiện), `determinism` (≈ 3), `linux-nollvm` (≈ 1), `deny` (≈ 0,5; +3–5 với cargo-deny), `changes` (≈ 0,3).
+* **Việc của Giang:** vào GitHub → Settings → Billing and plans → Usage: xem phút còn lại; đặt **Spending limit = 0 USD** / cảnh báo chi tiêu về 0 nếu chưa (để không bị tính tiền khi hết phút miễn phí).
+
