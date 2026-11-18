@@ -1,0 +1,20 @@
+{"program": "wc", "kind": "dogfood", "profile": "dev", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "wc", "kind": "dogfood", "profile": "release-o2", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "json", "kind": "dogfood", "profile": "dev", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "json", "kind": "dogfood", "profile": "release-o2", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "sha256", "kind": "dogfood", "profile": "dev", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "sha256", "kind": "dogfood", "profile": "release-o2", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "sortlines", "kind": "dogfood", "profile": "dev", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "sortlines", "kind": "dogfood", "profile": "release-o2", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "wordfreq", "kind": "dogfood", "profile": "dev", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "wordfreq", "kind": "dogfood", "profile": "release-o2", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "csvstat", "kind": "capstone", "profile": "dev", "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "csvstat", "kind": "capstone", "profile": "release-o2", "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "calc", "kind": "capstone", "profile": "dev", "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "calc", "kind": "capstone", "profile": "release-o2", "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "kvstore", "kind": "capstone", "profile": "dev", "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "kvstore", "kind": "capstone", "profile": "release-o2", "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "grep-lite", "kind": "capstone", "profile": "dev", "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "grep-lite", "kind": "capstone", "profile": "release-o2", "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "stats", "kind": "dogfood", "profile": "dev", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}
+{"program": "stats", "kind": "dogfood", "profile": "release-o2", "baseline_exit": 0, "ok_by_mib": {"4": true, "8": true, "16": true, "32": true, "64": true, "256": true}, "min_mib": 4}

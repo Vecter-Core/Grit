@@ -61,8 +61,23 @@ def totals(path=LOG):
     return t
 
 
+def hashed_files(target):
+    """Danh sách tệp (đường dẫn trong chỉ mục git) mà băm nguồn của `target` bao phủ: đổi bất kỳ tệp nào ⇒ băm đổi ⇒ giờ cũ KHÔNG còn tính."""
+    out = subprocess.run(["git", "ls-files", *SRC_DIRS[target]], cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout
+    return [x for x in out.splitlines() if x]
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
+    if "--kind-done" in sys.argv:
+        k = sys.argv[sys.argv.index("--kind-done") + 1]
+        sys.exit(0 if seconds_on_hash(k, current_hash(k)) >= TARGET_HOURS * 3600 else 1)
+    if "--list-files" in sys.argv:
+        for target in ("lex", "parse"):
+            print(f"{target}: {len(hashed_files(target))} tệp được băm (băm {current_hash(target)}):")
+            for f in hashed_files(target):
+                print("  " + f)
+        return
     if "--done-on-current-hash" in sys.argv:
         ok = all(seconds_on_hash(k, current_hash(k)) >= TARGET_HOURS * 3600 for k in ("lex", "parse"))
         sys.exit(0 if ok else 1)
@@ -79,7 +94,7 @@ def main():
         )
     for target in ("lex", "parse"):
         h = current_hash(target)
-        print(f"  {target}: trên BĂM NGUỒN HIỆN TẠI {h}: {seconds_on_hash(target, h) / 3600:.2f} giờ / {TARGET_HOURS:.0f}")
+        print(f"  {target}: GIỜ TRÊN BĂM HIỆN TẠI {h}: {seconds_on_hash(target, h) / 3600:.2f} giờ / {TARGET_HOURS:.0f}  ({len(hashed_files(target))} tệp được băm; `python tools/fuzz_total.py --list-files` để xem)")
 
 
 if __name__ == "__main__":

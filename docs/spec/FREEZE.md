@@ -26,3 +26,6 @@ Quy tắc chung: một mục ĐÓNG BĂNG chỉ được đổi bằng (1) một
 - Tập đột biến/corpus (chỉ được TĂNG).
 - Windows: đã chạy cổng liền mạch xanh ở `89438fd` (rc3, 2026-11-18); CI GitHub, capstone K1/K2/K4 trên Windows, VS Code thật CHƯA kiểm ⇒ không có cam kết cho các phần đó.
 - Mọi tính năng ghi ở `docs/SEED_LIMITATIONS.md` là "chưa có" (closure, `?`, phân rã tuple, `unwrap`, …): có thể thêm sau, KHÔNG phải thay đổi phá vỡ.
+
+## ĐÓNG BĂNG lexer/parser cho tới khi đủ 24 giờ fuzz (GÓI 4 S5.a, 2026-11-19)
+Điều kiện #2 (GRIT_PLAN §7, ADR-037) KHÔNG được nới: giờ fuzz tính trên BĂM NGUỒN HIỆN TẠI (tệp: `python tools/fuzz_total.py --list-files`). Vì vậy mã `crates/gt-lexer`, `crates/gt-parser`, `crates/gt-ast`, `crates/gt-span`, `crates/gt-diag` (phần `src` và `fuzz/fuzz_targets`) **ĐÓNG BĂNG** cho tới khi lexer và parser mỗi cái đủ 24 giờ: CHỈ sửa khi phát hiện lỗi thật (test đỏ trước, FB), và **mỗi lần sửa thì giờ đã tích luỹ trên băm cũ MẤT** (không cộng dồn). Lúc đóng băng: lexer 0,05 giờ, parser 0,02 giờ trên băm hiện tại.

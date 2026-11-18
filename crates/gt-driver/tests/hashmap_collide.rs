@@ -28,6 +28,10 @@ const DEFS: &str = "ƒ bn(b: bool) → u64 ! ∅ { ⎇ b { 1u64 } ⇝ { 0u64 } }
 ⊐ std::Hash for Cl { ƒ hash(&self) → u64 ! ∅ { 3u64 } }
 ";
 
+/// băm PHÂN TÁN (không va chạm) cho chế độ `spread`: ép bảng tăng dung lượng nhiều lần
+const SPREAD_HASH_OLD: &str = "{ 3u64 }";
+const SPREAD_HASH_NEW: &str = "{ self.v *% 11400714819323198485u64 }";
+
 fn fold(acc: u64, v: u64) -> u64 {
     acc.wrapping_mul(31).wrapping_add(v)
 }
@@ -38,10 +42,18 @@ struct Prog {
     used: BTreeMap<&'static str, u64>,
 }
 
-fn prog(seed: u64) -> Prog {
+fn prog(seed: u64, spread: bool) -> Prog {
     let mut r = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
-    let pool = [6u64, 30, 90][r.below(3) as usize];
-    let nops = 40 + r.below(120);
+    let pool = if spread {
+        [50u64, 300, 700][r.below(3) as usize]
+    } else {
+        [6u64, 30, 90][r.below(3) as usize]
+    };
+    let nops = if spread {
+        150 + r.below(350)
+    } else {
+        40 + r.below(120)
+    };
     let mut model: BTreeMap<u64, u64> = BTreeMap::new();
     let mut acc = 0u64;
     let mut used: BTreeMap<&'static str, u64> = BTreeMap::new();
@@ -105,7 +117,12 @@ fn prog(seed: u64) -> Prog {
     bump(&mut used, "new");
     Prog {
         src: format!(
-            "{DEFS}ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μm ≔ std::HashMap::new(&ar);\n  μacc ≔ 0u64;\n{body}  acc\n}}\n"
+            "{defs}ƒ main() → u64 ! {{mem}} {{\n  μar ≔ Arena::new();\n  μm ≔ std::HashMap::new(&ar);\n  μacc ≔ 0u64;\n{body}  acc\n}}\n",
+            defs = if spread {
+                DEFS.replace(SPREAD_HASH_OLD, SPREAD_HASH_NEW)
+            } else {
+                DEFS.to_string()
+            }
         ),
         want: acc,
         used,
@@ -162,7 +179,7 @@ fn hashmap_with_all_colliding_keys_matches_the_rust_model() {
     let mut per_fn: BTreeMap<&'static str, u64> = BTreeMap::new();
     let mut bad = Vec::new();
     for seed in 1..=N {
-        let p = prog(seed);
+        let p = prog(seed, false);
         for k in p.used.keys() {
             *per_fn.entry(*k).or_default() += 1;
         }
@@ -210,4 +227,34 @@ fn hashmap_with_all_colliding_keys_matches_the_rust_model() {
             per_fn.get(f)
         );
     }
+}
+
+/// S4.f (GÓI 4 S2.c): ≥ 100 chuỗi thao tác NGẪU NHIÊN trên băm PHÂN TÁN (không va chạm), 50–700 khoá và 150–500 thao tác ⇒ bảng tăng dung lượng nhiều lần;
+/// mô hình Rust (`BTreeMap`) ≡ exe LLVM. Hồ sơ: `GT_PROFILE`. Số chuỗi: `HASHMAP_RANDOM_N` (mặc định 100).
+#[test]
+fn hashmap_random_operation_chains_with_growth_match_the_rust_model() {
+    let profile = std::env::var("GT_PROFILE").unwrap_or_else(|_| "dev".to_string());
+    let n: u64 = std::env::var("HASHMAP_RANDOM_N")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(100);
+    let mut bad = Vec::new();
+    for seed in 1..=n {
+        let p = prog(1000 + seed, true);
+        match run(&p.src, &profile, 1000 + seed) {
+            Ok(got) if got == p.want.to_string() => {}
+            Ok(got) => bad.push(format!("#{seed}: exe {got} ≠ mô hình {}", p.want)),
+            Err(e) => bad.push(format!("#{seed}: {e}")),
+        }
+    }
+    eprintln!(
+        "{{\"kind\":\"hashmap_random_chains\",\"profile\":\"{profile}\",\"programs\":{n},\"mismatch\":{}}}",
+        bad.len()
+    );
+    assert!(
+        bad.is_empty(),
+        "{} bất đồng:\n\n{}",
+        bad.len(),
+        bad.join("\n")
+    );
 }

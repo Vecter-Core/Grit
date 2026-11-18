@@ -8,6 +8,26 @@
 # Điều kiện #2 (GRIT_PLAN §7) chỉ được ghi "ĐẠT" khi `python tools/fuzz_total.py` báo ≥ 24 giờ MỖI loại trên băm hiện tại.
 set -u
 HOURS="${1:-8}"
+# GÓI 4 S5.b: `--parallel` chạy lexer và parser ĐỒNG THỜI (hai tiến trình riêng, mỗi mục tiêu có giờ đồng hồ thật riêng) NẾU RAM/bộ nhớ ảo trống đủ
+# (FUZZ_PAR_MIN_GB, mặc định 10); không đủ ⇒ tự lùi về chế độ lần lượt. `--plan` chỉ in kế hoạch (MODE=...) rồi thoát (dùng cho test).
+WANT_PAR=0; PLAN_ONLY=0
+for a in "$@"; do [ "$a" = "--parallel" ] && WANT_PAR=1; [ "$a" = "--plan" ] && PLAN_ONLY=1; done
+free_gb() {
+  if [ -n "${FUZZ_FAKE_FREE_GB:-}" ]; then echo "$FUZZ_FAKE_FREE_GB"; return; fi
+  if command -v powershell.exe >/dev/null 2>&1 && [ "$(uname -s | cut -c1-5)" = "MINGW" ]; then
+    kb=$(powershell.exe -NoProfile -Command "(Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory" 2>/dev/null | tr -d '\r\n '); echo $(( ${kb:-0} / 1048576 ))
+  else
+    kb=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo 2>/dev/null); echo $(( ${kb:-0} / 1048576 ))
+  fi
+}
+PAR_MIN="${FUZZ_PAR_MIN_GB:-10}"
+MODE=sequential; MODE_WHY="không đặt --parallel"
+if [ "$WANT_PAR" = 1 ]; then
+  g=$(free_gb)
+  if [ "$g" -ge "$PAR_MIN" ]; then MODE=parallel; MODE_WHY="trống ${g} GB >= ${PAR_MIN} GB"; else MODE_WHY="trống ${g} GB < ${PAR_MIN} GB ⇒ lùi về lần lượt"; fi
+fi
+echo "fuzz_loop: MODE=$MODE ($MODE_WHY)"
+[ "$PLAN_ONLY" = 1 ] && exit 0
 SEC="${FUZZ_SESSION_SEC:-600}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 2
@@ -27,6 +47,32 @@ echo "fuzz_loop: dựng fuzz một lần…"
 ( cd crates/gt-lexer && cargo +nightly fuzz build lex ) >/dev/null 2>&1 || { echo "fuzz_loop: dựng lex THẤT BẠI"; exit 4; }
 ( cd crates/gt-parser && cargo +nightly fuzz build parse ) >/dev/null 2>&1 || { echo "fuzz_loop: dựng parse THẤT BẠI"; exit 4; }
 START=$(date +%s); LIMIT=$(python -c "print(int(float('$HOURS')*3600))")
+if [ "$MODE" = parallel ]; then
+  bash tools/preflight.sh "$ROOT" >/dev/null 2>&1 || { echo "fuzz_loop: preflight đầy đủ FAIL trước khi chạy song song — dừng"; exit 2; }
+  one_kind() { # $1 = lex|parse ; vòng riêng, kiểm sức khoẻ kho + RAM mỗi vòng (không kiểm "có cargo khác" vì tiến trình bạn cũng là cargo)
+    local k="$1" tries=0 left s out code
+    while [ "$STOP" = 0 ] && [ $(( $(date +%s) - START )) -lt "$LIMIT" ]; do
+      python tools/fuzz_total.py --kind-done "$k" && { echo "fuzz_loop[$k]: đạt 24 giờ trên băm hiện tại — xong"; return 0; }
+      if ! PREFLIGHT_SKIP_RESOURCES=1 bash tools/preflight.sh "$ROOT" >/dev/null 2>&1 || [ "$(free_gb)" -lt $(( PAR_MIN / 2 )) ]; then
+        tries=$((tries+1)); [ "$tries" -ge 30 ] && { echo "fuzz_loop[$k]: kho/RAM chưa đạt 30 lần — dừng"; return 1; }
+        echo "fuzz_loop[$k]: kho hoặc RAM chưa đạt ($tries/30) — ngủ 120 s"; sleep 120; continue
+      fi
+      tries=0
+      left=$(( LIMIT - ( $(date +%s) - START ) )); s=$SEC; [ "$left" -lt "$s" ] && s=$left; [ "$s" -lt 30 ] && return 0
+      out="$(FUZZ_PEER=1 bash tools/fuzz_session.sh "$k" "$s" 2>&1)"; code=$?
+      echo "[$k] $(echo "$out" | tail -1)"
+      [ "$code" -ne 0 ] && { echo "fuzz_loop[$k]: phiên LỖI (exit $code) — dừng; điều tra artifacts"; return "$code"; }
+    done
+    return 0
+  }
+  one_kind lex & P1=$!
+  one_kind parse & P2=$!
+  wait $P1; R1=$?; wait $P2; R2=$?
+  python tools/fuzz_total.py
+  echo "fuzz_loop: kết thúc song song sau $(( $(date +%s) - START )) s (lex=$R1 parse=$R2)"
+  [ "$R1" = 0 ] && [ "$R2" = 0 ] && exit 0
+  exit 1
+fi
 i=0
 while [ "$STOP" = 0 ] && [ $(( $(date +%s) - START )) -lt "$LIMIT" ]; do
   if python tools/fuzz_total.py --done-on-current-hash >/dev/null 2>&1; then echo "fuzz_loop: CẢ HAI đạt 24 giờ trên băm hiện tại — xong"; break; fi

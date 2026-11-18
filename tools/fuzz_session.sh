@@ -16,7 +16,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$ROOT/docs/FUZZ_LOG.jsonl"
 TRACK_SNAP_FUZZ="$(mktemp)"; TRACK_IGNORE='docs/FUZZ_LOG.jsonl' bash "$ROOT/tools/track_guard.sh" snapshot "$TRACK_SNAP_FUZZ" "$ROOT"
 ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
-if command -v tasklist >/dev/null 2>&1; then
+if [ "${FUZZ_PEER:-0}" = 1 ]; then
+  busy=""   # chế độ song song của fuzz_loop.sh: tiến trình cargo/fuzz của phiên bạn là CHÍNH MÌNH; fuzz_loop đã kiểm kho + RAM
+elif command -v tasklist >/dev/null 2>&1; then
   busy=$(tasklist 2>/dev/null | grep -i -E "^(cargo|rustc|link|gritc|cl|clang|rig)\.exe|^[a-z_0-9]+-[0-9a-f]{16}\.exe" | head -3)
 else
   # Linux: tiến trình cargo/rustc/gritc/rig hoặc tệp test (`<tên>-<16 hex>`) đang chạy (trừ chính phiên này, vốn gọi `cargo fuzz`)
