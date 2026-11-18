@@ -1,0 +1,6 @@
+[package]
+name = "csv2json"
+version = "0.1.0"
+
+[dependencies]
+std = { path = "D:/Grit/lib/std" }

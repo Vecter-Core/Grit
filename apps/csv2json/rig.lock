@@ -1,0 +1,16 @@
+# rig.lock — tạo bởi `rig lock`; KHÔNG sửa tay. Băm nội dung từng gói; lệch ⇒ rig từ chối build.
+version = 1
+
+[[package]]
+name = "csv2json"
+version = "0.1.0"
+source = "root"
+deps = ["std"]
+hash = "sha256:d3d6d55ae9f5d89f71a5c57bb2c359d33075434f5abb09d027e8b5ddcda9cdeb"
+
+[[package]]
+name = "std"
+version = "0.1.0"
+source = "path"
+deps = []
+hash = "sha256:bdcc83c7e16500637031a8c99d27860ef5e2dae078ff226e95211b44b1fccec1"

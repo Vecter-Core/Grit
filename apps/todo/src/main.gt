@@ -1,0 +1,123 @@
+// todo: todo <tệp> add|done|remove|list [đối số]. Đặc tả: README.md. Viết bởi phiên KHÔNG sạch (GÓI 6 S3).
+// Mã thoát: 0 xong; 2 dùng sai/I-O/đối số không hợp lệ; 3 số thứ tự ngoài phạm vi; 4 tệp dữ liệu hỏng.
+
+ƒ usage(err: &Cap<ErrOut>) → ! ! {io, div} {
+  err.write_str("usage: todo <file> add <text> | done <n> | remove <n> | list\n");
+  core::exit(2u32)
+}
+
+ƒ fail(err: &Cap<ErrOut>, why: &str, code: u32) → ! ! {io, div} {
+  err.write_str("todo: ");
+  err.write_str(why);
+  err.write_str("\n");
+  core::exit(code)
+}
+
+// dòng hợp lệ: [ ] hoặc [x] rồi dấu cách rồi nội dung (cho phép rỗng? KHÔNG: dài >= 5)
+ƒ line_ok(b: &[u8], s: usize, e: usize) → bool ! ∅ ⊳ s <= e ∧ e <= b.len() {
+  ⎇ e - s < 5usize {
+    false
+  } ⇝ {
+    b[s] == 91u8 ∧ (b[s + 1usize] == 32u8 ∨ b[s + 1usize] == 120u8) ∧ b[s + 2usize] == 93u8 ∧ b[s + 3usize] == 32u8
+  }
+}
+
+ƒ main() ! {io, div, mem} {
+  out ≔ root_out();
+  err ≔ root_err();
+  env ≔ root_env();
+  fs ≔ root_fs();
+  argc ≔ env.arg_count();
+  ⎇ argc < 3usize ∨ argc > 4usize { usage(&err) } ⇝ { }
+  path ≔ env.arg(1usize);
+  cmd ≔ env.arg(2usize);
+  data ≔ ⌥ fs.open(path) {
+    Ok(f) ↦ f.bytes(),
+    Err(IoError::NotFound) ↦ "".as_bytes(),
+    Err(_) ↦ fail(&err, "cannot read data file", 2u32),
+  };
+  n ≔ data.len();
+  μar ≔ Arena::new();
+  μsv ≔ Vec::new(&ar);
+  μev ≔ Vec::new(&ar);
+  μpos ≔ 0usize;
+  ⟳ pos < n ↓ n - pos {
+    e ≔ data.find_byte_or_end(pos, 10u8);
+    ⎇ e >= n ∨ ¬line_ok(data, pos, e) {
+      fail(&err, "data file is corrupt", 4u32)
+    } ⇝ {
+      sv.push(pos);
+      ev.push(e);
+      pos ← e + 1usize;
+    }
+  }
+  ss ≔ sv.as_slice();
+  es ≔ ev.as_slice();
+  cnt ≔ ss.len();
+  is_list ≔ cmd == "list";
+  is_add ≔ cmd == "add";
+  is_done ≔ cmd == "done";
+  is_remove ≔ cmd == "remove";
+  ⎇ is_list {
+    ⎇ argc != 3usize { usage(&err) } ⇝ { }
+    μi ≔ 0usize;
+    ⟳ i < cnt ↓ cnt - i {
+      out.write_u64((i + 1usize) as u64);
+      out.write_str(" ");
+      out.write_bytes(&data[ss[i]..es[i]]);
+      out.write_str("\n");
+      i ← i + 1usize;
+    }
+  } ⇝ {
+    ⎇ argc != 4usize ∨ ¬(is_add ∨ is_done ∨ is_remove) { usage(&err) } ⇝ { }
+    arg ≔ env.arg(3usize);
+    μres ≔ Vec::new(&ar);
+    ⎇ is_add {
+      ab ≔ arg.as_bytes();
+      has_nl ≔ ⌥ ab.find_byte(0usize, 10u8) { Some(_) ↦ true, None ↦ false, };
+      ⎇ ab.len() == 0usize ∨ has_nl {
+        fail(&err, "text must be non-empty and have no newline", 2u32)
+      } ⇝ { }
+      res.extend_from_slice(data);
+      res.push_str("[ ] ");
+      res.extend_from_slice(ab);
+      res.push(10u8);
+    } ⇝ {
+      num ≔ ⌥ arg.parse_u64() {
+        Ok(v) ↦ v,
+        Err(_) ↦ fail(&err, "bad item number", 2u32),
+      };
+      ⎇ num == 0u64 ∨ num > cnt as u64 {
+        fail(&err, "item number out of range", 3u32)
+      } ⇝ { }
+      target ≔ (num - 1u64) as usize;
+      μj ≔ 0usize;
+      ⟳ j < cnt ↓ cnt - j {
+        ⎇ j == target {
+          ⎇ is_done {
+            res.push_str("[x] ");
+            res.extend_from_slice(&data[ss[j] + 4usize..es[j]]);
+            res.push(10u8);
+          } ⇝ { }
+        } ⇝ {
+          res.extend_from_slice(&data[ss[j]..es[j]]);
+          res.push(10u8);
+        }
+        j ← j + 1usize;
+      }
+    }
+    ⌥ fs.write(path, res.as_slice()) {
+      Ok(_) ↦ { },
+      Err(_) ↦ fail(&err, "cannot write data file", 2u32),
+    }
+    ⎇ is_add {
+      out.write_str("added ");
+      out.write_u64((cnt + 1usize) as u64);
+      out.write_str("\n");
+    } ⇝ {
+      ⎇ is_done { out.write_str("done "); } ⇝ { out.write_str("removed "); }
+      out.write_str(arg);
+      out.write_str("\n");
+    }
+  }
+}

@@ -1,0 +1,243 @@
+// csv2json: csv2json <tệp.csv> — in JSON (mảng đối tượng) ra stdout. Đặc tả: README.md. Viết bởi phiên KHÔNG sạch (GÓI 6 S3).
+// Mã thoát: 0 xong; 2 dùng sai/không đọc được tệp/không phải UTF-8; 3 lỗi CSV (không in gì ra stdout).
+
+ƒ hexd(n: u8) → u8 ! ∅ {
+  ⎇ n < 10u8 { 48u8 + n } ⇝ { 87u8 + n }
+}
+
+// ghi chuỗi JSON (có nháy kép) của lát byte b vào out
+ƒ push_json<'a>(out: &!Vec<'a, u8>, b: &[u8]) ! {mem} {
+  out.push(34u8);
+  μi ≔ 0usize;
+  ⟳ i < b.len() ↓ b.len() - i {
+    c ≔ b[i];
+    ⎇ c == 34u8 {
+      out.push(92u8);
+      out.push(34u8);
+    } ⇝ {
+      ⎇ c == 92u8 {
+        out.push(92u8);
+        out.push(92u8);
+      } ⇝ {
+        ⎇ c == 10u8 {
+          out.push(92u8);
+          out.push(110u8);
+        } ⇝ {
+          ⎇ c == 13u8 {
+            out.push(92u8);
+            out.push(114u8);
+          } ⇝ {
+            ⎇ c == 9u8 {
+              out.push(92u8);
+              out.push(116u8);
+            } ⇝ {
+              ⎇ c < 32u8 {
+                out.push(92u8);
+                out.push(117u8);
+                out.push(48u8);
+                out.push(48u8);
+                out.push(hexd(c / 16u8));
+                out.push(hexd(c % 16u8));
+              } ⇝ {
+                out.push(c);
+              }
+            }
+          }
+        }
+      }
+    }
+    i ← i + 1usize;
+  }
+  out.push(34u8);
+}
+
+// vị trí kết thúc của trường KHÔNG nháy bắt đầu tại p0: byte đầu tiên là ',', LF, CRLF hoặc nháy kép (nháy ⇒ lỗi), hoặc hết dữ liệu
+ƒ plain_end(b: &[u8], p0: usize) → usize ! ∅ ⊳ p0 <= b.len() ⊲ result >= p0 ∧ result <= b.len() {
+  n ≔ b.len();
+  μp ≔ p0;
+  ⟳ p < n ∧ b[p] != 44u8 ∧ b[p] != 10u8 ∧ b[p] != 34u8 ∧ ¬(b[p] == 13u8 ∧ p + 1usize < n ∧ b[p + 1usize] == 10u8) ↓ n - p {
+    p ← p + 1usize;
+  }
+  p
+}
+
+// vị trí nháy đóng của trường có nháy; p0 = ngay sau nháy mở; n nếu không đóng
+ƒ quote_end(b: &[u8], p0: usize) → usize ! ∅ ⊳ p0 <= b.len() ⊲ result >= p0 ∧ result <= b.len() {
+  n ≔ b.len();
+  μp ≔ p0;
+  ⟳ p < n ∧ (b[p] != 34u8 ∨ (p + 1usize < n ∧ b[p + 1usize] == 34u8)) ↓ n - p {
+    ⎇ b[p] == 34u8 { p ← p + 2usize; } ⇝ { p ← p + 1usize; }
+  }
+  p
+}
+
+// chép b[from..to] vào fd, đổi "" thành "
+ƒ copy_unquoted<'a>(b: &[u8], from_: usize, to: usize, fd: &!Vec<'a, u8>) ! {mem} ⊳ from_ <= to ∧ to <= b.len() {
+  μq ≔ from_;
+  ⟳ q < to ↓ to - q {
+    c ≔ b[q];
+    fd.push(c);
+    ⎇ c == 34u8 ∧ q + 1usize < to { q ← q + 2usize; } ⇝ { q ← q + 1usize; }
+  }
+}
+
+// bản ghi bắt đầu tại pos (pos < n, không phải dòng rỗng). Trả vị trí bản ghi kế tiếp; 0 nếu sai nháy. Ghi trường vào fd/fs/fe; trả số trường qua rc.
+ƒ record<'a>(b: &[u8], pos: usize, fd: &!Vec<'a, u8>, fs: &!Vec<'a, usize>, fe: &!Vec<'a, usize>, rc: &!Vec<'a, usize>) → usize ! {mem} ⊳ pos < b.len() {
+  n ≔ b.len();
+  μfp ≔ pos;
+  μnf ≔ 0usize;
+  μnext ≔ 0usize;
+  ⟳ fp <= n ↓ n + 1usize - fp {
+    start ≔ fd.len();
+    μe ≔ fp;
+    μok ≔ true;
+    ⎇ fp < n ∧ b[fp] == 34u8 {
+      q ≔ quote_end(b, fp + 1usize);
+      ⎇ q >= n {
+        ok ← false;
+      } ⇝ {
+        copy_unquoted(b, fp + 1usize, q, fd);
+        e ← q + 1usize;
+      }
+    } ⇝ {
+      pe ≔ plain_end(b, fp);
+      ⎇ pe < n ∧ b[pe] == 34u8 { ok ← false; } ⇝ {
+        fd.extend_from_slice(&b[fp..pe]);
+        e ← pe;
+      }
+    }
+    ⎇ ok {
+      fs.push(start);
+      fe.push(fd.len());
+      nf ← nf + 1usize;
+      ⎇ e < n ∧ b[e] == 44u8 {
+        fp ← e + 1usize;
+      } ⇝ {
+        ⎇ e >= n {
+          next ← n;
+          fp ← n + 1usize;
+        } ⇝ {
+          ⎇ b[e] == 10u8 {
+            next ← e + 1usize;
+            fp ← n + 1usize;
+          } ⇝ {
+            ⎇ b[e] == 13u8 ∧ e + 1usize < n ∧ b[e + 1usize] == 10u8 {
+              next ← e + 2usize;
+              fp ← n + 1usize;
+            } ⇝ {
+              // sau nháy đóng gặp ký tự lạ
+              ok ← false;
+              fp ← n + 1usize;
+            }
+          }
+        }
+      }
+    } ⇝ {
+      fp ← n + 1usize;
+    }
+    ⎇ ok { } ⇝ { next ← 0usize; nf ← 0usize; }
+  }
+  rc.push(nf);
+  next
+}
+
+ƒ main() ! {io, div, mem} {
+  out ≔ root_out();
+  err ≔ root_err();
+  env ≔ root_env();
+  fs ≔ root_fs();
+  ⎇ env.arg_count() != 2usize {
+    err.write_str("usage: csv2json <file.csv>\n");
+    core::exit(2u32)
+  } ⇝ { }
+  path ≔ env.arg(1usize);
+  data ≔ ⌥ fs.open(path) {
+    Ok(f) ↦ f.bytes(),
+    Err(_) ↦ {
+      err.write_str("csv2json: cannot read ");
+      err.write_str(path);
+      err.write_str("\n");
+      core::exit(2u32)
+    },
+  };
+  μar ≔ Arena::new();
+  ⌥ Text::from_utf8(&ar, data) {
+    Some(_) ↦ { },
+    None ↦ {
+      err.write_str("csv2json: input is not valid UTF-8\n");
+      core::exit(2u32)
+    },
+  }
+  μfd ≔ Vec::new(&ar);
+  μfsv ≔ Vec::new(&ar);
+  μfev ≔ Vec::new(&ar);
+  μrcv ≔ Vec::new(&ar);
+  n ≔ data.len();
+  μpos ≔ 0usize;
+  μfuel ≔ (n + 1usize) as u64;
+  ⟳ pos < n ∧ fuel > 0u64 ↓ fuel {
+    fuel ← fuel - 1u64;
+    ⎇ data[pos] == 10u8 {
+      pos ← pos + 1usize;
+    } ⇝ {
+      ⎇ data[pos] == 13u8 ∧ pos + 1usize < n ∧ data[pos + 1usize] == 10u8 {
+        pos ← pos + 2usize;
+      } ⇝ {
+        nx ≔ record(data, pos, &!fd, &!fsv, &!fev, &!rcv);
+        ⎇ nx == 0usize {
+          err.write_str("csv2json: malformed quoting\n");
+          core::exit(3u32)
+        } ⇝ {
+          pos ← nx;
+        }
+      }
+    }
+  }
+  core::fuel_left(fuel);
+  fdat ≔ fd.as_slice();
+  fss ≔ fsv.as_slice();
+  fes ≔ fev.as_slice();
+  rcs ≔ rcv.as_slice();
+  nrec ≔ rcs.len();
+  μres ≔ Vec::new(&ar);
+  ⎇ nrec <= 1usize {
+    res.push_str("[]\n");
+  } ⇝ {
+    hn ≔ rcs[0usize];
+    μv ≔ 1usize;
+    μbadrow ≔ false;
+    ⟳ v < nrec ↓ nrec - v {
+      ⎇ rcs[v] != hn { badrow ← true; } ⇝ { }
+      v ← v + 1usize;
+    }
+    ⎇ badrow {
+      err.write_str("csv2json: row has a different number of fields than the header\n");
+      core::exit(3u32)
+    } ⇝ { }
+    μr ≔ 1usize;
+    μfi ≔ hn;
+    res.push_str("[\n");
+    ⟳ r < nrec ↓ nrec - r {
+      k ≔ rcs[r];
+      ⎇ k != hn {
+        r ← r + 1usize;
+      } ⇝ {
+        res.push(123u8);
+        μj ≔ 0usize;
+        ⟳ j < hn ↓ hn - j {
+          ⎇ j > 0usize { res.push(44u8); } ⇝ { }
+          push_json(&!res, &fdat[fss[j]..fes[j]]);
+          res.push(58u8);
+          push_json(&!res, &fdat[fss[fi + j]..fes[fi + j]]);
+          j ← j + 1usize;
+        }
+        res.push(125u8);
+        ⎇ r + 1usize < nrec { res.push_str(",\n"); } ⇝ { res.push_str("\n"); }
+        fi ← fi + k;
+        r ← r + 1usize;
+      }
+    }
+    res.push_str("]\n");
+  }
+  out.write_bytes(res.as_slice());
+}

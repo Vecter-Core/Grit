@@ -1,0 +1,138 @@
+// difflite: difflite <tệp_a> <tệp_b> — so hai tệp theo dòng bằng quy hoạch động (LCS). Đặc tả: README.md. Viết bởi phiên KHÔNG sạch (GÓI 6 S3).
+// Mã thoát: 0 giống nhau (không in gì); 1 khác nhau (in kịch bản sửa); 2 dùng sai/không đọc được tệp; 3 quá lớn (> 2000 dòng mỗi tệp hoặc bảng > 4 000 000 ô).
+
+ƒ usage(err: &Cap<ErrOut>) → ! ! {io, div} {
+  err.write_str("usage: difflite <file_a> <file_b>\n");
+  core::exit(2u32)
+}
+
+ƒ fail(err: &Cap<ErrOut>, why: &str, code: u32) → ! ! {io, div} {
+  err.write_str("difflite: ");
+  err.write_str(why);
+  err.write_str("\n");
+  core::exit(code)
+}
+
+ƒ read_file(fs: &Cap<Fs>, err: &Cap<ErrOut>, path: &str) → &'static [u8] ! {io, div} {
+  ⌥ fs.open(path) {
+    Ok(f) ↦ f.bytes(),
+    Err(_) ↦ fail(err, "cannot read input file", 2u32),
+  }
+}
+
+// tách dòng: dòng k là b[s[k]..e[k]] (không gồm LF); dòng cuối không có LF vẫn là một dòng; tệp rỗng ⇒ 0 dòng
+ƒ split_lines<'a>(b: &[u8], s: &!Vec<'a, usize>, e: &!Vec<'a, usize>) ! {mem} {
+  n ≔ b.len();
+  μpos ≔ 0usize;
+  ⟳ pos < n ↓ n - pos {
+    x ≔ b.find_byte_or_end(pos, 10u8);
+    s.push(pos);
+    e.push(x);
+    pos ← x + 1usize;
+  }
+}
+
+// điền n số 0 vào v
+ƒ fill_zero<'a>(v: &!Vec<'a, u32>, n: usize) ! {mem} {
+  μz ≔ 0usize;
+  ⟳ z < n ↓ n - z {
+    v.push(0u32);
+    z ← z + 1usize;
+  }
+}
+
+// tbl[i * w + j] = độ dài LCS của a[i..] và b[j..]; các lát dòng (s, e) của hai tệp
+ƒ build_table(a: &[u8], as_: &[usize], ae: &[usize], b: &[u8], bs: &[usize], be: &[usize], tbl: &![u32], w: usize) ! ∅ {
+  na ≔ as_.len();
+  nb ≔ bs.len();
+  μi ≔ na;
+  ⟳ i > 0usize ↓ i {
+    i ← i - 1usize;
+    μj ≔ nb;
+    ⟳ j > 0usize ↓ j {
+      j ← j - 1usize;
+      ⎇ (&a[as_[i]..ae[i]]).equals(&b[bs[j]..be[j]]) {
+        tbl[i * w + j] ← tbl[(i + 1usize) * w + (j + 1usize)] + 1u32;
+      } ⇝ {
+        down ≔ tbl[(i + 1usize) * w + j];
+        right ≔ tbl[i * w + (j + 1usize)];
+        ⎇ down >= right { tbl[i * w + j] ← down; } ⇝ { tbl[i * w + j] ← right; }
+      }
+    }
+  }
+}
+
+// kịch bản sửa từ (0, 0); trả số dòng khác nhau
+ƒ walk<'a>(a: &[u8], as_: &[usize], ae: &[usize], b: &[u8], bs: &[usize], be: &[usize], tbl: &[u32], w: usize, res: &!Vec<'a, u8>) → usize ! {mem} {
+  na ≔ as_.len();
+  nb ≔ bs.len();
+  μdiffs ≔ 0usize;
+  μp ≔ 0usize;
+  μq ≔ 0usize;
+  μfuel ≔ (na + nb + 1usize) as u64;
+  ⟳ (p < na ∨ q < nb) ∧ fuel > 0u64 ↓ fuel {
+    fuel ← fuel - 1u64;
+    ⎇ p < na ∧ q < nb ∧ (&a[as_[p]..ae[p]]).equals(&b[bs[q]..be[q]]) {
+      res.push_str("  ");
+      res.extend_from_slice(&a[as_[p]..ae[p]]);
+      res.push(10u8);
+      p ← p + 1usize;
+      q ← q + 1usize;
+    } ⇝ {
+      ⎇ q >= nb ∨ (p < na ∧ tbl[(p + 1usize) * w + q] >= tbl[p * w + (q + 1usize)]) {
+        res.push_str("- ");
+        res.extend_from_slice(&a[as_[p]..ae[p]]);
+        res.push(10u8);
+        p ← p + 1usize;
+        diffs ← diffs + 1usize;
+      } ⇝ {
+        res.push_str("+ ");
+        res.extend_from_slice(&b[bs[q]..be[q]]);
+        res.push(10u8);
+        q ← q + 1usize;
+        diffs ← diffs + 1usize;
+      }
+    }
+  }
+  core::fuel_left(fuel);
+  diffs
+}
+
+ƒ main() ! {io, div, mem} {
+  out ≔ root_out();
+  err ≔ root_err();
+  env ≔ root_env();
+  fs ≔ root_fs();
+  ⎇ env.arg_count() != 3usize { usage(&err) } ⇝ { }
+  a ≔ read_file(&fs, &err, env.arg(1usize));
+  b ≔ read_file(&fs, &err, env.arg(2usize));
+  μar ≔ Arena::new();
+  μasv ≔ Vec::new(&ar);
+  μaev ≔ Vec::new(&ar);
+  μbsv ≔ Vec::new(&ar);
+  μbev ≔ Vec::new(&ar);
+  split_lines(a, &!asv, &!aev);
+  split_lines(b, &!bsv, &!bev);
+  as_ ≔ asv.as_slice();
+  ae ≔ aev.as_slice();
+  bs ≔ bsv.as_slice();
+  be ≔ bev.as_slice();
+  na ≔ as_.len();
+  nb ≔ bs.len();
+  ⎇ na > 2000usize ∨ nb > 2000usize ∨ (na + 1usize) * (nb + 1usize) > 4000000usize {
+    fail(&err, "input too large", 3u32)
+  } ⇝ { }
+  w ≔ nb + 1usize;
+  μtv ≔ Vec::new(&ar);
+  fill_zero(&!tv, (na + 1usize) * w);
+  μtbl ≔ tv.as_mut_slice();
+  build_table(a, as_, ae, b, bs, be, tbl, w);
+  μres ≔ Vec::new(&ar);
+  diffs ≔ walk(a, as_, ae, b, bs, be, tv.as_slice(), w, &!res);
+  ⎇ diffs == 0usize {
+    core::exit(0u32)
+  } ⇝ {
+    out.write_bytes(res.as_slice());
+    core::exit(1u32)
+  }
+}

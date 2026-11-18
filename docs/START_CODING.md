@@ -19,14 +19,15 @@ Dành cho Giang. Tự chứa, ≤ 2 trang. Trạng thái: `1.0.0-rc3` (chưa ph�
 
 Luật cho phiên viết ứng dụng ở `AGENTS.md`: chỉ sửa trong `apps/` (và ghi `docs/USER_BUGS.md`); không sửa `crates/`, `runtime/`, `tests/`, `docs/spec/`.
 
-## 3. Ba chương trình đầu nên thử (dễ → khó)
+## 3. Ba chương trình đầu nên thử (dễ → khó) — ĐÃ có bản mẫu trong `apps/`
+Đếm từ và máy tính đã nằm trong bốn capstone nên ba chương trình mẫu có hình dạng khác. Mỗi cái đã được viết, so từng byte với bản tham chiếu Python ở `dev` và `release-o2` (`docs/APPS_LOG.md`: số lần biên dịch, thông báo khó hiểu, khoảng trống). Viết bởi phiên KHÔNG sạch: dùng làm hồi quy và ví dụ, không thay capstone.
 | # | chương trình | đối chiếu |
 |---|---|---|
-| 1 | Đếm tần suất từ trong một tệp văn bản và in top 10 (`wordfreq`; xem `examples/wordfreq` để biết cái gì viết được) | script Python `collections.Counter` cùng tệp; so từng dòng. Thứ tự các từ cùng tần suất: tự quy ước (HashMap duyệt không xác định) |
-| 2 | Chuyển CSV nhỏ sang JSON (tệp đọc toàn bộ, tách dòng) | `python -c "import csv,json,sys..."` cùng tệp; so JSON sau khi chuẩn hoá |
-| 3 | Máy tính biểu thức dòng lệnh (`+ - * /`, ngoặc, số nguyên; lỗi cú pháp ⇒ mã thoát khác 0) | Python `eval` trên tập biểu thức hợp lệ cố định; kiểm thêm biểu thức sai/tràn/chia 0 |
-
-Mỗi chương trình: chạy `rig check` (phải XANH), `rig run`, rồi chạy cả đầu vào lớn và đầu vào rỗng.
+| 1 | `apps/todo` — `todo <tệp> add|done|remove|list` lưu bằng `Cap<Fs>::write` | `python apps/check_app.py todo` (110/110 ca) |
+| 2 | `apps/csv2json` — CSV (có nháy, CRLF, UTF-8) → JSON mảng đối tượng | `python apps/check_app.py csv2json` (148/148) |
+| 3 | `apps/difflite` — so hai tệp theo dòng bằng quy hoạch động hai chiều (giới hạn cỡ nghiêm ngặt) | `python apps/check_app.py difflite` (186/186) |
+Muốn thử đường dùng với chương trình MỚI: bảo Claude viết bản riêng (đừng chép) trong `apps/<tên_mới>/` kèm `README.md` đặc tả, `reference.py` độc lập và `cases.py` (xem ba mẫu), rồi `python apps/check_app.py <tên_mới>` (cần thư mục `apps/<tên>/src/*.gt`; `rig new` tạo sẵn gói với phụ thuộc `std`).
+Gặp lỗi: đọc `docs/AI_GUIDE.md` §10 và bảng lỗi (E0702: hàm quá lớn → tách hàm; E0902: hợp đồng trên lát không kiểm được lúc chạy).
 
 ## 4. Grit CHƯA làm được (trích `docs/SEED_LIMITATIONS.md`, đọc đủ ở tệp đó)
 * Không mạng (kể cả `Cap<Net>::connect` chưa có lowering), không đọc stdin theo dòng (đọc toàn bộ rồi tách), không chuỗi định dạng, không in/phân tích số thực.
@@ -42,6 +43,6 @@ Mỗi chương trình: chạy `rig check` (phải XANH), `rig run`, rồi chạy
 * `bash tools/setup_cloud.sh` — ĐÃ CHẠY THẬT trên Linux CI (Ubuntu 24.04), thoát 0 (các job `linux-gate`/`tsan`).
 * Windows: `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml` và `cargo build --release -p gt-driver -p rig` — ĐÃ CHẠY THẬT ở các gói trước (cổng `89438fd`); tại gói này chỉ dùng bản debug.
 * `rig new` / `rig lock` / `rig check` / `rig run` trong `apps/` (bản debug, Windows, 2026-11-19): ĐÃ CHẠY, đều thoát 0 (`rig check`: green, 0 lỗi); gói thử đã xoá.
-* Ba chương trình mẫu (đếm từ, CSV→JSON, máy tính) và so với Python: CHƯA THỬ (chưa viết; đây là việc của phiên viết ứng dụng). `examples/wordfreq` (đã có) đối chiếu với Rust trong test dogfood của nó.
+* Ba chương trình mẫu `todo`, `csv2json`, `difflite` và so với bản tham chiếu Python: ĐÃ CHẠY (`python apps/check_app.py <tên>` ở Windows, dev + release-o2: 110/110, 148/148, 186/186 ca khớp).
 * `gritc check` / `gritc run` trực tiếp trên một tệp: ĐÃ CHẠY (`gritc run --backend=llvm tests/tsan/narrow_droplock.gt` ⇒ "main trả về 2", thoát 0).
 * Mở Claude Code trên repo và dán câu lệnh mẫu: CHƯA THỬ (cần Giang).

@@ -231,12 +231,12 @@ cannot open
 | E0602 | chia 0 chắc chắn | kiểm mẫu số trước |
 | E0603 | chỉ số ngoài biên chắc chắn | kiểm `i < xs.len()` |
 | E0701 | vòng lặp không chứng minh được dừng | thêm `↓ …` (§5) hoặc nhiên liệu |
-| E0702 | `↓` không giảm nghiêm ngặt / không bị chặn dưới | mỗi đường phải giảm; tránh gán hằng; biểu thức tuyến tính |
+| E0702 | `↓` không giảm nghiêm ngặt / không bị chặn dưới | mỗi đường phải giảm; tránh gán hằng; biểu thức tuyến tính Hàm có hơn 24 biến (hoặc hơn 24 vòng lặp) vượt giới hạn của bộ chứng minh và vòng ĐÚNG cũng bị E0702 (thông báo có lời nhắc): tách hàm. Thoát sớm bằng `⊠;`, không dùng cờ bool. |
 | E0703 | đệ quy thiếu `↓` | tham số `budget` + `↓ budget` + gọi với `budget - 1` |
 | E0801 | hiệu ứng suy ra ⊄ khai báo | thêm `{io}`/`{mem}`/`{div}` vào hàm (và hàm gọi nó) |
 | E0802 | impl khai nhiều hiệu ứng hơn trait | khớp trait |
 | E0901 | hợp đồng `⊳`/`⊲` chắc chắn sai (kể cả `⊳` qua con trỏ hàm) | sửa đối số hoặc gọi trực tiếp |
-| E0902 | không kiểm được lúc chạy | tránh `⊳` trên tham số `&!` |
+| E0902 | không kiểm được lúc chạy | tránh `⊳` trên tham số `&!`; hàm có `⊳`/`⊲` mà đối số là lát/`Vec` (không Copy) thì không kiểm được lúc chạy: bỏ hợp đồng (bounds check vẫn có) hoặc truyền chỉ số/độ dài |
 | E1001 | `⚠`/con trỏ thô | không dùng |
 | E1101 | IR Guard từ chối | lỗi compiler: báo, đừng lách |
 | E9901 | lỗi nội bộ (ICE) | ghi lại tệp tối thiểu gây lỗi và báo |

@@ -9,3 +9,6 @@ cd tan_suat_tu && rig lock && rig check && rig run
 ```
 
 Luật: ở đây CHỈ có chương trình ứng dụng. Phiên Claude viết ứng dụng KHÔNG sửa compiler, test, spec hay tài liệu ngoài `apps/` và `docs/USER_BUGS.md` (xem `AGENTS.md`, `docs/START_CODING.md`). Gặp lỗi của `gritc` thì ghi `docs/USER_BUGS.md`, không "sửa cho qua".
+
+## Ứng dụng mẫu hiện có (GÓI 6 S3; viết bởi phiên không sạch, làm hồi quy)
+`todo/`, `csv2json/`, `difflite/` — mỗi cái: `README.md` (đặc tả), `reference.py` (bản tham chiếu độc lập), `cases.py` (bộ ca), `src/main.gt`. Kiểm: `python apps/check_app.py <tên>`. Nhật ký: `docs/APPS_LOG.md`.
