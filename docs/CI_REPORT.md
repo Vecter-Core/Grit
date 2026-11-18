@@ -39,4 +39,4 @@ Trạng thái Billing thật; CI trên Windows cho phần test lớn (gt-driver,
 * **Phút ước tính tới nay ≈ 624 + tsan 11 + coverage 2×55 = ≈ 745 phút** (chưa tính run kiểm tra cuối của gói; CHƯA kiểm Billing).
 * **Workflow nào tốn phút:** `linux-gate` (≈ 72–87), `windows-core` (≈ 21 ×2 = 42 tính phí), `coverage` (≈ 55, thủ công), `tsan` (≈ 11, có điều kiện), `determinism` (≈ 3), `linux-nollvm` (≈ 1), `deny` (≈ 0,5; +3–5 với cargo-deny), `changes` (≈ 0,3).
 * **Việc của Giang:** vào GitHub → Settings → Billing and plans → Usage: xem phút còn lại; đặt **Spending limit = 0 USD** / cảnh báo chi tiêu về 0 nếu chưa (để không bị tính tiền khi hết phút miễn phí).
-
+* Run kiểm cuối GÓI 5 `44304931977`: linux-gate ≈ 46 phút, windows-core ≈ 21 (×2), deny/determinism/nollvm vài phút ⇒ cộng ≈ 100 phút tính phí; `44312549679` (deny) ≈ 4. **Tổng ước tính ≈ 850 phút** (CHƯA kiểm Billing).
