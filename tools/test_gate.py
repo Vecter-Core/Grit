@@ -12,7 +12,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def gate(test_cmd):
-    env = dict(os.environ, GATE_STAGES="test", GATE_TEST_CMD=test_cmd, PYTHONIOENCODING="utf-8")
+    # các cổng lồng này chạy trên thư mục THẬT: GATE_RESET/GATE_BUDGET_SEC của cổng ngoài KHÔNG được lọt vào (sẽ xoá điểm lưu thật giữa chừng)
+    env = {k: v for k, v in os.environ.items() if k not in ("GATE_RESET", "GATE_BUDGET_SEC", "GATE_FORCE_PREFLIGHT")}
+    env.update(GATE_STAGES="test", GATE_TEST_CMD=test_cmd, PYTHONIOENCODING="utf-8")
     p = subprocess.run(["bash", "tools/gate.sh", ROOT.replace("\\", "/")], cwd=ROOT, env=env,
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     return p.returncode, p.stdout
