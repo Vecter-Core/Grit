@@ -1,21 +1,38 @@
-# CI cho Linux (ubuntu-24.04) và Windows (windows-2022). CHƯA được chạy trên GitHub từ môi trường soạn thảo (chỉ viết, không push workflow lên chạy):
-# Linux đã kiểm bằng `bash tools/gate.sh .` trong container Ubuntu 24.04 (libllvm20 = LLVM 20.1.2); **Windows: chưa kiểm** sau các thay đổi của nhánh Seed 1.0.
+# CI (GÓI 4 S0). Viết lại 2026-11-19: quyền tối thiểu, KHÔNG secret, KHÔNG pull_request_target, KHÔNG cron; action ghim theo SHA commit.
+# Chạy khi `push` (mọi nhánh) và thủ công (`workflow_dispatch`). Ngân sách phút (gói miễn phí repo riêng tư ≈ 2 000 phút/tháng, Windows tính gấp đôi):
+#   Linux = cổng đầy đủ; Windows = BẢN RÚT GỌN (không chạy toàn bộ test workspace: tốn nhiều phút ×2). Xem docs/CI_REPORT.md.
 name: ci
 
 on:
   push:
-  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   linux-gate:
-    # cổng đầy đủ (fmt, clippy -D warnings, audit, mọi test, doc_test, nul, deletions, track); giai đoạn `track` cần git sạch ⇒ checkout đầy đủ
+    # cổng đầy đủ (fmt, clippy -D warnings, audit, mọi test, doc_test, nul, deletions, track)
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0 (đã tra qua gh api)
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: linux-cargo-
       - name: Cài môi trường (Rust, libllvm20, dựng runtime/gritc/rig, gritc doctor)
         run: bash tools/setup_cloud.sh
       - run: cargo install cargo-audit --locked
@@ -32,20 +49,20 @@ jobs:
     # gritc dựng KHÔNG có backend llvm (chỉ thông dịch)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: cargo test --locked -p gt-driver --no-default-features -- --test-threads=2
 
   deny:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: EmbarkStudios/cargo-deny-action@70f81531115945ba6eb6b941ec9d39d063438eb9 # v2
 
   determinism:
     # D9: dựng gritc hai lần từ cùng nguồn (cùng đường dẫn), so sha256
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: sudo apt-get update && sudo apt-get install -y libllvm20
       - run: |
           export GRIT_LLVM_LIB_DIR=/usr/lib/x86_64-linux-gnu
@@ -57,24 +74,46 @@ jobs:
           echo "$a" "$b"
           test "$a" = "$b"
 
-  windows-gate:
-    # Windows: CHƯA KIỂM. LLVM 20.1.8 bản dựng sẵn ở D:\Tools\llvm-20.1.8 trên máy chính (docs/ENVIRONMENT.md); trên runner phải tải và đặt GRIT_LLVM_DIR.
+  windows-core:
+    # BẢN RÚT GỌN (windows-2022, phút tính gấp đôi): dựng, doctor, các giai đoạn cổng nhẹ (fmt, clippy, expect, doc, deletions, nul, failopen, track) và test lõi.
+    # KHÔNG chạy: audit, test toàn bộ workspace (gt-fmt riêng ≈ 17 phút, gt-driver ≈ 20 phút trên máy chính) — đã chạy trên máy Windows chính (docs/RUN_REPORTS.md).
     runs-on: windows-2022
-    timeout-minutes: 300
+    timeout-minutes: 120
     defaults:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - name: LLVM 20.1.8 (bản dựng sẵn)
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: llvmcache
+        with:
+          path: ${{ runner.temp }}/llvm
+          key: llvm-20.1.8-windows-x64
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            runtime/gt-rt/target
+          key: windows-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: windows-cargo-
+      - name: LLVM 20.1.8 (bản dựng sẵn; cache)
+        if: steps.llvmcache.outputs.cache-hit != 'true'
         run: |
           curl -sSfL -o llvm.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/clang+llvm-20.1.8-x86_64-pc-windows-msvc.tar.xz
           mkdir -p "$RUNNER_TEMP/llvm" && tar -xJf llvm.tar.xz -C "$RUNNER_TEMP/llvm" --strip-components=1
+      - name: Đặt biến LLVM
+        run: |
           echo "GRIT_LLVM_DIR=$(cygpath -w "$RUNNER_TEMP/llvm")" >> "$GITHUB_ENV"
           echo "$(cygpath -u "$RUNNER_TEMP/llvm")/bin" >> "$GITHUB_PATH"
       - name: runtime gt-rt
         run: cargo build --release --manifest-path runtime/gt-rt/Cargo.toml
       - name: gritc doctor
         run: cargo run --release -p gt-driver --bin gritc -- doctor
-      - name: Cổng đầy đủ
-        run: bash tools/gate.sh .
+      - name: Giai đoạn cổng nhẹ
+        run: GATE_STAGES="nul gtrt fmt clippy expect doc deletions failopen track" bash tools/gate.sh .
+        env:
+          GRIT_RT_LIB: ${{ github.workspace }}/runtime/gt-rt/target/release/gt_rt.lib
+      - name: Test lõi (lexer, parser, resolve, types, mir, guard, term, effects)
+        run: cargo test --locked -p gt-lexer -p gt-parser -p gt-resolve -p gt-types -p gt-mir -p gt-guard -p gt-term -p gt-effects -- --test-threads=2
