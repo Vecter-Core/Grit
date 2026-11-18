@@ -36,3 +36,6 @@
 | `crates/rig/tests/dogfood_wordfreq.rs::perf_report_against_rust` | đo hiệu năng: `--ignored --nocapture` |
 
 Các test `dump_*`/`probe_*` KHÔNG khẳng định kết quả nên không phải lỗ hổng độ phủ; năm `batch` là oracle chạy tay theo lô (ghi trong `docs/RUNLIST.md`/`RUN_REPORTS.md`).
+
+## Cập nhật GÓI 6
+Danh sách `--list` Windows nay 1045 mục (thêm 3 test `gt-term/tests/limit_hint.rs`); Linux = Windows trừ 3 test chỉ-Windows (CI bước `PLATFORM_DIFF_OK`). Bước diff bắt được ngay danh sách cũ khi thêm test (CI run `44365492150` đỏ ở bước này dù cổng GREEN): phải thêm tên test mới vào `docs/platform_tests_windows.list`.
