@@ -1,5 +1,0 @@
-// expect: fail E0203
-// note: GÓI 7 S2.c (pat.rs struct_pat): pattern struct nêu trường riêng tư của struct ở module khác
-▦ m { ◈ ▢ S { x: i32 } ◈ ƒ mk() → S ! ∅ { S { x: 1 } } }
-ƒ f() → i32 ! ∅ { s ≔ m::mk(); ⌥ s { m::S { x } ↦ x } }
-ƒ main() → i32 ! ∅ { f() }

@@ -38,4 +38,4 @@
 Các test `dump_*`/`probe_*` KHÔNG khẳng định kết quả nên không phải lỗ hổng độ phủ; năm `batch` là oracle chạy tay theo lô (ghi trong `docs/RUNLIST.md`/`RUN_REPORTS.md`).
 
 ## Cập nhật GÓI 6
-Danh sách `--list` Windows nay 1048 mục (thêm 3 test `gt-term/tests/limit_hint.rs` và 3 test `ghost_limit_soundness.rs`, `ghost_wide_oracle.rs` của GÓI 7); Linux = Windows trừ 3 test chỉ-Windows (CI bước `PLATFORM_DIFF_OK`). Bước diff bắt được ngay danh sách cũ khi thêm test (CI run `44365492150` đỏ ở bước này dù cổng GREEN): phải thêm tên test mới vào `docs/platform_tests_windows.list`.
+Danh sách `--list` Windows nay 1050 mục (thêm 3 test `gt-term/tests/limit_hint.rs` và 5 test của GÓI 7 (`ghost_limit_soundness.rs`, `ghost_wide_oracle.rs`, `struct_pat_privacy.rs`)); Linux = Windows trừ 3 test chỉ-Windows (CI bước `PLATFORM_DIFF_OK`). Bước diff bắt được ngay danh sách cũ khi thêm test (CI run `44365492150` đỏ ở bước này dù cổng GREEN): phải thêm tên test mới vào `docs/platform_tests_windows.list`.

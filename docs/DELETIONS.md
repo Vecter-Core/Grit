@@ -202,3 +202,4 @@ Tệp này biến mất khỏi cây làm việc (không qua commit) ngày 2026-1
 | tests/fail/E0901_pre_fn_value_option_unwrap.gt | cc51dea | đổi mã kỳ vọng sang E0313 vì intrinsic không làm giá trị; giữ E0901 cho lời gọi trực tiếp |
 | {} | (commit dọn dẹp 2026-11-17) | tệp RỖNG tên `{}` ở thư mục gốc, tạo nhầm bởi một lệnh shell (2026-10-18); không chứa gì, không được tham chiếu |
 | tiến trình dự án.md | (chưa commit) | báo cáo chưa theo dõi, đổi tên không dấu thành docs/PROJECT_STATUS.md (lệnh P0b); không có commit xoá |
+| tests/fail/E0203_struct_pat_private_field_cov.gt | 9ffcc28 | thêm nhầm ở GÓI 7 S2.c: tiền tố E0203 khiến `gt-resolve` (chủ mã E0203) đòi resolver báo lỗi này, nhưng lỗi trường riêng tư trong pattern do `gt-types` phát; thay bằng test `crates/gt-types/tests/struct_pat_privacy.rs` |
