@@ -99,7 +99,7 @@ dependencies = [
 
 [[package]]
 name = "gt-driver"
-version = "1.0.0-rc5"
+version = "1.0.0-rc6"
 dependencies = [
  "find-msvc-tools",
  "gt-ast",
