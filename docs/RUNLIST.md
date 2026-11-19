@@ -90,3 +90,6 @@ S0 xong (main=e450c69). S1 xong (TSan đối chứng qua Grit). S2 xong (PLATFOR
 
 ## GÓI 6 (2026-11-19) — ĐANG CHẠY cổng CI trên rc4
 S0 xong (main `17beed4`, sau khi Giang tự hợp nhất hai PR trên GitHub). S1 độ phủ: 104→100→90 nhánh chưa chạy, bảng từng nhánh. S2 đo cỡ hàm + LIMITS_AUDIT + sửa thông báo E0702 (rc4). S3 ba app (csv2json/todo/difflite) khớp tham chiếu. S4 SEED_FINISH_LINE. S5: cổng Linux CI chạy trên commit này.
+
+## GÓI 7 (2026-11-19) — XONG trừ phần CHẶN/CHƯA (xem docs/RUN_REPORTS.md)
+S0 xong (kho CÔNG KHAI, quét bí mật: không thấy bí mật thật; SECURITY.md). S1 **CHẶN** (Actions vẫn khoá). S2.a FB-C32 sửa (+ FB-C33 do phiên kiểm toán tìm, sửa). S2.b thí nghiệm biên 32 768 khối và ngân sách theo loại nghĩa vụ. S2.c nhóm D một phần, độ phủ CHƯA đo. S3 AI_PITFALLS. S4 workflow fuzz + fuzz_ingest viết xong, CHƯA chạy thử. S5 rc5: cổng đầy đủ CHƯA xanh liền mạch (preflight đỏ 3 lần: bộ nhớ ảo); không thẻ, không đẩy main.

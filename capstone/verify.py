@@ -27,6 +27,8 @@ def main(argv):
     rows = []
     for k in ks:
         ref = os.path.join(HERE, "reference", "target", "release", k)
+        if not os.path.isfile(ref) and os.path.isfile(ref + ".exe"):
+            ref += ".exe"  # Windows
         if not os.path.isfile(ref):
             print(f"thiếu bản tham chiếu {ref}: chạy `cargo build --release` trong capstone/reference")
             return 3

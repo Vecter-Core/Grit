@@ -56,3 +56,6 @@ Run kiểm cuối `44379290084` (commit `d1e36b7`) KHÔNG còn: `gh run list` r�
 | cron / schedule | không có | đạt |
 | còn nội suy trong `run:` | chỉ trong khoá cache/`env:`/`if:` (không phải script) | đạt |
 Ghi chú: `cargo install cargo-audit/cargo-deny/cargo-llvm-cov --locked` chưa ghim phiên bản công cụ (rủi ro chuỗi cung ứng nhỏ; ghi nhận, chưa đổi).
+
+## GÓI 7 S1 (2026-11-19) — CHẶN
+Giang báo đã mở được CI nhưng `gh workflow run ci.yml --ref windows-work -f only=...` vẫn trả `HTTP 422: Actions has been disabled for this user` (thử 3 lần trong gói); `gh api repos/gn3305970-lang/Grit/actions/permissions` ⇒ `enabled: true, allowed_actions: all` (cấp repo bật; bị tắt ở cấp NGƯỜI DÙNG); `gh api .../actions/runs` ⇒ `total_count: 0`. Kho là PUBLIC nên phút Actions không tính phí; nguyên nhân khoá chưa rõ (chính sách tài khoản). KHÔNG có run mới ⇒ CHƯA kiểm: rc4/rc5 trên CI sau `d1e36b7`, Windows `full=true`, job `coverage`, job `fuzz` (đường đi).

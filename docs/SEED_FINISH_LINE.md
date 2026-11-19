@@ -22,3 +22,9 @@ Cột **Chặn**: **SEED** = còn thiếu thì KHÔNG được gắn `1.0.0-seed
 
 **Tóm tắt:** CHẶN SEED còn: #1 (fuzz), #2 (R11c), #3 (capstone), #4 (Giang đọc #6), #5 (LSP/VS Code), #8 (cổng Windows đầy đủ), #9 (A2), #12 (tái lập `gritc`), có thể #11. Không chặn nhãn: #6, #7, #10, #13. Chặn riêng GĐ2: #14.
 Việc ngắn nhất Giang làm được ngay: #4 (đọc), #8 (bấm dispatch), #1 (chạy fuzz qua đêm), #6/#7 (vài phút).
+
+## Cập nhật GÓI 7 (2026-11-19)
+* **Fuzz trên CI Linux** (điều kiện #1; việc chặn Seed lớn nhất): workflow `.github/workflows/fuzz.yml` (CHỈ bấm tay). Cách bấm (cần Actions mở): (a) thử đường đi: `gh workflow run fuzz.yml --ref windows-work -f minutes=10`; (b) chạy thật: `gh workflow run fuzz.yml --ref windows-work -f minutes=330` — mỗi lần ≈ 5,5 giờ cho CẢ HAI mục tiêu song song; cần ≈ 5 lần (không chạy chồng; `concurrency` không huỷ) để đủ 24 giờ mỗi cái; (c) sau mỗi lần: `gh run download <run-id> -D /tmp/fz` rồi `python tools/fuzz_ingest.py /tmp/fz` (chống ghi trùng) rồi `python tools/fuzz_total.py` (in giờ đồng hồ treo tường theo nguồn trên băm hiện tại). Trước đó sửa lexer/parser làm băm đổi ⇒ mất giờ cũ: đừng sửa gt-lexer/gt-parser.
+* **Hàng Billing và Actions: CHƯA bỏ** — Actions vẫn bị khoá (HTTP 422); kho nay công khai (phút miễn phí) nên Billing không còn là rào, còn Actions bị khoá thì chưa có CI.
+* **Mới (GÓI 7):** cổng đầy đủ rc5 liền mạch (Linux và Windows) CHƯA có: cần máy rảnh bộ nhớ ảo ≥ 4 GB.
+* **Mới:** kho công khai ⇒ Giang xử lý mục KHẨN trong `docs/PENDING_GIANG.md` (fixture token, giấy phép, cài đặt GitHub).

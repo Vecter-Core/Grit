@@ -95,3 +95,6 @@ Không đổi trạng thái TCB, không đánh dấu #6, A2 vẫn **chưa**. B�
 
 ## GÓI 6 (2026-11-19)
 Nhãn `1.0.0-rc4`. Không đổi trạng thái TCB, không đánh dấu #6, A2 vẫn **chưa**. Bằng chứng thêm: cổng đầy đủ Linux GREEN trên rc4 (`GATE_TREE=19dc2326…`; 1028/0/207); độ phủ nhánh hàm quyết định (90 nhánh chưa chạy, bảng từng nhánh); `docs/LIMITS_AUDIT.md` (17 giới hạn, không vượt-mà-chấp-nhận-lặng-lẽ trong thí nghiệm; một số mục chỉ đọc mã). Ba app thử đường dùng thật khớp bản tham chiếu (phiên không sạch; không thay capstone). CI hiện bị khoá (Giang kiểm). Đích còn lại tới Seed: `docs/SEED_FINISH_LINE.md`.
+
+## GÓI 7 (2026-11-19)
+Nhãn `1.0.0-rc5`. KHÔNG đổi trạng thái TCB, không đánh dấu #6, A2 vẫn **chưa**. **Dòng CI: CHƯA** (Actions bị khoá; không có run nào cho rc5; trước đó rc4 Linux xanh trên `1793b7f`, Windows rút gọn xanh). Hai lỗ hổng soundness (FB-C32, FB-C33) đã sửa; cổng đầy đủ rc5 CHƯA xanh liền mạch (preflight đỏ); bằng chứng cục bộ: 3 app và capstone K1–K4 khớp 100% (dev + release-o2). Kho CÔNG KHAI nên mọi tuyên bố an toàn phải đúng với `docs/SAFETY_CLAIMS.md` (README đã nói thẳng: chưa kiểm toán độc lập).
