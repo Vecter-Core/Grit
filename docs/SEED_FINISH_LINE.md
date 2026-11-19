@@ -28,3 +28,11 @@ Việc ngắn nhất Giang làm được ngay: #4 (đọc), #8 (bấm dispatch),
 * **Hàng Billing và Actions: CHƯA bỏ** — Actions vẫn bị khoá (HTTP 422); kho nay công khai (phút miễn phí) nên Billing không còn là rào, còn Actions bị khoá thì chưa có CI.
 * **Mới (GÓI 7):** cổng đầy đủ rc5 liền mạch (Linux và Windows) CHƯA có: cần máy rảnh bộ nhớ ảo ≥ 4 GB.
 * **Mới:** kho công khai ⇒ Giang xử lý mục KHẨN trong `docs/PENDING_GIANG.md` (fixture token, giấy phép, cài đặt GitHub).
+
+## Cập nhật GÓI 8 (2026-11-20)
+* **Cổng đầy đủ rc6:** Windows XANH (`16c37f0`); Linux CHƯA: Giang chạy phiên đám mây theo `docs/CLOUD_GATE_PROMPT.md` (≈ 46–74 phút + dựng) và dán vào `docs/CLOUD_GATE_RESULT.md`; cần CẢ HAI trên cùng cây mã mới đẩy `main`.
+* **Phiên tấn công (hộp đen):** `bash tools/make_attack_kit.sh <thư_mục>` tạo kit (không mã nguồn) + `docs/E_PROMPT_ATTACK.md` (mỗi phiên MỘT chủ đề); chạy trên thư mục riêng, KHÔNG ghi vào kho; kết quả nhập bằng `tools/import_attack.py`.
+* **Fuzz qua đêm:** cần đóng WSL (`wsl --shutdown`) và trình duyệt để bộ nhớ ảo ≥ 4 GB (preflight); chạy trong clone riêng nếu phiên khác ghi vào kho.
+* **Giấy phép / kiểm fixture bí mật:** `docs/PENDING_GIANG.md` (mục KIỂM FIXTURE BÍ MẬT ở đầu tệp; giấy phép; email `gamil`).
+* **Actions:** vẫn khoá (HTTP 422, thử 1 lần trong gói).
+* **Quyết định kiến trúc chờ Giang:** ADR-C12 (cho phép `{detach}` ở mã người dùng rồi siết, hoặc đồng bộ prelude/TCB theo hành vi hiện tại), ADR-C13 (declassify không Cap).

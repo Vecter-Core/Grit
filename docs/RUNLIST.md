@@ -93,3 +93,6 @@ S0 xong (main `17beed4`, sau khi Giang tự hợp nhất hai PR trên GitHub). S
 
 ## GÓI 7 (2026-11-19) — XONG trừ phần CHẶN/CHƯA (xem docs/RUN_REPORTS.md)
 S0 xong (kho CÔNG KHAI, quét bí mật: không thấy bí mật thật; SECURITY.md). S1 **CHẶN** (Actions vẫn khoá). S2.a FB-C32 sửa (+ FB-C33 do phiên kiểm toán tìm, sửa). S2.b thí nghiệm biên 32 768 khối và ngân sách theo loại nghĩa vụ. S2.c nhóm D một phần, độ phủ CHƯA đo. S3 AI_PITFALLS. S4 workflow fuzz + fuzz_ingest viết xong, CHƯA chạy thử. S5 rc5: cổng đầy đủ CHƯA xanh liền mạch (preflight đỏ 3 lần: bộ nhớ ảo); không thẻ, không đẩy main.
+
+## GÓI 8 (2026-11-20) — XONG trừ phần CHƯA (xem docs/RUN_REPORTS.md "CẬP NHẬT KẾT QUẢ CUỐI")
+Cổng đầy đủ Windows rc6 GREEN trên `16c37f0` (`GATE_TREE=b828b981…`, 1 045 test, 213 bộ). FB-C34 sửa; ICE 33 hợp đồng; E1001 oan; kit hộp đen; audit/fixture/reports_index. S2 (ADR-C12) chưa áp dụng; S3 (ADR-C13) KHÔNG XONG; S1d chưa làm; cổng Linux/CI chưa; không đẩy main.

@@ -98,3 +98,6 @@ Nhãn `1.0.0-rc4`. Không đổi trạng thái TCB, không đánh dấu #6, A2 v
 
 ## GÓI 7 (2026-11-19)
 Nhãn `1.0.0-rc5`. KHÔNG đổi trạng thái TCB, không đánh dấu #6, A2 vẫn **chưa**. **Dòng CI: CHƯA** (Actions bị khoá; không có run nào cho rc5; trước đó rc4 Linux xanh trên `1793b7f`, Windows rút gọn xanh). Hai lỗ hổng soundness (FB-C32, FB-C33) đã sửa; cổng đầy đủ rc5 CHƯA xanh liền mạch (preflight đỏ); bằng chứng cục bộ: 3 app và capstone K1–K4 khớp 100% (dev + release-o2). Kho CÔNG KHAI nên mọi tuyên bố an toàn phải đúng với `docs/SAFETY_CLAIMS.md` (README đã nói thẳng: chưa kiểm toán độc lập).
+
+## GÓI 8 (2026-11-20)
+Nhãn `1.0.0-rc6`. KHÔNG đổi trạng thái TCB, không đánh dấu #6, A2 vẫn **chưa**. **Dòng cổng/CI: cổng đầy đủ WINDOWS xanh trên `16c37f0` (`GATE_TREE=b828b981…`, 1 045 test/0 lỗi/213 bộ); cổng LINUX chưa; CI chưa (Actions khoá).** Ba lỗ hổng soundness đã sửa trong 3 gói liên tiếp (FB-C32, FB-C33, FB-C34): bài học là mỗi giới hạn/giả định "callee có thân" phải được thử bằng chương trình SAI. ADR-C12 (detach của `spawn`) chưa áp dụng; ADR-C13 (declassify) KHÔNG XONG.
