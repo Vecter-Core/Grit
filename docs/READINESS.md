@@ -101,3 +101,6 @@ Nhãn `1.0.0-rc5`. KHÔNG đổi trạng thái TCB, không đánh dấu #6, A2 v
 
 ## GÓI 8 (2026-11-20)
 Nhãn `1.0.0-rc6`. KHÔNG đổi trạng thái TCB, không đánh dấu #6, A2 vẫn **chưa**. **Dòng cổng/CI: cổng đầy đủ WINDOWS xanh trên `16c37f0` (`GATE_TREE=b828b981…`, 1 045 test/0 lỗi/213 bộ); cổng LINUX chưa; CI chưa (Actions khoá).** Ba lỗ hổng soundness đã sửa trong 3 gói liên tiếp (FB-C32, FB-C33, FB-C34): bài học là mỗi giới hạn/giả định "callee có thân" phải được thử bằng chương trình SAI. ADR-C12 (detach của `spawn`) chưa áp dụng; ADR-C13 (declassify) KHÔNG XONG.
+
+## Cập nhật GÓI 10 (2026-11-20)
+Không đổi trạng thái điều kiện nào (KHÔNG đánh dấu #6; A2 KHÔNG đổi thành đạt). Bằng chứng mới: bản sao ngoài máy kiểm khôi phục thật (`git fsck --full` rc=0; thẻ `seed-1.0-rc6` = `16c37f0`); `Cap` là affine (ĐO bằng `gritc 1.0.0-rc6`). Cổng Linux cục bộ (WSL2): CHƯA (không có WSL Ubuntu). Cổng nhẹ trong clone: xem `docs/RUN_REPORTS.md` mục GÓI 10.

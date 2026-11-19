@@ -33,4 +33,13 @@ GitHub chưa cho agent biết lý do; chỉ Giang đọc được thông báo tr
 `tools/make_export.sh` ⇒ `D:\Grit_export` (bundle `--all`, tar cây mã của `seed-1.0-rc6`, SHA256SUMS, RESTORE.md, REFS.txt). Giang cần chép ra ngoài máy (xem `docs/PENDING_GIANG.md`).
 
 ## 6. Trạng thái cuối gói (`gh auth status` chạy MỘT lần)
-(điền ở S5.c)
+`gh auth status` (2026-11-20, cuối GÓI 10, MỘT lần, nguyên văn; token đã bị che bởi chính `gh`):
+```text
+github.com
+  ✓ Logged in to github.com account Vecter-Core (keyring)
+  - Active account: true
+  - Git operations protocol: https
+  - Token: gho_************************************
+  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
+```
+Máy hiện đăng nhập tài khoản MỚI `Vecter-Core` (do Giang tự đăng nhập), không còn tài khoản `gn3305970-lang` bị đình chỉ. GÓI 10 cấm đẩy ⇒ agent KHÔNG đẩy gì trong gói này. Kho `gn3305970-lang/Grit` vẫn ở `4a520f1` (CHƯA KIỂM: không gọi API).

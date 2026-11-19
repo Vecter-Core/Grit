@@ -40,3 +40,8 @@ Việc ngắn nhất Giang làm được ngay: #4 (đọc), #8 (bấm dispatch),
 ## Cập nhật GÓI 9 (2026-11-20, chỉ tài liệu)
 * Giai đoạn 2 (#14) vẫn "cấm khi chưa có lệnh". Đã có kế hoạch ĐỀ XUẤT `docs/PHASE2_PLAN.md` (điều kiện vào ở mục 1) và đối chiếu mã `docs/PHASE2_FACTCHECK.md`.
 * **Đợt đo ở `PHASE2_FACTCHECK.md` mục 10 chạy SAU cổng rc6** (một Cargo tại một thời điểm; preflight PASS trước; không chạy khi cổng đang chạy).
+
+## Cập nhật GÓI 10 (2026-11-20; chỉ tài liệu/công cụ/test)
+* **CHẶN bởi GitHub:** CI mọi job; `main`; fuzz trên CI Linux; cổng Linux qua đám mây (`CLOUD_GATE_PROMPT.md`).
+* **Làm được CỤC BỘ (chưa làm xong):** cổng Linux bằng WSL2 Ubuntu (CẦN Giang cài WSL Ubuntu, xem PENDING_GIANG; và bộ nhớ ảo ≥ 4 GB); fuzz (`tools/fuzz_*`); phiên Opus đọc mã (R11c) trong clone riêng; hai phiên capstone sạch; thử VS Code; điều kiện #6 (Giang đọc); giấy phép (GPL-3.0-only đã đặt ở kho mới `Vecter-Core/Grit`).
+* Bản sao ngoài máy: `D:\Grit_export` (Giang chép ra ngoài ổ). Đo Giai đoạn 2: CHƯA ĐO (preflight đỏ).

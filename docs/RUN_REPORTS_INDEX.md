@@ -53,6 +53,6 @@ Sinh bởi `tools/reports_index.py` từ `RUN_REPORTS.md`. Mục KHÔNG theo th�
 | 47 | GÓI 5 (2026-11-19; Claude Sonnet 5.5) | 2026-11-19 | 293 | 10 |
 | 48 | GÓI 6 (2026-11-19; Claude Sonnet 5.5) | 2026-11-19 | 303 | 10 |
 | 49 | GÓI 7 (2026-11-19; Claude Sonnet 5.5) | 2026-11-19 | 313 | 14 |
-| 50 | GÓI 8 (2026-11-19; Claude Haiku 5.5 — model đổi giữa phiên; commit ghi Author-Model thật) | 2026-11-19 | 327 | 38 |
+| 50 | GÓI 8 (2026-11-19; Claude Haiku 5.5 — model đổi giữa phiên; commit ghi Author-Model thật) | 2026-11-19 | 327 | 50 |
 
 Tổng: 50 mục.
