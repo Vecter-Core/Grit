@@ -1,0 +1,4 @@
+// expect: fail E0703
+// note: GÓI 8 S0d: nhập từ docs/audits/AUDIT_01 F1 (FB-C33). Kỳ vọng ban đầu của kẻ tấn công là E0702; theo thiết kế sửa d220202 đệ quy qua cạnh gián tiếp của spawn không kiểm được biến thể ⇒ E0703 (xem docs/FIELD_BUGS.md FB-C33).
+ƒ f(n: u64) → () ! ∅ ↓ n { spawn(f, n); }
+ƒ main() → i32 ! ∅ { f(1u64); 0 }

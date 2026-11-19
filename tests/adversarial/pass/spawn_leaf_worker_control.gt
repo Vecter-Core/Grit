@@ -1,0 +1,5 @@
+// expect: pass
+// note: GÓI 8 S0d: đối chứng: spawn hàm lá không đệ quy vẫn được chấp nhận
+ƒ w(n: u64) → () ! ∅ { }
+ƒ run() → () ! ∅ { spawn(w, 1u64); }
+ƒ main() → i32 ! ∅ { run(); 0 }

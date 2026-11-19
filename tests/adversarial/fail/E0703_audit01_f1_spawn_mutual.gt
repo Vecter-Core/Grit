@@ -1,0 +1,5 @@
+// expect: fail E0703
+// note: GÓI 8 S0d: nhập từ docs/audits/AUDIT_01 F1 (FB-C33): đệ quy qua spawn không biến thể
+ƒ a(n: u64) → () ! ∅ { spawn(b, n); }
+ƒ b(n: u64) → () ! ∅ { a(n); }
+ƒ main() → i32 ! ∅ { a(1u64); 0 }
