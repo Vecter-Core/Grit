@@ -81,18 +81,31 @@ fn trait_members_function_types_and_deep_types() {
     assert_eq!(n("ƒ f(g: ƒ(u8) → *□ u8 ! ∅) ! ∅ { }"), 1);
     assert_eq!(n("ƒ f(g: ƒ(u8) → u8 ! ∅) ! ∅ { }"), 0);
     // kiểu lồng RẤT sâu: con trỏ thô ở đáy vẫn bị thấy (và quá sâu thì từ chối, fail-closed)
-    let deep = |inner: &str| {
+    let deep_n = |k: usize, inner: &str| {
         let mut ty = inner.to_string();
-        for _ in 0..40 {
+        for _ in 0..k {
             ty = format!("Option<{ty}>");
         }
         format!("ƒ f(x: {ty}) ! ∅ {{ }}")
     };
+    let deep = |inner: &str| deep_n(40, inner);
     assert_eq!(n(&deep("*□ u8")), 1);
+    // GÓI 8 S0g(ii): giới hạn độ sâu nay 256 (tuple 33 tầng không có con trỏ thô không còn bị E1001 oan). 40 tầng không có con trỏ ⇒ 0 (đúng);
+    // vượt 256 vẫn fail-closed: coi là "có con trỏ thô".
     assert_eq!(
         n(&deep("u8")),
+        0,
+        "40 tầng không có con trỏ thô: không cần unsafe"
+    );
+    assert_eq!(
+        n(&deep_n(250, "u8")),
+        0,
+        "250 tầng không có con trỏ thô (parser cho tới 256 mức; E0102 ngoài đó)"
+    );
+    assert_eq!(
+        n(&deep_n(250, "*□ u8")),
         1,
-        "kiểu quá sâu không đoán: coi là có con trỏ thô"
+        "con trỏ thô ở đáy 250 tầng vẫn phải được thấy"
     );
 }
 

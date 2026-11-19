@@ -14,8 +14,10 @@ use gt_types::{AdtKind, Ty, TypesOutput};
 use std::collections::BTreeSet;
 
 fn has_raw_ptr(ty: &Ty, depth: usize) -> bool {
-    if depth > 32 {
-        return true; // quá sâu: không đoán, coi là có (fail-closed)
+    // GÓI 8 S0g(ii): giới hạn 32 làm tuple lồng 33 tầng (không có con trỏ thô) bị E1001 oan. Kiểu là cây hữu hạn; giới hạn chỉ bảo vệ ngăn xếp.
+    // Vượt 256 tầng vẫn coi là "có" (fail-closed; mã E1001 khi đó KHÔNG phải mã đúng: xem KNOWN_LIMITATIONS).
+    if depth > 256 {
+        return true;
     }
     match ty {
         Ty::RawPtr(..) => true,
