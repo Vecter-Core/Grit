@@ -1,0 +1,5 @@
+// expect: fail E0703
+// note: GÓI 7 FB-C33: đệ quy tương hỗ qua `spawn`, không có `↓`/`div`
+ƒ a(n: u64) → () ! ∅ { spawn(b, n); }
+ƒ b(n: u64) → () ! ∅ { a(n); }
+ƒ main() → i32 ! ∅ { a(1u64); 0 }

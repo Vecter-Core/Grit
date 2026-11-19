@@ -1,0 +1,4 @@
+// expect: fail E0703
+// note: GÓI 7 FB-C33: đệ quy trực tiếp qua `spawn` (hàm worker truyền làm đối số của intrinsic không có thân), không `↓`/`div`
+ƒ f(n: u64) → () ! ∅ { spawn(f, n); }
+ƒ main() → i32 ! ∅ { f(1u64); 0 }
