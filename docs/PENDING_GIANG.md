@@ -5,6 +5,15 @@
 2. Đọc thông báo đình chỉ GitHub (xem `docs/GITHUB_SUSPENSION.md`).
 3. Tuỳ chọn: tạo kho RIÊNG TƯ ở dịch vụ khác bằng tài khoản của CHÍNH Giang (GitLab, Codeberg…), rồi Giang TỰ chạy `git remote add backup <url>`, `git push backup --all`, `git push backup --tags`. Agent KHÔNG giữ thông tin đăng nhập và KHÔNG đẩy. Đây là sao lưu, không thay GitHub.
 
+## CỔNG LINUX CỤC BỘ (GÓI 10 S1.b): CẦN GIANG CÀI WSL UBUNTU
+`wsl -l -v` (2026-11-20) chỉ có `docker-desktop` (Stopped; bản nội bộ của Docker, không dùng được) và `OpenClawGateway` (Running; KHÔNG phải của agent, agent không đụng). KHÔNG có bản Ubuntu/Debian dùng chung ⇒ cổng Linux (S1.c–e) BỎ QUA. Agent không cài hộ và không đổi cấu hình hệ thống. Các bước cho Giang (PowerShell thường):
+```text
+wsl --install -d Ubuntu-24.04      # cần tạo tên người dùng/mật khẩu WSL; có thể phải khởi động lại
+wsl -d Ubuntu-24.04 -- sudo apt update
+wsl -d Ubuntu-24.04 -- sudo apt install -y build-essential git curl python3 pkg-config
+```
+Cần thêm (nhờ phiên Claude làm sau): Rust bằng rustup, LLVM 20 (xem `tools/setup_cloud.sh`) và `%UserProfile%\.wslconfig` đề nghị `[wsl2]` `memory=10GB` `swap=8GB` (preflight cần ≥4 GB bộ nhớ ảo). Ở lần sau: `git clone -c core.autocrlf=false /mnt/d/Grit ~/grit_lin` (KHÔNG chạy trong /mnt/d), `git checkout seed-1.0-rc6` (= `16c37f0`), cổng đầy đủ, so `GATE_TREE` với `b828b9812b7a6bc39d2ed6c1b42edf90c52c5d784188e8f62602c04d4335ffa4`.
+
 ## KHẨN: TÀI KHOẢN GITHUB BỊ ĐÌNH CHỈ (GÓI 8, 2026-11-20)
 `gh auth status` (chỉ-đọc) ⇒ `The token in keyring is invalid … Error: HTTP 403: Sorry. Your account was suspended`; `git push origin integration:windows-work` ⇒ `HTTP 403`; `gh repo view` ⇒ cùng lỗi. Đây rất có thể là nguyên nhân Actions bị khoá từ GÓI 6 (`Actions has been disabled for this user`, HTTP 422) và là lý do KHÔNG đẩy được `windows-work` ở cuối GÓI 8. Agent KHÔNG thử đường vòng (không đổi tài khoản, không dùng token khác).
 **Việc Giang:** đăng nhập github.com bằng trình duyệt, đọc thông báo đình chỉ và làm theo hướng dẫn kháng nghị của GitHub Support (https://support.github.com). Sau khi khôi phục: `gh auth refresh -h github.com`, rồi `git push origin integration:windows-work` (`windows-work` trên GitHub đang ở `4a520f1`; cục bộ `integration` ở HEAD, mã rc6 `16c37f0`, thẻ cục bộ `seed-1.0-rc6`, bundle `grit-final.bundle` ở D:/Grit/.backup và C:/Users/PC/GritBackup).
