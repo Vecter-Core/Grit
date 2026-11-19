@@ -6,6 +6,15 @@
 Hệ quả: GÓI 7 (sau `4a520f1`) và GÓI 8 chưa có commit nào trên GitHub; không CI; không `main`. Mọi bằng chứng của GÓI 8 là cục bộ.
 
 
+## GIAI ĐOẠN 2: CẦN GIANG DUYỆT (GÓI 9, 2026-11-20; agent KHÔNG đánh dấu thay Giang)
+Tài liệu ĐỀ XUẤT: `docs/PHASE2_PLAN.md` (đọc mục 0 trước), `docs/PHASE2_ADR_DRAFTS.md`, `docs/PHASE2_FACTCHECK.md`, `docs/PHASE2_PROPOSAL_OPUS.md`. Chưa có dòng mã Giai đoạn 2 nào; chưa sửa `DECISIONS.md`/`TCB_INTRINSICS.md`.
+- [ ] Duyệt CẤU TRÚC Giai đoạn 2 (bốn dòng việc A/B/C/D, giai đoạn con 2.0–2.4, điều kiện vào) — ADR-P2-00.
+- [ ] Duyệt QUY TẮC GOM CÚ PHÁP: mọi cú pháp mới vào MỘT đợt edition sau N8; lexer/parser đóng băng lại, fuzz 24 giờ một lần — ADR-P2-01.
+- [ ] Xác nhận THỨ TỰ "an toàn trước hiệu năng" (xoá Secret và ADR thiết kế lên đầu; hiệu năng sau) thay cho thứ tự của đề xuất Opus.
+- [ ] Duyệt HAI ĐƯỜNG HẠ ở L1 (`MIR→LLVM` cũ và `GLIR→LLVM` mới, cờ chỉ có trong test, bỏ đường cũ chỉ khi trùng trên toàn corpus + bộ sinh) — ADR-P2-02.
+- [ ] Quyết định ĐỔI MẶC ĐỊNH dev sang backend khác (L5) — để SAU: chỉ xét khi COFF/Windows xong và cổng xanh cả hai backend.
+Liên quan, đang chờ từ GÓI 8: ADR-C12 (spawn/detach) phải giải trước kênh có kiểu (8.D).
+
 ## KIỂM FIXTURE BÍ MẬT (GÓI 8 S0f, ngoại tuyến)
 Mục loại (i) và (iv) — việc Giang: mở từng tệp, dòng dưới đây; nếu chuỗi giống token/khoá THẬT của bạn thì THU HỒI ngay. Giá trị không được in ở đây (chỉ 4 ký tự đầu).
 * (iv) `tests/warn/S101_private_key_block.gt:3` — loại pem, bắt đầu `----****` — không phân loại được

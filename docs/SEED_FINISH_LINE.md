@@ -36,3 +36,7 @@ Việc ngắn nhất Giang làm được ngay: #4 (đọc), #8 (bấm dispatch),
 * **Giấy phép / kiểm fixture bí mật:** `docs/PENDING_GIANG.md` (mục KIỂM FIXTURE BÍ MẬT ở đầu tệp; giấy phép; email `gamil`).
 * **Actions:** vẫn khoá (HTTP 422, thử 1 lần trong gói).
 * **Quyết định kiến trúc chờ Giang:** ADR-C12 (cho phép `{detach}` ở mã người dùng rồi siết, hoặc đồng bộ prelude/TCB theo hành vi hiện tại), ADR-C13 (declassify không Cap).
+
+## Cập nhật GÓI 9 (2026-11-20, chỉ tài liệu)
+* Giai đoạn 2 (#14) vẫn "cấm khi chưa có lệnh". Đã có kế hoạch ĐỀ XUẤT `docs/PHASE2_PLAN.md` (điều kiện vào ở mục 1) và đối chiếu mã `docs/PHASE2_FACTCHECK.md`.
+* **Đợt đo ở `PHASE2_FACTCHECK.md` mục 10 chạy SAU cổng rc6** (một Cargo tại một thời điểm; preflight PASS trước; không chạy khi cổng đang chạy).

@@ -416,6 +416,8 @@ Chỉ chuyển khi đạt **tất cả**:
 
 ## 8. GIAI ĐOẠN 2 — ASCEND (hướng tới triết lý đầy đủ)
 
+> Kế hoạch hợp nhất ĐỀ XUẤT (chưa duyệt) cho Giai đoạn 2: `docs/PHASE2_PLAN.md`.
+
 Mỗi hạng mục dưới đây là một "đường ray" độc lập, mỗi cái có cổng hoàn thành riêng. Thứ tự đề xuất: A → B → C → D → E → F → G → H.
 
 **8.A — Bộ giải Obligation đầy đủ (SMT)**

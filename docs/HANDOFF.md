@@ -2,6 +2,8 @@
 
 > **Muốn nắm toàn cảnh trong một lượt (dự án là gì, có mấy phần, đã tới đâu, cái gì cần Giang duyệt): đọc `docs/PROJECT_STATUS.md`.** Tệp này chỉ giữ luật làm việc, trạng thái từng gói gần nhất và môi trường; phần lịch sử tháng 10 đã chuyển sang `HANDOFF_ARCHIVE.md` (2026-11-17).
 
+> **GÓI 9 (2026-11-20, CHỈ TÀI LIỆU):** đã thêm `docs/PHASE2_PLAN.md` (kế hoạch hợp nhất, ĐỀ XUẤT), `docs/PHASE2_ADR_DRAFTS.md` (4 ADR nháp), `docs/PHASE2_FACTCHECK.md` (đối chiếu đề xuất Opus với mã, bằng ĐỌC), `docs/PHASE2_PROPOSAL_OPUS.md`. KHÔNG mã, KHÔNG cargo, KHÔNG cổng. Giai đoạn 2 vẫn CẤM mở mã khi chưa có lệnh của Giang (điều kiện vào ở PHASE2_PLAN mục 1); việc duyệt ở `docs/PENDING_GIANG.md`.
+
 > **Kho git (2026-11-17):** nhánh làm việc = `integration`; `main` CHƯA đụng (không push `main`); `integration` đã push lên `origin/windows-work`. Lệnh hiện hành: P0–P4 trong `docs/RUNLIST.md`; việc chờ Giang: `docs/PENDING_GIANG.md`; mục lục giới hạn: `docs/KNOWN_LIMITATIONS_DIGEST.md`; báo cáo toàn cảnh: `docs/PROJECT_STATUS.md`.
 
 > **Fuzz qua đêm (điều kiện #2) — MỘT lệnh Giang gõ (Git Bash, máy rảnh, không chạy cargo khác):** `cd /d/Grit && bash tools/fuzz_loop.sh 10` (10 = tổng giờ tối đa; Ctrl+C an toàn, chạy lại để tiếp tục). Tự đặt PATH ASan DLL, dựng một lần, phiên 10 phút xen kẽ lexer/parser, ghi `docs/FUZZ_LOG.jsonl` kèm băm nguồn; in tổng tích luỹ. Đạt 24 giờ/loại trên băm hiện tại cần ≈ 48 giờ chạy (24 × 2 loại) ⇒ nhiều đêm. Hiện: `python tools/fuzz_total.py`.
