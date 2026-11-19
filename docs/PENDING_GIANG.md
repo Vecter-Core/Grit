@@ -7,6 +7,11 @@
 * **Thông tin cá nhân (chỉ liệt kê; KHÔNG sửa lịch sử):** (1) email trong metadata commit: 439 commit `Nguyen Truong Giang <ngu****@gamil.com>` (tên miền gõ sai `gamil`), 1 commit `Vecter <ngu****@gmail.com>`, 2 commit `gn3305970@gmail.com` (qua GitHub), 93 commit `Claude <noreply@anthropic.com>`, 7 commit `Codex <codex@local>`. Email thật nay công khai vĩnh viễn trong lịch sử. **Đề xuất:** bật G5 bên dưới và đặt `git config user.email <id>+<tên>@users.noreply.github.com` cho commit MỚI; xoá email cũ khỏi lịch sử là việc viết lại lịch sử, quyết định của Giang, agent không làm. (2) Đường dẫn `C:\Users\PC` (tên tài khoản Windows chung chung) 7 dòng trong 4 commit tài liệu: rủi ro thấp. (3) 3 chuỗi giống số điện thoại là số giả trong test/PROGRESS. (4) Không thấy từ khoá tài chính/đầu tư/ngân hàng/TCBS nào trong dòng thêm vào ở mọi commit.
 * **Gói 7 đã làm:** `SECURITY.md`, `.github/ISSUE_TEMPLATE/user_bug.yml`, README nói thẳng mức tin cậy, workflow không còn nội suy `${{ github.event.* }}` vào shell (`docs/CI_REPORT.md`).
 
+## Hai phát hiện soundness của GÓI 7 (đã sửa) và một câu hỏi thiết kế (GÓI 7)
+* **FB-C32** (đã sửa, rc5): vòng không dừng được chấp nhận khi hàm có > 24 biến bóng (`docs/FIELD_BUGS.md`).
+* **FB-C33** (đã sửa, rc5): đệ quy qua `spawn` không bị kiểm dừng. Do một phiên kiểm toán khác (thư mục `attack/`, KHÔNG được commit; chưa rõ phiên nào) tìm ra và ghi vào `docs/FIELD_BUGS.md` đang sửa dở trong cùng cây làm việc; tôi tái hiện độc lập và sửa. Phiên đó làm cổng của tôi bị vô hiệu một lần (tệp theo dõi đổi giữa lúc chạy). **Việc Giang:** xác nhận phiên `attack/` là của bạn; thư mục `attack/` còn chưa commit (không có `git add`).
+* **Câu hỏi thiết kế (từ `attack/b01_spawn_in_pure_fn.gt`):** hàm khai báo `! ∅` gọi `spawn` vẫn XANH; `docs/TCB_INTRINSICS.md` ghi `spawn` có hiệu ứng `detach`, còn M8 ghi hiệu ứng của lời gọi = hiệu ứng worker trừ `lock`. Hai tài liệu mâu thuẫn. **Đề xuất:** coi `spawn` cần hiệu ứng `detach` ở hàm gọi (siết lại, fail-closed) — đổi ngữ nghĩa nên cần quyết định của bạn; mặc định khi chờ: giữ nguyên.
+
 ## Cài đặt GitHub Giang nên chỉnh (agent KHÔNG tự làm; GÓI 7 S0g)
 | # | cài đặt | vì sao |
 |---|---|---|
