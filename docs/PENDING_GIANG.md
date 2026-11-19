@@ -10,6 +10,12 @@ Mục loại (i) và (iv) — việc Giang: mở từng tệp, dòng dưới đ�
 * (iv) `crates/gt-secrets/tests/secrets.rs:263` — loại pem, bắt đầu `----****` — không phân loại được
 
 
+## Email tác giả commit: tên miền gõ sai (GÓI 8 S0h)
+* 439 commit mang email `nguyentruonggiang25092007@gamil.com` (tên miền `gamil`, không phải `gmail`); 1 commit `…@gmail.com` (Vecter); 2 commit `gn3305970@gmail.com`. Ai kiểm soát tên miền `gamil.com` có thể xác minh email đó trên GitHub và nhận ghi công cho các commit ấy. Rủi ro THẤP (chỉ ghi công commit, không quyền truy cập).
+* **Agent KHÔNG đổi cấu hình git của bạn** (`git config user.email` hiện là `nguyentruonggiang25092007@gamil.com`).
+* **Khuyến nghị:** (1) GitHub → Settings → Emails: bật "Keep my email addresses private" và "Block command line pushes that expose my email"; (2) đặt cho commit MỚI: `git config user.email "<ID>+gn3305970-lang@users.noreply.github.com"` (ID là số trong địa chỉ noreply của bạn); (3) thêm `.mailmap` để `git log` hiển thị gọn — KHÔNG viết lại lịch sử (kho công khai).
+* Agent chưa tạo `.mailmap` vì không biết chính xác địa chỉ noreply mới của bạn; nếu bạn cho ID, phiên sau tạo được.
+
 ## KHẨN / AN TOÀN KHO CÔNG KHAI (GÓI 7 S0, 2026-11-19)
 `gh repo view`: **visibility = PUBLIC**, nhánh mặc định `windows-work`, chưa có giấy phép (`licenseInfo = null`), không phải fork. Quét `python tools/secret_scan_history.py` trên **542 commit, 2 391 tệp (mọi nhánh cục bộ + từ xa, 3 thẻ)**; mẫu đã quét: token GitHub/AWS/Google/Slack/sk-, khối khoá riêng, URL có mật khẩu, `authorization: bearer`, gán `password/secret/token/api_key`, chuỗi entropy cao, tên tệp nguy hiểm (`.env`, `*.pem`, `*.key`, `*.pfx`, `*.p12`, `id_rsa*`, `.git-credentials`, `credentials*`, `*.bundle`, `*.sqlite`, hộp thư). KHÔNG phải bằng chứng "không có".
 * **Bí mật thật: KHÔNG thấy.** Các phát hiện mẫu khoá (AWS 17, GitHub 5, Slack 3, Google 2, khối khoá riêng 5 trong tổng 49) đều nằm trong fixture của bộ quét S101 của Grit (`crates/gt-secrets/tests/`, `tests/warn/S101_*`, `audit/probes/secret_*`, `docs/errors/S101.md`, `docs/LANGUAGE_REFERENCE.md`). Tệp ghi nhãn "GIẢ"; khoá AWS có dấu `EXAMPLE`; token GitHub/Slack/Google trong fixture có entropy cao nên KHÔNG chứng minh được là giả chỉ bằng đọc (agent không được và không có cách kiểm bằng cách dùng thử). **Việc Giang (1 phút):** mở `tests/warn/S101_github_token.gt` và `crates/gt-secrets/tests/secrets.rs`, xem các chuỗi `ghp_…`, `xoxb-…`, `AIza…` có phải bạn tự gõ bừa không; nếu từng là khoá thật thì THU HỒI ngay (gỡ khỏi lịch sử không đủ vì kho đã công khai).
