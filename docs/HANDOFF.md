@@ -24,6 +24,8 @@
 
 > **GÓI 8 (2026-11-20) — TRẠNG THÁI CUỐI:** nhãn `1.0.0-rc6`; **cổng đầy đủ Windows GREEN** trên `16c37f0` (`GATE_TREE=b828b9812b7a…`, 1 045 test / 0 lỗi / 213 bộ), thẻ cục bộ `seed-1.0-rc6`; cổng Linux CHƯA (Actions khoá HTTP 422; dự phòng: `docs/CLOUD_GATE_PROMPT.md`); `main` giữ `17beed4`. Lưu ý chạy cổng: băm cổng gồm tệp CHƯA theo dõi ⇒ chạy trong clone sạch nếu phiên khác ghi vào kho. Việc kế: Giang chạy cổng Linux (đám mây) và quyết ADR-C12 (spawn/detach), ADR-C13 (declassify); S1d đột biến; oracle spawn.
 
+> **KHẨN (2026-11-20): tài khoản GitHub `gn3305970-lang` BỊ ĐÌNH CHỈ** (`HTTP 403: Sorry. Your account was suspended`) — push thất bại, Actions khoá (cùng nguyên nhân). Mọi commit GÓI 7/8 sau `4a520f1` chỉ có cục bộ (`integration` tại HEAD; bundle `grit-final.bundle`). Giang xử lý tại GitHub Support rồi `gh auth refresh` và `git push origin integration:windows-work`. Xem `docs/PENDING_GIANG.md`.
+
 ## Gói 2 tiếp tục — checkpoint G2.1 (2026-11-12)
 - Nhánh `integration`; `main` chưa đụng. `windows-work` đã push tới `a9dcd24`; mutation follow-up + regression mới chưa commit.
 - probe_diff: 20.000 seed độc lập theo range 0..19999, 5 lô tuần tự; edge violations=0; mutant 361/591/554 mỗi mutant `i=0`; đối chứng 238 `i=277`; xem `docs/PROBE_DIFF_RESULTS.jsonl`.

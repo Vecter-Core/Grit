@@ -59,3 +59,6 @@ Ghi chú: `cargo install cargo-audit/cargo-deny/cargo-llvm-cov --locked` chưa g
 
 ## GÓI 7 S1 (2026-11-19) — CHẶN
 Giang báo đã mở được CI nhưng `gh workflow run ci.yml --ref windows-work -f only=...` vẫn trả `HTTP 422: Actions has been disabled for this user` (thử 3 lần trong gói); `gh api repos/gn3305970-lang/Grit/actions/permissions` ⇒ `enabled: true, allowed_actions: all` (cấp repo bật; bị tắt ở cấp NGƯỜI DÙNG); `gh api .../actions/runs` ⇒ `total_count: 0`. Kho là PUBLIC nên phút Actions không tính phí; nguyên nhân khoá chưa rõ (chính sách tài khoản). KHÔNG có run mới ⇒ CHƯA kiểm: rc4/rc5 trên CI sau `d1e36b7`, Windows `full=true`, job `coverage`, job `fuzz` (đường đi).
+
+## GÓI 8 (2026-11-20) — NGUYÊN NHÂN KHOÁ ACTIONS
+`gh auth status`: token keyring không hợp lệ; `HTTP 403: Sorry. Your account was suspended` (cả `api.github.com` và GraphQL). Tài khoản `gn3305970-lang` bị đình chỉ ⇒ giải thích `Actions has been disabled for this user` (HTTP 422) từ GÓI 6 và `git push` 403 ở cuối GÓI 8. Không có run CI mới; không thể kiểm Billing. Việc của Giang: xem `docs/PENDING_GIANG.md` mục KHẨN.
