@@ -300,6 +300,8 @@ impl AState {
 }
 
 struct Ctx<'a> {
+    /// GÓI 8 S0g(i): đặt khi một nguyên tử "không biểu diễn được" ra ngoài miền (≥ UNREP_SLOTS-1 hợp đồng trên một lời gọi). Thân khi đó được báo ICE (E9901) thay vì panic.
+    unrep_ice: std::cell::Cell<bool>,
     body: &'a Body,
     nl: usize,
     itys: Vec<Option<Ty>>,
@@ -507,6 +509,7 @@ impl<'a> Ctx<'a> {
             rpo_pos[b.index()] = i;
         }
         Ctx {
+            unrep_ice: std::cell::Cell::new(false),
             body,
             nl,
             itys,
@@ -1060,8 +1063,11 @@ impl<'a> Ctx<'a> {
 
     fn unrep_atom(&self, bb: usize, idx: usize) -> VarId {
         // `fixpoint` đã từ chối thân vượt miền (khối ≥ UNREP_MAX_BLOCKS hoặc ≥ UNREP_SLOTS-1 hợp đồng ở một hàm) nên không tới được đây; nếu tới: ICE (E9901), KHÔNG đoán
+        // GÓI 8 S0g(i): ngoài miền ⇒ KHÔNG panic (trước đây mã thoát 2 với thông báo thô). Đánh dấu ICE cho thân (E9901 ở cuối
+        // `analyze_body`); nguyên tử dự phòng chỉ để không dừng giữa chừng — thân đã đỏ nên không được coi là chứng minh.
         let Some(a) = unrep_atom_id(bb, idx) else {
-            panic!("unrep_atom ngoài miền: bb={bb} idx={idx}")
+            self.unrep_ice.set(true);
+            return unrep_atom_id(0, UNREP_SLOTS - 1).unwrap_or(0);
         };
         a
     }
@@ -1990,6 +1996,13 @@ pub fn analyze_body(body: &Body, info: &ProgInfo, prover: &mut dyn Prover) -> Bo
     }
     rep.judged = judge.out;
     rep.discharged_blocks = judge.discharged;
+    if cx.unrep_ice.get() {
+        rep.ice = Some(format!(
+            "lời gọi có hơn {} hợp đồng `⊳`/`⊲` (giới hạn {} nguyên tử không biểu diễn được mỗi lời gọi): tách hàm hoặc gộp điều kiện",
+            UNREP_SLOTS - 2,
+            UNREP_SLOTS - 1
+        ));
+    }
     rep
 }
 
