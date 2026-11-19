@@ -12,3 +12,6 @@ __pycache__/
 runtime/gt-rt/target
 capstone/reference/target/
 mut_track_*.txt
+
+# phiên tấn công (GÓI 8 S0b): không đưa vào băm cổng/commit
+/attack/
