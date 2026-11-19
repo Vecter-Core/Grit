@@ -3,7 +3,7 @@
 name = "gt-rt"
 version = "0.0.0"
 edition = "2024"
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0-only"
 publish = false
 
 [features]
