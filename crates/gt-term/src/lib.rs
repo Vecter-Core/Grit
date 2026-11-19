@@ -392,6 +392,23 @@ fn instance_graph(
                         let a2: Vec<Ty> = generics.iter().map(&sub).collect();
                         let j = add((*n2, a2), &mut idx, &mut list)?;
                         edges[k].push((j, false));
+                    } else {
+                        // GÓI 7 FB-C33: callee KHÔNG có thân (intrinsic như `spawn`, `Mutex::with`) có thể gọi hàm được truyền làm đối số
+                        // (`spawn(f, n)` chạy `f` ở luồng mới): cạnh GIÁN TIẾP tới mọi hàm `FnItem` trong đối số. Thiếu cạnh này, đệ quy qua spawn
+                        // không bị kiểm biến thể (không dừng được chấp nhận).
+                        for o in cargs {
+                            if let gt_mir::Operand::Const(gt_mir::Const::FnItem {
+                                node: fnode,
+                                generics: fg,
+                                ..
+                            }) = o
+                                && by_node.contains_key(fnode)
+                            {
+                                let a3: Vec<Ty> = fg.iter().map(&sub).collect();
+                                let j = add((*fnode, a3), &mut idx, &mut list)?;
+                                edges[k].push((j, true));
+                            }
+                        }
                     }
                 }
                 Callee::TraitMethod {
@@ -537,7 +554,8 @@ fn conservative_graph(
     let mut indirect: Vec<Vec<usize>> = vec![Vec::new(); bodies.len()];
     for (i, b) in bodies.iter().enumerate() {
         for bb in &b.blocks {
-            let Some(TerminatorKind::Call { callee, .. }) = bb.terminator.as_ref().map(|t| &t.kind)
+            let Some(TerminatorKind::Call { callee, args, .. }) =
+                bb.terminator.as_ref().map(|t| &t.kind)
             else {
                 continue;
             };
@@ -545,6 +563,18 @@ fn conservative_graph(
                 Callee::Fn { node, .. } => {
                     if let Some(&j) = by_node.get(node) {
                         adj[i].push(j);
+                    } else {
+                        // GÓI 7 FB-C33: callee không có thân (intrinsic) có thể gọi hàm `FnItem` truyền làm đối số (xem `instance_graph`)
+                        for o in args {
+                            if let gt_mir::Operand::Const(gt_mir::Const::FnItem {
+                                node: fnode, ..
+                            }) = o
+                                && let Some(&j) = by_node.get(fnode)
+                            {
+                                adj[i].push(j);
+                                indirect[i].push(j);
+                            }
+                        }
                     }
                 }
                 Callee::Value(_) => {
