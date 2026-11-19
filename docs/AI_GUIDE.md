@@ -254,7 +254,8 @@ cannot open
 8. Không có: closure, `?`, phân rã tuple, `unwrap()`/`is_some()`, `==` trên kiểu ghép, `f32`, macro, `dyn`, async, `unsafe` cho người dùng, tham số lifetime lồng. Cách né ở các mục trên.
 9. Văn bản là BYTE: tách dòng theo `\n` (10), cắt khoảng trắng 32/9/13. Đầu ra: `write_str` (literal), `write_bytes` (lát), `write_u64`/`write_i64` (số).
 10. `main` không trả mã thoát: dùng `core::exit(2u32)` (hiệu ứng `{div}`) cho lỗi dùng sai; kết thúc bình thường ⇒ mã 0.
-11. Một Arena `Arena::new()` mỗi chương trình là đủ; dữ liệu nhập/tệp (`&'static [u8]`) KHÔNG cần Arena.
+11. `spawn(f, a)` có hiệu ứng của worker `f`; `! ∅` KHÔNG nghĩa là "không có luồng".
+12. Một Arena `Arena::new()` mỗi chương trình là đủ; dữ liệu nhập/tệp (`&'static [u8]`) KHÔNG cần Arena.
 
 ## 11. Mẫu hoàn chỉnh: đếm dòng chứa mẫu (đọc stdin, tách dòng, tìm chuỗi, thoát có mã)
 ```grit std run exit=1

@@ -25,3 +25,13 @@ Không có bằng chứng nào bị thiếu ⇒ không mục nào phải giữ "
 - **B9 phiên bản:** đổi lên `1.0.0-rc3` trong MỘT commit riêng ở cuối.
 ## Loại C — việc của Giang
 C1 sao lưu ngoài ổ/đẩy repo (một phần xong: xem PENDING_GIANG); C2 thử VS Code 10 phút; C3 mở phiên sạch viết capstone.
+
+## Ủy quyền GÓI 10 (2026-11-20) — điểm "GIAI ĐOẠN 2" của PENDING_GIANG
+Giang đã nhắn "tiếp tục" ⇒ ủy quyền kiến trúc sư quyết 5 điểm sau (THU HỒI ĐƯỢC bất cứ lúc nào; agent KHÔNG ghi thay Giang ở mục khác):
+1. Cấu trúc Giai đoạn 2 = bốn dòng việc A (Bảo đảm), B (Độc lập backend), C (Dùng được cho AI), D (Hiệu năng); giai đoạn con 2.0–2.4 (ADR-P2-00).
+2. Quy tắc gom: mọi cú pháp mới vào MỘT đợt "edition", sau N8; lexer/parser đóng băng lại; fuzz 24 giờ MỘT lần (ADR-P2-01).
+3. Thứ tự: an toàn trước hiệu năng.
+4. Hai đường hạ ở L1 (`MIR → LLVM` và `GLIR → LLVM`) tới khi trùng trên cổng liền mạch xanh (ADR-P2-02).
+5. Đổi mặc định dev: CHƯA; quyết sau.
+**Không có mã Giai đoạn 2** trước khi nhãn Seed đạt hoặc đạt có điều kiện được Giang ký.
+Cùng gói: ADR-C12 = phương án (b) cho tài liệu (không sửa prelude); ADR-C13 (declassify) HOÃN; N9 (nhãn đối số) HOÃN tới ngưỡng ≥ 3 lỗi đảo đối số cùng kiểu đã XÁC NHẬN trong ≥ 2 phiên capstone độc lập (Haiku 5.5 và Sonnet 5.5); chưa đạt thì KHÔNG làm.

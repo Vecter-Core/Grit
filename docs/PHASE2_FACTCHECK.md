@@ -20,7 +20,7 @@
 | 12 | §2.1 thứ tự "chỗ trước, giá trị sau" (semantics §3a) | KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ | chưa mở `docs/spec` mục đó; cần đọc spec và thử oracle (Q1.h #7) |
 | 13 | §2.4 Arena đặt trước giữ được "kiểm `arena_overlap` của hồ sơ dev" | ĐÚNG (mô tả hiện trạng) | `lib.rs:500-570` (`arena_verify`, `arena_check_on`); tính khả thi của thiết kế mới là suy luận, CHƯA KIỂM |
 | 14 | §2.5 gritc debug dựng 0,2–1,1 s; chưa đo gritc release | ĐÚNG | `docs/BENCHMARK.md:5,24` (cột "dựng (gritc debug)"); không có số gritc release trong kho (`grep` rỗng) ⇒ Q1.h #1 |
-| 15 | §2.6/§6 ADR-013: AST dùng `Box` có lập luận | ĐÚNG MỘT PHẦN | tiêu đề `docs/DECISIONS.md:100` ("cây Box + NodeId dày đặc"); lý do "khớp mẫu, round-trip" chỉ thấy gián tiếp (`:132`); chưa đọc toàn ADR |
+| 15 | §2.6/§6 ADR-013: AST dùng `Box` có lập luận | ĐÚNG (GÓI 10 S3.d.ii; trước: ĐÚNG MỘT PHẦN) | đã đọc TOÀN ADR-013 (`docs/DECISIONS.md:100-111`): phương án (A) cây `Box` chọn vì khớp mẫu/parser đệ quy tự nhiên và so sánh round-trip là `==`; (B) arena bị loại vì "lợi ích không đáng vì M5 hạ xuống HIR/MIR — đó mới là nơi cần cấu trúc phẳng". Khớp lời trích của đề xuất |
 | 16 | §2.7 "Grit không có null nên tham chiếu luôn khác 0 (D3)" làm niche cho `Option<&T>` | ĐÚNG MỘT PHẦN — **SAI cho con trỏ béo** | `lib.rs:278-291` và `:823-826`: một chuỗi/lát RỖNG có thể qua ABI dạng `null + 0` ("A Grit empty string may cross the ABI as null + zero"). Vậy trường `ptr` của `&str`/`&[T]` có thể bằng 0 ⇒ KHÔNG dùng làm niche; chỉ `&T` mỏng mới là ứng viên. Chưa kiểm `D3` có nói "khác 0" hay không (D3 trong `GRIT_PLAN.md` nói về abort) |
 | 17 | §2.7/7b nhóm đột biến NGUY HIỂM M7 được chấp nhận bằng lập luận (`M7_DANGER_MUTANTS.md`) | ĐÚNG (tệp có) | `docs/M7_DANGER_MUTANTS.md`, `docs/MUTATION_M7_DANGER.jsonl` tồn tại; nội dung từng đột biến CHƯA đọc lại |
 | 18 | §2.8 nền `Send`-like (E0501), `Mutex` có cấp khoá (E0502) | ĐÚNG | `docs/TCB_INTRINSICS.md:33,39` |
@@ -29,8 +29,8 @@
 | 21 | §6 cú pháp và ngữ nghĩa lõi ĐÓNG BĂNG (`FREEZE.md`, ADR-C04); lexer/parser khoá tới đủ 24 giờ fuzz | ĐÚNG | `docs/DECISIONS.md:1305` (ADR-C04); `docs/spec/FREEZE.md:30-31` (lúc đóng băng: lexer 0,05 giờ, parser 0,02 giờ) |
 | 22 | §6 N2: `⊲` nhắc tham số bị gán lại ⇒ E0902 (KNOWN_LIMITATIONS M7) | ĐÚNG | `docs/KNOWN_LIMITATIONS.md:141` điểm (2) |
 | 23 | §6 N7: `SEED_LIMITATIONS` ghi "chưa có `?`" | ĐÚNG | `docs/SEED_LIMITATIONS.md:14` |
-| 24 | §6 N8: "FREEZE cho phép THÊM khoá `edition` trong `rig.toml`" | KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ | `grep -n edition docs/spec/FREEZE.md` rỗng: FREEZE.md không có câu đó. Có thể nằm ở nơi khác hoặc là suy luận của đề xuất; cần quyết định kiến trúc (ADR-P2-01) |
-| 25 | §6 N6: `Cap<T>` hiện là affine | KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ | chưa mở ADR-022/M6; cần đọc `gt-borrowck` cho `Cap` |
+| 24 | §6 N8: "FREEZE cho phép THÊM khoá `edition` trong `rig.toml`" | SAI (GÓI 10 S3.d.iii; trước: KHÔNG KIỂM ĐƯỢC) | `grep -n edition docs/spec/FREEZE.md` rỗng: FREEZE.md KHÔNG có câu cho phép thêm khoá. Khoá `edition` cần ADR riêng và sửa FREEZE có ADR (ADR-P2-01); bộ đọc TOML của `rig` từ chối khoá lạ (fail-closed) nên `rig` phải nhận `edition` TRƯỚC |
+| 25 | §6 N6: `Cap<T>` hiện là affine | ĐÚNG (GÓI 10 S3.d.i; trước: KHÔNG KIỂM ĐƯỢC) | ĐO bằng `gritc 1.0.0-rc6 check`: `ƒ use1(c: Cap<Fs>) ! ∅ { }` + `ƒ main(c: Cap<Fs>) ! ∅ { use1(c); use1(c); }` ⇒ `E0401` (dùng sau move; test `tests/fail/E0401_cap_used_twice.gt`); `ƒ main(c: Cap<Fs>) ! ∅ { }` (bỏ không dùng) ⇒ XANH. Tức là affine (≤ 1 lần), KHÔNG tuyến tính. Khớp ADR-020/ADR-022 mức kiểu: `Cap` không Copy (`DECISIONS.md:217,226`) |
 | 26 | §6 N9: lỗi đảo đối số "rất hay gặp ở mã AI" | KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ | `docs/USER_BUGS.md` (23 dòng) không có từ khoá "đảo/swap/thứ tự đối số" (`grep` rỗng); đề xuất tự ghi "đo trước". Q1.h #6 |
 | 27 | §7.2.1 mặc định `dev` đã là -O0, mọi check giữ | ĐÚNG | như #1 |
 | 28 | §7.2.2 `GRIT_PLAN` liệt kê LLVM trong TCB | ĐÚNG | `GRIT_PLAN.md:112` (danh sách TCB Phase 1, mục (3) LLVM). Đề xuất ghi "§3.3": số mục CHƯA đối chiếu |
@@ -51,7 +51,7 @@
 | 43 | §7.1, §7.5, nguồn ngoài (Zig, QBE, Cranelift, Goose) | KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ | nguồn ngoài; đề xuất tự ghi một phần chưa tra gốc |
 | 44 | §6.1 Eiffel/SPARK/Dafny/Austral/Unison… | KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ | đề xuất tự ghi "chưa tra lại tài liệu gốc" |
 
-**Tổng (44 dòng, đếm bằng script từ cột nhãn):** ĐÚNG **29** · ĐÚNG MỘT PHẦN **7** (#2, 10, 15, 16, 29, 32, 42; #16 có phần SAI) · SAI **1** (#19) · KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ **7** (#12, 24, 25, 26, 31, 43, 44). Thêm 7 dòng đối chiếu ADR ở mục 7 (5 ĐÚNG, 2 ĐÚNG MỘT PHẦN: ADR-013 và ADR-038).
+**Tổng (44 dòng, đếm lại sau GÓI 10 S3.d; trước đó 29/7/1/7):** ĐÚNG **31** · ĐÚNG MỘT PHẦN **6** (#2, 10, 16, 29, 32, 42; #16 có phần SAI) · SAI **2** (#19, #24) · KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ **5** (#12, 26, 31, 43, 44). Thêm 7 dòng đối chiếu ADR ở mục 7 (6 ĐÚNG, 1 ĐÚNG MỘT PHẦN: ADR-038; ADR-013 nay ĐÚNG).
 
 ## 2. Mục bắt buộc (a) Bố cục enum — `crates/gt-codegen-llvm/src/lower.rs`
 - **Tag:** `i64` (8 byte), trường 0 của `{ i64, [k x i64] }` (`:697-713`). Ghi tag bằng `build_struct_gep(et, p, 0)` rồi `store i64` (`:1515-1518`); đọc `load i64` (`:1650-1651`). `Result<T,T>` do hạ (`:2881-2899`) và `Result<X, IoError>` do I/O (`:3528-3557`) cũng dùng tag `i64`.

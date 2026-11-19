@@ -1,0 +1,6 @@
+// expect: pass
+// note: GÓI 10 S4.a — KHOÁ hành vi spawn (ADR-C12): spawn trong `! ∅` với worker `! ∅` được chấp nhận (chú thích {detach} của prelude KHÔNG được thi hành); worker `mem` hợp lệ khi người gọi khai `mem`
+ƒ w0(n: u32) ! ∅ { }
+ƒ wm(n: u32) ! {mem} { }
+ƒ pure_spawner() ! ∅ { spawn(w0, 1u32); }
+ƒ main() ! {mem} { pure_spawner(); spawn(wm, 2u32); }
