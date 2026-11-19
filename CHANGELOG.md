@@ -2,6 +2,11 @@
 
 Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng 2026-11-18, xem `docs/RUN_REPORTS.md`).
 
+## 1.0.0-rc6 — GÓI 8: FB-C34, ICE 33 hợp đồng, E1001 oan, công cụ audit/kit (2026-11-19)
+- **Sửa soundness (FB-C34):** `gt-term`: callee không có thân, có tham số kiểu hàm, nhận đối số có thể mang hàm (vd `spawn(id(f), n)`) ⇒ cạnh gián tiếp tới mọi hàm bị thoát ⇒ E0703. Test đỏ trước, bộ sinh `spawn_family`.
+- `gt-oblig`: ≥ 33 hợp đồng mỗi lời gọi ⇒ ICE E9901 (không panic); giới hạn độ sâu `has_raw_ptr` 32 → 256 (tuple lồng không còn E1001 oan).
+- Công cụ/tài liệu: `make_attack_kit.sh`, `import_attack.py`, `adversarial_check.py`, `fixture_secret_check.py`, `reports_index.py`, `call_edge_probe.py`, `docs/CALL_EDGE_AUDIT.md`, ADR-C12/C13.
+
 ## 1.0.0-rc5 — GÓI 7: FB-C32 (vòng không dừng được chấp nhận khi hết 24 biến bóng), kho công khai, fuzz CI (2026-11-19)
 - **Sửa soundness (FB-C32):** `gt-oblig` `judge_variant_edge`: vòng thiếu biến bóng riêng không còn được chứng minh bằng biến bóng cũ ⇒ E0702. Test đỏ trước (`ghost_limit_soundness`), oracle hàm rộng (`ghost_wide_oracle`), mẫu corpus `E0702_ghost_limit_stale_ghost`.
 - Công cụ/tài liệu: `tools/secret_scan_history.py`, SECURITY.md, issue template, workflow `fuzz.yml` (chỉ dispatch), `tools/fuzz_ingest.py`, `docs/AI_PITFALLS.md`, `tools/limits_probe.py` + LIMITS_AUDIT cập nhật.
