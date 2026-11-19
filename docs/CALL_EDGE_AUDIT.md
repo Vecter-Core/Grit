@@ -32,7 +32,23 @@ Phương pháp: `tools/call_edge_probe.py` sinh chương trình, chạy `gritc c
 - Sửa đầu tiên quá rộng (mọi đối số không phải hằng ⇒ đồ thị bảo thủ) làm `E0502_ok_*` (chương trình ĐÚNG) bị E0703 oan. Đã thu hẹp: chỉ đối số kiểu hàm / tham số chưa biết / có phép chiếu, và chỉ callee có tham số kiểu hàm. Kiểm: `m8_corpus` xanh, toàn bộ `gt-term` xanh (13 bộ, exit 0).
 
 ## 3. CHƯA KIỂM / giới hạn
-- Chưa làm đủ 9 dòng biến thể phụ thuộc trạng thái (Cell/Atomic/Vec/len, `n -% 1`, …) (S1c).
+- S1c đã chạy (mục 4). Chưa làm: 2 dòng không viết được (static khả biến, Text/HashMap len).
 - Bộ sinh spawn không chạy thông dịch (oracle với `spawn` chưa có); "tự bắt khi tắt bản sửa" CHƯA kiểm bằng tay.
 - Intrinsic không thân nhận hàm NẰM TRONG cấu trúc (tuple/struct) không được phát hiện qua chữ ký (giới hạn đã ghi trong `gt-term`).
-- Cổng đầy đủ chưa chạy lại (preflight đỏ: bộ nhớ ảo khả dụng < 4 GB).
+- Cổng đầy đủ GREEN trên `7fa8647` (rc5 + FB-C34); xem RUN_REPORTS GÓI 8.
+
+## 4. S1c — biến thể phụ thuộc trạng thái (GÓI 8; mỗi dòng một lần `gritc check`, bản dựng debug sau FB-C34)
+| # | chương trình | kỳ vọng | kết quả |
+|---|---|---|---|
+| 1 | `⟳ c.get() > 0 ↓ c.get() { c.set(c.get()+1) }` (Cell) | ĐỎ | ĐỎ E0702 (+N0601) |
+| 2 | `⟳ A.load(SeqCst) > 0 ↓ A.load(SeqCst) { A.store(9, SeqCst) }` (Atomic) | ĐỎ | ĐỎ E0702 |
+| 3 | static khả biến | — | không viết được (static phải `Sync`, không `μ`; E0501/E0308 của audit 01 a08) |
+| 4 | `⟳ v.len() < 10 ↓ v.len() { v.push(1) }` (Vec) | ĐỎ | ĐỎ E0702 |
+| 5 | Text/HashMap len khi thân thêm | ĐỎ | không viết được trong thí nghiệm này (CHƯA KIỂM) |
+| 6 | `⟳ *r > 0 ↓ *r { *r ← *r + 1 }` (qua `&!`) | ĐỎ | ĐỎ E0702 (+N0601) |
+| 7a | `↓ m { m ← m -% 1 }` không bảo vệ | ĐỎ | ĐỎ E0702 |
+| 7b | `↓ m { m ← m -^ 1 }` (bão hoà) không bảo vệ | ĐỎ | ĐỎ E0702 |
+| 7c | `⟳ m > 0 ↓ m { m ← m -% 1 }` có bảo vệ | XANH | XANH (đúng) |
+| 8 | biến thể/điều kiện là kết quả hàm `g(i)` | ĐỎ | ĐỎ E0702 (+N0601) |
+| 9 | `↓ i * m` (m có thể 0) | ĐỎ | ĐỎ E0702 |
+**Kết luận:** 0 chương trình XANH sai trong 9 dòng; không có FB-C mới từ S1c.
