@@ -94,6 +94,14 @@ S0 xong (main `17beed4`, sau khi Giang tự hợp nhất hai PR trên GitHub). S
 ## GÓI 7 (2026-11-19) — XONG trừ phần CHẶN/CHƯA (xem docs/RUN_REPORTS.md)
 S0 xong (kho CÔNG KHAI, quét bí mật: không thấy bí mật thật; SECURITY.md). S1 **CHẶN** (Actions vẫn khoá). S2.a FB-C32 sửa (+ FB-C33 do phiên kiểm toán tìm, sửa). S2.b thí nghiệm biên 32 768 khối và ngân sách theo loại nghĩa vụ. S2.c nhóm D một phần, độ phủ CHƯA đo. S3 AI_PITFALLS. S4 workflow fuzz + fuzz_ingest viết xong, CHƯA chạy thử. S5 rc5: cổng đầy đủ CHƯA xanh liền mạch (preflight đỏ 3 lần: bộ nhớ ảo); không thẻ, không đẩy main.
 
+## GÓI 10 (2026-11-20) — bản sao ngoài máy; cổng Linux WSL BỎ QUA; đo Giai đoạn 2 CHƯA ĐO (preflight đỏ); quyết định kiến trúc sư (chỉ tài liệu/công cụ/test)
+- [x] S0 `tools/make_export.sh`; bản sao `D:\Grit_export` (bundle 3 977 668 B, tar cây `seed-1.0-rc6` 11 141 120 B, SHA256SUMS, RESTORE.md, REFS.txt); kiểm khôi phục thật XONG; `docs/GITHUB_SUSPENSION.md`; mục KHẨN 0 ở PENDING_GIANG.
+- [x] S1.a `tools/gate_clean.sh` + `tools/test_gate_clean.py` (3 test OK, thêm vào cổng); quy tắc ở AGENTS.md/HANDOFF. [ ] S1.b–e BỎ QUA: `wsl -l -v` không có bản Ubuntu (chỉ `docker-desktop`, `OpenClawGateway` không phải của agent); bước cho Giang ở PENDING_GIANG. Cổng Linux CHƯA.
+- [ ] S2 đo: CHƯA ĐO (preflight ĐỎ 3 + 3 lần: bộ nhớ ảo khả dụng ≈ 2,1–2,6 GB < 4 GB; `vmmemWSL` ≈ 4 GB commit). Mục 10 (đảo đối số): 0 ca trong nhật ký. `docs/PHASE2_MEASUREMENTS.md`; D4 đánh dấu CHƯA ĐỦ ĐIỀU KIỆN.
+- [ ] S3.a–c (FB-C34 tắt bản sửa, đột biến S1d, oracle spawn) CHƯA LÀM (cần cargo). [x] S3.d: Cap affine (E0401, ĐO bằng gritc rc6), ADR-013 đối chiếu ĐÚNG, FACTCHECK #24 SAI; tổng 31/6/2/5.
+- [x] S4 a–f: ADR-C12 (b) cho tài liệu + test khoá; ADR-C13 hoãn; N8; N9 hoãn; GIANG_DECISIONS; `docs/NEXT_PRODUCT_BATCH.md` (4 mục chờ).
+- [x] S5: không đổi `crates/ runtime/ lib/` kể từ `16c37f0` (`git diff --name-only 16c37f0..HEAD -- crates runtime lib` rỗng); không đổi nhãn (1.0.0-rc6).
+
 ## GÓI 9 (2026-11-20) — CHỈ TÀI LIỆU: kế hoạch Giai đoạn 2 (ĐỀ XUẤT)
 - [x] Q0 `docs/PHASE2_PROPOSAL_OPUS.md` (sao chép nguyên văn từ tệp chưa theo dõi `docs/DE_XUAT_GIAI_DOAN_2.md`; thân không sửa).
 - [x] Q1 `docs/PHASE2_FACTCHECK.md` (44 khẳng định; đo sau cổng ở mục 10).

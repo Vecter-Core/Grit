@@ -223,3 +223,6 @@ bash tools/gate.sh D:/Grit                         # CỔNG ĐẦY ĐỦ ≈ 40 
 ```
 
 c
+
+## Cập nhật GÓI 10 (2026-11-20)
+Nhãn vẫn `1.0.0-rc6`. Mã sản phẩm đóng băng (không đổi `crates/ runtime/ lib/`). Thêm: `tools/make_export.sh`, `tools/gate_clean.sh`; tài liệu `GITHUB_SUSPENSION.md`, `NEXT_PRODUCT_BATCH.md`, `PHASE2_MEASUREMENTS.md`; ADR-C12 (b) cho tài liệu; ADR-C13/N9 hoãn.
