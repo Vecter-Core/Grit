@@ -56,3 +56,47 @@ fn spawning_a_non_recursive_worker_is_still_accepted() {
     );
     assert!(c.is_empty(), "{c:?}");
 }
+
+/// GÓI 8 S1b: bộ sinh nhỏ cho đệ quy qua `spawn`: nhiều hình dạng (trực tiếp, tương hỗ 2–3 hàm, qua hàm trung gian, qua generic),
+/// mỗi hình dạng có/không `↓` không giảm. Mọi chương trình KHÔNG có `div` phải bị từ chối. Bộ này bắt được FB-C33 khi tắt bản sửa d220202 (kiểm tay).
+fn spawn_family(shape: usize, depth: usize) -> String {
+    let mut s = String::new();
+    match shape {
+        0 => s.push_str("ƒ f(n: u64) → () ! ∅ { spawn(f, n); }\n"),
+        1 => s.push_str("ƒ a(n: u64) → () ! ∅ { spawn(b, n); }\nƒ b(n: u64) → () ! ∅ { a(n); }\n"),
+        2 => s.push_str("ƒ f(n: u64) → () ! ∅ ↓ n { spawn(f, n); }\n"),
+        3 => s.push_str("ƒ id<T>(x: T) → T ! ∅ { x }\nƒ f(n: u64) → () ! ∅ { spawn(id(f), n); }\n"),
+        _ => s.push_str("ƒ w(n: u64) → () ! ∅ { w2(n); }\nƒ w2(n: u64) → () ! ∅ { spawn(w, n); }\n"),
+    }
+    // chuỗi hàm trung gian không đệ quy trước điểm vào (độ sâu tuỳ ý, không đổi chu trình)
+    for k in 0..depth {
+        s.push_str(&format!("ƒ pad{k}(n: u64) → () ! ∅ {{ }}\n"));
+    }
+    let entry = match shape {
+        1 => "a",
+        4 => "w",
+        _ => "f",
+    };
+    s.push_str(&format!("ƒ main() → i32 ! ∅ {{ {entry}(1u64); 0 }}\n"));
+    s
+}
+
+#[test]
+fn spawn_family_recursion_without_variant_is_rejected() {
+    let mut accepted = Vec::new();
+    for shape in 0..5 {
+        for depth in 0..4 {
+            let src = spawn_family(shape, depth);
+            let c = codes(&src);
+            if c.is_empty() {
+                accepted.push((shape, depth));
+            }
+            if shape != 2 && shape != 3 && shape != 4 {
+                // hình dạng 0,1: đệ quy không `↓` ⇒ phải từ chối
+                assert!(c.iter().any(|x| x == "E0703" || x == "E0702"), "shape {shape} depth {depth} được chấp nhận: {src}");
+            }
+        }
+    }
+    // hình dạng 2 (↓ không giảm) và 3/4 (qua generic/trung gian) cũng phải bị từ chối; chấp nhận ở đây là FB-C nghiêm trọng
+    assert!(accepted.is_empty(), "các hình dạng spawn-đệ quy được chấp nhận: {accepted:?}");
+}
