@@ -541,11 +541,12 @@ fn discover(
 /// Giới hạn đã biết: intrinsic không thân nhận hàm nằm TRONG cấu trúc (tuple/struct) không được phát hiện qua chữ ký.
 fn may_hold_fn(ty: &gt_types::Ty) -> bool {
     use gt_types::Ty;
-    match ty {
-        Ty::Fn(..) | Ty::Param(_) | Ty::Infer(_) => true,
-        Ty::Ref(_, inner) | Ty::RawPtr(_, inner) => may_hold_fn(inner),
-        _ => false,
+    // KHÔNG tính `Param`/`Infer`: giá trị kiểu tham số không thể là đối số `spawn` mà chưa khớp kiểu hàm; tính chúng làm mã generic của `std`
+    // (vd `Ord::cmp` của `Option<T>`) bị E0703 oan (cổng GÓI 8 lần 1: std_lib, std2_lib, hashmap_collide, release_policy, rig).
+    if let Ty::Ref(_, inner) | Ty::RawPtr(_, inner) = ty {
+        return may_hold_fn(inner);
     }
+    matches!(ty, Ty::Fn(..))
 }
 
 fn dyn_fn_arg(locals: &[gt_mir::LocalDecl], args: &[gt_mir::Operand]) -> bool {
@@ -553,9 +554,10 @@ fn dyn_fn_arg(locals: &[gt_mir::LocalDecl], args: &[gt_mir::Operand]) -> bool {
         gt_mir::Operand::Const(_) => false,
         gt_mir::Operand::Copy(p) | gt_mir::Operand::Move(p) => {
             !p.projection.is_empty()
-                || locals
-                    .get(p.local.index())
-                    .is_none_or(|d| may_hold_fn(&d.ty))
+                || match locals.get(p.local.index()) {
+                    Some(d) => may_hold_fn(&d.ty),
+                    None => true,
+                }
         }
     })
 }
