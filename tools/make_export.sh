@@ -7,7 +7,7 @@ out="${1:-D:/Grit_export}"
 dir="${2:-.}"
 tag="${3:-seed-1.0-rc6}"
 cd "$dir" || exit 2
-root="$(git rev-parse --show-toplevel)" || exit 2
+root="$(cd "$(git rev-parse --show-toplevel)" && pwd)" || exit 2
 mkdir -p "$out" || exit 2
 absout="$(cd "$out" && pwd)"
 case "$absout/" in "$root"/*) echo "EXPORT_FAIL: đích $absout nằm TRONG kho"; exit 2 ;; esac

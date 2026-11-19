@@ -22,6 +22,7 @@
 - Trên Windows dùng Git Bash tại `C:\Program Files\Git\bin\bash.exe`; không dùng `bash` trong WindowsApps/WSL shim.
 - Preflight: `bash tools/preflight.sh D:/Grit`.
 - Gate đầy đủ: `bash tools/gate.sh D:/Grit`; chỉ một lần chạy liền mạch đầy đủ mới được gọi là xanh.
+- Cổng đầy đủ luôn chạy trong CLONE sạch: `bash tools/gate_clean.sh <commit> <thư_mục_ngoài_kho>` (băm cổng gồm tệp chưa theo dõi; một tệp lạ trong kho gốc đã làm vô hiệu cổng nhiều lần). Không chạy cổng đầy đủ trực tiếp trong kho làm việc.
 - Dựng runtime trước test LLVM: `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml`.
 - Môi trường/test recipes: `docs/HANDOFF.md` mục 8 và `docs/ENVIRONMENT.md`.
 - Đột biến dùng `tools/mut.py`, tôn trọng phạm vi, resume, giới hạn worker và sổ kết quả.
