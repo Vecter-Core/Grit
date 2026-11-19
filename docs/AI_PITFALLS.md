@@ -194,3 +194,4 @@ Viết đúng: viết escape `
 * **E0309 "không có phương thức `push_str`"** khi tự viết `rig.toml`: thiếu phụ thuộc gói `std`; dùng `rig new` (tự có `std`).
 * **E0301 `&![T]` ≠ `&[T]`**: `&!` không tự hạ xuống `&`; với `Vec` dùng `v.as_slice()`.
 * **Quá 24 biến cục bộ**: quan hệ giữa biến bị bỏ (ghi chú N0605 ẩn), vòng đúng có thể bị E0702: tách hàm.
+* **`! ∅` vẫn có thể tạo luồng:** `spawn(f, a)` có hiệu ứng của worker `f`; hàm `! ∅` gọi `spawn` với worker `! ∅` được chấp nhận. Đừng coi `! ∅` là "không có luồng"; worker `mem` trong hàm `! ∅` bị E0801.

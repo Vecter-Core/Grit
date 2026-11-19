@@ -54,6 +54,7 @@ Ký hiệu nguồn: "Opus §x" = `PHASE2_PROPOSAL_OPUS.md`; "GP 8.x" = `GRIT_PLA
 | **C2 — N7 `?`** | Opus §6.1; `SEED_LIMITATIONS.md:14` | ADR-P2-01 | không (hạ thành `⌥`+return sớm) nếu desugar trước M4; CHƯA KIỂM chỗ desugar | corpus + test từ chối; round-trip `fmt` | cú pháp mới ⇒ đợt edition | **CÓ** |
 | **C3 — N8 edition + `gritc fix`** | Opus §6.1; FACTCHECK #24 (khẳng định FREEZE chưa kiểm được) | ADR-P2-01 | không | `rig.toml edition`; golden `fix`; cổng | PHẢI trước mọi cú pháp mới | Không (khoá cấu hình; CHƯA xác minh FREEZE cho phép) |
 | **C4 — N9 nhãn đối số** | Opus §6.1; FACTCHECK #26 | ADR riêng, **CHỈ nếu Q1.h #6 cho thấy tần suất đáng kể** | không | corpus; đột biến E03xx | không có số liệu hiện tại; có thể KHÔNG làm | **CÓ** (nếu duyệt) |
+| (C4: HOÃN, GÓI 10) | | | | | N9 chỉ làm khi có ≥ 3 lỗi đảo đối số cùng kiểu XÁC NHẬN (đầu ra sai, qua mọi kiểm tra) trong ≥ 2 phiên capstone độc lập (Haiku 5.5 và Sonnet 5.5); đo GÓI 10 trên nhật ký hiện có: 0 ca |
 | **C5 — N10 newtype trong suốt** | Opus §6.1 | ADR nhỏ (cùng B1) | `gt-layout` bảo đảm bố cục | golden bố cục | phụ thuộc B1 | Không |
 | **C6 — N11 chứng nhận theo băm** | Opus §6.1 | ADR | không (lưu trữ) | tái lập; cache ≡ biên dịch lại | cache sai = false negative; D9 tất định | Không |
 
@@ -63,7 +64,7 @@ Ký hiệu nguồn: "Opus §x" = `PHASE2_PROPOSAL_OPUS.md`; "GP 8.x" = `GRIT_PLA
 | **D1** bằng chứng release-o2 hết mức (Q82) | Opus §3.1; `DECISIONS.md:1110` | không (đã có) | không | `RELEASE_DIFF_RESULTS.jsonl` ≥ 1500 chương trình; ca float/abort | gần như thuần đo |
 | **D2 — 7a** niche cơ bản + tag nhỏ | Opus §2.7 | ADR (sau GLIR) | đổi bố cục enum ⇒ Guard/TCB cập nhật | differential dev/release/release-o2; golden; oracle bố cục | **KHÔNG áp niche lên con trỏ béo** (FACTCHECK #16: ptr có thể 0); tag đổi ở ≥ 6 cụm hạ (FACTCHECK #42); phụ thuộc B1 |
 | **D3** khởi tạo tại chỗ (destination-passing) | Opus §2.1 | ADR | không đổi TCB nếu chỉ hạ | `bench_profile` trước/sau; oracle abort giữa chừng (Q1.h #7) | KHÔNG phải biện pháp bảo vệ Secret (Opus §2.1 đúng) |
-| **D4** Arena đặt trước địa chỉ ảo | Opus §2.4 | ADR | `gritrt_arena_*` đổi hợp đồng TCB | `mut_arena.py`, `shared_arena_diff`, benchmark; test CẢ HAI đường (đặt trước thất bại ⇒ lùi về chunk) | **KHÔNG nới luật M6** ("`push` vô hiệu tham chiếu cũ"); commit charge Windows (Q1.h #9) |
+| **D4** Arena đặt trước địa chỉ ảo — **CHƯA ĐỦ ĐIỀU KIỆN** (GÓI 10 S2): đề xuất Opus giả định `Vec` giữ `&!Arena` ĐỘC QUYỀN; bản hiện hành là `&'a Arena` CHIA SẺ (ADR-C03). Với Arena chia sẻ chỉ khối được cấp CUỐI CÙNG mới lớn tại chỗ được ⇒ lợi ích THU HẸP; chưa đủ điều kiện cho tới khi có số `memcpy` của `Vec::push` (Q1.h #3; GÓI 10 CHƯA đo vì preflight đỏ) | Opus §2.4 | ADR | `gritrt_arena_*` đổi hợp đồng TCB | `mut_arena.py`, `shared_arena_diff`, benchmark; test CẢ HAI đường (đặt trước thất bại ⇒ lùi về chunk) | **KHÔNG nới luật M6** ("`push` vô hiệu tham chiếu cũ"); commit charge Windows (Q1.h #9) |
 | **D5** kênh có kiểu (8.D) | Opus §2.8 | ADR (gồm giải ADR-C12 spawn/detach) | intrinsic TCB mới + TSan | TSan như H7/H8 (`tsan_check.sh`) | mâu thuẫn spawn/detach (FACTCHECK §6) phải giải TRƯỚC |
 | **D6** biên dịch tăng dần (8.E, `gritc serve`) | Opus §2.5 | ADR | cache trong đường quyết định | cổng "tăng dần ≡ từ đầu" trên bộ sinh | cache sai = false negative; làm SAU đo Q1.h #1 |
 

@@ -144,6 +144,7 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 ## 18. Nguyên thủy đồng thời (concurrency primitives)
 - `spawn(f, args)` là **hàm** trong `lib/core`, không phải từ khoá. Phase 1 không có closure: `f` là tên hàm (không bắt biến), `args` là giá trị
   chuyển sang luồng mới và phải `Send`-like (M8). Chữ ký dùng kiểu hàm tĩnh `ƒ(A) → R ! E` (Q12, đã duyệt): không bắt biến, không có closure.
+  **Hiệu ứng của `spawn` (hành vi HIỆN TẠI, GÓI 10/ADR-C12):** bằng hiệu ứng của worker `f` (trừ `lock(*)`); chú thích `{detach}` trong chữ ký prelude không được thi hành. Hàm khai `! ∅` vẫn có thể tạo luồng nếu worker là `! ∅`; `! ∅` KHÔNG có nghĩa "không có luồng".
 - **Atomic ordering** là enum thường trong `lib/core`, không phải từ khoá: `Relaxed`, `Acquire`, `Release`, `AcqRel`, `SeqCst`.
   Mọi thao tác atomic bắt buộc truyền ordering tường minh (plan M8); không có ordering mặc định.
 - `Mutex<T, L>` và cấp khoá: xem §11.

@@ -1,0 +1,16 @@
+# NEXT_PRODUCT_BATCH — thay đổi MÃ SẢN PHẨM đang chờ (lập GÓI 10, 2026-11-20)
+
+Mã sản phẩm (`crates/`, `runtime/`, `lib/`) ĐÓNG BĂNG sau cổng xanh rc6 (`16c37f0`). Danh sách này gom mọi thay đổi cần làm; áp dụng MỘT LẦN khi có kích hoạt, rồi MỘT nhãn rc7 và MỘT cổng.
+**Kích hoạt:** (a) phát hiện hỏng bộ nhớ hoặc âm tính giả (false negative) của kiểm tra an toàn: sửa NGAY (test đỏ trước, `FIELD_BUGS.md`), nâng rc7, cổng lại; hoặc (b) quyết định của kiến trúc sư/Giang.
+
+| # | Thay đổi | Lý do | Nguồn | Trạng thái |
+|---|---|---|---|---|
+| 1 | Chú thích `{detach}` trong chữ ký prelude `spawn` (`lib/core/prelude.gt:15`) không khớp hành vi (không được thi hành) | tài liệu đã đồng bộ theo hành vi (GÓI 10); mã vẫn mang chú thích sai | ADR-C12 | CHỜ — sửa prelude đổi hợp đồng TCB (cần duyệt) |
+| 2 | Đường siết spawn: cho phép khai `{detach}` ở mã người dùng (E1002 hiện chặn) rồi bắt buộc hàm gọi `spawn` khai `detach` | `! ∅` hiện không bảo đảm "không có luồng" | ADR-C12 | CHỜ — cần ADR riêng, làm TRƯỚC kênh có kiểu |
+| 3 | `declassify` không có `Cap<Secret>` ⇒ lỗi kiểu ĐỎ (hiện chỉ cảnh báo S201) | D28: dùng năng lực cần `Cap` | ADR-C13 | HOÃN — thay đổi phá vỡ; bán kính chưa đo bằng chạy thật (27 tệp theo `grep`) |
+| 4 | Xoá `Secret<T>` có bảo đảm (`secret_wipe`) | hiện không có chỗ nào xoá | `PHASE2_ADR_DRAFTS.md` ADR-P2-03 | ĐỀ XUẤT |
+| 5 | Phát hiện từ S1 (cổng Linux WSL) | — | GÓI 10 S1 | KHÔNG CÓ (S1 bỏ qua: chưa có WSL Ubuntu) |
+| 6 | Phát hiện từ S3 (FB-C34 tắt bản sửa, đột biến S1d) | — | GÓI 10 S3 | KHÔNG CÓ (S3.a–c chưa chạy: preflight đỏ) |
+| 7 | Kết quả R11c (Opus đọc mã) | — | sau này | CHƯA CÓ |
+
+Số mục đang chờ thật (1–4): **4** (mục 5–7 là chỗ giữ chỗ).

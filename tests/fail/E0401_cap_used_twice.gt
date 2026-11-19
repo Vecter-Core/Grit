@@ -1,0 +1,4 @@
+// expect: fail E0401
+// note: GÓI 10 S4/S3.d — Cap là affine: dùng một Cap theo giá trị hai lần ⇒ E0401 (dùng sau khi move)
+ƒ use1(c: Cap<Fs>) ! ∅ { }
+ƒ main(c: Cap<Fs>) ! ∅ { use1(c); use1(c); }

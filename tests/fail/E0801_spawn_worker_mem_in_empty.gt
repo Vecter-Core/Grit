@@ -1,0 +1,4 @@
+// expect: fail E0801
+// note: GÓI 10 S4.a — KHOÁ hành vi spawn (ADR-C12): hiệu ứng hiệu dụng của spawn = hiệu ứng worker; worker có `mem` trong hàm `! ∅` ⇒ E0801
+ƒ work(n: u32) ! {mem} { }
+ƒ main() ! ∅ { spawn(work, 5u32); }

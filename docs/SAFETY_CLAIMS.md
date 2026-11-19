@@ -24,6 +24,7 @@ Tài liệu này nói đúng mức tin cậy mà dự án có bằng chứng. N�
 - **Logic nghiệp vụ**: chương trình chạy đúng theo mã nhưng mã sai đề bài. (Vì vậy dự án so với bản tham chiếu Rust độc lập ở `capstone/`.)
 - **Abort có kiểm soát vẫn là dừng chương trình**: tràn số hoặc chỉ số ngoài biên không chứng minh được sẽ abort (mã 70) — an toàn về bộ nhớ nhưng là từ chối dịch vụ nếu đầu vào do kẻ tấn công điều khiển.
 - **Cạn tài nguyên**: bộ nhớ Arena, thời gian chạy, đĩa. Có giới hạn `GRITRT_ARENA_LIMIT` nhưng không có hạn mức thời gian.
+- **`! ∅` không có nghĩa "không tạo luồng"** (ADR-C12, GÓI 10): hiệu ứng của `spawn` bằng hiệu ứng của worker; chú thích `{detach}` trong prelude không được thi hành, nên hàm `! ∅` gọi `spawn` với worker `! ∅` vẫn được chấp nhận. Đừng dùng `! ∅` để suy ra "đơn luồng"; đường siết cần ADR riêng (xem `docs/NEXT_PRODUCT_BATCH.md`).
 - **Data race không có oracle động**: mô hình đa luồng mới chỉ được kiểm bằng corpus + lặp; không có bộ sinh/oracle động đầy đủ cho mọi mẫu truy cập.
 - **Hạ tầng bên ngoài TCB**: bug của LLVM, trình liên kết, hệ điều hành, phần cứng, thư viện C chuẩn; kênh phụ (thời gian, bộ nhớ đệm); tệp/đường dẫn bị đổi giữa lúc kiểm và lúc dùng; tính nguyên tử của ghi tệp (`Cap<Fs>::write` có thể để lại tệp cụt).
 - **Đặc tả sai / thiếu**: kiểm tra chỉ so với những gì được nêu; thông dịch MIR là công cụ đối chiếu NGOÀI TCB.
