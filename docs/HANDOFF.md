@@ -20,6 +20,8 @@
 
 > **GÓI 7 (2026-11-19) — TRẠNG THÁI:** nhãn `1.0.0-rc5` (FB-C32 + FB-C33 sửa). **Kho GitHub là CÔNG KHAI** (`gh repo view`: PUBLIC, mặc định `windows-work`, chưa có giấy phép); quét bí mật 542 commit: không thấy bí mật thật (xem `docs/PENDING_GIANG.md` mục KHẨN, việc Giang 1 phút). **Cổng đầy đủ rc5 CHƯA xanh liền mạch** (preflight đỏ 3 lần do bộ nhớ ảo khả dụng < 4 GB; các lần trước vô hiệu vì cây đổi giữa chừng — băm cổng gồm cả tệp CHƯA theo dõi, nên đừng ghi vào cây khi cổng chạy); Actions vẫn khoá (HTTP 422) ⇒ chưa CI nào; KHÔNG có thẻ `seed-1.0-rc5`, `main` giữ `17beed4`. Việc kế: (1) giải phóng RAM/bộ nhớ ảo rồi `bash tools/preflight.sh D:/Grit` và `bash tools/gate.sh D:/Grit` MỘT lần liền mạch; (2) khi Actions mở: `gh workflow run ci.yml --ref windows-work -f only=all -f full=true`, rồi `bash tools/main_check.sh <commit xanh> <đầu>` trước khi đẩy `main`; (3) fuzz CI: `gh workflow run fuzz.yml --ref windows-work -f minutes=10` thử đường đi, sau đó ≈ 5 lần `-f minutes=330`, rồi `gh run download <id> -D /tmp/fz && python tools/fuzz_ingest.py /tmp/fz`.
 
+> **GÓI 8 (2026-11-19) — DỪNG GIỮA CHỪNG:** preflight đỏ (bộ nhớ ảo < 4 GB); cổng đầy đủ CHƯA chạy trên `b2df3bd`; nhãn vẫn `1.0.0-rc5`; Actions khoá (HTTP 422). Đã sửa FB-C32/33/34 (spawn qua generic), ICE 33 hợp đồng, E1001 oan tuple lồng, công cụ kit hộp đen và adversarial. Việc kế: (1) Giang đóng WSL/trình duyệt, chạy preflight+gate một lần; (2) S1c/S1d/S2/S3/S4 của GÓI 8 (xem RUN_REPORTS mục GÓI 8).
+
 ## Gói 2 tiếp tục — checkpoint G2.1 (2026-11-12)
 - Nhánh `integration`; `main` chưa đụng. `windows-work` đã push tới `a9dcd24`; mutation follow-up + regression mới chưa commit.
 - probe_diff: 20.000 seed độc lập theo range 0..19999, 5 lô tuần tự; edge violations=0; mutant 361/591/554 mỗi mutant `i=0`; đối chứng 238 `i=277`; xem `docs/PROBE_DIFF_RESULTS.jsonl`.
@@ -31,7 +33,7 @@
 - G2.6/G2.7: kiểm kê docs đủ 11/11, doc-test sau cập nhật 207 khối/0 sai; `docs/G2_CLEAN_SESSION.md` chuẩn bị handoff, không sửa/author capstone. G2.1 còn cần xác nhận đúng phạm vi scan E04xx/A.1; mutation survivor có lập luận tương đương; G2.2 R11b đang chờ reviewer Claude khác họ.
 - G2.1.c: sáu bộ ở dev/release-o2 có mismatch 0; chi tiết mới ở `docs/G2_CODEGEN_DIFF_RESULTS.jsonl`, `docs/CODEGEN_DIFF_RESULTS.jsonl`, `docs/RELEASE_O2_DIFF_RESULTS.jsonl`. G2.1.d còn survivor mutation và E04xx/A.1 scan.
 
-**Cập nhật tại commit 684c680, ngày 2026-11-19.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit b2df3bd, ngày 2026-11-19.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (cập nhật 2026-11-19, GÓI 4):** người thực thi = Claude Sonnet 5.5; kiến trúc sư = Claude; Giang CHỈ dùng Claude (không GPT/Codex). Giang đã ủy quyền không chờ duyệt trong phạm vi gói. (Dòng gốc 2026-11-12 ghi Codex thực thi: giữ làm lịch sử.) Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
