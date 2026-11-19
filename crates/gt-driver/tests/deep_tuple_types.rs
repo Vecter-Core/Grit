@@ -13,7 +13,9 @@ fn check_nested(depth: usize, name: &str) -> (i32, String) {
         val = format!("({val},)");
     }
     let src = format!("ƒ f() → i32 ! ∅ {{ t: {ty} ≔ {val}; 0 }}\nƒ main() → i32 ! ∅ {{ f() }}\n");
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("deep_tuple").join(name);
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("deep_tuple")
+        .join(name);
     std::fs::create_dir_all(&dir).expect("tạo thư mục tạm");
     let p = dir.join("main.gt");
     std::fs::write(&p, src).expect("ghi");
@@ -31,13 +33,19 @@ fn check_nested(depth: usize, name: &str) -> (i32, String) {
 #[test]
 fn tuple_of_33_levels_is_not_a_false_e1001() {
     let (code, out) = check_nested(33, "d33");
-    assert!(!out.contains("E1001"), "E1001 oan với tuple 33 tầng (không có con trỏ thô): {out}");
+    assert!(
+        !out.contains("E1001"),
+        "E1001 oan với tuple 33 tầng (không có con trỏ thô): {out}"
+    );
     assert_eq!(code, 0, "{out}");
 }
 
 #[test]
 fn tuple_of_100_levels_is_not_a_false_e1001() {
     let (code, out) = check_nested(100, "d100");
-    assert!(!out.contains("E1001"), "E1001 oan với tuple 100 tầng: {out}");
+    assert!(
+        !out.contains("E1001"),
+        "E1001 oan với tuple 100 tầng: {out}"
+    );
     assert_eq!(code, 0, "{out}");
 }

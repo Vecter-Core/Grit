@@ -66,7 +66,9 @@ fn spawn_family(shape: usize, depth: usize) -> String {
         1 => s.push_str("ƒ a(n: u64) → () ! ∅ { spawn(b, n); }\nƒ b(n: u64) → () ! ∅ { a(n); }\n"),
         2 => s.push_str("ƒ f(n: u64) → () ! ∅ ↓ n { spawn(f, n); }\n"),
         3 => s.push_str("ƒ id<T>(x: T) → T ! ∅ { x }\nƒ f(n: u64) → () ! ∅ { spawn(id(f), n); }\n"),
-        _ => s.push_str("ƒ w(n: u64) → () ! ∅ { w2(n); }\nƒ w2(n: u64) → () ! ∅ { spawn(w, n); }\n"),
+        _ => {
+            s.push_str("ƒ w(n: u64) → () ! ∅ { w2(n); }\nƒ w2(n: u64) → () ! ∅ { spawn(w, n); }\n")
+        }
     }
     // chuỗi hàm trung gian không đệ quy trước điểm vào (độ sâu tuỳ ý, không đổi chu trình)
     for k in 0..depth {
@@ -93,10 +95,16 @@ fn spawn_family_recursion_without_variant_is_rejected() {
             }
             if shape != 2 && shape != 3 && shape != 4 {
                 // hình dạng 0,1: đệ quy không `↓` ⇒ phải từ chối
-                assert!(c.iter().any(|x| x == "E0703" || x == "E0702"), "shape {shape} depth {depth} được chấp nhận: {src}");
+                assert!(
+                    c.iter().any(|x| x == "E0703" || x == "E0702"),
+                    "shape {shape} depth {depth} được chấp nhận: {src}"
+                );
             }
         }
     }
     // hình dạng 2 (↓ không giảm) và 3/4 (qua generic/trung gian) cũng phải bị từ chối; chấp nhận ở đây là FB-C nghiêm trọng
-    assert!(accepted.is_empty(), "các hình dạng spawn-đệ quy được chấp nhận: {accepted:?}");
+    assert!(
+        accepted.is_empty(),
+        "các hình dạng spawn-đệ quy được chấp nhận: {accepted:?}"
+    );
 }

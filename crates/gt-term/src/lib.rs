@@ -409,6 +409,11 @@ fn instance_graph(
                                 edges[k].push((j, true));
                             }
                         }
+                        // GÓI 8 S1b (FB-C34): đối số KHÔNG phải hằng hàm (vd kết quả `id(f)` qua generic) ⇒ không biết callee chạy hàm nào:
+                        // lùi về đồ thị bảo thủ (cạnh gián tiếp tới mọi hàm bị thoát). Không bao giờ bỏ cạnh vì thiếu thông tin.
+                        if dyn_fn_arg(&body.locals, cargs) && takes_fn_param(t, *n2) {
+                            return None;
+                        }
                     }
                 }
                 Callee::TraitMethod {
@@ -531,6 +536,45 @@ fn discover(
     Some(())
 }
 
+/// GÓI 8 S1b (FB-C34): kiểu có THỂ mang một giá trị hàm: hàm, tham số kiểu chưa biết, suy kiểu chưa xong (và tham chiếu/con trỏ tới chúng).
+/// Hằng hàm (`Const`) xử lý riêng (cạnh trực tiếp). Place có phép chiếu (trường/chỉ số) ⇒ coi là có thể (bảo thủ).
+/// Giới hạn đã biết: intrinsic không thân nhận hàm nằm TRONG cấu trúc (tuple/struct) không được phát hiện qua chữ ký.
+fn may_hold_fn(ty: &gt_types::Ty) -> bool {
+    use gt_types::Ty;
+    match ty {
+        Ty::Fn(..) | Ty::Param(_) | Ty::Infer(_) => true,
+        Ty::Ref(_, inner) | Ty::RawPtr(_, inner) => may_hold_fn(inner),
+        _ => false,
+    }
+}
+
+fn dyn_fn_arg(locals: &[gt_mir::LocalDecl], args: &[gt_mir::Operand]) -> bool {
+    args.iter().any(|o| match o {
+        gt_mir::Operand::Const(_) => false,
+        gt_mir::Operand::Copy(p) | gt_mir::Operand::Move(p) => {
+            !p.projection.is_empty()
+                || locals
+                    .get(p.local.index())
+                    .is_none_or(|d| may_hold_fn(&d.ty))
+        }
+    })
+}
+
+/// GÓI 8 S1b (FB-C34): hàm (không có thân trong chương trình) có tham số kiểu hàm trong chữ ký: có thể chạy một hàm do người gọi đưa vào
+/// (vd `spawn`). Không tìm được chữ ký ⇒ `true` (bảo thủ).
+fn takes_fn_param(t: &TypesOutput, node: NodeId) -> bool {
+    let sig =
+        t.db.fns
+            .values()
+            .map(|(sig, _)| sig)
+            .chain(t.db.impls.iter().flat_map(|imp| imp.members.iter()))
+            .find(|sig| sig.node == node);
+    match sig {
+        Some(sig) => sig.params.iter().any(may_hold_fn),
+        None => true,
+    }
+}
+
 /// Đồ thị theo NÚT bảo thủ (hành vi cũ): mọi `TraitMethod` nối tới mọi thành viên của mọi impl của trait; mọi lời gọi giá trị nối tới
 /// mọi hàm bị thoát.
 fn conservative_graph(
@@ -564,15 +608,14 @@ fn conservative_graph(
                     if let Some(&j) = by_node.get(node) {
                         adj[i].push(j);
                     } else {
-                        // GÓI 7 FB-C33: callee không có thân (intrinsic) có thể gọi hàm `FnItem` truyền làm đối số (xem `instance_graph`)
-                        for o in args {
-                            if let gt_mir::Operand::Const(gt_mir::Const::FnItem {
-                                node: fnode, ..
-                            }) = o
-                                && let Some(&j) = by_node.get(fnode)
-                            {
-                                adj[i].push(j);
-                                indirect[i].push(j);
+                        // GÓI 7 FB-C33 + GÓI 8 S1b (FB-C34): callee không có thân nhận đối số không phải hằng hàm ⇒ gọi được mọi hàm bị thoát
+                        let dyn_arg = dyn_fn_arg(&b.locals, args);
+                        if dyn_arg && takes_fn_param(t, *node) {
+                            for n in escaped {
+                                if let Some(&j) = by_node.get(n) {
+                                    adj[i].push(j);
+                                    indirect[i].push(j);
+                                }
                             }
                         }
                     }
