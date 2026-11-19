@@ -1,5 +1,10 @@
 # PENDING_GIANG — việc CHỜ GIANG (lập 2026-11-17; agent KHÔNG tự đánh dấu thay Giang)
 
+## KHẨN 0 (GÓI 10): SAO LƯU NGOÀI MÁY — làm trước
+1. **Chép `D:\Grit_export` ra ngoài máy** (USB, kho lưu trữ đám mây, hoặc email cho chính mình; cỡ ≈ 15 MB: bundle ≈ 3,9 MB, tar ≈ 10,9 MB). Đã kiểm khôi phục thật (clone bundle, `git fsck --full` rc=0, thẻ `seed-1.0-rc6` = `16c37f0`). Mọi bản sao hiện nay (C: và D:) có thể cùng một ổ.
+2. Đọc thông báo đình chỉ GitHub (xem `docs/GITHUB_SUSPENSION.md`).
+3. Tuỳ chọn: tạo kho RIÊNG TƯ ở dịch vụ khác bằng tài khoản của CHÍNH Giang (GitLab, Codeberg…), rồi Giang TỰ chạy `git remote add backup <url>`, `git push backup --all`, `git push backup --tags`. Agent KHÔNG giữ thông tin đăng nhập và KHÔNG đẩy. Đây là sao lưu, không thay GitHub.
+
 ## KHẨN: TÀI KHOẢN GITHUB BỊ ĐÌNH CHỈ (GÓI 8, 2026-11-20)
 `gh auth status` (chỉ-đọc) ⇒ `The token in keyring is invalid … Error: HTTP 403: Sorry. Your account was suspended`; `git push origin integration:windows-work` ⇒ `HTTP 403`; `gh repo view` ⇒ cùng lỗi. Đây rất có thể là nguyên nhân Actions bị khoá từ GÓI 6 (`Actions has been disabled for this user`, HTTP 422) và là lý do KHÔNG đẩy được `windows-work` ở cuối GÓI 8. Agent KHÔNG thử đường vòng (không đổi tài khoản, không dùng token khác).
 **Việc Giang:** đăng nhập github.com bằng trình duyệt, đọc thông báo đình chỉ và làm theo hướng dẫn kháng nghị của GitHub Support (https://support.github.com). Sau khi khôi phục: `gh auth refresh -h github.com`, rồi `git push origin integration:windows-work` (`windows-work` trên GitHub đang ở `4a520f1`; cục bộ `integration` ở HEAD, mã rc6 `16c37f0`, thẻ cục bộ `seed-1.0-rc6`, bundle `grit-final.bundle` ở D:/Grit/.backup và C:/Users/PC/GritBackup).
