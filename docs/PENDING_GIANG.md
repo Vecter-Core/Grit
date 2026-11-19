@@ -1,5 +1,15 @@
 # PENDING_GIANG — việc CHỜ GIANG (lập 2026-11-17; agent KHÔNG tự đánh dấu thay Giang)
 
+## KIỂM FIXTURE BÍ MẬT (GÓI 8 S0f, ngoại tuyến)
+Mục loại (i) và (iv) — việc Giang: mở từng tệp, dòng dưới đây; nếu chuỗi giống token/khoá THẬT của bạn thì THU HỒI ngay. Giá trị không được in ở đây (chỉ 4 ký tự đầu).
+* (iv) `tests/warn/S101_private_key_block.gt:3` — loại pem, bắt đầu `----****` — không phân loại được
+* (iv) `crates/gt-secrets/tests/secrets.rs:36` — loại github, bắt đầu `gith****` — dạng github_pat_ (checksum chưa biết cách tính đã nêu)
+* (iv) `crates/gt-secrets/tests/secrets.rs:38` — loại google, bắt đầu `AIza****` — không phân loại được
+* (iv) `crates/gt-secrets/tests/secrets.rs:39` — loại other, bắt đầu `sk_l****` — không phân loại được
+* (iv) `crates/gt-secrets/tests/secrets.rs:40` — loại pem, bắt đầu `----****` — không phân loại được
+* (iv) `crates/gt-secrets/tests/secrets.rs:263` — loại pem, bắt đầu `----****` — không phân loại được
+
+
 ## KHẨN / AN TOÀN KHO CÔNG KHAI (GÓI 7 S0, 2026-11-19)
 `gh repo view`: **visibility = PUBLIC**, nhánh mặc định `windows-work`, chưa có giấy phép (`licenseInfo = null`), không phải fork. Quét `python tools/secret_scan_history.py` trên **542 commit, 2 391 tệp (mọi nhánh cục bộ + từ xa, 3 thẻ)**; mẫu đã quét: token GitHub/AWS/Google/Slack/sk-, khối khoá riêng, URL có mật khẩu, `authorization: bearer`, gán `password/secret/token/api_key`, chuỗi entropy cao, tên tệp nguy hiểm (`.env`, `*.pem`, `*.key`, `*.pfx`, `*.p12`, `id_rsa*`, `.git-credentials`, `credentials*`, `*.bundle`, `*.sqlite`, hộp thư). KHÔNG phải bằng chứng "không có".
 * **Bí mật thật: KHÔNG thấy.** Các phát hiện mẫu khoá (AWS 17, GitHub 5, Slack 3, Google 2, khối khoá riêng 5 trong tổng 49) đều nằm trong fixture của bộ quét S101 của Grit (`crates/gt-secrets/tests/`, `tests/warn/S101_*`, `audit/probes/secret_*`, `docs/errors/S101.md`, `docs/LANGUAGE_REFERENCE.md`). Tệp ghi nhãn "GIẢ"; khoá AWS có dấu `EXAMPLE`; token GitHub/Slack/Google trong fixture có entropy cao nên KHÔNG chứng minh được là giả chỉ bằng đọc (agent không được và không có cách kiểm bằng cách dùng thử). **Việc Giang (1 phút):** mở `tests/warn/S101_github_token.gt` và `crates/gt-secrets/tests/secrets.rs`, xem các chuỗi `ghp_…`, `xoxb-…`, `AIza…` có phải bạn tự gõ bừa không; nếu từng là khoá thật thì THU HỒI ngay (gỡ khỏi lịch sử không đủ vì kho đã công khai).
