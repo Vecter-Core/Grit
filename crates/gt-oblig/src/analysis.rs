@@ -1067,7 +1067,7 @@ impl<'a> Ctx<'a> {
         // `analyze_body`); nguyên tử dự phòng chỉ để không dừng giữa chừng — thân đã đỏ nên không được coi là chứng minh.
         let Some(a) = unrep_atom_id(bb, idx) else {
             self.unrep_ice.set(true);
-            return unrep_atom_id(0, UNREP_SLOTS - 1).unwrap_or(0);
+            return UNREP_BASE + (UNREP_SLOTS as VarId - 1);
         };
         a
     }
