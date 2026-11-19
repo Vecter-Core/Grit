@@ -17,5 +17,6 @@ git clone -q --no-hardlinks "$repo" "$absdest" || { echo "GATE_CLEAN_FAIL: clone
 git -C "$absdest" -c advice.detachedHead=false checkout -q "$full" || { echo "GATE_CLEAN_FAIL: checkout lỗi"; exit 2; }
 [ "$(git -C "$absdest" rev-parse HEAD)" = "$full" ] || { echo "GATE_CLEAN_FAIL: HEAD khác commit yêu cầu"; exit 2; }
 echo "GATE_CLEAN_COMMIT=$full dir=$absdest"
-if [ -z "${GATE_CLEAN_SKIP_PREFLIGHT:-}" ]; then bash "$absdest/tools/preflight.sh" "$absdest" || { echo "GATE_RESULT=RED"; echo "GATE_CLEAN_FAIL: preflight"; exit 2; }; fi
+# như gate.sh: chạy một phần (GATE_STAGES) không bắt preflight (trừ khi GATE_FORCE_PREFLIGHT)
+if [ -z "${GATE_CLEAN_SKIP_PREFLIGHT:-}" ] && { [ -z "${GATE_STAGES:-}" ] || [ -n "${GATE_FORCE_PREFLIGHT:-}" ]; }; then bash "$absdest/tools/preflight.sh" "$absdest" || { echo "GATE_RESULT=RED"; echo "GATE_CLEAN_FAIL: preflight"; exit 2; }; fi
 bash "$absdest/tools/gate.sh" "$absdest"
