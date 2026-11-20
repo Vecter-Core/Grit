@@ -94,6 +94,10 @@ S0 xong (main `17beed4`, sau khi Giang tự hợp nhất hai PR trên GitHub). S
 ## GÓI 7 (2026-11-19) — XONG trừ phần CHẶN/CHƯA (xem docs/RUN_REPORTS.md)
 S0 xong (kho CÔNG KHAI, quét bí mật: không thấy bí mật thật; SECURITY.md). S1 **CHẶN** (Actions vẫn khoá). S2.a FB-C32 sửa (+ FB-C33 do phiên kiểm toán tìm, sửa). S2.b thí nghiệm biên 32 768 khối và ngân sách theo loại nghĩa vụ. S2.c nhóm D một phần, độ phủ CHƯA đo. S3 AI_PITFALLS. S4 workflow fuzz + fuzz_ingest viết xong, CHƯA chạy thử. S5 rc5: cổng đầy đủ CHƯA xanh liền mạch (preflight đỏ 3 lần: bộ nhớ ảo); không thẻ, không đẩy main.
 
+## GÓI 13 (2026-11-21) — ĐANG LÀM
+- [x] A1 cây main: giai đoạn nhẹ hai nền GREEN, `GATE_TREE=aa9510e7…`. [x] A2 PENDING_GIANG KHẨN. [x] A3 thông dịch ICE hai nền (đọc bất kỳ `□`/`■`).
+- [~] B2 thí nghiệm 8 chương trình XONG (4 vòng đỏ, 3 đối chứng xanh chạy LLVM, 0 FB mới); [ ] thêm hình dạng vào bộ sinh; [ ] B1 đột biến; [ ] B3 TSan (chờ clang); [ ] B4 coverage; [ ] C cổng Linux rc8; [ ] D.
+
 ## GÓI 12 (2026-11-20/21) — XONG MỘT PHẦN (xem docs/RUN_REPORTS.md "GÓI 12")
 - [x] P0 nguồn gốc lần đẩy (`docs/REMOTE_STATE.md`; hai chỗ lệch ghi nhận; cây `main` khác cây đã qua cổng một dòng `license`).
 - [x] P1 cổng Linux rc7 GREEN (WSL2 cục bộ; `GATE_TREE` khớp; 1051/0/215).
