@@ -36,3 +36,6 @@ Tài liệu cho NGƯỜI DÙNG (và AI viết Grit). Chi tiết kỹ thuật, b�
 ## Công cụ
 - `gritc lsp`: chẩn đoán + định dạng toàn tài liệu; chưa có hover/đi tới định nghĩa/hoàn thành mã. `editors/vscode`: khung chưa thử trong VS Code thật.
 - `gritc check` văn bản ẩn ghi chú `N…` (xem bằng `GRIT_NOTES=1` hoặc `--json`).
+
+## GÓI 13 — thông dịch và `□`/`■` (người dùng thấy)
+- **Backend thông dịch (`--backend=interpreter`) không chạy được chương trình ĐỌC một `□` hoặc `■`**: `gritc: lỗi nội bộ khi chạy: … hằng ngoài phạm vi thông dịch`, mã thoát 2 (ICE). ĐO ngày 2026-11-21 trên Windows VÀ Linux (WSL2), `gritc 1.0.0-rc8`: kể cả `■ Y: u32 ≔ 9;` (literal) rồi `r ≔ Y;`. Chương trình không đọc hằng/static chạy bình thường. Dùng backend LLVM (mặc định khi bản dựng có LLVM). `gritc check` vẫn đúng.

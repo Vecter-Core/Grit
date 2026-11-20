@@ -2,7 +2,7 @@
 
 **Trạng thái: `1.0.0-rc8` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
 
-**Nhãn `main` trên GitHub (`Vecter-Core/Grit`):** `main` = `e8a8ae5` (rc7): cổng Windows XANH, cổng Linux XANH (WSL2 cục bộ, không phải CI) trên `4ef044e`; cây `main` khác `4ef044e` đúng một dòng `license` (`docs/REMOTE_STATE.md`). rc8 (bản cục bộ ở trên) CHƯA lên `main`.
+**Nhãn `main` trên GitHub (`Vecter-Core/Grit`):** `main` = `e8a8ae5` (rc7): cổng Windows XANH, cổng Linux XANH (WSL2 cục bộ, không phải CI) trên `4ef044e`; cây `main` khác `4ef044e` đúng một dòng `license` (`docs/REMOTE_STATE.md`). Cây `main` KHÔNG áp dụng `GATE_TREE` rc7 nguyên văn; giai đoạn nhẹ trên đúng cây `main`: Windows và WSL GREEN, `GATE_TREE=aa9510e7…` (`docs/REMOTE_STATE.md` mục 8); cổng đầy đủ trên cây này CHƯA chạy. rc8 (bản cục bộ ở trên) CHƯA lên `main`.
 
 **Nói thẳng về mức tin cậy:** Grit an toàn *bằng kiểm tra* (trình biên dịch fail-closed: không chứng minh được thì từ chối), corpus có oracle, đột biến và đọc mã cùng họ model. **Chưa có kiểm toán độc lập**, chưa có bằng chứng hình thức đầy đủ, và còn điều kiện cứng mở. Điều được và không được khẳng định: [`docs/SAFETY_CLAIMS.md`](docs/SAFETY_CLAIMS.md); giới hạn đã biết: [`docs/SEED_LIMITATIONS.md`](docs/SEED_LIMITATIONS.md). Báo lỗi an toàn (chấp nhận sai): xem [`SECURITY.md`](SECURITY.md). Chưa có giấy phép (LICENSE): mặc định mọi quyền được bảo lưu.
 

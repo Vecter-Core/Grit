@@ -1,5 +1,11 @@
 # PENDING_GIANG — việc CHỜ GIANG (lập 2026-11-17; agent KHÔNG tự đánh dấu thay Giang)
 
+## KHẨN (GÓI 13, 2026-11-21) — đọc trước
+1. **Kho `Vecter-Core/Grit` đang CÔNG KHAI.** Khuyến nghị: chuyển RIÊNG TƯ (GitHub ▸ Settings ▸ Danger Zone ▸ Change visibility) cho tới khi có CI xanh; chưa có lý do cần công khai khi chưa có giấy phép được duyệt và chưa có kiểm toán độc lập. Lịch sử đã đẩy vẫn có thể bị sao chép từ lúc công khai (CHƯA đo).
+2. **6 fixture bí mật loại (iv) chỉ được model xem bằng mắt: KHÔNG phải bằng chứng đã loại trừ token thật.** Giang tự mở `tests/warn/S101_github_token.gt` và `crates/gt-secrets/tests/secrets.rs` (dòng 33–41, 263) và `tests/warn/S101_private_key_block.gt`; chuỗi nào giống token của bạn thì thu hồi ngay.
+3. **Tệp tạm của agent ngoài kho — Giang tự xoá** (agent không xoá, không nhờ xoá bằng cách lách quyền): `D:\p1_g12.sh`; trong `D:\Grit_export\`: `p1_g12.sh`, `p1_wsl.out`, `fz_g12.sh`, `gw_g12.sh`, `cov_g12.sh`, `lw_g12.sh`, `interp.sh`, `fuzz_clone_log.jsonl`, `n1.gt`, `n2.gt`, `lit*.gt`, `*.log`, thư mục `cov\`; thư mục `D:\Grit_cnt`, `D:\Grit_g12w`, `D:\Grit_g12w2`, `D:\Grit_g12w3`, `D:\Grit_g12L`, `D:\Grit_g12L2`, `D:\Grit_g12L3`, `D:\Grit_g12L4`, `D:\Grit_main1`; trong WSL: `~/grit_g12`, `~/grit_fuzz`, `~/grit_cov`, `~/grit_light`, `~/*.sh`, `~/*.log`.
+4. **TSan cần `clang` trong WSL:** lệnh chính xác Giang gõ (cần mật khẩu sudo của bạn): `wsl -d Ubuntu-24.04 -- sudo apt install -y clang`. Xong báo phiên Claude chạy `tools/tsan_check.sh`. Chưa có clang thì TSan ghi "CHƯA CHẠY: thiếu clang".
+
 ## GÓI 12 (2026-11-20) — việc CHỜ GIANG (mới nhất; agent KHÔNG tự đánh dấu thay Giang)
 1. **Đọc `docs/REMOTE_STATE.md`** (nguồn gốc lần đẩy lên `Vecter-Core/Grit`, kho CÔNG KHAI, hai chỗ lệch quy trình: đẩy khi lệnh GÓI 10 cấm và `main` lên khi cổng Linux chưa chạy; cây `main` khác cây đã qua cổng đúng một dòng `license`). Quyết định: có giữ kho công khai không? Có chạy cổng trên cây Vecter-Core không?
 2. **Fuzz qua đêm trong WSL (điều kiện #1; việc chặn Seed lớn nhất)** — lệnh ở `docs/HANDOFF.md` mục "Fuzz qua đêm (WSL)". Tắt chế độ ngủ Windows trước (Cài đặt ▸ Nguồn ▸ Ngủ = Không bao giờ khi cắm điện). Tuỳ chọn `%UserProfile%\.wslconfig`: `[wsl2]` `memory=10GB` `swap=8GB` (agent KHÔNG sửa tệp này).

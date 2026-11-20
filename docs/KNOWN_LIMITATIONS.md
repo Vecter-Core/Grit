@@ -392,3 +392,4 @@ Khi một phiên công cụ bị ngắt đột ngột, `.git/index`, ref `master
 - **gt-term — ca đột biến phòng thủ CHƯA GIẢI THÍCH:** các dòng 559, 576, 671 (xem `docs/MUT_GT_TERM_GOI10.md` GÓI 12): chỉ có phép đo 0 lần và giả thuyết, chưa có chương trình/chứng minh. Mục tiêu "0 ca chấp-nhận-thêm không có test/lập luận" CHƯA ĐẠT.
 - **Hồ sơ `release` không nhanh hơn `dev`** (sha256 chậm hơn ×0,69–0,86 ở cả Windows và WSL); chỉ `release-o2` nhanh. Nguyên nhân chưa giải thích (`PHASE2_MEASUREMENTS.md` P5.a).
 - **Cổng Linux rc7 là cổng CỤC BỘ trên WSL2, không phải CI** (`CLOUD_GATE_RESULT.md`). Không có CI GitHub nào chạy cho rc6/rc7/rc8.
+- **Cải chính GÓI 13 (ĐO, Windows và WSL2):** thông dịch ICE (mã 2) khi chương trình ĐỌC bất kỳ `□`/`■`, kể cả initializer là literal (không chỉ "không phải literal" như ghi ở GÓI 12). Xem `SEED_LIMITATIONS.md`, `NEXT_PRODUCT_BATCH` #13.

@@ -37,3 +37,8 @@ Số mục đang chờ thật (1–4): **4** (mục 5–7 là chỗ giữ chỗ)
 | 174 | `inferred_candidates`: phép so sánh khác `< ≤ > ≥` ⇒ bỏ ứng viên | thiếu ứng viên ⇒ vòng phải có `↓` (đỏ nếu thiếu) | giữ |
 | ~371, ~779 | `Rvalue` khác Use/Cast/Repeat/Aggregate ⇒ không phát hiện hàm dùng như giá trị | kiểu hàm không thể là toán hạng của BinaryOp/UnaryOp/Ref/Len/Discriminant (type-check M4; hàng 6) — NHƯNG lý do này chỉ đúng với `Const::FnItem`, KHÔNG đúng với `Const::Item` (FB-C36 nằm ở đây) | **đổi sang match vét cạn** (mục 11) |
 | callee match | `Callee::{Fn,Value,TraitMethod}` | đã vét cạn, không có `_` | giữ |
+
+## Bổ sung GÓI 13 (2026-11-21)
+| # | Thay đổi | Lý do | Nguồn | Trạng thái |
+|---|---|---|---|---|
+| 13 | Thông dịch: hỗ trợ khởi tạo `□`/`■` (đọc giá trị), HOẶC `check`/`run` báo "chưa hỗ trợ" rõ ràng (mã thoát 3) thay vì ICE (mã 2) | ĐO hai nền: MỌI chương trình đọc `□`/`■` (kể cả literal) ⇒ ICE mã 2 ở thông dịch | `docs/SEED_LIMITATIONS.md` GÓI 13 | CHỜ — gom lô rc9 |

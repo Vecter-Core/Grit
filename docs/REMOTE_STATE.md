@@ -45,3 +45,8 @@ Không có lệnh `gh auth switch` hay đăng nhập mới nào do tôi chạy t
 
 ## 7. Kiểm fixture bí mật (loại iv, 6 mục) — Claude xem trực tiếp (2026-11-20)
 Chạy lại `tools/fixture_secret_check.py` ⇒ 21 mục: (i) 0, (ii) 11, (iii) 4, (iv) 6. Mở từng mục (iv): `github_pat_11ABCDEFG0abcdefghijkl_mnop` (ngắn bất thường, chữ cái liên tiếp); `AIzaSyA-abcdefghijklmnopqrstuvwxyz01234` (bảng chữ cái liên tiếp); `sk_live_abcdefghijklmnopqrstuvwx` (bảng chữ cái); 3 khối PEM chỉ có tiêu đề và thân `MIIE…`/`MIIEFAKE`/`x`, không có nội dung khoá. Không chuỗi nào trông như token thật. ĐÂY LÀ QUAN SÁT BẰNG MẮT của Claude, không phải xác nhận của nhà cung cấp; Giang vẫn nên tự xem (PENDING_GIANG). Kho công khai ⇒ các chuỗi giả này đã công khai (vô hại nếu đúng là giả).
+
+## 8. Cây `main` (GÓI 13 A1, 2026-11-21) — giai đoạn nhẹ trên ĐÚNG commit `e8a8ae5`
+- **`GATE_TREE` rc7 (`c0d7b267…`) KHÔNG áp dụng nguyên văn cho cây `main`** (cây `main` khác cây đã qua cổng một dòng `license` ở `runtime/gt-rt/Cargo.toml`, nay đã ĐO: băm cây khác nhau).
+- Clone cục bộ từ `D:\Grit-vecter` (commit đã có sẵn; KHÔNG fetch; có một lần `git ls-remote origin` chỉ-đọc để xác nhận `main` = `e8a8ae5b7e42…`). Giai đoạn nhẹ (`gtrt fmt clippy expect nul doc deletions failopen track`, gritc dựng sẵn trong clone): **Windows GREEN, WSL2 GREEN, cùng `GATE_TREE=aa9510e7595630d0a9fa5739dc4a07efe634d641e381dd03f398f5d9fdca4375`** (fmt, clippy, DOC_TEST 220/0, FAIL_OPEN 479/0 mới, NUL_OK 2127, TRACK_OK). KHÔNG phải cổng đầy đủ (không `test`, không `audit`): cổng đầy đủ trên cây `main` CHƯA chạy.
+- KHÔNG sửa dòng `license`: việc đồng nhất `main` với rc8 là việc của lần đẩy kế tiếp (Giang xác nhận). Quy tắc: mọi thay đổi vào `main` phải qua cổng trên ĐÚNG cây đó.
