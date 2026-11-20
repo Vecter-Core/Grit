@@ -6,3 +6,7 @@
 {"ts":"2026-11-17T10:44:56Z","target":"lex","status":"ok","seconds":60,"runs":77065,"exit":0,"src":"be37297c8d7b"}
 {"ts":"2026-11-17T10:47:53Z","target":"parse","status":"ok","seconds":60,"runs":10174,"exit":0,"src":"68ba24a71fef"}
 {"ts":"2026-11-17T10:49:09Z","target":"lex","status":"ok","seconds":60,"runs":64835,"exit":0,"src":"be37297c8d7b"}
+{"ts":"2026-11-20T16:26:45Z","target":"lex","status":"ok","seconds":300,"runs":2193827,"exit":0,"src":"be37297c8d7b","source":"wsl-linux","os":"Ubuntu 24.04.5 LTS","kernel":"6.18.33.2-microsoft-standard-WSL2"}
+{"ts":"2026-11-20T16:26:45Z","target":"parse","status":"ok","seconds":300,"runs":317200,"exit":0,"src":"68ba24a71fef","source":"wsl-linux","os":"Ubuntu 24.04.5 LTS","kernel":"6.18.33.2-microsoft-standard-WSL2"}
+{"ts":"2026-11-20T16:31:47Z","target":"lex","status":"ok","seconds":300,"runs":2844341,"exit":0,"src":"be37297c8d7b","source":"wsl-linux","os":"Ubuntu 24.04.5 LTS","kernel":"6.18.33.2-microsoft-standard-WSL2"}
+{"ts":"2026-11-20T16:31:47Z","target":"parse","status":"ok","seconds":300,"runs":303778,"exit":0,"src":"68ba24a71fef","source":"wsl-linux","os":"Ubuntu 24.04.5 LTS","kernel":"6.18.33.2-microsoft-standard-WSL2"}
