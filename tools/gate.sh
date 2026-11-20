@@ -97,7 +97,7 @@ stage_expect() {
   $PY tools/check_expectations.py | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: check_expectations"; r=1; }
   $PY tools/reports_index.py --check | tail -1; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: reports_index"; r=1; }
   $PY tools/adversarial_check.py | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: adversarial_check"; r=1; }
-  for t in test_check_expectations test_mut_guard test_mut_resume test_preflight test_nul_check test_gate test_require_preflight test_unsafe_inventory test_version_docs test_platform_tests test_triage_user_bugs test_deny test_tsan_inject test_secret_scan_history test_fuzz_ingest test_adversarial_check test_reports_index test_fuzz_loop test_nul_scan test_doc_test test_ai_guide test_gen_docs test_gate_clean test_pyfind; do
+  for t in test_check_expectations test_mut_guard test_mut_resume test_preflight test_nul_check test_gate test_require_preflight test_unsafe_inventory test_version_docs test_platform_tests test_triage_user_bugs test_deny test_tsan_inject test_secret_scan_history test_fuzz_ingest test_adversarial_check test_reports_index test_fuzz_loop test_nul_scan test_doc_test test_ai_guide test_gen_docs test_gate_clean test_pyfind test_gate_split; do
     if [ -f "tools/$t.py" ]; then
       $PY -m unittest "tools/$t.py" 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: unittest $t"; r=1; }
     fi
@@ -123,20 +123,50 @@ if has clippy;     then unit clippy stage_clippy; fi
 if has audit;      then unit audit stage_audit; fi
 
 # ---- test: mỗi crate một đơn vị (điểm lưu); GATE_TEST_CMD (kiểm thử cổng) chạy một cục -------------------------------------------------------
-test_unit() { # $1 = gói
-  local pkg="$1" out="$TMPD/gate_test_$1.txt"
-  cargo test -p "$pkg" --no-fail-fast -- --test-threads=2 > "$out" 2>&1; local c=$?
+# GÓI 12 P4: gói nằm trong GATE_SPLIT_PKGS (mặc định: gt-driver, đơn vị 35 phút ở GÓI 11) được CHIA: mỗi mục tiêu `--lib`, `--bin X`, `--test Y`, `--doc` là một đơn vị
+# có điểm lưu riêng (`test:<gói>:<mục tiêu>`), in `secs=` từng đơn vị để biết bộ nào vượt 15 phút. Gói khác giữ một đơn vị/gói.
+test_unit() { # $1 = gói; $2 = nhãn (mặc định = gói); còn lại = đối số thêm cho `cargo test` (vd --test tên)
+  local pkg="$1" label="${2:-$1}" t0; shift; [ $# -gt 0 ] && shift
+  local out="$TMPD/gate_test_${label//[:\/]/_}.txt"; t0=$(date +%s)
+  cargo test -p "$pkg" "$@" --no-fail-fast -- --test-threads=2 > "$out" 2>&1; local c=$?
   if [ "$c" != 0 ]; then cp "$out" "$TMPD/gate_test_last.txt"; fi
   grep -E "panicked" -A4 "$out" | head -40
   local n f p
   n=$(grep -c "test result" "$out"); f=$(grep -E "test result" "$out" | awk '{f+=$6} END {print f+0}'); p=$(grep -E "test result" "$out" | awk '{p+=$4} END {print p+0}')
-  echo "TEST_UNIT $pkg passed=$p failed=$f suites=$n exit=$c"
+  echo "TEST_UNIT $label passed=$p failed=$f suites=$n exit=$c secs=$(( $(date +%s) - t0 ))"
   if [ "$c" != 0 ] || [ "$n" = 0 ] || [ "$f" != 0 ]; then tail -100 "$out"; fi
   [ "$c" = 0 ] || return 1
-  [ "$n" != 0 ] || { echo "TEST_STAGE_INVALID: $pkg không có dòng \`test result\` — KHÔNG được coi là xanh"; return 1; }
+  [ "$n" != 0 ] || { echo "TEST_STAGE_INVALID: $label không có dòng \`test result\` — KHÔNG được coi là xanh"; return 1; }
   [ "$f" = 0 ] || return 1
-  printf '%s\t%s\t%s\t%s\t%s\n' "TESTSUM:$pkg" "PASS" "$p" "$n" "$KEY" >> "$STATE"
+  printf '%s\t%s\t%s\t%s\t%s\n' "TESTSUM:$label" "PASS" "$p" "$n" "$KEY" >> "$STATE"
   return 0
+}
+split_targets() { # $1 = gói ⇒ dòng `loại<TAB>tên` (lib|bin|test) từ cargo metadata
+  cargo metadata --no-deps --format-version 1 2>/dev/null | $PY -c "
+import sys, json
+for p in json.load(sys.stdin)['packages']:
+    if p['name'] != sys.argv[1]:
+        continue
+    for t in p['targets']:
+        k = t['kind']
+        if any(x in ('lib', 'rlib', 'dylib', 'cdylib', 'staticlib', 'proc-macro') for x in k): print('lib\t' + t['name'])
+        elif 'bin' in k: print('bin\t' + t['name'])
+        elif 'test' in k: print('test\t' + t['name'])
+" "$1" | tr -d '\r'
+}
+split_unit() { # $1 = gói đã chọn chia
+  local p="$1" kind name haslib=0 any=0
+  while IFS=$'\t' read -r kind name; do
+    [ -n "$kind" ] || continue
+    any=1
+    case "$kind" in
+      lib) haslib=1; unit "test:$p:lib" test_unit "$p" "$p:lib" --lib ;;
+      bin) unit "test:$p:bin:$name" test_unit "$p" "$p:bin:$name" --bin "$name" ;;
+      test) unit "test:$p:$name" test_unit "$p" "$p:$name" --test "$name" ;;
+    esac
+  done < <(split_targets "$p")
+  if [ "$any" = 0 ]; then echo "TEST_STAGE_INVALID: không liệt kê được mục tiêu của $p"; red "giai đoạn test không hợp lệ"; return 1; fi
+  if [ "$haslib" = 1 ]; then unit "test:$p:doc" test_unit "$p" "$p:doc" --doc; fi
 }
 if has test; then
   if [ -n "$GATE_TEST_CMD" ]; then
@@ -154,7 +184,10 @@ if has test; then
     # thứ tự phụ thuộc: crate nhỏ trước; mỗi gói một đơn vị. Gói thật lấy từ `cargo metadata` để KHÔNG bỏ sót crate mới.
     PKGS=$(cargo metadata --no-deps --format-version 1 2>/dev/null | $PY -c "import sys,json; print(' '.join(p['name'] for p in json.load(sys.stdin)['packages']))")
     [ -n "$PKGS" ] || { echo "TEST_STAGE_INVALID: không liệt kê được gói"; red "giai đoạn test không hợp lệ"; }
-    for p in $PKGS; do unit "test:$p" test_unit "$p"; done
+    SPLIT=" ${GATE_SPLIT_PKGS-gt-driver} "
+    for p in $PKGS; do
+      case "$SPLIT" in *" $p "*) split_unit "$p" ;; *) unit "test:$p" test_unit "$p" ;; esac
+    done
     if [ "$INCOMPLETE" = 0 ] && [ "$rc" = 0 ] && [ -n "$PKGS" ]; then
       awk -F'\t' '$1 ~ /^TESTSUM:/ && $2=="PASS" {p+=$3; n+=$4} END {print "TEST_PASSED="p+0" FAILED=0 SUITES="n+0}' "$STATE"
     fi
