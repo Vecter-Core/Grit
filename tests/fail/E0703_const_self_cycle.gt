@@ -1,0 +1,4 @@
+// expect: fail E0703
+// note: FB-C36 — hằng tự tham chiếu: □ được tính bằng lời gọi ở mỗi chỗ dùng ⇒ đệ quy vô hạn; trước sửa: check XANH, exe tràn ngăn xếp
+□ C: u32 ≔ C;
+ƒ main() → i32 ! ∅ { r ≔ C; 0 }

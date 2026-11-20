@@ -1,0 +1,6 @@
+// expect: pass
+// note: FB-C36 đối chứng — chuỗi hằng không vòng, hằng khởi tạo bằng hàm đọc hằng khác
+□ K: u32 ≔ 5u32;
+ƒ f() → u32 ! ∅ { K }
+□ C: u32 ≔ f();
+ƒ main() → i32 ! ∅ { r ≔ C; 0 }

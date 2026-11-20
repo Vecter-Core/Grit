@@ -1,0 +1,5 @@
+// expect: fail E0703
+// note: FB-C36 — hằng khởi tạo bằng hàm đọc chính hằng đó
+ƒ f() → u32 ! ∅ { C }
+□ C: u32 ≔ f();
+ƒ main() → i32 ! ∅ { r ≔ C; 0 }

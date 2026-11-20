@@ -1,0 +1,5 @@
+// expect: fail E0703
+// note: FB-C36 — hai hằng đọc nhau
+□ A: u32 ≔ B;
+□ B: u32 ≔ A;
+ƒ main() → i32 ! ∅ { r ≔ A; 0 }
