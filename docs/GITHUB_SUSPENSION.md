@@ -43,3 +43,14 @@ github.com
   - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
 ```
 Máy hiện đăng nhập tài khoản MỚI `Vecter-Core` (do Giang tự đăng nhập), không còn tài khoản `gn3305970-lang` bị đình chỉ. GÓI 10 cấm đẩy ⇒ agent KHÔNG đẩy gì trong gói này. Kho `gn3305970-lang/Grit` vẫn ở `4a520f1` (CHƯA KIỂM: không gọi API).
+
+## 7. Trạng thái cuối GÓI 11 (`gh auth status`, MỘT lần, 2026-11-20)
+```text
+github.com
+  ✓ Logged in to github.com account Vecter-Core (keyring)
+  - Active account: true
+  - Git operations protocol: https
+  - Token: gho_************************************
+  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
+```
+Trong GÓI 11 có đẩy lên kho MỚI `Vecter-Core/Grit` theo lệnh trực tiếp của Giang (fast-forward `fc992b9..75f7d99`, rồi lần cuối gói); kho cũ `gn3305970-lang/Grit` không đụng.
