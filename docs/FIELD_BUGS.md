@@ -263,3 +263,11 @@ Guard coi mọi tên `llvm.*` là hợp lệ nếu LLVM verifier nhận lời g�
 - **Sửa (fail-closed):** `crates/gt-term/src/lib.rs` `instance_graph`: callee KHÔNG có thân nhận đối số không phải hằng ⇒ `None` (lùi về đồ thị bảo thủ, không bao giờ bỏ cạnh); `conservative_graph`: callee không có thân ⇒ cạnh gián tiếp tới MỌI hàm bị thoát.
 - **Phạm vi:** chỉ ảnh hưởng chương trình có lời gọi intrinsic/không thân với đối số không phải hằng VÀ có hàm bị thoát trong cùng chu trình. Không đổi phán quyết chương trình không đệ quy.
 - **CHƯA:** oracle thông dịch với `spawn` (bộ sinh chỉ kiểm phán quyết, không chạy); kiểm bằng cách tắt bản sửa đang làm bằng tay (xem RUN_REPORTS GÓI 8).
+
+## FB-C35 — NGHIÊM TRỌNG (âm tính giả, D12): đệ quy qua THÂN HỢP ĐỒNG `⊳`/`⊲` — PHÁT HIỆN GÓI 11 (2026-11-20); sửa ở commit riêng
+- **Phát hiện bởi:** kiểm kê MIR của gt-term (S1.f, `docs/CONTROL_TRANSFER_INVENTORY.md`): `bodies` của `check_termination` chỉ gồm `BodyKind::Fn`; thân hợp đồng (`Pre`/`Post`) không nằm trong đồ thị gọi.
+- **Tái hiện (đã chạy, `gritc 1.0.0-rc6`, Windows):** `ƒ f(n: u32) → u32 ! ∅ ⊳ g(n) { n }` + `ƒ g(n: u32) → bool ! ∅ { f(n) > 0u32 }` + `ƒ main() → i32 ! ∅ { r ≔ f(1u32); 0 }` ⇒ `gritc check`: **XANH** (1 ghi chú N0901); `gritc run --backend=interpreter`: "chưa kết thúc (mã thoát 71)"; `gritc run` (LLVM dev): thoát với trạng thái 1 (mã 101). Hai biến thể khác (hậu điều kiện `⊲ g(result)`; hợp đồng gọi chính hàm: `⊳ f(n) > 0u32`) cũng XANH và cùng không dừng.
+- **Cơ chế:** kiểm tra hợp đồng lúc chạy được chèn SAU M8 (gt-oblig) tại điểm gọi (tiền điều kiện) và cuối hàm (hậu điều kiện) và gọi thân hợp đồng, rồi hàm người dùng trong đó; đồ thị của gt-term không có cạnh "hàm → hàm gọi trong hợp đồng của nó" nên chu trình `g → f → (⊳) g` không được thấy.
+- **Vi phạm:** D12 (mọi đệ quy phải có `↓` hoặc `div`).
+- **Test ĐỎ trước:** `crates/gt-term/tests/contract_recursion.rs` (4 chương trình bị chấp nhận sai + 1 đối chứng).
+- **Mức:** âm tính giả của kiểm an toàn ⇒ nghiêm trọng nhất theo grit-contract §3.3 ⇒ sửa ngay theo luật đóng băng (rc7, cổng đầy đủ lại).
