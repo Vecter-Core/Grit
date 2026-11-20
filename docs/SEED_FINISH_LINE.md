@@ -43,5 +43,5 @@ Việc ngắn nhất Giang làm được ngay: #4 (đọc), #8 (bấm dispatch),
 
 ## Cập nhật GÓI 10 (2026-11-20; chỉ tài liệu/công cụ/test)
 * **CHẶN bởi GitHub:** CI mọi job; `main`; fuzz trên CI Linux; cổng Linux qua đám mây (`CLOUD_GATE_PROMPT.md`).
-* **Làm được CỤC BỘ (chưa làm xong):** cổng Linux bằng WSL2 Ubuntu (CẦN Giang cài WSL Ubuntu, xem PENDING_GIANG; và bộ nhớ ảo ≥ 4 GB); fuzz (`tools/fuzz_*`); phiên Opus đọc mã (R11c) trong clone riêng; hai phiên capstone sạch; thử VS Code; điều kiện #6 (Giang đọc); giấy phép (GPL-3.0-only đã đặt ở kho mới `Vecter-Core/Grit`).
+* **Cổng Linux cục bộ: XONG (WSL2, GREEN trên `16c37f0`, GATE_TREE khớp; không phải CI).** **Làm được CỤC BỘ (chưa làm xong):** fuzz (`tools/fuzz_*`); phiên Opus đọc mã (R11c) trong clone riêng; hai phiên capstone sạch; thử VS Code; điều kiện #6 (Giang đọc); giấy phép (GPL-3.0-only đã đặt ở kho mới `Vecter-Core/Grit`).
 * Bản sao ngoài máy: `D:\Grit_export` (Giang chép ra ngoài ổ). Đo Giai đoạn 2: CHƯA ĐO (preflight đỏ).

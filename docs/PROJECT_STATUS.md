@@ -226,3 +226,4 @@ c
 
 ## Cập nhật GÓI 10 (2026-11-20)
 Nhãn vẫn `1.0.0-rc6`. Mã sản phẩm đóng băng (không đổi `crates/ runtime/ lib/`). Thêm: `tools/make_export.sh`, `tools/gate_clean.sh`; tài liệu `GITHUB_SUSPENSION.md`, `NEXT_PRODUCT_BATCH.md`, `PHASE2_MEASUREMENTS.md`; ADR-C12 (b) cho tài liệu; ADR-C13/N9 hoãn.
+Cổng Linux cục bộ (WSL2) GREEN trên `16c37f0`, GATE_TREE khớp Windows (xem `docs/CLOUD_GATE_RESULT.md`); đột biến gt-term: 27/110 sống sót (`docs/MUT_GT_TERM_GOI10.md`).
