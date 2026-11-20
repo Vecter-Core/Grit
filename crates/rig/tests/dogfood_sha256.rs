@@ -74,10 +74,10 @@ fn python_cmd() -> String {
             .output()
             .is_ok_and(|o| o.status.success())
     };
-    if let Ok(p) = std::env::var("PYTHON") {
-        if ok(&p) {
-            return p;
-        }
+    if let Ok(p) = std::env::var("PYTHON")
+        && ok(&p)
+    {
+        return p;
     }
     for c in ["python", "python3"] {
         if ok(c) {
