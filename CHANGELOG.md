@@ -2,6 +2,8 @@
 
 Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng 2026-11-18, xem `docs/RUN_REPORTS.md`).
 
+## 1.0.0-rc7 — GÓI 11: FB-C35 (đệ quy qua thân hợp đồng ⊳/⊲ được chấp nhận; gt-term gộp cạnh hợp đồng), ghim rustc 1.98.1, công cụ (2026-11-20)
+
 ## 1.0.0-rc6 — GÓI 8: FB-C34, ICE 33 hợp đồng, E1001 oan, công cụ audit/kit (2026-11-19)
 - **Sửa soundness (FB-C34):** `gt-term`: callee không có thân, có tham số kiểu hàm, nhận đối số có thể mang hàm (vd `spawn(id(f), n)`) ⇒ cạnh gián tiếp tới mọi hàm bị thoát ⇒ E0703. Test đỏ trước, bộ sinh `spawn_family`.
 - `gt-oblig`: ≥ 33 hợp đồng mỗi lời gọi ⇒ ICE E9901 (không panic); giới hạn độ sâu `has_raw_ptr` 32 → 256 (tuple lồng không còn E1001 oan).

@@ -1,6 +1,6 @@
 # Grit
 
-**Trạng thái: `1.0.0-rc6` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
+**Trạng thái: `1.0.0-rc7` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
 
 **Nói thẳng về mức tin cậy:** Grit an toàn *bằng kiểm tra* (trình biên dịch fail-closed: không chứng minh được thì từ chối), corpus có oracle, đột biến và đọc mã cùng họ model. **Chưa có kiểm toán độc lập**, chưa có bằng chứng hình thức đầy đủ, và còn điều kiện cứng mở. Điều được và không được khẳng định: [`docs/SAFETY_CLAIMS.md`](docs/SAFETY_CLAIMS.md); giới hạn đã biết: [`docs/SEED_LIMITATIONS.md`](docs/SEED_LIMITATIONS.md). Báo lỗi an toàn (chấp nhận sai): xem [`SECURITY.md`](SECURITY.md). Giấy phép: GNU General Public License v3.0 only (`GPL-3.0-only`), xem [`LICENSE`](LICENSE).
 
