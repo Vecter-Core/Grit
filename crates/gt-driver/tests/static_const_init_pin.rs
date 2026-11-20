@@ -22,22 +22,20 @@ fn gritc(args: &[&str], src: &str, tag: &str) -> (i32, String) {
     (o.status.code().unwrap_or(-1), text)
 }
 
-const S_CYCLE_F: &str =
-    "ƒ f() → u32 ! ∅ { X }\n■ X: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ X; 0 }\n";
+const S_CYCLE_F: &str = "ƒ f() → u32 ! ∅ { X }\n■ X: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ X; 0 }\n";
 const S_CYCLE_DEEP: &str = "ƒ h() → u32 ! ∅ { X }\nƒ g() → u32 ! ∅ { h() }\n■ X: u32 ≔ g();\nƒ main() → i32 ! ∅ { r ≔ X; 0 }\n";
-const S_CYCLE_MUTUAL: &str =
-    "■ A: u32 ≔ B;\n■ B: u32 ≔ A;\nƒ main() → i32 ! ∅ { r ≔ A; 0 }\n";
-const S_OK: &str = "ƒ f() → u32 ! ∅ { Y }\n■ Y: u32 ≔ 7;\n■ X: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ X; 0 }\n";
-const S_OK2: &str =
-    "ƒ f() → u32 ! ∅ { 3u32 }\n■ X: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ X; 0 }\n";
+const S_CYCLE_MUTUAL: &str = "■ A: u32 ≔ B;\n■ B: u32 ≔ A;\nƒ main() → i32 ! ∅ { r ≔ A; 0 }\n";
+const S_OK: &str =
+    "ƒ f() → u32 ! ∅ { Y }\n■ Y: u32 ≔ 7;\n■ X: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ X; 0 }\n";
+const S_OK2: &str = "ƒ f() → u32 ! ∅ { 3u32 }\n■ X: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ X; 0 }\n";
 const S_OK3: &str = "■ Y: u32 ≔ 9;\n■ X: u32 ≔ Y;\nƒ main() → i32 ! ∅ { r ≔ X; 0 }\n";
 const C_OK: &str = "ƒ f() → u32 ! ∅ { 3u32 }\n□ C: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ C; 0 }\n";
-const C_OK2: &str = "□ K: u32 ≔ 5u32;\nƒ f() → u32 ! ∅ { K }\n□ C: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ C; 0 }\n";
+const C_OK2: &str =
+    "□ K: u32 ≔ 5u32;\nƒ f() → u32 ! ∅ { K }\n□ C: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ C; 0 }\n";
 const C_OK3: &str = "□ A: u32 ≔ 1u32;\n□ B: u32 ≔ A;\nƒ main() → i32 ! ∅ { r ≔ B; 0 }\n";
 const C_CYCLE_SELF: &str = "□ C: u32 ≔ C;\nƒ main() → i32 ! ∅ { r ≔ C; 0 }\n";
 const C_CYCLE_MUTUAL: &str = "□ A: u32 ≔ B;\n□ B: u32 ≔ A;\nƒ main() → i32 ! ∅ { r ≔ A; 0 }\n";
-const C_CYCLE_F: &str =
-    "ƒ f() → u32 ! ∅ { C }\n□ C: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ C; 0 }\n";
+const C_CYCLE_F: &str = "ƒ f() → u32 ! ∅ { C }\n□ C: u32 ≔ f();\nƒ main() → i32 ! ∅ { r ≔ C; 0 }\n";
 
 fn check_green(src: &str, tag: &str) {
     let (c, t) = gritc(&["check"], src, tag);
@@ -53,7 +51,11 @@ fn interp_ice(src: &str, tag: &str) {
 
 #[test]
 fn static_cycles_check_green_interpreter_ice() {
-    for (s, tag) in [(S_CYCLE_F, "sc1"), (S_CYCLE_DEEP, "sc2"), (S_CYCLE_MUTUAL, "sc3")] {
+    for (s, tag) in [
+        (S_CYCLE_F, "sc1"),
+        (S_CYCLE_DEEP, "sc2"),
+        (S_CYCLE_MUTUAL, "sc3"),
+    ] {
         check_green(s, tag);
         interp_ice(s, tag);
     }
@@ -76,7 +78,11 @@ fn acyclic_static_and_const_initialisers_check_green_interpreter_ice() {
 
 #[test]
 fn const_cycles_are_rejected_by_check_and_never_build() {
-    for (s, tag) in [(C_CYCLE_SELF, "cc1"), (C_CYCLE_MUTUAL, "cc2"), (C_CYCLE_F, "cc3")] {
+    for (s, tag) in [
+        (C_CYCLE_SELF, "cc1"),
+        (C_CYCLE_MUTUAL, "cc2"),
+        (C_CYCLE_F, "cc3"),
+    ] {
         let (c, t) = gritc(&["check"], s, tag);
         assert_eq!(c, 1, "{t}");
         assert!(t.contains("E0703"), "{t}");
@@ -91,13 +97,25 @@ mod llvm {
 
     #[test]
     fn static_cycles_are_refused_by_the_llvm_backend_with_no_exe() {
-        for (s, tag) in [(S_CYCLE_F, "lc1"), (S_CYCLE_DEEP, "lc2"), (S_CYCLE_MUTUAL, "lc3")] {
-            let out = std::env::temp_dir().join(format!("grit_pin_lc_{tag}_{}.exe", std::process::id()));
+        for (s, tag) in [
+            (S_CYCLE_F, "lc1"),
+            (S_CYCLE_DEEP, "lc2"),
+            (S_CYCLE_MUTUAL, "lc3"),
+        ] {
+            let out =
+                std::env::temp_dir().join(format!("grit_pin_lc_{tag}_{}.exe", std::process::id()));
             let _ = std::fs::remove_file(&out);
-            let (c, t) = gritc(&["build", "--backend=llvm", "-o", out.to_str().unwrap()], s, tag);
+            let (c, t) = gritc(
+                &["build", "--backend=llvm", "-o", out.to_str().unwrap()],
+                s,
+                tag,
+            );
             assert_eq!(c, 3, "{t}");
             assert!(t.contains("vòng phụ thuộc khởi tạo giữa các static"), "{t}");
-            assert!(!out.exists(), "KHÔNG được sinh exe cho vòng khởi tạo static");
+            assert!(
+                !out.exists(),
+                "KHÔNG được sinh exe cho vòng khởi tạo static"
+            );
         }
     }
 
