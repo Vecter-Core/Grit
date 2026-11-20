@@ -1,0 +1,3 @@
+// expect: fail E0301
+// note: GÓI 12 P6 (nhóm D, pat.rs:222 hướng false): pattern khoảng trên biến suy kiểu KHÔNG phải Int (literal số thực chưa ép kiểu) bị từ chối, không chấp nhận
+ƒ main() → i32 ! ∅ { x ≔ 1.5; ⌥ x { 0.0..=2.0 ↦ 1, _ ↦ 0 } }

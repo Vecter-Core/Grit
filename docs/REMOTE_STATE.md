@@ -29,7 +29,7 @@ Không có lệnh `gh auth switch` hay đăng nhập mới nào do tôi chạy t
 
 ## 5. Quy tắc đã áp dụng và chỗ LỆCH
 - Lệnh GÓI 10 và GÓI 11 (phần S0) cấm đẩy/dùng tài khoản khác; dòng "Đẩy code lên kho đi" ở GÓI 11 mâu thuẫn với nó. Tôi đã hiểu dòng đó là chỉ dẫn đẩy, KHÔNG hỏi lại và KHÔNG ghi sự mâu thuẫn trong báo cáo GÓI 11 ⇒ **lệch quy trình, ghi nhận**.
-- Quy tắc từ GÓI 7 (và `AGENTS.md` mục Nhánh): `main` chỉ lên khi cổng Windows VÀ cổng Linux cùng xanh trên cùng cây mã. Lúc đẩy `e8a8ae5`: cổng Windows rc7 XANH, cổng Linux rc7 CHƯA chạy (kết quả: xem READINESS mục GÓI 12/P1) ⇒ **lệch quy tắc, ghi nhận**.
+- Quy tắc từ GÓI 7 (và `AGENTS.md` mục Nhánh): `main` chỉ lên khi cổng Windows VÀ cổng Linux cùng xanh trên cùng cây mã. Lúc đẩy `e8a8ae5`: cổng Windows rc7 XANH, cổng Linux rc7 CHƯA chạy (kết quả cổng Linux rc7 chạy SAU đó, GÓI 12 P1: **GREEN** trên `4ef044e`, `GATE_TREE` khớp cổng Windows; xem `CLOUD_GATE_RESULT.md`) ⇒ **lệch quy tắc về THỨ TỰ (đẩy trước khi có cổng Linux), nay đã có bằng chứng Linux cho cây `4ef044e` nhưng KHÔNG cho cây `main` (khác một dòng `license`)**.
 - `tools/main_check.sh` dành cho kho `D:\Grit` (nhánh `main` có CI xanh); kho `Vecter-Core` chưa có CI chạy: CHƯA KIỂM.
 - Tên nhánh: kho GitHub mới chỉ có `main`; `windows-work`/`integration` chưa đẩy.
 

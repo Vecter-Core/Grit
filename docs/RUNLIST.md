@@ -94,6 +94,16 @@ S0 xong (main `17beed4`, sau khi Giang tự hợp nhất hai PR trên GitHub). S
 ## GÓI 7 (2026-11-19) — XONG trừ phần CHẶN/CHƯA (xem docs/RUN_REPORTS.md)
 S0 xong (kho CÔNG KHAI, quét bí mật: không thấy bí mật thật; SECURITY.md). S1 **CHẶN** (Actions vẫn khoá). S2.a FB-C32 sửa (+ FB-C33 do phiên kiểm toán tìm, sửa). S2.b thí nghiệm biên 32 768 khối và ngân sách theo loại nghĩa vụ. S2.c nhóm D một phần, độ phủ CHƯA đo. S3 AI_PITFALLS. S4 workflow fuzz + fuzz_ingest viết xong, CHƯA chạy thử. S5 rc5: cổng đầy đủ CHƯA xanh liền mạch (preflight đỏ 3 lần: bộ nhớ ảo); không thẻ, không đẩy main.
 
+## GÓI 12 (2026-11-20/21) — XONG MỘT PHẦN (xem docs/RUN_REPORTS.md "GÓI 12")
+- [x] P0 nguồn gốc lần đẩy (`docs/REMOTE_STATE.md`; hai chỗ lệch ghi nhận; cây `main` khác cây đã qua cổng một dòng `license`).
+- [x] P1 cổng Linux rc7 GREEN (WSL2 cục bộ; `GATE_TREE` khớp; 1051/0/215).
+- [~] P2 fuzz WSL chạy thử XONG (2×5 phút/mục tiêu, băm khớp, đã nhập log, lệnh qua đêm ở HANDOFF); **TSan CHẶN: thiếu `clang` (việc của Giang)**.
+- [x] P3 FB-C36 (hằng `□`) phát hiện, test ĐỎ trước, sửa, rc8, cổng Windows rc8 GREEN (1071/0/217); static init cycle ghim; đột biến `const_cycles` (12; còn 2 sống: 1 tương đương, 1 chưa có test). [ ] 25 ca cũ không chạy lại.
+- [x] P4 gate chia `gt-driver` theo mục tiêu (dài nhất 581 s ⇒ không ngoại lệ).
+- [~] P5 đo: release/dev (sha256 chậm hơn, chưa giải thích), memcpy Vec = 0 byte (sortlines), enum 4 capstone; `perf` không có.
+- [~] P6 coverage chạy MỘT lần (5/6 crate; **gt-oblig hết 14 phút**); nhóm D: 1 nhánh thí nghiệm mới (`pat.rs:222` false); phần còn lại CHƯA LÀM (`docs/COVERAGE_GOI12.md`).
+- [ ] Cổng Linux trên rc8; cổng trên cây `Vecter-Core/main`; TSan.
+
 ## GÓI 11 (2026-11-20) — XONG MỘT PHẦN (xem docs/RUN_REPORTS.md "GÓI 11")
 - [x] S0 nền tái lập (ghim rustc, setup_cloud --check, pyfind, bench_profile, số test).
 - [x] S1: FB-C35 phát hiện (kiểm kê MIR), test ĐỎ → sửa → bộ sinh 160 → rc7 → cổng đầy đủ Windows rc7 GREEN. [~] S1.c/g đột biến chạy lại một phần.
