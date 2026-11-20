@@ -12,7 +12,7 @@ fails=0
 for i in $(seq 1 "$N"); do
   log="fuzz/logs/session_$i.log"
   echo "== phiên $i/$N, ${T}s: $(date -u +%FT%TZ)" | tee -a fuzz/logs/summary.log
-  cargo +nightly fuzz run check -- -max_total_time="$T" -max_len=2048 -timeout=30 -rss_limit_mb=4096 -print_final_stats=1 > "$log" 2>&1
+  cargo +${FUZZ_TOOLCHAIN:-nightly} fuzz run check -- -max_total_time="$T" -max_len=2048 -timeout=30 -rss_limit_mb=4096 -print_final_stats=1 > "$log" 2>&1
   code=$?
   runs=$(grep -o 'number_of_executed_units: [0-9]*' "$log" | tail -1)
   echo "   exit=$code $runs" | tee -a fuzz/logs/summary.log

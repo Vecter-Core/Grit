@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Fuzz TÍCH LUỸ qua đêm bằng MỘT lệnh (P3.a, 2026-11-17):   bash tools/fuzz_loop.sh <tổng_giờ>        (vd 8 ⇒ chạy tối đa 8 giờ)
 # - Windows: tự tìm thư mục chứa clang_rt.asan_dynamic-x86_64.dll của MSVC (vswhere) và đặt PATH.
-# - Dựng fuzz MỘT lần (`cargo +nightly fuzz build`), rồi chạy phiên 10 phút (đổi bằng FUZZ_SESSION_SEC) XEN KẼ lexer / parser bằng tools/fuzz_session.sh.
+# - Dựng fuzz MỘT lần (`cargo +${FUZZ_TOOLCHAIN:-nightly} fuzz build`), rồi chạy phiên 10 phút (đổi bằng FUZZ_SESSION_SEC) XEN KẼ lexer / parser bằng tools/fuzz_session.sh.
 # - MỖI vòng: preflight (thiếu RAM/ảo hoặc có cargo khác ⇒ ngủ 2 phút rồi thử lại, tối đa 30 lần/vòng), bọc track_guard (chỉ docs/FUZZ_LOG.jsonl được đổi).
 # - docs/FUZZ_LOG.jsonl ghi kèm BĂM NGUỒN (`src`) của crate; dừng khi CẢ HAI đạt 24 giờ TRÊN BĂM HIỆN TẠI hoặc hết <tổng_giờ>.
 # - Ctrl+C an toàn: dừng sau phiên đang chạy; chạy lại cùng lệnh để tiếp tục (tổng tích luỹ nằm trong FUZZ_LOG). In tổng mỗi vòng.
+# Linux/WSL (GÓI 12): `FUZZ_TOOLCHAIN=nightly-2026-10-04` chọn nightly ghim (mặc định `nightly`); không cần ASan DLL; preflight Linux + log nguồn `wsl-linux` (fuzz_session.sh).
 # Điều kiện #2 (GRIT_PLAN §7) chỉ được ghi "ĐẠT" khi `python tools/fuzz_total.py` báo ≥ 24 giờ MỖI loại trên băm hiện tại.
 set -u
 HOURS="${1:-8}"
@@ -44,8 +45,8 @@ fi
 STOP=0
 trap 'STOP=1; echo "fuzz_loop: nhận ngắt — dừng sau phiên đang chạy"' INT TERM
 echo "fuzz_loop: dựng fuzz một lần…"
-( cd crates/gt-lexer && cargo +nightly fuzz build lex ) >/dev/null 2>&1 || { echo "fuzz_loop: dựng lex THẤT BẠI"; exit 4; }
-( cd crates/gt-parser && cargo +nightly fuzz build parse ) >/dev/null 2>&1 || { echo "fuzz_loop: dựng parse THẤT BẠI"; exit 4; }
+( cd crates/gt-lexer && cargo +${FUZZ_TOOLCHAIN:-nightly} fuzz build lex ) >/dev/null 2>&1 || { echo "fuzz_loop: dựng lex THẤT BẠI"; exit 4; }
+( cd crates/gt-parser && cargo +${FUZZ_TOOLCHAIN:-nightly} fuzz build parse ) >/dev/null 2>&1 || { echo "fuzz_loop: dựng parse THẤT BẠI"; exit 4; }
 . "$(dirname "${BASH_SOURCE[0]}")/pyfind.sh"; [ -n "$PY" ] || exit 2
 START=$(date +%s); LIMIT=$($PY -c "print(int(float('$HOURS')*3600))")
 if [ "$MODE" = parallel ]; then
