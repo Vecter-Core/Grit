@@ -54,6 +54,7 @@ class SplitTestUnits(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.bin, True)
         with open(os.path.join(self.bin, "cargo"), "w", encoding="utf-8", newline="\n") as f:
             f.write(FAKE_CARGO.replace("@@META@@", META))
+        os.chmod(os.path.join(self.bin, "cargo"), 0o755)  # Linux: PATH chỉ chạy tệp có bit thực thi (nếu thiếu, gate gọi cargo THẬT)
 
     def run_gate(self, fail="-"):
         env = {k: v for k, v in os.environ.items() if k not in ("GATE_RESET", "GATE_BUDGET_SEC", "GATE_FORCE_PREFLIGHT", "GATE_TEST_CMD")}
