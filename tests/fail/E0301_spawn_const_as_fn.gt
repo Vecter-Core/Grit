@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: GÓI 13 B4 (nhóm D, call.rs:13 hướng false): đối số Path của tham số `{poly}`/`detach` là hằng, không phải hàm ⇒ E0301
+□ K: u32 ≔ 1u32;
+ƒ main() ! {mem} { h ≔ spawn(K, 1u32); }

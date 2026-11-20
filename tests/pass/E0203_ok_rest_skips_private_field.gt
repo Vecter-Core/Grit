@@ -1,0 +1,4 @@
+// expect: pass
+// note: GÓI 13 B4 — `..` bỏ qua trường riêng tư ở module khác (hành vi ĐO; chưa có quyết định kiến trúc về việc này)
+▦ m { ◈ ▢ S { ◈ a: u32, b: u32 } ◈ ƒ mk() → S ! ∅ { S { a: 1u32, b: 2u32 } } }
+ƒ main() → i32 ! ∅ { s ≔ m::mk(); ⌥ s { m::S { a: x, .. } ↦ 0 } }
