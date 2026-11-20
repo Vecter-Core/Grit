@@ -30,10 +30,11 @@ need_pkg build-essential "command -v cc && command -v make"
 need_pkg curl "command -v curl"
 need_pkg git "command -v git"
 need_pkg python3 "[ -n \"$PY\" ]"
-need_pkg libffi-dev "ls /usr/include/ffi.h /usr/include/*/ffi.h"
-need_pkg libzstd-dev "ls /usr/include/zstd.h"
-need_pkg zlib1g-dev "ls /usr/include/zlib.h"
-need_pkg libxml2-dev "ls /usr/include/libxml2/libxml/parser.h"
+have_file() { local f; for f in "$@"; do [ -e "$f" ] && return 0; done; return 1; }
+need_pkg libffi-dev "have_file /usr/include/ffi.h /usr/include/*/ffi.h"
+need_pkg libzstd-dev "have_file /usr/include/zstd.h"
+need_pkg zlib1g-dev "have_file /usr/include/zlib.h"
+need_pkg libxml2-dev "have_file /usr/include/libxml2/libxml/parser.h"
 find_llvm_dir() {
   for d in "${GRIT_LLVM_LIB_DIR:-}" /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib/llvm-20/lib "$HOME/.grit/llvm/lib"; do
     [ -n "$d" ] && [ -f "$d/libLLVM-20.so" ] && { echo "$d"; return 0; }
