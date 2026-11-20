@@ -295,6 +295,7 @@ fn instance_graph(
     bodies: &[&Body],
     by_node: &BTreeMap<NodeId, usize>,
     escaped: &BTreeSet<NodeId>,
+    contracts: &BTreeMap<NodeId, Vec<&Body>>,
 ) -> Option<NodeGraph> {
     use gt_types::Ty;
     if FORCE_CONSERVATIVE.load(std::sync::atomic::Ordering::SeqCst) {
@@ -339,7 +340,12 @@ fn instance_graph(
         let Some(&bi) = by_node.get(&node) else {
             continue;
         };
-        let body = bodies[bi];
+        // GÓI 11 FB-C35: kiểm tra hợp đồng `⊳`/`⊲` chạy lúc chạy (chèn sau M8) và gọi hàm người dùng trong thân hợp đồng; gộp cạnh gọi của thân hợp đồng
+        // vào nút của hàm sở hữu (mọi chu trình thật qua hợp đồng đều là chu trình trong đồ thị gộp).
+        let mut srcs: Vec<&Body> = vec![bodies[bi]];
+        if let Some(cs) = contracts.get(&node) {
+            srcs.extend(cs.iter().copied());
+        }
         let params = t.db.fn_params(node);
         let sub = |ty: &Ty| -> Ty {
             ty.subst(&|p| {
@@ -349,93 +355,95 @@ fn instance_graph(
                     .and_then(|i| args.get(i).cloned())
             })
         };
-        for bb in &body.blocks {
-            // hàm dùng như giá trị: chỉ PHÁT HIỆN instance (không có cạnh)
-            let mut ops: Vec<&gt_mir::Operand> = Vec::new();
-            for st in &bb.statements {
-                if let gt_mir::StatementKind::Assign(_, rv) = &st.kind {
-                    match rv {
-                        gt_mir::Rvalue::Use(o)
-                        | gt_mir::Rvalue::Cast(o, _)
-                        | gt_mir::Rvalue::Repeat(o, _) => {
-                            ops.push(o);
+        for body in srcs {
+            for bb in &body.blocks {
+                // hàm dùng như giá trị: chỉ PHÁT HIỆN instance (không có cạnh)
+                let mut ops: Vec<&gt_mir::Operand> = Vec::new();
+                for st in &bb.statements {
+                    if let gt_mir::StatementKind::Assign(_, rv) = &st.kind {
+                        match rv {
+                            gt_mir::Rvalue::Use(o)
+                            | gt_mir::Rvalue::Cast(o, _)
+                            | gt_mir::Rvalue::Repeat(o, _) => {
+                                ops.push(o);
+                            }
+                            gt_mir::Rvalue::Aggregate(_, v) => ops.extend(v.iter()),
+                            _ => {}
                         }
-                        gt_mir::Rvalue::Aggregate(_, v) => ops.extend(v.iter()),
-                        _ => {}
                     }
                 }
-            }
-            let Some(term) = bb.terminator.as_ref() else {
+                let Some(term) = bb.terminator.as_ref() else {
+                    for o in ops {
+                        discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;
+                    }
+                    continue;
+                };
+                let TerminatorKind::Call {
+                    callee,
+                    args: cargs,
+                    ..
+                } = &term.kind
+                else {
+                    for o in ops {
+                        discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;
+                    }
+                    continue;
+                };
+                ops.extend(cargs.iter());
                 for o in ops {
                     discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;
                 }
-                continue;
-            };
-            let TerminatorKind::Call {
-                callee,
-                args: cargs,
-                ..
-            } = &term.kind
-            else {
-                for o in ops {
-                    discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;
-                }
-                continue;
-            };
-            ops.extend(cargs.iter());
-            for o in ops {
-                discover(o, &sub, by_node, &mut |i| add(i, &mut idx, &mut list))?;
-            }
-            match callee {
-                Callee::Fn { node: n2, generics } => {
-                    if by_node.contains_key(n2) {
-                        let a2: Vec<Ty> = generics.iter().map(&sub).collect();
-                        let j = add((*n2, a2), &mut idx, &mut list)?;
-                        edges[k].push((j, false));
-                    } else {
-                        // GÓI 7 FB-C33: callee KHÔNG có thân (intrinsic như `spawn`, `Mutex::with`) có thể gọi hàm được truyền làm đối số
-                        // (`spawn(f, n)` chạy `f` ở luồng mới): cạnh GIÁN TIẾP tới mọi hàm `FnItem` trong đối số. Thiếu cạnh này, đệ quy qua spawn
-                        // không bị kiểm biến thể (không dừng được chấp nhận).
-                        for o in cargs {
-                            if let gt_mir::Operand::Const(gt_mir::Const::FnItem {
-                                node: fnode,
-                                generics: fg,
-                                ..
-                            }) = o
-                                && by_node.contains_key(fnode)
-                            {
-                                let a3: Vec<Ty> = fg.iter().map(&sub).collect();
-                                let j = add((*fnode, a3), &mut idx, &mut list)?;
+                match callee {
+                    Callee::Fn { node: n2, generics } => {
+                        if by_node.contains_key(n2) {
+                            let a2: Vec<Ty> = generics.iter().map(&sub).collect();
+                            let j = add((*n2, a2), &mut idx, &mut list)?;
+                            edges[k].push((j, false));
+                        } else {
+                            // GÓI 7 FB-C33: callee KHÔNG có thân (intrinsic như `spawn`, `Mutex::with`) có thể gọi hàm được truyền làm đối số
+                            // (`spawn(f, n)` chạy `f` ở luồng mới): cạnh GIÁN TIẾP tới mọi hàm `FnItem` trong đối số. Thiếu cạnh này, đệ quy qua spawn
+                            // không bị kiểm biến thể (không dừng được chấp nhận).
+                            for o in cargs {
+                                if let gt_mir::Operand::Const(gt_mir::Const::FnItem {
+                                    node: fnode,
+                                    generics: fg,
+                                    ..
+                                }) = o
+                                    && by_node.contains_key(fnode)
+                                {
+                                    let a3: Vec<Ty> = fg.iter().map(&sub).collect();
+                                    let j = add((*fnode, a3), &mut idx, &mut list)?;
+                                    edges[k].push((j, true));
+                                }
+                            }
+                            // GÓI 8 S1b (FB-C34): đối số KHÔNG phải hằng hàm (vd kết quả `id(f)` qua generic) ⇒ không biết callee chạy hàm nào:
+                            // lùi về đồ thị bảo thủ (cạnh gián tiếp tới mọi hàm bị thoát). Không bao giờ bỏ cạnh vì thiếu thông tin.
+                            if dyn_fn_arg(&body.locals, cargs) && takes_fn_param(t, *n2) {
+                                return None;
+                            }
+                        }
+                    }
+                    Callee::TraitMethod {
+                        trait_def,
+                        member,
+                        self_ty,
+                        generics,
+                    } => {
+                        let st = sub(self_ty);
+                        if st.has_param() || st.has_infer() {
+                            return None;
+                        }
+                        let ga: Vec<Ty> = generics.iter().map(&sub).collect();
+                        let (n2, a2) = t.db.resolve_trait_method(*trait_def, *member, &st, &ga)?;
+                        if by_node.contains_key(&n2) {
+                            let j = add((n2, a2), &mut idx, &mut list)?;
+                            if !DROP_TRAIT_EDGES.load(std::sync::atomic::Ordering::SeqCst) {
                                 edges[k].push((j, true));
                             }
                         }
-                        // GÓI 8 S1b (FB-C34): đối số KHÔNG phải hằng hàm (vd kết quả `id(f)` qua generic) ⇒ không biết callee chạy hàm nào:
-                        // lùi về đồ thị bảo thủ (cạnh gián tiếp tới mọi hàm bị thoát). Không bao giờ bỏ cạnh vì thiếu thông tin.
-                        if dyn_fn_arg(&body.locals, cargs) && takes_fn_param(t, *n2) {
-                            return None;
-                        }
                     }
+                    Callee::Value(_) => value_call[k] = true,
                 }
-                Callee::TraitMethod {
-                    trait_def,
-                    member,
-                    self_ty,
-                    generics,
-                } => {
-                    let st = sub(self_ty);
-                    if st.has_param() || st.has_infer() {
-                        return None;
-                    }
-                    let ga: Vec<Ty> = generics.iter().map(&sub).collect();
-                    let (n2, a2) = t.db.resolve_trait_method(*trait_def, *member, &st, &ga)?;
-                    if by_node.contains_key(&n2) {
-                        let j = add((n2, a2), &mut idx, &mut list)?;
-                        if !DROP_TRAIT_EDGES.load(std::sync::atomic::Ordering::SeqCst) {
-                            edges[k].push((j, true));
-                        }
-                    }
-                }
-                Callee::Value(_) => value_call[k] = true,
             }
         }
     }
@@ -584,6 +592,7 @@ fn conservative_graph(
     bodies: &[&Body],
     by_node: &BTreeMap<NodeId, usize>,
     escaped: &BTreeSet<NodeId>,
+    contracts: &BTreeMap<NodeId, Vec<&Body>>,
 ) -> NodeGraph {
     let trait_impl_members = |trait_def: gt_resolve::DefId| -> Vec<NodeId> {
         t.db.impls
@@ -599,42 +608,49 @@ fn conservative_graph(
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); bodies.len()];
     let mut indirect: Vec<Vec<usize>> = vec![Vec::new(); bodies.len()];
     for (i, b) in bodies.iter().enumerate() {
-        for bb in &b.blocks {
-            let Some(TerminatorKind::Call { callee, args, .. }) =
-                bb.terminator.as_ref().map(|t| &t.kind)
-            else {
-                continue;
-            };
-            match callee {
-                Callee::Fn { node, .. } => {
-                    if let Some(&j) = by_node.get(node) {
-                        adj[i].push(j);
-                    } else {
-                        // GÓI 7 FB-C33 + GÓI 8 S1b (FB-C34): callee không có thân nhận đối số không phải hằng hàm ⇒ gọi được mọi hàm bị thoát
-                        let dyn_arg = dyn_fn_arg(&b.locals, args);
-                        if dyn_arg && takes_fn_param(t, *node) {
-                            for n in escaped {
-                                if let Some(&j) = by_node.get(n) {
-                                    adj[i].push(j);
-                                    indirect[i].push(j);
+        // GÓI 11 FB-C35: thân hợp đồng của hàm này là một phần của nút (xem `instance_graph`)
+        let mut srcs: Vec<&Body> = vec![*b];
+        if let Some(cs) = contracts.get(&b.node) {
+            srcs.extend(cs.iter().copied());
+        }
+        for b in srcs {
+            for bb in &b.blocks {
+                let Some(TerminatorKind::Call { callee, args, .. }) =
+                    bb.terminator.as_ref().map(|t| &t.kind)
+                else {
+                    continue;
+                };
+                match callee {
+                    Callee::Fn { node, .. } => {
+                        if let Some(&j) = by_node.get(node) {
+                            adj[i].push(j);
+                        } else {
+                            // GÓI 7 FB-C33 + GÓI 8 S1b (FB-C34): callee không có thân nhận đối số không phải hằng hàm ⇒ gọi được mọi hàm bị thoát
+                            let dyn_arg = dyn_fn_arg(&b.locals, args);
+                            if dyn_arg && takes_fn_param(t, *node) {
+                                for n in escaped {
+                                    if let Some(&j) = by_node.get(n) {
+                                        adj[i].push(j);
+                                        indirect[i].push(j);
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                Callee::Value(_) => {
-                    for n in escaped {
-                        if let Some(&j) = by_node.get(n) {
-                            adj[i].push(j);
-                            indirect[i].push(j);
+                    Callee::Value(_) => {
+                        for n in escaped {
+                            if let Some(&j) = by_node.get(n) {
+                                adj[i].push(j);
+                                indirect[i].push(j);
+                            }
                         }
                     }
-                }
-                Callee::TraitMethod { trait_def, .. } => {
-                    for n in trait_impl_members(*trait_def) {
-                        if let Some(&j) = by_node.get(&n) {
-                            adj[i].push(j);
-                            indirect[i].push(j);
+                    Callee::TraitMethod { trait_def, .. } => {
+                        for n in trait_impl_members(*trait_def) {
+                            if let Some(&j) = by_node.get(&n) {
+                                adj[i].push(j);
+                                indirect[i].push(j);
+                            }
                         }
                     }
                 }
@@ -783,9 +799,15 @@ pub fn check_termination(
         s
     };
     // Đồ thị gọi theo INSTANCE (ADR-033 phụ lục); không dựng được ⇒ lùi về đồ thị theo nút bảo thủ (mọi `TraitMethod` nối tới mọi impl).
-    let graph = instance_graph(t, &bodies, &by_node, &escaped).unwrap_or_else(|| {
+    let mut contracts: BTreeMap<NodeId, Vec<&Body>> = BTreeMap::new();
+    for b in &m.bodies {
+        if matches!(b.kind, BodyKind::Pre | BodyKind::Post) {
+            contracts.entry(b.sig_node).or_default().push(b);
+        }
+    }
+    let graph = instance_graph(t, &bodies, &by_node, &escaped, &contracts).unwrap_or_else(|| {
         CONSERVATIVE_FALLBACKS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        conservative_graph(t, &bodies, &by_node, &escaped)
+        conservative_graph(t, &bodies, &by_node, &escaped, &contracts)
     });
     for (i, b) in bodies.iter().enumerate() {
         if !graph.recursive[i] {

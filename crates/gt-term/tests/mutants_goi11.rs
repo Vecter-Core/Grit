@@ -55,7 +55,11 @@ fn graph_limit_is_exact_to_the_node() {
     let run = || {
         let before = conservative_fallbacks();
         let o = check_termination(&t, &m, &info, &mut ZoneProver::new(24));
-        assert!(o.report.diagnostics.is_empty(), "{:?}", o.report.diagnostics);
+        assert!(
+            o.report.diagnostics.is_empty(),
+            "{:?}",
+            o.report.diagnostics
+        );
         conservative_fallbacks() - before
     };
     set_graph_limit_for_test(n);
@@ -71,15 +75,23 @@ fn graph_limit_is_exact_to_the_node() {
 #[test]
 fn recursion_through_each_edge_kind_is_rejected() {
     // cạnh trực tiếp qua instance generic (thân generic gọi lại chính nó)
-    rejected("ƒ g<T: Copy>(x: T, n: u32) → u32 ! ∅ { g(x, n) }\nƒ main() → u32 ! ∅ { g(1u32, 2u32) }\n");
+    rejected(
+        "ƒ g<T: Copy>(x: T, n: u32) → u32 ! ∅ { g(x, n) }\nƒ main() → u32 ! ∅ { g(1u32, 2u32) }\n",
+    );
     // hai instance khác nhau của cùng một hàm generic trong một vòng (g<u32> → g<u32> qua h)
-    rejected("ƒ h<T: Copy>(x: T, n: u32) → u32 ! ∅ { g(x, n) }\nƒ g<T: Copy>(x: T, n: u32) → u32 ! ∅ { h(x, n) }\nƒ main() → u32 ! ∅ { g(1u32, 2u32) }\n");
+    rejected(
+        "ƒ h<T: Copy>(x: T, n: u32) → u32 ! ∅ { g(x, n) }\nƒ g<T: Copy>(x: T, n: u32) → u32 ! ∅ { h(x, n) }\nƒ main() → u32 ! ∅ { g(1u32, 2u32) }\n",
+    );
     // phương thức trait (cạnh gián tiếp)
-    rejected("⊏ T { ƒ t(&self, n: u32) → u32 ! ∅; }\n▢ S { }\n⊐ T for S { ƒ t(&self, n: u32) → u32 ! ∅ { x ≔ S { }; x.t(n) } }\nƒ main() → u32 ! ∅ { x ≔ S { }; x.t(1u32) }\n");
+    rejected(
+        "⊏ T { ƒ t(&self, n: u32) → u32 ! ∅; }\n▢ S { }\n⊐ T for S { ƒ t(&self, n: u32) → u32 ! ∅ { x ≔ S { }; x.t(n) } }\nƒ main() → u32 ! ∅ { x ≔ S { }; x.t(1u32) }\n",
+    );
     // hàm dùng làm giá trị rồi gọi (cạnh gián tiếp tới hàm bị thoát)
     rejected("ƒ f(n: u32) → u32 ! ∅ { μg ≔ f; g(n) }\nƒ main() → u32 ! ∅ { f(1u32) }\n");
     // tham số hàm: hàm gọi tham số, main đưa chính nó
-    rejected("ƒ app(h: ƒ(u32) → u32 ! ∅, n: u32) → u32 ! ∅ { h(n) }\nƒ f(n: u32) → u32 ! ∅ { app(f, n) }\nƒ main() → u32 ! ∅ { f(1u32) }\n");
+    rejected(
+        "ƒ app(h: ƒ(u32) → u32 ! ∅, n: u32) → u32 ! ∅ { h(n) }\nƒ f(n: u32) → u32 ! ∅ { app(f, n) }\nƒ main() → u32 ! ∅ { f(1u32) }\n",
+    );
     // đệ quy qua `spawn` với worker là chính hàm gọi (đối số FnItem của callee không thân)
     rejected("ƒ f(n: u64) → () ! ∅ { spawn(f, n); }\nƒ main() → i32 ! ∅ { f(1u64); 0 }\n");
 }
@@ -88,7 +100,9 @@ fn recursion_through_each_edge_kind_is_rejected() {
 #[test]
 fn non_recursive_uses_of_each_edge_kind_stay_accepted() {
     accepted("ƒ g<T: Copy>(x: T) → T ! ∅ { x }\nƒ main() → u32 ! ∅ { g(1u32) }\n");
-    accepted("⊏ T { ƒ t(&self) → u32 ! ∅; }\n▢ S { }\n⊐ T for S { ƒ t(&self) → u32 ! ∅ { 1u32 } }\nƒ main() → u32 ! ∅ { x ≔ S { }; x.t() }\n");
+    accepted(
+        "⊏ T { ƒ t(&self) → u32 ! ∅; }\n▢ S { }\n⊐ T for S { ƒ t(&self) → u32 ! ∅ { 1u32 } }\nƒ main() → u32 ! ∅ { x ≔ S { }; x.t() }\n",
+    );
     accepted("ƒ f(n: u32) → u32 ! ∅ { n }\nƒ main() → u32 ! ∅ { μg ≔ f; g(1u32) }\n");
     accepted("ƒ w(n: u64) → () ! ∅ { }\nƒ main() → i32 ! ∅ { spawn(w, 1u64); 0 }\n");
 }

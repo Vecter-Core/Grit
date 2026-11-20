@@ -33,12 +33,16 @@ fn rejected(src: &str) {
 
 #[test]
 fn recursion_through_a_precondition_is_rejected() {
-    rejected("ƒ f(n: u32) → u32 ! ∅ ⊳ g(n) { n }\nƒ g(n: u32) → bool ! ∅ { f(n) > 0u32 }\nƒ main() → i32 ! ∅ { r ≔ f(1u32); 0 }\n");
+    rejected(
+        "ƒ f(n: u32) → u32 ! ∅ ⊳ g(n) { n }\nƒ g(n: u32) → bool ! ∅ { f(n) > 0u32 }\nƒ main() → i32 ! ∅ { r ≔ f(1u32); 0 }\n",
+    );
 }
 
 #[test]
 fn recursion_through_a_postcondition_is_rejected() {
-    rejected("ƒ f(n: u32) → u32 ! ∅ ⊲ g(result) { n }\nƒ g(n: u32) → bool ! ∅ { f(n) > 0u32 }\nƒ main() → i32 ! ∅ { r ≔ f(1u32); 0 }\n");
+    rejected(
+        "ƒ f(n: u32) → u32 ! ∅ ⊲ g(result) { n }\nƒ g(n: u32) → bool ! ∅ { f(n) > 0u32 }\nƒ main() → i32 ! ∅ { r ≔ f(1u32); 0 }\n",
+    );
 }
 
 #[test]
@@ -56,6 +60,8 @@ fn recursion_through_a_contract_in_a_longer_cycle_is_rejected() {
 /// Đối chứng: hợp đồng gọi hàm KHÔNG quay lại thì vẫn được chấp nhận (không đỏ oan).
 #[test]
 fn a_contract_calling_a_non_recursive_helper_stays_accepted() {
-    let c = codes("ƒ pos(n: u32) → bool ! ∅ { n > 0u32 }\nƒ f(n: u32) → u32 ! ∅ ⊳ pos(n) { n }\nƒ main() → i32 ! ∅ { r ≔ f(1u32); 0 }\n");
+    let c = codes(
+        "ƒ pos(n: u32) → bool ! ∅ { n > 0u32 }\nƒ f(n: u32) → u32 ! ∅ ⊳ pos(n) { n }\nƒ main() → i32 ! ∅ { r ≔ f(1u32); 0 }\n",
+    );
     assert!(c.is_empty(), "{c:?}");
 }
