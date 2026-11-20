@@ -42,3 +42,14 @@ Số mục đang chờ thật (1–4): **4** (mục 5–7 là chỗ giữ chỗ)
 | # | Thay đổi | Lý do | Nguồn | Trạng thái |
 |---|---|---|---|---|
 | 13 | Thông dịch: hỗ trợ khởi tạo `□`/`■` (đọc giá trị), HOẶC `check`/`run` báo "chưa hỗ trợ" rõ ràng (mã thoát 3) thay vì ICE (mã 2) | ĐO hai nền: MỌI chương trình đọc `□`/`■` (kể cả literal) ⇒ ICE mã 2 ở thông dịch | `docs/SEED_LIMITATIONS.md` GÓI 13 | CHỜ — gom lô rc9 |
+
+## D3 (GÓI 13) — thứ tự đề xuất của MỘT lô rc9 (CHƯA áp dụng; mọi mục dưới đây đổi mã sản phẩm ⇒ cần kích hoạt: lỗi âm tính giả HOẶC quyết định kiến trúc sư)
+Đã XONG, không còn trong lô: FB-C35 (rc7), FB-C36 (rc8).
+| Thứ tự | Mục | Đổi gì | Rủi ro (đề xuất) | Ghi chú |
+|---|---|---|---|---|
+| 1 | #11 match vét cạn ở dựng cạnh gt-term (2 chỗ `_ => {}`) | chỉ dạng mã, không đổi hành vi | **thấp** | chạy gate gt-term + đột biến lại; lợi: biến thể MIR mới buộc phải xem |
+| 2 | #13 thông dịch đọc `□`/`■` | hoặc hỗ trợ khởi tạo (`gt-interp`, trung bình), hoặc báo "chưa hỗ trợ" mã 3 thay ICE (thấp) | thấp (báo rõ) / trung bình (hỗ trợ) | đề xuất làm bản "báo rõ" trước; ĐO: ICE ở cả hai nền, kể cả literal |
+| 3 | #12 kiểm vòng khởi tạo static ở M4/M8 ⇒ `check` ĐỎ | thêm mã lỗi mới (đóng băng ⇒ cần ADR) + test ≥ 3 fail/3 pass | trung bình | `static_const_init_pin.rs` phải đổi theo (chủ ý) |
+| 4 | gt-term nhánh phòng thủ 567/584/687/699 | đổi `None => true` thành ICE tường minh (E9901) thay vì lặng lẽ | thấp–trung bình | biến false negative tiềm ẩn thành lỗi nếu bất biến bị phá; có thể làm cùng #11 |
+| 5 | #1, #2 (spawn/`detach`), #3, #4 (`declassify`, `secret_wipe`) | đổi hợp đồng TCB/ngữ nghĩa | **cao**, cần duyệt kiến trúc sư/Giang | KHÔNG gom vào rc9 trừ khi có quyết định |
+Ước lượng: mục 1+4 cùng gt-term (một cổng gt-term + toàn bộ); mục 2 gt-driver; mục 3 gt-types/gt-term/docs spec. Một nhãn rc9 + MỘT cổng đầy đủ hai nền (≈ 3 giờ).
