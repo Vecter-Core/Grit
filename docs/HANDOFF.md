@@ -43,7 +43,7 @@
 - G2.6/G2.7: kiểm kê docs đủ 11/11, doc-test sau cập nhật 207 khối/0 sai; `docs/G2_CLEAN_SESSION.md` chuẩn bị handoff, không sửa/author capstone. G2.1 còn cần xác nhận đúng phạm vi scan E04xx/A.1; mutation survivor có lập luận tương đương; G2.2 R11b đang chờ reviewer Claude khác họ.
 - G2.1.c: sáu bộ ở dev/release-o2 có mismatch 0; chi tiết mới ở `docs/G2_CODEGEN_DIFF_RESULTS.jsonl`, `docs/CODEGEN_DIFF_RESULTS.jsonl`, `docs/RELEASE_O2_DIFF_RESULTS.jsonl`. G2.1.d còn survivor mutation và E04xx/A.1 scan.
 
-**Cập nhật tại commit 745234d, ngày 2026-11-20.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
+**Cập nhật tại commit abdb4c9, ngày 2026-11-20.** (`bash tools/handoff_check.sh` in số commit đã qua kể từ commit này; > 5 thì CẬP NHẬT tệp này. Mỗi bước nhỏ: commit + sửa mục 5 "Việc tiếp theo" + dòng này.)
 
 **Vai trò thực thi (cập nhật 2026-11-19, GÓI 4):** người thực thi = Claude Sonnet 5.5; kiến trúc sư = Claude; Giang CHỈ dùng Claude (không GPT/Codex). Giang đã ủy quyền không chờ duyệt trong phạm vi gói. (Dòng gốc 2026-11-12 ghi Codex thực thi: giữ làm lịch sử.) Trên Windows, gọi Git Bash bằng `C:\Program Files\Git\bin\bash.exe`, không dùng shim `bash` trong WindowsApps.
 
