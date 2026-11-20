@@ -45,3 +45,7 @@ Việc ngắn nhất Giang làm được ngay: #4 (đọc), #8 (bấm dispatch),
 * **CHẶN bởi GitHub:** CI mọi job; `main`; fuzz trên CI Linux; cổng Linux qua đám mây (`CLOUD_GATE_PROMPT.md`).
 * **Cổng Linux cục bộ: XONG (WSL2, GREEN trên `16c37f0`, GATE_TREE khớp; không phải CI).** **Làm được CỤC BỘ (chưa làm xong):** fuzz (`tools/fuzz_*`); phiên Opus đọc mã (R11c) trong clone riêng; hai phiên capstone sạch; thử VS Code; điều kiện #6 (Giang đọc); giấy phép (GPL-3.0-only đã đặt ở kho mới `Vecter-Core/Grit`).
 * Bản sao ngoài máy: `D:\Grit_export` (Giang chép ra ngoài ổ). Đo Giai đoạn 2: CHƯA ĐO (preflight đỏ).
+
+## Cập nhật GÓI 11 (2026-11-20)
+* Nhãn `1.0.0-rc7`; cổng Windows rc7 GREEN; cổng Linux rc7 CHƯA (rc6 đã GREEN ở WSL2). Fuzz 24 giờ (#1) vẫn là việc chặn lớn nhất: CHƯA bắt đầu trong WSL (S3 chưa làm); lệnh qua đêm CHƯA soạn.
+* Việc cho Giang: (1) chép `D:\Grit_export` ra ngoài máy; (2) quyết định giao GÓI 12 làm S3 (fuzz WSL + TSan), S4 (nhóm D + coverage), S2.a/b/e và chạy lại cổng Linux trên rc7.

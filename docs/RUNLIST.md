@@ -94,6 +94,13 @@ S0 xong (main `17beed4`, sau khi Giang tự hợp nhất hai PR trên GitHub). S
 ## GÓI 7 (2026-11-19) — XONG trừ phần CHẶN/CHƯA (xem docs/RUN_REPORTS.md)
 S0 xong (kho CÔNG KHAI, quét bí mật: không thấy bí mật thật; SECURITY.md). S1 **CHẶN** (Actions vẫn khoá). S2.a FB-C32 sửa (+ FB-C33 do phiên kiểm toán tìm, sửa). S2.b thí nghiệm biên 32 768 khối và ngân sách theo loại nghĩa vụ. S2.c nhóm D một phần, độ phủ CHƯA đo. S3 AI_PITFALLS. S4 workflow fuzz + fuzz_ingest viết xong, CHƯA chạy thử. S5 rc5: cổng đầy đủ CHƯA xanh liền mạch (preflight đỏ 3 lần: bộ nhớ ảo); không thẻ, không đẩy main.
 
+## GÓI 11 (2026-11-20) — XONG MỘT PHẦN (xem docs/RUN_REPORTS.md "GÓI 11")
+- [x] S0 nền tái lập (ghim rustc, setup_cloud --check, pyfind, bench_profile, số test).
+- [x] S1: FB-C35 phát hiện (kiểm kê MIR), test ĐỎ → sửa → bộ sinh 160 → rc7 → cổng đầy đủ Windows rc7 GREEN. [~] S1.c/g đột biến chạy lại một phần.
+- [~] S2: cỡ enum, bench_profile; S2.a/b/e/f CHƯA.
+- [ ] **S3 (fuzz WSL, TSan) CHƯA LÀM — đang dở: chưa bắt đầu.** [ ] **S4 (nhóm D, coverage) CHƯA LÀM.** Giao GÓI 12.
+- [ ] Cổng Linux trên rc7 CHƯA.
+
 ## GÓI 10 (2026-11-20) — bản sao ngoài máy; cổng Linux WSL BỎ QUA; đo Giai đoạn 2 CHƯA ĐO (preflight đỏ); quyết định kiến trúc sư (chỉ tài liệu/công cụ/test)
 - [x] S0 `tools/make_export.sh`; bản sao `D:\Grit_export` (bundle 3 977 668 B, tar cây `seed-1.0-rc6` 11 141 120 B, SHA256SUMS, RESTORE.md, REFS.txt); kiểm khôi phục thật XONG; `docs/GITHUB_SUSPENSION.md`; mục KHẨN 0 ở PENDING_GIANG.
 - [x] S1.a `tools/gate_clean.sh` + `tools/test_gate_clean.py` (3 test OK, thêm vào cổng); quy tắc ở AGENTS.md/HANDOFF. [ ] S1.b–e BỎ QUA: `wsl -l -v` không có bản Ubuntu (chỉ `docker-desktop`, `OpenClawGateway` không phải của agent); bước cho Giang ở PENDING_GIANG. Cổng Linux CHƯA.

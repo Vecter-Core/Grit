@@ -14,3 +14,10 @@ Mã sản phẩm (`crates/`, `runtime/`, `lib/`) ĐÓNG BĂNG sau cổng xanh rc
 | 7 | Kết quả R11c (Opus đọc mã) | — | sau này | CHƯA CÓ |
 
 Số mục đang chờ thật (1–4): **4** (mục 5–7 là chỗ giữ chỗ).
+
+## Bổ sung GÓI 11 (2026-11-20)
+| # | Thay đổi | Lý do | Nguồn | Trạng thái |
+|---|---|---|---|---|
+| 8 | Vòng khởi tạo static qua lời gọi hàm (`■ X ≔ f()`, `f` đọc `X`) hiện `gritc check` XANH nhưng backend LLVM từ chối và thông dịch báo lỗi nội bộ: thêm kiểm đồ thị khởi tạo static ở M4/M8 để ĐỎ ngay ở `check` | nhất quán D12/fail-closed ở giai đoạn kiểm, không chờ backend | `docs/CONTROL_TRANSFER_INVENTORY.md` hàng 13 | CHỜ (không phải âm tính giả chạy được: backend từ chối) |
+| 9 | 25 đột biến gt-term còn sống: thêm test giết (đặc biệt nhánh `None => true` ở `dyn_fn_arg`, `takes_fn_param`, `has_back_edge` 0 lần trong 974 đầu vào) | `docs/MUT_GT_TERM_GOI10.md` | GÓI 11 S1 | CHỜ (chỉ test) |
+| (đã làm) | FB-C35 sửa trong GÓI 11 (commit `7c6334c`, rc7 `41ae5e7`) — KHÔNG còn chờ | — | FIELD_BUGS | XONG |

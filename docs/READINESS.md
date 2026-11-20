@@ -104,3 +104,6 @@ Nhãn `1.0.0-rc6`. KHÔNG đổi trạng thái TCB, không đánh dấu #6, A2 v
 
 ## Cập nhật GÓI 10 (2026-11-20)
 Không đổi trạng thái điều kiện nào (KHÔNG đánh dấu #6; A2 KHÔNG đổi thành đạt). Bằng chứng mới: bản sao ngoài máy kiểm khôi phục thật (`git fsck --full` rc=0; thẻ `seed-1.0-rc6` = `16c37f0`); `Cap` là affine (ĐO bằng `gritc 1.0.0-rc6`). **Cổng Linux cục bộ (WSL2, KHÔNG phải CI): GREEN trên `16c37f0`**, `GATE_TREE=b828b981…` khớp Windows, 1042/0/213 (`docs/CLOUD_GATE_RESULT.md`). Cổng Windows rc6 GREEN (GÓI 8). CI GitHub vẫn CHƯA. Cổng nhẹ trong clone: xem `docs/RUN_REPORTS.md` mục GÓI 10.
+
+## Cập nhật GÓI 11 (2026-11-20)
+Nhãn `1.0.0-rc7` (FB-C35). **Cổng đầy đủ WINDOWS rc7: GREEN** (`GATE_TREE=c0d7b267…`, 1054 đạt / 0 lỗi / 215 bộ, 35 m 38 s liền mạch cuối; clone `D:\Grit_g11`; hai lần đỏ do lỗi tự gây ra đã sửa: clippy `collapsible_if` và snapshot borrowck). Cổng LINUX trên rc7: CHƯA (cổng Linux GREEN chỉ trên rc6 `16c37f0`). KHÔNG đánh dấu #6; A2 KHÔNG đổi thành đạt. Fuzz 24 giờ, TSan WSL, nhóm D/coverage: CHƯA LÀM trong GÓI 11.
