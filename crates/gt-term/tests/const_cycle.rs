@@ -72,6 +72,56 @@ fn a_const_calling_a_function_that_reads_another_const_stays_accepted() {
     assert!(c.is_empty(), "{c:?}");
 }
 
+/// Đột biến GÓI 12 (`mut.py`, 5 ca sống sót ở `const_cycles`) ⇒ test giết: hằng là toán hạng PHẢI của phép toán, là ĐỐI SỐ của lời gọi, và vòng qua phương
+/// thức trait (cạnh `TraitMethod` nối tới mọi impl).
+#[test]
+fn a_const_as_the_right_operand_of_an_operator_is_rejected() {
+    rejected(
+        "□ C: u32 ≔ 1u32 + C;
+ƒ main() → i32 ! ∅ { r ≔ C; 0 }
+",
+    );
+}
+
+#[test]
+fn a_const_passed_as_a_call_argument_is_rejected() {
+    rejected(
+        "ƒ id(x: u32) → u32 ! ∅ { x }
+□ C: u32 ≔ id(C);
+ƒ main() → i32 ! ∅ { r ≔ C; 0 }
+",
+    );
+}
+
+#[test]
+fn a_const_cycle_through_a_trait_method_is_rejected() {
+    rejected(
+        "⊏ T { ƒ v(&self) → u32 ! ∅; }
+▢ S { a: u32 }
+⊐ T for S { ƒ v(&self) → u32 ! ∅ { C } }
+ƒ h<X: T>(x: &X) → u32 ! ∅ { x.v() }
+ƒ g() → u32 ! ∅ { s ≔ S { a: 1u32 }; h(&s) }
+□ C: u32 ≔ g();
+ƒ main() → i32 ! ∅ { r ≔ C; 0 }
+",
+    );
+}
+
+#[test]
+fn a_trait_method_that_does_not_read_the_const_stays_accepted() {
+    let c = codes(
+        "⊏ T { ƒ v(&self) → u32 ! ∅; }
+▢ S { a: u32 }
+⊐ T for S { ƒ v(&self) → u32 ! ∅ { self.a } }
+ƒ h<X: T>(x: &X) → u32 ! ∅ { x.v() }
+ƒ g() → u32 ! ∅ { s ≔ S { a: 1u32 }; h(&s) }
+□ C: u32 ≔ g();
+ƒ main() → i32 ! ∅ { r ≔ C; 0 }
+",
+    );
+    assert!(c.is_empty(), "{c:?}");
+}
+
 const TYPES: [&str; 4] = ["u32", "i32", "u64", "i64"];
 
 fn lit(ty: &str) -> String {
