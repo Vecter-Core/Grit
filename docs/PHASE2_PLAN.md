@@ -147,3 +147,11 @@ Chung cho MỌI mục: test ĐỎ trước khi sửa; ADR viết TRƯỚC mã; d
 A5 (N6) cần: Drop đã hạ + oracle M6 mở rộng.   A2/A3 cần ADR SMT trước.
 ```
 KHÔNG hứa mốc ngày.
+
+## Cập nhật theo số đo GÓI 12 (2026-11-20; số liệu: `docs/PHASE2_MEASUREMENTS.md` mục GÓI 12 P5)
+| Hạng mục | Quyết định | Căn cứ (nền tảng, ĐO/SUY RA) |
+|---|---|---|
+| D4 Arena đặt trước địa chỉ ảo | **HẠ ƯU TIÊN** (không còn động cơ memcpy cho sortlines) | ĐO (Windows, bản sao đếm): sortlines có 3 lần cấp khối mới và **0 byte** `memcpy` do tăng dung lượng (đặt trước bằng `reserve`). Ứng dụng `push` dần CHƯA ĐO ⇒ chưa loại hẳn; điều kiện cũ (Vec giữ `&!Arena` độc quyền) vẫn chưa đạt: giữ **CHƯA ĐỦ ĐIỀU KIỆN** |
+| D2 tag nhỏ (niche) | **HẠ ƯU TIÊN, giữ trong kế hoạch** | ĐO tĩnh: enum k=0 có mặt ở mọi công cụ/capstone (2–85 kiểu) nhưng lợi tối đa 7 byte/giá trị; enum có payload căn lề 8 không lợi. Số giá trị lúc chạy CHƯA ĐO ⇒ CHƯA ĐỦ SỐ ĐO để nâng ưu tiên |
+| D3 khởi tạo tại chỗ | **CHƯA ĐỦ ĐIỀU KIỆN** | chưa có số đo chi phí sao chép giá trị lớn qua sret; oracle abort giữa chừng suy ra từ D3 abort dừng ngay (đọc mã) |
+| Hồ sơ `release` (nền tảng cho mọi so sánh trước/sau) | **Lưu ý** | ĐO (Windows và WSL): `release` KHÔNG nhanh hơn `dev` (sha256 chậm hơn ×0,69–0,86); chỉ `release-o2` nhanh (≈3,5–3,9×). Mọi đo "trước/sau" của D2/D3 PHẢI so ở `release-o2`, không ở `release`. Nguyên nhân `release` chậm: chưa giải thích |

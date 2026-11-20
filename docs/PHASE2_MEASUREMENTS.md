@@ -35,3 +35,21 @@ wordfreq   0,42 / 0,42 s         7,504 s (7,468–7,757)        6,203 s (6,016�
 ```
   Quan sát (ĐO, một lượt, KHÔNG kết luận nguyên nhân): `stats` và `sha256` ở hồ sơ `release` CHẬM hơn `dev` (x0,17 và x0,65). Lần đo trước trong cùng ngày (`bench_profile` đứt ở sortlines) cho fib(35) dev 1,097 s (so với 0,110 s ở đây): nhiễu máy rất lớn giữa hai lượt (~10 lần ở fib), nên các số này KHÔNG dùng để ra quyết định hiệu năng; cần đo lại hai lượt khi máy rảnh. Thêm `wordfreq` (đầu vào như `wc`).
 - **Chưa làm (CHƯA ĐO):** S2.a (`memcpy` của `Vec::push`: cần bản gt-rt có bộ đếm), S2.b (profile sortlines: chưa kiểm `perf` trong WSL), S2.e (commit charge Arena), S2.f (chưa sửa `PHASE2_PLAN.md` ngoài dòng D4 đã CHƯA ĐỦ ĐIỀU KIỆN ở GÓI 10).
+
+## GÓI 12 P5 — đo còn nợ (2026-11-20; mỗi số ghi nền tảng và ĐO/SUY RA)
+**P5.a — `release` chậm hơn `dev`? (ĐO, gritc rc8 dev, đảo thứ tự hồ sơ mỗi lượt, đầu ra băm GIỐNG nhau mọi ca)**
+| nền | bench | dev (min / trung vị) | release (min / trung vị) | release-o2 |
+|---|---|---|---|---|
+| Windows, lượt 1 (bench_profile 11 lượt) | sha256 33 MiB | 1,694 / 1,888 s | 2,427 / 2,675 s | — |
+| Windows, đo lại 9 lượt (exe cũ) | sha256 | 1,566 / 1,676 s | 2,281 / 2,571 s | 0,428 / 0,506 s (7 lượt) |
+| WSL Ubuntu 24.04, 9 lượt | sha256 | 1,421 / 1,500 s | 1,654 / 1,739 s | 0,389 / 0,418 s |
+| Windows lượt 1 | stats 6,9 MB | 0,167 / 0,186 s | **1,162 / 1,180 s** | — |
+| Windows, đo lại 9 lượt (cùng exe) | stats | 0,175 / 0,192 s | 0,182 / 0,196 s | 0,067 / 0,074 s |
+| WSL, 9 lượt | stats | 0,097 / 0,104 s | 0,108 / 0,121 s | 0,038 / 0,042 s |
+- **sha256: `release` CHẬM hơn `dev` (×0,69–0,86), lặp lại ở 3 phép đo độc lập trên 2 nền ⇒ hiệu ứng THẬT.** Nguyên nhân: CHƯA GIẢI THÍCH. IR phát (`GRITC_DUMP_IR`, trước tối ưu) của stats ở hai hồ sơ chỉ khác khai báo `gritrt_dev_checks` (cùng 10 hàm, cùng số lời gọi): nên khác biệt nằm ở đường tối ưu của `release` (danh sách trắng pass, KHÔNG inline: `lower.rs` `RELEASE_PASSES`, ADR-036 §6) và/hoặc mã máy, chưa soi. Giả thuyết (CHƯA KIỂM): bỏ inline + mem2reg trên mã dev vốn đã dùng alloca nhiều. `release-o2` nhanh gấp ≈3,5–3,9 lần `dev` ở sha256.
+- **stats `release` = 1,18 s ở lượt đầu KHÔNG tái hiện** (cùng exe chạy lại: 0,18 s). Giả thuyết CHƯA KIỂM: quét exe mới của Windows Defender ngay sau khi dựng (bench chạy exe vừa dựng). ⇒ Số ×0,17 và ×0,65 của GÓI 11: ×0,17 là nhiễu/Defender (KHÔNG dùng), ×0,65 là hiệu ứng thật của sha256. `release` không nhanh hơn `dev` ở fib/stats (≈ bằng nhau). Vẫn: bench_profile.py KHÔNG phải cơ sở quyết định (nhiễu); số trên chỉ để biết hướng.
+- Không khởi động lại máy giữa các lượt (không làm được từ phiên này): CHƯA LÀM.
+
+**P5.b — `memcpy` do `Vec` tăng dung lượng khi chạy sortlines (ĐO bằng bộ đếm trong BẢN SAO ngoài kho `D:/Grit_cnt`, Windows, dev, 200 000 dòng = 2 800 000 byte đầu vào):** **3 lần cấp khối mới, tổng 9 200 000 byte khối mới, byte `memcpy` = 0** (cả 3 lần tăng từ `len = 0`: sortlines đặt trước dung lượng bằng `reserve`). ⇒ Với sortlines, sao chép do tăng dung lượng KHÔNG tồn tại để tiết kiệm. Chỉ đo MỘT chương trình; ứng dụng khác (json, wordfreq, kvstore dùng `push` dần) CHƯA ĐO. Bộ đếm nằm trong bản sao (thêm `gritrt_dbg_count` ở `gt-rt`, bảng `RUNTIME` của Guard và `lower.rs`); kho KHÔNG đổi.
+
+**P5.c — cỡ enum 4 capstone (ĐO tĩnh, Windows, `GRITC_DUMP_IR`, dev; đếm KIỂU `{ i64, [k x i64] }` trong IR, không phải số giá trị lúc chạy):** calc {k=0: 2, k=1: 67}; csvstat {0: 48, 1: 96}; grep_lite {0: 2, 1: 29}; kvstore {0: 85, 1: 96, 2: 14, 4: 36, 6: 14}. Cùng kết luận GÓI 11: chỉ k=0 co được bằng tag `u8` (tối đa 7 byte/giá trị); số GIÁ TRỊ lúc chạy CHƯA ĐO. Profile sortlines bằng `perf`: KHÔNG có `perf` trong WSL (`which perf` ⇒ không); thời gian từng đoạn: CHƯA LÀM.
