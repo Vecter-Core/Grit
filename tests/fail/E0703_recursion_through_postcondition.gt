@@ -1,0 +1,5 @@
+// expect: fail E0703
+// note: FB-C35 — đệ quy qua hậu điều kiện: f ⊲ g(result), g gọi lại f
+ƒ f(n: u32) → u32 ! ∅ ⊲ g(result) { n }
+ƒ g(n: u32) → bool ! ∅ { f(n) > 0u32 }
+ƒ main() → i32 ! ∅ { r ≔ f(1u32); 0 }
