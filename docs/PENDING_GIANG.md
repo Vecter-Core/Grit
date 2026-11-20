@@ -1,5 +1,13 @@
 # PENDING_GIANG — việc CHỜ GIANG (lập 2026-11-17; agent KHÔNG tự đánh dấu thay Giang)
 
+## GÓI 12 (2026-11-20) — việc CHỜ GIANG (mới nhất; agent KHÔNG tự đánh dấu thay Giang)
+1. **Đọc `docs/REMOTE_STATE.md`** (nguồn gốc lần đẩy lên `Vecter-Core/Grit`, kho CÔNG KHAI, hai chỗ lệch quy trình: đẩy khi lệnh GÓI 10 cấm và `main` lên khi cổng Linux chưa chạy; cây `main` khác cây đã qua cổng đúng một dòng `license`). Quyết định: có giữ kho công khai không? Có chạy cổng trên cây Vecter-Core không?
+2. **Fuzz qua đêm trong WSL (điều kiện #1; việc chặn Seed lớn nhất)** — lệnh ở `docs/HANDOFF.md` mục "Fuzz qua đêm (WSL)". Tắt chế độ ngủ Windows trước (Cài đặt ▸ Nguồn ▸ Ngủ = Không bao giờ khi cắm điện). Tuỳ chọn `%UserProfile%\.wslconfig`: `[wsl2]` `memory=10GB` `swap=8GB` (agent KHÔNG sửa tệp này).
+3. **TSan trong WSL chưa chạy được: thiếu `clang`.** Giang chạy: `wsl -d Ubuntu-24.04 -- apt install -y clang` (trong WSL bạn là root; agent không tự cài theo lệnh GÓI 12). Rồi báo phiên Claude chạy lại `tools/tsan_check.sh`.
+4. **Tệp tạm do agent để lại ngoài kho (agent không xoá được theo luật):** `D:\p1_g12.sh` (script tạm ở gốc ổ D); trong `D:\Grit_export\`: `p1_g12.sh`, `p1_wsl.out`, `fz_g12.sh`, `gw_g12.sh`, `fuzz_clone_log.jsonl`, `g12_win_gate*.log`; thư mục `D:\Grit_cnt` (bản sao đếm byte memcpy), `D:\Grit_g12w`, `D:\Grit_g12w2` (clone cổng). Xoá khi không cần. Trong WSL: `~/grit_g12`, `~/grit_fuzz`, `~/p1.sh`, `~/fz.sh`.
+5. **Chép `D:\Grit_export` (bundle mới nhất) ra ngoài máy** (việc cũ, vẫn mở).
+6. Quyết định ADR cho mã lỗi mới "vòng khởi tạo static" (`NEXT_PRODUCT_BATCH` #12) và duyệt đổi `_ =>` sang match vét cạn (#11).
+
 ## KHẨN 0 (GÓI 10): SAO LƯU NGOÀI MÁY — làm trước
 1. **Chép `D:\Grit_export` ra ngoài máy** (USB, kho lưu trữ đám mây, hoặc email cho chính mình; cỡ ≈ 15 MB: bundle ≈ 3,9 MB, tar ≈ 10,9 MB). Đã kiểm khôi phục thật (clone bundle, `git fsck --full` rc=0, thẻ `seed-1.0-rc6` = `16c37f0`). Mọi bản sao hiện nay (C: và D:) có thể cùng một ổ.
 2. Đọc thông báo đình chỉ GitHub (xem `docs/GITHUB_SUSPENSION.md`).

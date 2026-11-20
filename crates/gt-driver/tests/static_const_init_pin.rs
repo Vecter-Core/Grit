@@ -4,6 +4,7 @@
 //!    thông dịch báo "lỗi nội bộ" (ICE, mã 2) — với chương trình người dùng đây là ICE chứ không phải chẩn đoán;
 //!  - `■`/`□` KHÔNG vòng, initializer gọi hàm: LLVM chạy đúng; thông dịch cũng ICE ("hằng ngoài phạm vi thông dịch") — hạn chế của backend interpreter;
 //!  - vòng `□` (FB-C36): `check` ĐỎ E0703 (mã thoát 1), không có exe.
+//!
 //! Khi sửa theo NEXT_PRODUCT_BATCH #12 (check đỏ cho vòng `■`), test `static_cycles_*` PHẢI đổi — đó là chủ ý của việc ghim.
 use std::process::Command;
 

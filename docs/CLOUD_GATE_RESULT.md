@@ -18,3 +18,11 @@ Môi trường: WSL 2.7.14.0, Ubuntu 24.04.5 LTS, nhân 6.18.33.2-microsoft-stan
 2. `gt-driver::std_lib::std_ord_int_file_matches_generator` ĐỎ: test gọi `python`, Ubuntu chỉ có `python3` ⇒ cài `python-is-python3`; sau đó 183/183.
 3. `cargo build` ban đầu lỗi liên kết `-lffi`: cần `libffi-dev` (cùng `libzstd-dev zlib1g-dev libxml2-dev`).
 **Lỗ hổng của `tools/setup_cloud.sh` (CHƯA sửa):** không cài `libffi-dev`, `python-is-python3`, `rustfmt`/`clippy`, `cargo-audit`, và không ghim rustc 1.98.1. Ghi vào việc kế.
+
+## Cổng Linux rc7 (GÓI 12 P1, 2026-11-20; WSL2 cục bộ, KHÔNG phải CI)
+- **GATE_RESULT=GREEN** trên commit `4ef044e893fb6a365a914dffc11426246788e90c` (= commit cổng Windows rc7). **`GATE_TREE=c0d7b2679410dbe6b2e0ba29045f6139d4166bd410defed075d9cb362c489380` KHỚP cổng Windows rc7** (cùng cây).
+- Số liệu: `TEST_PASSED=1051 FAILED=0 SUITES=215` (Windows rc7: 1054/0/215). DOC_TEST 220/0, ADVERSARIAL 3/0, FAIL_OPEN 479 mục/0 mới, NUL_OK 2127, DELETIONS_OK 193, TRACK_OK, clippy `-D warnings` và `cargo audit` đạt, fmt OK. gt-term 51, gt-driver 183 (Windows 186), rig 48.
+- Môi trường: Ubuntu 24.04.5 LTS, nhân 6.18.33.2-microsoft-standard-WSL2, rustc 1.98.1 (ghim; không còn lỗi clippy 1.100), clippy 0.1.98, `cargo-audit` 0.23.0; `setup_cloud.sh --check` ⇒ `SETUP_CHECK=OK`. RAM WSL ≈7,7 GB. Clone `~/grit_g12` (trong hệ tệp Linux, không chạy trong `/mnt/d`), `core.autocrlf=false`.
+- Thời gian: ≈ 64 phút từ lúc chạy (14:25 → 15:29 giờ WSL), 4 lô (lô đầu + 3 lô tiếp, ngân sách 840 s mỗi lệnh, dừng ở ranh giới đơn vị); đơn vị `gt-driver` chạy MỘT cục (cổng rc7 chưa có bản chia; thời gian riêng của nó trên Linux: không ghi được từ nhật ký, CHƯA ĐO).
+- **Chênh lệch số test (đã giải thích, tên cụ thể):** 1054 − 1051 = 3 = đúng 3 test `#[cfg(windows)]` của `gt-driver` (183 so với 186): `fs_read_io_error::a_locked_file_aborts_io_error`, `llvm::built_exe_does_not_depend_on_llvm_dll`, `llvm::check_runs_without_llvm_on_path` (`tools/platform_tests.py --list`, `docs/PLATFORM_TESTS.md`).
+- **Phạm vi:** cổng này chứng minh rc7 `4ef044e` XANH trên Linux. Nó KHÔNG chứng minh `Vecter-Core/main` (`e8a8ae5`): cây đó khác đúng một dòng `license` ở `runtime/gt-rt/Cargo.toml` (xem `REMOTE_STATE.md` mục 6) và chưa chạy cổng. Không phải rc8 (rc8: cổng Windows riêng, xem READINESS).
