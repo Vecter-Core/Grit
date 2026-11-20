@@ -702,6 +702,136 @@ fn has_back_edge(b: &Body, head: gt_mir::BasicBlock) -> bool {
     false
 }
 
+/// GÓI 12 FB-C36: backend LLVM hạ MỖI lần dùng `□ C` thành MỘT LỜI GỌI hàm tính `C` (`Const::Item` ⇒ `build_call`), nên một chu trình đi qua thân `Const`
+/// (`□ C ≔ C`; `□ A ≔ B; □ B ≔ A`; `□ C ≔ f()` với `f` đọc `C`, kể cả qua `⊳`/`⊲`) là đệ quy vô hạn mà không có biến thể nào giảm được. Thân `Const` không
+/// nằm trong đồ thị hàm ⇒ trước đây bị bỏ sót. Đồ thị này BẢO THỦ (như `conservative_graph`: `TraitMethod` nối tới mọi impl, giá trị hàm tới mọi hàm bị thoát)
+/// và thêm cạnh `Const::Item`. Trả các thân `Const` nằm trong chu trình. Static KHÔNG xét ở đây (đọc static không phải lời gọi; xem NEXT_PRODUCT_BATCH #8).
+fn const_cycles<'a>(
+    t: &TypesOutput,
+    m: &'a MirOutput,
+    fn_bodies: &[&'a Body],
+    escaped: &BTreeSet<NodeId>,
+    contracts: &BTreeMap<NodeId, Vec<&'a Body>>,
+) -> Vec<&'a Body> {
+    let consts: Vec<&Body> = m
+        .bodies
+        .iter()
+        .filter(|b| b.kind == BodyKind::Const)
+        .collect();
+    if consts.is_empty() {
+        return Vec::new();
+    }
+    let all: Vec<&Body> = fn_bodies
+        .iter()
+        .copied()
+        .chain(consts.iter().copied())
+        .collect();
+    let idx: BTreeMap<NodeId, usize> = all.iter().enumerate().map(|(i, b)| (b.node, i)).collect();
+    let trait_impl_members = |trait_def: gt_resolve::DefId| -> Vec<NodeId> {
+        t.db.impls
+            .iter()
+            .filter(|i| {
+                i.trait_ref
+                    .as_ref()
+                    .is_some_and(|tr| tr.trait_def == trait_def)
+            })
+            .flat_map(|i| i.members.iter().map(|mm| mm.node))
+            .collect()
+    };
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); all.len()];
+    for (i, b) in all.iter().enumerate() {
+        let mut srcs: Vec<&Body> = vec![*b];
+        if let Some(cs) = contracts.get(&b.node) {
+            srcs.extend(cs.iter().copied());
+        }
+        for src in srcs {
+            for bb in &src.blocks {
+                let mut ops: Vec<&gt_mir::Operand> = Vec::new();
+                for st in &bb.statements {
+                    if let gt_mir::StatementKind::Assign(_, rv) = &st.kind {
+                        match rv {
+                            gt_mir::Rvalue::Use(o)
+                            | gt_mir::Rvalue::Repeat(o, _)
+                            | gt_mir::Rvalue::Cast(o, _)
+                            | gt_mir::Rvalue::CastFits(o, _)
+                            | gt_mir::Rvalue::UnaryOp(_, o) => ops.push(o),
+                            gt_mir::Rvalue::BinaryOp(_, a, c)
+                            | gt_mir::Rvalue::CheckedBinaryOp(_, a, c) => {
+                                ops.push(a);
+                                ops.push(c);
+                            }
+                            gt_mir::Rvalue::Aggregate(_, v) => ops.extend(v.iter()),
+                            gt_mir::Rvalue::Ref(..)
+                            | gt_mir::Rvalue::Len(_)
+                            | gt_mir::Rvalue::Discriminant(_) => {}
+                        }
+                    }
+                }
+                if let Some(term) = bb.terminator.as_ref() {
+                    match &term.kind {
+                        TerminatorKind::Call { callee, args, .. } => {
+                            ops.extend(args.iter());
+                            match callee {
+                                Callee::Fn { node, .. } => {
+                                    if let Some(&j) = idx.get(node) {
+                                        adj[i].push(j);
+                                    } else if dyn_fn_arg(&src.locals, args)
+                                        && takes_fn_param(t, *node)
+                                    {
+                                        for n in escaped {
+                                            if let Some(&j) = idx.get(n) {
+                                                adj[i].push(j);
+                                            }
+                                        }
+                                    }
+                                }
+                                Callee::Value(_) => {
+                                    for n in escaped {
+                                        if let Some(&j) = idx.get(n) {
+                                            adj[i].push(j);
+                                        }
+                                    }
+                                }
+                                Callee::TraitMethod { trait_def, .. } => {
+                                    for n in trait_impl_members(*trait_def) {
+                                        if let Some(&j) = idx.get(&n) {
+                                            adj[i].push(j);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        TerminatorKind::SwitchInt { discr, .. } => ops.push(discr),
+                        TerminatorKind::Assert { cond, .. } => ops.push(cond),
+                        TerminatorKind::Goto(_)
+                        | TerminatorKind::Return
+                        | TerminatorKind::Unreachable
+                        | TerminatorKind::Drop { .. } => {}
+                    }
+                }
+                for o in ops {
+                    if let gt_mir::Operand::Const(gt_mir::Const::Item { node, .. }) = o
+                        && let Some(&j) = idx.get(node)
+                    {
+                        adj[i].push(j);
+                    }
+                }
+            }
+        }
+        adj[i].sort_unstable();
+        adj[i].dedup();
+    }
+    let comp = sccs(all.len(), &adj);
+    let mut size: BTreeMap<usize, usize> = BTreeMap::new();
+    for c in &comp {
+        *size.entry(*c).or_default() += 1;
+    }
+    (fn_bodies.len()..all.len())
+        .filter(|&i| size[&comp[i]] > 1 || adj[i].contains(&i))
+        .map(|i| all[i])
+        .collect()
+}
+
 /// Kiểm điều kiện dừng toàn chương trình. `base` từ `driver::build_prog_info` (hợp đồng, vị từ…).
 pub fn check_termination(
     t: &TypesOutput,
@@ -837,6 +967,20 @@ pub fn check_termination(
                 format!("`{}` đệ quy qua giá trị hàm hoặc phương thức trait: không kiểm được biến thể giảm; khai báo hiệu ứng `div` nếu cố ý", b.key),
             ));
         }
+    }
+
+    // GÓI 12 FB-C36: chu trình đi qua thân hằng `□` (hằng được tính bằng lời gọi ở mỗi chỗ dùng) không bao giờ dừng
+    for b in const_cycles(t, m, &bodies, &escaped, &contracts) {
+        bag.push(mk(
+            t,
+            "E0703",
+            b.node,
+            b.span,
+            format!(
+                "hằng `{}` thuộc một chu trình tham chiếu/đệ quy (hằng được tính lại ở mỗi chỗ dùng nên vòng này không dừng)",
+                b.key
+            ),
+        ));
     }
 
     // ---- vòng lặp ----

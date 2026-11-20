@@ -116,15 +116,17 @@ fn cyclic_family(shape: usize, ty_i: usize, pad: usize) -> String {
             s + &format!("□ C0: {ty} ≔ f0();\n{main}")
         }
         // 3: vòng qua tiền điều kiện của hàm: f ⊳ C0 > 0, C0 ≔ f(1)
-        3 => format!(
-            "{p}ƒ f(n: {ty}) → {ty} ! ∅ ⊳ C0 > {} {{ n }}\n□ C0: {ty} ≔ f({});\n{main}",
-            format!("0{ty}"),
-            lit(ty)
-        ),
+        3 => {
+            let zero = format!("0{ty}");
+            format!(
+                "{p}ƒ f(n: {ty}) → {ty} ! ∅ ⊳ C0 > {zero} {{ n }}
+□ C0: {ty} ≔ f({});
+{main}",
+                lit(ty)
+            )
+        }
         // 4: hằng thứ hai đọc hằng vòng: C1 ≔ C0 + vòng C0 ≔ g() với g đọc C1
-        _ => format!(
-            "{p}ƒ g() → {ty} ! ∅ {{ C1 }}\n□ C1: {ty} ≔ C0;\n□ C0: {ty} ≔ g();\n{main}"
-        ),
+        _ => format!("{p}ƒ g() → {ty} ! ∅ {{ C1 }}\n□ C1: {ty} ≔ C0;\n□ C0: {ty} ≔ g();\n{main}"),
     }
 }
 
@@ -135,14 +137,14 @@ fn generated_const_cycles_are_all_rejected() {
     let mut total = 0;
     for shape in 0..5 {
         let mut per_shape = 0;
-        for ty_i in 0..TYPES.len() {
+        for (ty_i, ty) in TYPES.iter().enumerate() {
             for pad in 0..8 {
                 let src = cyclic_family(shape, ty_i, pad);
                 total += 1;
                 per_shape += 1;
                 let c = codes(&src);
                 if !c.iter().any(|x| x == "E0703") {
-                    accepted.push(format!("hình {shape}, {}, pad {pad}", TYPES[ty_i]));
+                    accepted.push(format!("hình {shape}, {ty}, pad {pad}"));
                 }
             }
         }
@@ -159,9 +161,8 @@ fn generated_const_cycles_are_all_rejected() {
 /// Đối chứng sinh: cùng kiểu/đệm nhưng KHÔNG có chu trình ⇒ không có E0703.
 #[test]
 fn generated_acyclic_controls_are_not_rejected() {
-    for ty_i in 0..TYPES.len() {
+    for ty in TYPES {
         for pad in 0..8 {
-            let ty = TYPES[ty_i];
             let src = format!(
                 "{}□ K: {ty} ≔ {};\nƒ f() → {ty} ! ∅ {{ K }}\n□ C0: {ty} ≔ f();\nƒ main() → i32 ! ∅ {{ r ≔ C0; 0 }}\n",
                 pads(pad, ty),
