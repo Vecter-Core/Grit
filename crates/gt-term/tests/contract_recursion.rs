@@ -118,11 +118,15 @@ fn contract_family(shape: usize, ty: &str, pad: usize) -> String {
 fn contract_recursion_family_is_always_rejected() {
     let tys = ["u32", "u64", "i32", "u8"];
     let mut n = 0usize;
+    let mut accepted: Vec<(usize, &str, usize)> = Vec::new();
     for shape in 0..5 {
         let mut per = 0usize;
         for ty in tys {
             for pad in 0..8 {
-                rejected(&contract_family(shape, ty, pad));
+                let c = codes(&contract_family(shape, ty, pad));
+                if !c.iter().any(|x| x == "E0703" || x == "E0702") {
+                    accepted.push((shape, ty, pad));
+                }
                 per += 1;
                 n += 1;
             }
@@ -130,4 +134,10 @@ fn contract_recursion_family_is_always_rejected() {
         assert!(per >= 30, "hình dạng {shape}: chỉ {per} chương trình");
     }
     assert_eq!(n, 160);
+    assert!(
+        accepted.is_empty(),
+        "FB-C35: {} / {n} chương trình đệ quy-qua-hợp đồng được CHẤP NHẬN; đầu tiên: {:?}",
+        accepted.len(),
+        &accepted[..accepted.len().min(5)]
+    );
 }
