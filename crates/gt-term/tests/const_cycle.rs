@@ -223,3 +223,109 @@ fn generated_acyclic_controls_are_not_rejected() {
         }
     }
 }
+
+/// GÓI 13 B2: hai hình dạng thêm (mỗi hình 4 kiểu × 8 đệm = 32): (5) `□` lồng `□` qua nhiều tầng hàm (`A ≔ B`, `B ≔ g0()`, chuỗi hàm 1..=4 tầng, tầng cuối đọc `A`);
+/// (6) `□` khởi tạo bằng lời gọi hàm CÓ `⊳` ở tầng cuối của chuỗi hàm 1..=4 tầng, `⊳` đọc `C0`. Mô hình phía bộ sinh: chu trình qua thân `Const` ⇒ PHẢI đỏ.
+fn nested_family(shape: usize, ty: &str, pad: usize) -> String {
+    let p = pads(pad, ty);
+    let main = "ƒ main() → i32 ! ∅ { r ≔ C0; 0 }
+";
+    let n = 1 + pad % 4;
+    let mut s = p;
+    if shape == 5 {
+        for i in 0..n {
+            let body = if i + 1 == n {
+                "C0".to_string()
+            } else {
+                format!("g{}()", i + 1)
+            };
+            s += &format!(
+                "ƒ g{i}() → {ty} ! ∅ {{ {body} }}
+"
+            );
+        }
+        s += &format!(
+            "□ B0: {ty} ≔ g0();
+□ C0: {ty} ≔ B0;
+{main}"
+        );
+    } else {
+        for i in 0..n {
+            let (contract, body) = if i + 1 == n {
+                (format!(" ⊳ C0 > 0{ty}"), "x".to_string())
+            } else {
+                (String::new(), format!("f{}(x)", i + 1))
+            };
+            s += &format!(
+                "ƒ f{i}(x: {ty}) → {ty} ! ∅{contract} {{ {body} }}
+"
+            );
+        }
+        s += &format!(
+            "□ C0: {ty} ≔ f0({});
+{main}",
+            lit(ty)
+        );
+    }
+    s
+}
+
+#[test]
+fn generated_nested_const_cycles_are_all_rejected() {
+    let mut accepted = Vec::new();
+    let mut total = 0;
+    for shape in [5, 6] {
+        let mut per = 0;
+        for ty in TYPES {
+            for pad in 0..8 {
+                per += 1;
+                total += 1;
+                let c = codes(&nested_family(shape, ty, pad));
+                if !c.iter().any(|x| x == "E0703") {
+                    accepted.push(format!("hình {shape}, {ty}, pad {pad}"));
+                }
+            }
+        }
+        assert_eq!(per, 32);
+    }
+    assert_eq!(total, 64);
+    assert!(
+        accepted.is_empty(),
+        "{} / {total} bị chấp nhận (FB-C36): {accepted:?}",
+        accepted.len()
+    );
+}
+
+/// Đối chứng: cùng cấu trúc nhưng tầng cuối KHÔNG đọc `C0` ⇒ không đỏ oan.
+#[test]
+fn nested_acyclic_controls_are_not_rejected() {
+    for ty in TYPES {
+        for pad in 0..8 {
+            let n = 1 + pad % 4;
+            let mut s = pads(pad, ty);
+            for i in 0..n {
+                let body = if i + 1 == n {
+                    lit(ty)
+                } else {
+                    format!("g{}()", i + 1)
+                };
+                s += &format!(
+                    "ƒ g{i}() → {ty} ! ∅ {{ {body} }}
+"
+                );
+            }
+            s += &format!(
+                "□ B0: {ty} ≔ g0();
+□ C0: {ty} ≔ B0;
+ƒ main() → i32 ! ∅ {{ r ≔ C0; 0 }}
+"
+            );
+            let c = codes(&s);
+            assert!(
+                c.is_empty(),
+                "{c:?}
+{s}"
+            );
+        }
+    }
+}
