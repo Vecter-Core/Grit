@@ -2,6 +2,10 @@
 
 Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng 2026-11-18, xem `docs/RUN_REPORTS.md`).
 
+## 1.0.0-rc8 — GÓI 12: FB-C36 (chu trình qua hằng □ được chấp nhận; gt-term thêm cạnh Const::Item), cổng Linux rc7, công cụ (2026-11-20)
+- **Sửa soundness (FB-C36):** hằng `□` được hạ thành LỜI GỌI hàm ở mỗi chỗ dùng; `□ C ≔ C`, vòng hằng và `□ C ≔ f()` với `f` đọc `C` (kể cả qua `⊳` hoặc phương thức trait) từng `check` XANH và tràn ngăn xếp khi chạy. Nay E0703. `gt-term` `const_cycles`; test `const_cycle` (12; bộ sinh 160 chương trình: tắt sửa 160/160 chấp nhận sai, bật 0/160), 3 tệp `tests/fail` + 1 `tests/pass`.
+- Công cụ: `tools/gate.sh` chia gói `gt-driver` theo mục tiêu (`GATE_SPLIT_PKGS`, in `secs=`); `tools/fuzz_import_local.py`; `FUZZ_TOOLCHAIN`; log fuzz ghi `source`/`os`/`kernel` trên Linux.
+
 ## 1.0.0-rc7 — GÓI 11: FB-C35 (đệ quy qua thân hợp đồng ⊳/⊲ được chấp nhận; gt-term gộp cạnh hợp đồng), ghim rustc 1.98.1, công cụ (2026-11-20)
 
 ## 1.0.0-rc6 — GÓI 8: FB-C34, ICE 33 hợp đồng, E1001 oan, công cụ audit/kit (2026-11-19)

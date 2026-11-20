@@ -237,48 +237,48 @@ crates/gt-mir/src/validate.rs	216	_ =>	AN TOÀN		rvalue không chứa kiểu Err
 crates/gt-mir/src/validate.rs	407	_ =>	AN TOÀN		terminator khác không cần kiểm thêm	_ => {}
 crates/gt-mir/src/validate.rs	452	_ =>	AN TOÀN		câu lệnh còn lại kiểm 'dùng ngoài storage' đúng chỗ	_ => {
 crates/gt-oblig/src/analysis.rs	201	_ =>	AN TOÀN		kiểu không phải số nguyên ⇒ None ⇒ local không được theo dõi (khoảng top)	_ => None,
-crates/gt-oblig/src/analysis.rs	366	_ =>	AN TOÀN		rvalue khác không tạo liên kết tái mượn ⇒ nguyên tử độ dài riêng của local đó, chỉ mất chính xác	_ => {}
-crates/gt-oblig/src/analysis.rs	388	_ =>	AN TOÀN		ngắt chuỗi tái mượn ⇒ root_of lùi về chính local (nguyên tử riêng), không gộp nhầm	_ => break,
-crates/gt-oblig/src/analysis.rs	410	_ =>	AN TOÀN		kiểu khác không có array_len ⇒ len_term None ⇒ Unknown	_ => {}
-crates/gt-oblig/src/analysis.rs	429	let _ =	AN TOÀN		`let _ = l;` chỉ nuốt cảnh báo biến không dùng, không ảnh hưởng phán quyết	let _ = l;
-crates/gt-oblig/src/analysis.rs	487	_ =>	AN TOÀN		chỉ chọn ngưỡng widening (độ chính xác); kết quả vẫn qua check_post_fixpoint độc lập	_ => {}
-crates/gt-oblig/src/analysis.rs	633	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
-crates/gt-oblig/src/analysis.rs	655	_ =>	AN TOÀN		projection khác Field(0) của Chk ⇒ None ⇒ Unknown	_ => None,
-crates/gt-oblig/src/analysis.rs	657	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
-crates/gt-oblig/src/analysis.rs	681	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
-crates/gt-oblig/src/analysis.rs	683	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
-crates/gt-oblig/src/analysis.rs	691	let _ =	AN TOÀN		`let _ = st;` no-op	let _ = st;
-crates/gt-oblig/src/analysis.rs	706	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
-crates/gt-oblig/src/analysis.rs	722	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
-crates/gt-oblig/src/analysis.rs	757	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
-crates/gt-oblig/src/analysis.rs	778	_ =>	AN TOÀN		nhánh cuối chỉ là Ge: is_comparison chỉ gồm Eq/Ne/Lt/Le/Gt/Ge nên không có phép khác lọt vào	_ => Prop::Le(tb, ta),
-crates/gt-oblig/src/analysis.rs	781	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
-crates/gt-oblig/src/analysis.rs	786	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
-crates/gt-oblig/src/analysis.rs	811	_ =>	AN TOÀN		kết quả không vừa kiểu ⇒ khoảng được quấn (wrap) về cả kiểu: sound; vừa kiểu mới giữ Term	_ => Val::Interval(iv.wrap(ty)),
-crates/gt-oblig/src/analysis.rs	817	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
-crates/gt-oblig/src/analysis.rs	836	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
-crates/gt-oblig/src/analysis.rs	848	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
-crates/gt-oblig/src/analysis.rs	859	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
-crates/gt-oblig/src/analysis.rs	870	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
-crates/gt-oblig/src/analysis.rs	882	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
-crates/gt-oblig/src/analysis.rs	892	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
-crates/gt-oblig/src/analysis.rs	908	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => {
-crates/gt-oblig/src/analysis.rs	1018	_ =>	AN TOÀN		chỉ gán nhãn loại nghĩa vụ (Overflow cho phép còn lại); mục tiêu vẫn lấy từ điều kiện Assert	_ => ObKind::Overflow,
-crates/gt-oblig/src/analysis.rs	1046	_ =>	AN TOÀN		không phải RefOf thì khoá là chính local; nguyên tử vị từ bị xoá khi local gán lại (forget_local/retain_atoms)	_ => l,
-crates/gt-oblig/src/analysis.rs	1181	unwrap_or	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	let g = goal.clone().unwrap_or(Prop::Atom(self.unrep_atom(bb, idx)));
-crates/gt-oblig/src/analysis.rs	1291	_ =>	AN TOÀN		không Copy mặc định ⇒ NotCheckable ⇒ Rejected (đúng chiều an toàn)	_ => false,
-crates/gt-oblig/src/analysis.rs	1297	unwrap_or	AN TOÀN		thiếu bảng local_copy ⇒ coi không Copy ⇒ từ chối, an toàn	Some(v) => v.get(l).copied().unwrap_or(false),
-crates/gt-oblig/src/analysis.rs	1369	unwrap_or	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	let g = goal.unwrap_or(Prop::Atom(self.unrep_atom(bb, idx)));
-crates/gt-oblig/src/analysis.rs	1510	_ =>	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	_ => Prop::Atom(self.unrep_atom(bb, UNREP_SLOTS - 1)),
-crates/gt-oblig/src/analysis.rs	1837	_ =>	AN TOÀN		không chứng minh được ⇒ Lowered (giữ Assert) hoặc Rejected (không kiểm được lúc chạy)	_ => match &ob.runtime {
-crates/gt-oblig/src/analysis.rs	1847	_ =>	AN TOÀN		chỉ chọn mã ghi chú N0604 cho loại còn lại	_ => "N0604",
-crates/gt-oblig/src/analysis.rs	1981	let _ =	AN TOÀN		bỏ giá trị trả về vì chỉ chạy để Judge ghi nghĩa vụ; khối không tới được không có nghĩa vụ ⇒ Assert giữ nguyên	let _ = cx.block_out(s, bb, Some(&mut judge));
-crates/gt-oblig/src/analysis.rs	2003	let _ =	AN TOÀN		collect_unknown dùng NoProver ⇒ mọi nghĩa vụ Unknown ⇒ giữ check/Rejected	let _ = cx.block_out(&init, bb, Some(judge));
-crates/gt-oblig/src/analysis.rs	2096	_ =>	AN TOÀN		check_post_fixpoint: cạnh không thoả ⇒ Err ⇒ bỏ narrowing hoặc ICE	_ => {
-crates/gt-oblig/src/analysis.rs	2157	unwrap_or	AN TOÀN		giá trị trả về của thân hợp đồng không diễn giải ⇒ nguyên tử BOOL_BASE, canon_prop đổi thành nguyên tử mờ riêng của hợp đồng (không bao giờ chứng minh được)	let v = cx.prop_of(&s, &ret).unwrap_or(Prop::Atom(BOOL_BASE));
-crates/gt-oblig/src/analysis.rs	2164	_ =>	AN TOÀN		vòng lặp/không biểu diễn được ⇒ walk_paths false ⇒ extract_contract None ⇒ nghĩa vụ không biểu diễn được	_ => {
-crates/gt-oblig/src/analysis.rs	2249	_ =>	AN TOÀN		chỉ cách dựng Or các đường (0 đường ⇒ False, 1 ⇒ chính nó), không mặc định đúng	_ => Prop::Or(paths),
-crates/gt-oblig/src/analysis.rs	2275	ok()?	AN TOÀN		DomainQuery::new trả None = 'không biết' (fail-closed); chỉ test dùng, không có người gọi trong crate quyết định	check_post_fixpoint(&cx, &states).ok()?;
+crates/gt-oblig/src/analysis.rs	368	_ =>	AN TOÀN		rvalue khác không tạo liên kết tái mượn ⇒ nguyên tử độ dài riêng của local đó, chỉ mất chính xác	_ => {}
+crates/gt-oblig/src/analysis.rs	390	_ =>	AN TOÀN		ngắt chuỗi tái mượn ⇒ root_of lùi về chính local (nguyên tử riêng), không gộp nhầm	_ => break,
+crates/gt-oblig/src/analysis.rs	412	_ =>	AN TOÀN		kiểu khác không có array_len ⇒ len_term None ⇒ Unknown	_ => {}
+crates/gt-oblig/src/analysis.rs	431	let _ =	AN TOÀN		`let _ = l;` chỉ nuốt cảnh báo biến không dùng, không ảnh hưởng phán quyết	let _ = l;
+crates/gt-oblig/src/analysis.rs	489	_ =>	AN TOÀN		chỉ chọn ngưỡng widening (độ chính xác); kết quả vẫn qua check_post_fixpoint độc lập	_ => {}
+crates/gt-oblig/src/analysis.rs	636	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
+crates/gt-oblig/src/analysis.rs	658	_ =>	AN TOÀN		projection khác Field(0) của Chk ⇒ None ⇒ Unknown	_ => None,
+crates/gt-oblig/src/analysis.rs	660	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
+crates/gt-oblig/src/analysis.rs	684	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
+crates/gt-oblig/src/analysis.rs	686	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
+crates/gt-oblig/src/analysis.rs	694	let _ =	AN TOÀN		`let _ = st;` no-op	let _ = st;
+crates/gt-oblig/src/analysis.rs	709	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
+crates/gt-oblig/src/analysis.rs	725	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
+crates/gt-oblig/src/analysis.rs	760	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
+crates/gt-oblig/src/analysis.rs	781	_ =>	AN TOÀN		nhánh cuối chỉ là Ge: is_comparison chỉ gồm Eq/Ne/Lt/Le/Gt/Ge nên không có phép khác lọt vào	_ => Prop::Le(tb, ta),
+crates/gt-oblig/src/analysis.rs	784	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
+crates/gt-oblig/src/analysis.rs	789	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
+crates/gt-oblig/src/analysis.rs	814	_ =>	AN TOÀN		kết quả không vừa kiểu ⇒ khoảng được quấn (wrap) về cả kiểu: sound; vừa kiểu mới giữ Term	_ => Val::Interval(iv.wrap(ty)),
+crates/gt-oblig/src/analysis.rs	820	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
+crates/gt-oblig/src/analysis.rs	839	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
+crates/gt-oblig/src/analysis.rs	851	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
+crates/gt-oblig/src/analysis.rs	862	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
+crates/gt-oblig/src/analysis.rs	873	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
+crates/gt-oblig/src/analysis.rs	885	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
+crates/gt-oblig/src/analysis.rs	895	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => None,
+crates/gt-oblig/src/analysis.rs	911	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => {
+crates/gt-oblig/src/analysis.rs	1021	_ =>	AN TOÀN		chỉ gán nhãn loại nghĩa vụ (Overflow cho phép còn lại); mục tiêu vẫn lấy từ điều kiện Assert	_ => ObKind::Overflow,
+crates/gt-oblig/src/analysis.rs	1049	_ =>	AN TOÀN		không phải RefOf thì khoá là chính local; nguyên tử vị từ bị xoá khi local gán lại (forget_local/retain_atoms)	_ => l,
+crates/gt-oblig/src/analysis.rs	1187	unwrap_or	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	let g = goal.clone().unwrap_or(Prop::Atom(self.unrep_atom(bb, idx)));
+crates/gt-oblig/src/analysis.rs	1297	_ =>	AN TOÀN		không Copy mặc định ⇒ NotCheckable ⇒ Rejected (đúng chiều an toàn)	_ => false,
+crates/gt-oblig/src/analysis.rs	1303	unwrap_or	AN TOÀN		thiếu bảng local_copy ⇒ coi không Copy ⇒ từ chối, an toàn	Some(v) => v.get(l).copied().unwrap_or(false),
+crates/gt-oblig/src/analysis.rs	1375	unwrap_or	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	let g = goal.unwrap_or(Prop::Atom(self.unrep_atom(bb, idx)));
+crates/gt-oblig/src/analysis.rs	1523	_ =>	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	_ => Prop::Atom(self.unrep_atom(bb, UNREP_SLOTS - 1)),
+crates/gt-oblig/src/analysis.rs	1850	_ =>	AN TOÀN		không chứng minh được ⇒ Lowered (giữ Assert) hoặc Rejected (không kiểm được lúc chạy)	_ => match &ob.runtime {
+crates/gt-oblig/src/analysis.rs	1860	_ =>	AN TOÀN		chỉ chọn mã ghi chú N0604 cho loại còn lại	_ => "N0604",
+crates/gt-oblig/src/analysis.rs	1994	let _ =	AN TOÀN		bỏ giá trị trả về vì chỉ chạy để Judge ghi nghĩa vụ; khối không tới được không có nghĩa vụ ⇒ Assert giữ nguyên	let _ = cx.block_out(s, bb, Some(&mut judge));
+crates/gt-oblig/src/analysis.rs	2023	let _ =	AN TOÀN		collect_unknown dùng NoProver ⇒ mọi nghĩa vụ Unknown ⇒ giữ check/Rejected	let _ = cx.block_out(&init, bb, Some(judge));
+crates/gt-oblig/src/analysis.rs	2116	_ =>	AN TOÀN		check_post_fixpoint: cạnh không thoả ⇒ Err ⇒ bỏ narrowing hoặc ICE	_ => {
+crates/gt-oblig/src/analysis.rs	2177	unwrap_or	AN TOÀN		giá trị trả về của thân hợp đồng không diễn giải ⇒ nguyên tử BOOL_BASE, canon_prop đổi thành nguyên tử mờ riêng của hợp đồng (không bao giờ chứng minh được)	let v = cx.prop_of(&s, &ret).unwrap_or(Prop::Atom(BOOL_BASE));
+crates/gt-oblig/src/analysis.rs	2184	_ =>	AN TOÀN		vòng lặp/không biểu diễn được ⇒ walk_paths false ⇒ extract_contract None ⇒ nghĩa vụ không biểu diễn được	_ => {
+crates/gt-oblig/src/analysis.rs	2269	_ =>	AN TOÀN		chỉ cách dựng Or các đường (0 đường ⇒ False, 1 ⇒ chính nó), không mặc định đúng	_ => Prop::Or(paths),
+crates/gt-oblig/src/analysis.rs	2295	ok()?	AN TOÀN		DomainQuery::new trả None = 'không biết' (fail-closed); chỉ test dùng, không có người gọi trong crate quyết định	check_post_fixpoint(&cx, &states).ok()?;
 crates/gt-oblig/src/driver.rs	82	_ =>	AN TOÀN		definite_code: kind lạ ⇒ E0901 là mã LỖI (ĐỎ); fail-closed (chỉ chọn mã chẩn đoán).	_ => "E0901",
 crates/gt-oblig/src/driver.rs	121	_ =>	AN TOÀN		note_msg: chỉ thông điệp; mã lạ vẫn là ghi chú 'giữ kiểm tra lúc chạy'.	_ => "kiểm tra giữ lại lúc chạy",
 crates/gt-oblig/src/driver.rs	533	is_some_and	AN TOÀN		imp=None chỉ với hàm tự do/khai báo trait (trait chưa có thân mặc định: thử `ƒ ok(&self){..}` trong ⊏ ⇒ E0101); hàm thành viên impl luôn tìm thấy impl nên self_ty được kiểm; thử `⊐ H{ƒ ok(&self)}` với Cell ⇒ N0901 giữ kiểm tra (/tmp/fo/t/a1.gt: abort precondition lúc chạy).	|| imp.is_some_and(|i| t.db.may_have_interior_mut(&i.self_ty, &gens));
@@ -323,12 +323,12 @@ crates/gt-oblig/src/ir.rs	455	let _ =	AN TOÀN		write! vào String không thể 
 crates/gt-oblig/src/prover.rs	183	unwrap_or	AN TOÀN		chỉ chạy khi bits ≤ 20 ⇒ min luôn vừa i128	.map(|d| d.ty.min().to_i128().unwrap_or(0))
 crates/gt-oblig/src/prover.rs	187	unwrap_or	AN TOÀN		chỉ chạy khi bits ≤ 20 ⇒ max luôn vừa i128	.map(|d| d.ty.max().to_i128().unwrap_or(0))
 crates/gt-oblig/src/prover.rs	272	unwrap_or_default	AN TOÀN		chỉ gọi khi viol>0 ⇒ witness luôn Some	witness: Witness(witness.unwrap_or_default()),
-crates/gt-oblig/src/unsafe_check.rs	28	_ =>	AN TOÀN		has_raw_ptr: mọi biến thể Ty còn lại là lá không chứa con trỏ thô (Int/Float/Bool/Char/Str/Never/Param/Infer/Err); phần còn lại đã được duyệt đệ quy	_ => false,
-crates/gt-oblig/src/unsafe_check.rs	52	is_some_and	AN TOÀN		scope cha thiếu ⇒ coi cha không phải ⚠ ⇒ báo thêm; validate.rs đảm bảo chỉ số scope hợp lệ	.is_some_and(|p| b.scopes.get(p.index()).is_some_and(|ps| ps.unsafe_ctx))
-crates/gt-oblig/src/unsafe_check.rs	56	is_some_and	AN TOÀN		scope thiếu ⇒ coi là NGOÀI ⚠ ⇒ chặt hơn; validate.rs đảm bảo scope hợp lệ	let in_unsafe = |scope: usize| b.scopes.get(scope).is_some_and(|s| s.unsafe_ctx);
-crates/gt-oblig/src/unsafe_check.rs	83	is_some_and	AN TOÀN		local đích thiếu sẽ không được báo, nhưng validate.rs (M5) đã ICE nếu local không tồn tại nên không với tới	.is_some_and(|d| has_raw_ptr(&d.ty, 0))
-crates/gt-oblig/src/unsafe_check.rs	110	is_some_and	AN TOÀN		như dòng 76 cho đích của lời gọi (validate.rs kiểm local và đích lời gọi hợp lệ)	.is_some_and(|d| has_raw_ptr(&d.ty, 0))
-crates/gt-oblig/src/unsafe_check.rs	117	unwrap_or	AN TOÀN		chỉ là vị trí báo lỗi (dùng span thân hàm khi thiếu)	let span = first_span.get(sc).copied().unwrap_or(b.span);
+crates/gt-oblig/src/unsafe_check.rs	30	_ =>	AN TOÀN		has_raw_ptr: mọi biến thể Ty còn lại là lá không chứa con trỏ thô (Int/Float/Bool/Char/Str/Never/Param/Infer/Err); phần còn lại đã được duyệt đệ quy	_ => false,
+crates/gt-oblig/src/unsafe_check.rs	54	is_some_and	AN TOÀN		scope cha thiếu ⇒ coi cha không phải ⚠ ⇒ báo thêm; validate.rs đảm bảo chỉ số scope hợp lệ	.is_some_and(|p| b.scopes.get(p.index()).is_some_and(|ps| ps.unsafe_ctx))
+crates/gt-oblig/src/unsafe_check.rs	58	is_some_and	AN TOÀN		scope thiếu ⇒ coi là NGOÀI ⚠ ⇒ chặt hơn; validate.rs đảm bảo scope hợp lệ	let in_unsafe = |scope: usize| b.scopes.get(scope).is_some_and(|s| s.unsafe_ctx);
+crates/gt-oblig/src/unsafe_check.rs	85	is_some_and	AN TOÀN		local đích thiếu sẽ không được báo, nhưng validate.rs (M5) đã ICE nếu local không tồn tại nên không với tới	.is_some_and(|d| has_raw_ptr(&d.ty, 0))
+crates/gt-oblig/src/unsafe_check.rs	112	is_some_and	AN TOÀN		như dòng 76 cho đích của lời gọi (validate.rs kiểm local và đích lời gọi hợp lệ)	.is_some_and(|d| has_raw_ptr(&d.ty, 0))
+crates/gt-oblig/src/unsafe_check.rs	119	unwrap_or	AN TOÀN		chỉ là vị trí báo lỗi (dùng span thân hàm khi thiếu)	let span = first_span.get(sc).copied().unwrap_or(b.span);
 crates/gt-oblig/src/zone.rs	20	_ =>	AN TOÀN		max của hai cận zone: thiếu cận (∞) ⇒ None = nới lỏng, sound.	_ => None,
 crates/gt-oblig/src/zone.rs	77	is_none_or	AN TOÀN		Không có/tràn đường qua cạnh mới ⇒ giữ cận cũ (bỏ ràng buộc = yếu hơn, sound).	if cur.is_none_or(|x| v < x) {
 crates/gt-oblig/src/zone.rs	84	is_some_and	AN TOÀN		Chỉ đánh rỗng khi đường chéo âm THẬT (checked i128); thiếu ⇒ không rỗng (không suy unreachable bừa).	if self.m[k * n + k].is_some_and(|v| v < 0) {
@@ -350,15 +350,16 @@ crates/gt-term/src/lib.rs	100	_ =>	AN TOÀN		Literal không phải số nguyên 
 crates/gt-term/src/lib.rs	118	_ =>	AN TOÀN		Toán tử khác +,-,* (hoặc nhân hai biến) ⇒ None ⇒ từ chối.	_ => None,
 crates/gt-term/src/lib.rs	138	_ =>	AN TOÀN		Biểu thức không thuộc dạng hỗ trợ ⇒ None ⇒ E0702/E0701.	_ => None,
 crates/gt-term/src/lib.rs	174	_ =>	AN TOÀN		Điều kiện không phải so sánh thứ tự ⇒ không sinh ứng viên; hết ứng viên ⇒ E0701.	_ => continue,
-crates/gt-term/src/lib.rs	364	_ =>	SỬA	FB-C15	instance_graph chỉ thu operand hàm-như-giá-trị từ Rvalue::Use/Cast/Aggregate, bỏ Rvalue::Repeat(op, n) nên `[f; 2]` không ghi nhận f bị thoát và lời gọi qua giá trị không có cạnh tới f ⇒ vòng đệ quy qua mảng-lặp bị bỏ sót, thiếu ↓/div vẫn qua.	_ => {}
-crates/gt-term/src/lib.rs	531	is_some_and	AN TOÀN		Lọc impl theo trait cho đồ thị bảo thủ; impl không phải của trait thì không là ứng viên đúng.	.is_some_and(|tr| tr.trait_def == trait_def)
-crates/gt-term/src/lib.rs	634	is_some_and	AN TOÀN		Không có chữ ký ⇒ coi là không có `div` ⇒ áp quy tắc nghiêm (cần ↓).	.is_some_and(|s| s.effects.iter().any(|e| e == "div"))
-crates/gt-term/src/lib.rs	688	_ =>	SỬA	FB-C15	Tập `escaped` (hàm bị dùng như giá trị) cũng chỉ duyệt Use/Cast/Aggregate, bỏ Repeat ⇒ cùng lỗ hổng: gọi giá trị không nối cạnh tới hàm trong `[f; n]` (cả đồ thị bảo thủ).	_ => {}
-crates/gt-term/src/lib.rs	823	unwrap_or_default	AN TOÀN		Thiếu điều kiện ⇒ danh sách ứng viên rỗng ⇒ E0701.	let cands = li.cond.as_ref().map(|c| inferred_candidates(&tx, c)).unwrap_or_default();
-crates/gt-term/src/lib.rs	868	is_some_and	AN TOÀN		Chỉ chọn nghĩa vụ gắn với đầu vòng này; nghĩa vụ không có tag thuộc lời gọi đệ quy được xét riêng ở vòng dưới.	.filter(|j| j.tag.is_some_and(|(h, _)| h == *head))
-crates/gt-term/src/lib.rs	871	unwrap_or_default	AN TOÀN		Không có báo cáo ⇒ judged rỗng ⇒ ok chỉ khi M7 khẳng định no_back_edge_heads ⇒ rep None ⇒ từ chối.	.unwrap_or_default();
-crates/gt-term/src/lib.rs	875	is_some_and	AN TOÀN		Chấp nhận tập rỗng CHỈ khi có khẳng định tường minh no_back_edge_heads (đúng luật dự án).	rep.is_some_and(|r| r.no_back_edge_heads.contains(head))
-crates/gt-term/src/lib.rs	879	unwrap_or	AN TOÀN		judged đã lọc tag Some nên unwrap_or((0,0)) không đạt tới.	let (_, c) = j.tag.unwrap_or((0, 0));
+crates/gt-term/src/lib.rs	371	_ =>	SỬA	FB-C15	instance_graph chỉ thu operand hàm-như-giá-trị từ Rvalue::Use/Cast/Aggregate, bỏ Rvalue::Repeat(op, n) nên `[f; 2]` không ghi nhận f bị thoát và lời gọi qua giá trị không có cạnh tới f ⇒ vòng đệ quy qua mảng-lặp bị bỏ sót, thiếu ↓/div vẫn qua.	_ => {}
+crates/gt-term/src/lib.rs	603	is_some_and	AN TOÀN		Lọc impl theo trait cho đồ thị bảo thủ; impl không phải của trait thì không là ứng viên đúng.	.is_some_and(|tr| tr.trait_def == trait_def)
+crates/gt-term/src/lib.rs	736	is_some_and	AN TOÀN		Lọc impl theo trait cho đồ thị hằng (FB-C36, `const_cycles`): impl không phải của trait thì không là ứng viên; thiếu cạnh chỉ có thể bỏ sót chu trình nên đồ thị này nối tới MỌI impl của trait (bảo thủ, hướng chặt thêm).	.is_some_and(|tr| tr.trait_def == trait_def)
+crates/gt-term/src/lib.rs	855	is_some_and	AN TOÀN		Không có chữ ký ⇒ coi là không có `div` ⇒ áp quy tắc nghiêm (cần ↓).	.is_some_and(|s| s.effects.iter().any(|e| e == "div"))
+crates/gt-term/src/lib.rs	909	_ =>	SỬA	FB-C15	Tập `escaped` (hàm bị dùng như giá trị) cũng chỉ duyệt Use/Cast/Aggregate, bỏ Repeat ⇒ cùng lỗ hổng: gọi giá trị không nối cạnh tới hàm trong `[f; n]` (cả đồ thị bảo thủ).	_ => {}
+crates/gt-term/src/lib.rs	1064	unwrap_or_default	AN TOÀN		Thiếu điều kiện ⇒ danh sách ứng viên rỗng ⇒ E0701.	let cands = li.cond.as_ref().map(|c| inferred_candidates(&tx, c)).unwrap_or_default();
+crates/gt-term/src/lib.rs	1109	is_some_and	AN TOÀN		Chỉ chọn nghĩa vụ gắn với đầu vòng này; nghĩa vụ không có tag thuộc lời gọi đệ quy được xét riêng ở vòng dưới.	.filter(|j| j.tag.is_some_and(|(h, _)| h == *head))
+crates/gt-term/src/lib.rs	1112	unwrap_or_default	AN TOÀN		Không có báo cáo ⇒ judged rỗng ⇒ ok chỉ khi M7 khẳng định no_back_edge_heads ⇒ rep None ⇒ từ chối.	.unwrap_or_default();
+crates/gt-term/src/lib.rs	1116	is_some_and	AN TOÀN		Chấp nhận tập rỗng CHỈ khi có khẳng định tường minh no_back_edge_heads (đúng luật dự án).	rep.is_some_and(|r| r.no_back_edge_heads.contains(head))
+crates/gt-term/src/lib.rs	1120	unwrap_or	AN TOÀN		judged đã lọc tag Some nên unwrap_or((0,0)) không đạt tới.	let (_, c) = j.tag.unwrap_or((0, 0));
 crates/gt-types/src/check/call.rs	20	_ =>	GHI NHẬN		đối số không phải Path tới hàm/local ⇒ không thay marker `poly`; hiệu ứng thật do gt-effects tính từ kiểu đối số; chưa thử đối số là biểu thức khác path (chưa hiểu hết tương tác unify marker)	_ => None,
 crates/gt-types/src/check/call.rs	23	_ =>	GHI NHẬN		như dòng 20: nhánh còn lại không có hiệu ứng để thay marker; chưa kiểm chứng tương tác với unify	_ => None,
 crates/gt-types/src/check/call.rs	112	unwrap_or	GHI NHẬN		const/static thiếu trong db.consts ⇒ Ty::Err không kèm chẩn đoán tại đây; chặn cuối là gt-mir validate (unresolved_types ⇒ ICE) nhưng chưa tái hiện nhánh này	self.env.db.consts.get(&d).cloned().unwrap_or(Ty::Err)
