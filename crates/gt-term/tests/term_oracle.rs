@@ -30,6 +30,15 @@ fn programs() -> u64 {
         .unwrap_or(1500)
 }
 
+/// GÓI 11 S1.d: số lần chạy mỗi chương trình (mặc định 8 cho cổng). Biến thể NHANH cho đột biến: `GT_TERM_PROGRAMS=150 GT_TERM_RUNS=3` (seed cố định 1..=n,
+/// tất định). Đo GÓI 10: 300 chương trình × 8 lần = 220,8 s (dev) ⇒ 1500 chương trình ≈ 18 phút, vượt `TIMEOUT=900 s` của `tools/mut.py` (nguyên nhân mã 143).
+fn runs() -> usize {
+    std::env::var("GT_TERM_RUNS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(8)
+}
+
 #[test]
 fn accepted_programs_never_run_out_of_fuel() {
     // GT_TERM_DROP=1: MÔ PHỎNG nghĩa vụ biến thể bị mất (B.3): gt-term không được chấp nhận chương trình phân kỳ nào (kiểm "tắt bản sửa": với logic cũ test này đỏ)
@@ -77,7 +86,7 @@ fn accepted_programs_never_run_out_of_fuel() {
         let ty = ity_of(p.ty);
         let mut rng = progen::Rng(seed ^ 0x1357_9BDF_2468_ACE1 | 1);
         let mut diverged = false;
-        for _ in 0..8 {
+        for _ in 0..runs() {
             let args: Vec<V> = (0..p.entry_params)
                 .map(|_| V::Int(rng.below(26) as i128, ty))
                 .collect();
