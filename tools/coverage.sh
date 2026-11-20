@@ -11,6 +11,6 @@ CRATES="${*:-gt-oblig gt-borrowck gt-types gt-term gt-effects gt-guard}"
 command -v cargo-llvm-cov >/dev/null 2>&1 || { echo "COVERAGE KHÔNG CHẠY ĐƯỢC: thiếu cargo-llvm-cov"; exit 3; }
 mkdir -p target/coverage
 for c in $CRATES; do
-  CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo +nightly llvm-cov --branch -p "$c" --json --output-path "target/coverage/$c.json" -- --test-threads=2 > "target/coverage/$c.log" 2>&1
+  CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo +${COV_TOOLCHAIN:-nightly} llvm-cov --branch -p "$c" --json --output-path "target/coverage/$c.json" -- --test-threads=2 > "target/coverage/$c.log" 2>&1
   echo "COVERAGE_ROW $c exit=$? json=target/coverage/$c.json"
 done
