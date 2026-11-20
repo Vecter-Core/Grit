@@ -41,3 +41,18 @@ Triệu chứng: `No space left on device`, `LNK1104`/`LNK1108`. Cách làm đã
 - **Phải dựng runtime trước:** `cargo build --release --manifest-path runtime/gt-rt/Cargo.toml` ⇒ `runtime/gt-rt/target/release/gt_rt.lib` (hoặc đặt `GRIT_RT_LIB`). `gritc` liên kết exe bằng `link.exe` tìm qua `find-msvc-tools` (cần VS Build Tools).
 - `PATH` lúc CHẠY test/gritc (backend llvm) phải có `%GRIT_LLVM_DIR%in`; `t.sh` và `tools/gate.sh` tự đặt. Chẩn đoán: `GRITC_DUMP_IR=<tệp>` ghi IR LLVM.
 - Hai cổng cần nhớ: mã thoát 3 khi thiếu `LLVM-C.dll`/`gt_rt.lib`/`link.exe` hoặc codegen chưa hỗ trợ; 2 khi lỗi nội bộ (verifier LLVM, liên kết).
+
+## Phiên bản đã sinh ra các cổng xanh (GÓI 11, 2026-11-20)
+Ghim: `rust-toolchain.toml` (channel 1.98.1, rustfmt, clippy) + `tools/TOOLCHAIN`; `tools/preflight.sh` so `rustc --version` và ĐỎ nếu lệch. Nâng toolchain là việc RIÊNG, có cổng riêng.
+```text
+                 Windows (cổng rc7 GREEN, GATE_TREE=c0d7b267…)        WSL2 (cổng rc6 GREEN, GATE_TREE=b828b981…)
+rustc/cargo      1.98.1 / 1.98.1                                      1.98.1 / 1.98.1 (rustup 1.29.3 ở Windows; WSL: CHƯA ghi)
+clippy           0.1.98                                               0.1.98
+cargo-audit      0.22.2                                               0.23.0
+LLVM             20.1.8 (D:\Tools\llvm-20.1.8)                        libllvm20 20.1.2 (gói apt)
+git              2.55.0.windows.5                                     CHƯA ghi
+bash             GNU bash 5.3.15 (Git Bash)                           CHƯA ghi
+python           3.12.9                                               `python` = python3 (gói python-is-python3); phiên bản CHƯA ghi
+hệ điều hành     Windows 11 10.0.26200                                Ubuntu 24.04.5 LTS, nhân 6.18.33.2-microsoft-standard-WSL2, WSL 2.7.14.0
+```
+Lưu ý: cổng WSL là trên rc6 (`16c37f0`); cổng rc7 CHƯA chạy ở WSL. Các gói hệ thống WSL: `build-essential libffi-dev libzstd-dev zlib1g-dev libxml2-dev python-is-python3 libllvm20` (kiểm bằng `bash tools/setup_cloud.sh --check`).
