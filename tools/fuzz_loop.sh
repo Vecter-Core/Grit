@@ -46,13 +46,14 @@ trap 'STOP=1; echo "fuzz_loop: nhận ngắt — dừng sau phiên đang chạy"
 echo "fuzz_loop: dựng fuzz một lần…"
 ( cd crates/gt-lexer && cargo +nightly fuzz build lex ) >/dev/null 2>&1 || { echo "fuzz_loop: dựng lex THẤT BẠI"; exit 4; }
 ( cd crates/gt-parser && cargo +nightly fuzz build parse ) >/dev/null 2>&1 || { echo "fuzz_loop: dựng parse THẤT BẠI"; exit 4; }
-START=$(date +%s); LIMIT=$(python -c "print(int(float('$HOURS')*3600))")
+. "$(dirname "${BASH_SOURCE[0]}")/pyfind.sh"; [ -n "$PY" ] || exit 2
+START=$(date +%s); LIMIT=$($PY -c "print(int(float('$HOURS')*3600))")
 if [ "$MODE" = parallel ]; then
   bash tools/preflight.sh "$ROOT" >/dev/null 2>&1 || { echo "fuzz_loop: preflight đầy đủ FAIL trước khi chạy song song — dừng"; exit 2; }
   one_kind() { # $1 = lex|parse ; vòng riêng, kiểm sức khoẻ kho + RAM mỗi vòng (không kiểm "có cargo khác" vì tiến trình bạn cũng là cargo)
     local k="$1" tries=0 left s out code
     while [ "$STOP" = 0 ] && [ $(( $(date +%s) - START )) -lt "$LIMIT" ]; do
-      python tools/fuzz_total.py --kind-done "$k" && { echo "fuzz_loop[$k]: đạt 24 giờ trên băm hiện tại — xong"; return 0; }
+      $PY tools/fuzz_total.py --kind-done "$k" && { echo "fuzz_loop[$k]: đạt 24 giờ trên băm hiện tại — xong"; return 0; }
       if ! PREFLIGHT_SKIP_RESOURCES=1 bash tools/preflight.sh "$ROOT" >/dev/null 2>&1 || [ "$(free_gb)" -lt $(( PAR_MIN / 2 )) ]; then
         tries=$((tries+1)); [ "$tries" -ge 30 ] && { echo "fuzz_loop[$k]: kho/RAM chưa đạt 30 lần — dừng"; return 1; }
         echo "fuzz_loop[$k]: kho hoặc RAM chưa đạt ($tries/30) — ngủ 120 s"; sleep 120; continue
@@ -68,14 +69,14 @@ if [ "$MODE" = parallel ]; then
   one_kind lex & P1=$!
   one_kind parse & P2=$!
   wait $P1; R1=$?; wait $P2; R2=$?
-  python tools/fuzz_total.py
+  $PY tools/fuzz_total.py
   echo "fuzz_loop: kết thúc song song sau $(( $(date +%s) - START )) s (lex=$R1 parse=$R2)"
   [ "$R1" = 0 ] && [ "$R2" = 0 ] && exit 0
   exit 1
 fi
 i=0
 while [ "$STOP" = 0 ] && [ $(( $(date +%s) - START )) -lt "$LIMIT" ]; do
-  if python tools/fuzz_total.py --done-on-current-hash >/dev/null 2>&1; then echo "fuzz_loop: CẢ HAI đạt 24 giờ trên băm hiện tại — xong"; break; fi
+  if $PY tools/fuzz_total.py --done-on-current-hash >/dev/null 2>&1; then echo "fuzz_loop: CẢ HAI đạt 24 giờ trên băm hiện tại — xong"; break; fi
   tries=0
   until bash tools/preflight.sh "$ROOT" >/dev/null 2>&1 && ! tasklist 2>/dev/null | grep -qiE "^(cargo|rustc|link|gritc)\.exe"; do
     tries=$((tries+1)); [ "$tries" -ge 30 ] && { echo "fuzz_loop: preflight/ máy bận 30 lần — dừng"; STOP=1; break; }
@@ -87,8 +88,8 @@ while [ "$STOP" = 0 ] && [ $(( $(date +%s) - START )) -lt "$LIMIT" ]; do
   [ "$s" -lt 30 ] && break
   out="$(bash tools/fuzz_session.sh "$k" "$s" 2>&1)"; code=$?
   echo "$out" | tail -2
-  if [ "$code" -ne 0 ]; then echo "fuzz_loop: phiên $k LỖI (exit $code) — dừng; điều tra artifacts trước khi chạy tiếp"; python tools/fuzz_total.py; exit "$code"; fi
-  python tools/fuzz_total.py
+  if [ "$code" -ne 0 ]; then echo "fuzz_loop: phiên $k LỖI (exit $code) — dừng; điều tra artifacts trước khi chạy tiếp"; $PY tools/fuzz_total.py; exit "$code"; fi
+  $PY tools/fuzz_total.py
 done
-python tools/fuzz_total.py
+$PY tools/fuzz_total.py
 echo "fuzz_loop: kết thúc sau $(( $(date +%s) - START )) s"

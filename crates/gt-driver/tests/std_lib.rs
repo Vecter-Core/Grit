@@ -123,17 +123,38 @@ fn diagnose(p: &stdgen::Prog, seed: u64) -> String {
     out
 }
 
+/// GÓI 11 S0.b: tìm Python: biến PYTHON → `python` → `python3` (Ubuntu không có `python` nếu thiếu gói python-is-python3).
+fn python_cmd() -> String {
+    let ok = |c: &str| {
+        std::process::Command::new(c)
+            .arg("--version")
+            .output()
+            .is_ok_and(|o| o.status.success())
+    };
+    if let Ok(p) = std::env::var("PYTHON") {
+        if ok(&p) {
+            return p;
+        }
+    }
+    for c in ["python", "python3"] {
+        if ok(c) {
+            return c.to_string();
+        }
+    }
+    panic!("không tìm thấy Python (PYTHON, python, python3); Ubuntu: sudo apt install python3")
+}
+
 #[test]
 fn std_ord_int_file_matches_generator() {
     // sửa tay lib/std/src/std_ord_int.gt ⇒ ĐỎ: tệp phải bằng ĐÚNG đầu ra của tools/gen_std.py (tất định)
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let o = std::process::Command::new("python")
+    let o = std::process::Command::new(python_cmd())
         .arg(root.join("tools/gen_std.py"))
         .arg("--stdout")
         .output()
         .expect("chạy python tools/gen_std.py");
     assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
-    let again = std::process::Command::new("python")
+    let again = std::process::Command::new(python_cmd())
         .arg(root.join("tools/gen_std.py"))
         .arg("--stdout")
         .output()

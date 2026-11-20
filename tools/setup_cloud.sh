@@ -3,6 +3,11 @@
 # Dùng: bash tools/setup_cloud.sh            (in thời gian từng bước; thoát 0 = XANH)
 # Nền đã kiểm: Ubuntu 24.04 x86_64 (apt `libllvm20` = LLVM 20.1.2). Windows: KHÔNG dùng script này (xem BUILDING.md; chưa kiểm).
 set -u
+# Cờ (GÓI 11 S0.b): --check = KHÔNG cài gì, in OK hoặc danh sách thiếu kèm LỆNH CHÍNH XÁC (thoát 0 nếu đủ, 1 nếu thiếu);
+#   --install-system = cho phép cài gói HỆ THỐNG bằng `sudo -n apt-get` (không hỏi mật khẩu; thất bại ⇒ in dòng `sudo apt install ...` cho Giang);
+#   --fuzz = cũng cài cargo-fuzz (cấp người dùng). Mặc định chỉ cài thứ CẤP NGƯỜI DÙNG (toolchain ghim, cargo-audit --locked).
+CHECK=0; SYS=0; FUZZ=0
+for a in "$@"; do case "$a" in --check) CHECK=1 ;; --install-system) SYS=1 ;; --fuzz) FUZZ=1 ;; *) echo "setup_cloud: cờ lạ $a (dùng --check, --install-system, --fuzz)" >&2; exit 2 ;; esac; done
 cd "$(dirname "$0")/.." || exit 1
 ROOT="$(pwd)"
 T0=$(date +%s)
@@ -13,27 +18,22 @@ tick() { local now; now=$(date +%s); echo "  [$(( now - step_t )) s] $1"; step_t
 die() { echo "setup_cloud: LỖI: $1" >&2; echo "SETUP_RESULT=RED"; exit 1; }
 echo "== setup_cloud: $(uname -sm), thư mục $ROOT"
 
-# 1. công cụ hệ thống: cc (build-essential), curl, python3, git
-need=""
-for c in cc curl python3 git; do command -v "$c" >/dev/null 2>&1 || need="$need $c"; done
-if [ -n "$need" ]; then
-  command -v apt-get >/dev/null 2>&1 || die "thiếu:$need và không có apt-get; cài thủ công rồi chạy lại"
-  $SUDO apt-get update -qq && $SUDO apt-get install -y -qq build-essential curl python3 git ca-certificates || die "apt-get không cài được:$need"
-fi
-tick "công cụ hệ thống (cc, curl, python3, git)"
-
-# 2. Rust (cargo ≥ 1.85, edition 2024)
-if ! command -v cargo >/dev/null 2>&1; then
-  [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
-fi
-if ! command -v cargo >/dev/null 2>&1; then
-  curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable >/dev/null 2>&1 || die "không cài được Rust (rustup); kiểm tra mạng tới sh.rustup.rs"
-  . "$HOME/.cargo/env"
-fi
-command -v cargo >/dev/null 2>&1 || die "cargo vẫn không có trong PATH"
-tick "Rust $(rustc --version 2>/dev/null | cut -d' ' -f2)"
-
-# 3. LLVM 20 (libLLVM-20.so): ưu tiên gói hệ thống; không có thì thử tải bản dựng sẵn 20.1.8 (ĐƯỜNG DỰ PHÒNG — CHƯA kiểm trên máy khác Ubuntu 24.04)
+MISSING_SYS=""; MISSING_USER=""
+want_ver() { awk -F= -v k="$1" '$1==k {gsub(/[[:space:]]/,"",$2); print $2}' "$ROOT/tools/TOOLCHAIN" 2>/dev/null; }
+RUSTV="$(want_ver rustc)"; RUSTV="${RUSTV:-1.98.1}"
+. "$ROOT/tools/pyfind.sh"
+# --- gói HỆ THỐNG (apt) ---
+need_pkg() { # $1 = tên gói apt; $2 = lệnh/tệp kiểm
+  if ! eval "$2" >/dev/null 2>&1; then MISSING_SYS="$MISSING_SYS $1"; fi
+}
+need_pkg build-essential "command -v cc && command -v make"
+need_pkg curl "command -v curl"
+need_pkg git "command -v git"
+need_pkg python3 "[ -n \"$PY\" ]"
+need_pkg libffi-dev "ls /usr/include/ffi.h /usr/include/*/ffi.h"
+need_pkg libzstd-dev "ls /usr/include/zstd.h"
+need_pkg zlib1g-dev "ls /usr/include/zlib.h"
+need_pkg libxml2-dev "ls /usr/include/libxml2/libxml/parser.h"
 find_llvm_dir() {
   for d in "${GRIT_LLVM_LIB_DIR:-}" /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib/llvm-20/lib "$HOME/.grit/llvm/lib"; do
     [ -n "$d" ] && [ -f "$d/libLLVM-20.so" ] && { echo "$d"; return 0; }
@@ -41,20 +41,47 @@ find_llvm_dir() {
   return 1
 }
 LLVMDIR="$(find_llvm_dir)" || LLVMDIR=""
-if [ -z "$LLVMDIR" ] && command -v apt-get >/dev/null 2>&1; then
-  $SUDO apt-get install -y -qq libllvm20 >/dev/null 2>&1 || { $SUDO apt-get update -qq >/dev/null 2>&1; $SUDO apt-get install -y -qq libllvm20 >/dev/null 2>&1; }
-  LLVMDIR="$(find_llvm_dir)" || LLVMDIR=""
+[ -n "$LLVMDIR" ] || MISSING_SYS="$MISSING_SYS libllvm20"
+# TSan (tuỳ chọn): clang — chỉ liệt kê, KHÔNG làm --check đỏ
+OPT_SYS=""; command -v clang >/dev/null 2>&1 || OPT_SYS="clang"
+# --- CẤP NGƯỜI DÙNG ---
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+command -v rustup >/dev/null 2>&1 || MISSING_USER="$MISSING_USER|curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none"
+if command -v rustup >/dev/null 2>&1; then
+  rustup toolchain list 2>/dev/null | grep -q "^$RUSTV" || MISSING_USER="$MISSING_USER|rustup toolchain install $RUSTV --profile minimal -c rustfmt -c clippy"
 fi
-if [ -z "$LLVMDIR" ]; then
-  echo "  gói libllvm20 không có; thử tải LLVM 20.1.8 dựng sẵn (dự phòng, chưa kiểm)..."
-  mkdir -p "$HOME/.grit" && cd "$HOME/.grit" || die "không tạo được ~/.grit"
-  curl -sSfL -o llvm.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/LLVM-20.1.8-Linux-X64.tar.xz" || die "không tải được LLVM 20.1.8; cài libllvm20 thủ công hoặc đặt GRIT_LLVM_LIB_DIR"
-  rm -rf llvm && mkdir llvm && tar -xJf llvm.tar.xz -C llvm --strip-components=1 || die "giải nén LLVM thất bại"
-  [ -f llvm/lib/libLLVM-20.so ] || { f="$(ls llvm/lib/libLLVM.so.20* 2>/dev/null | head -1)"; [ -n "$f" ] && ln -sf "$(basename "$f")" llvm/lib/libLLVM-20.so; }
-  cd "$ROOT" || exit 1
-  LLVMDIR="$(find_llvm_dir)" || LLVMDIR=""
+command -v cargo-audit >/dev/null 2>&1 || MISSING_USER="$MISSING_USER|cargo install cargo-audit --locked"
+if [ "$FUZZ" = 1 ]; then command -v cargo-fuzz >/dev/null 2>&1 || MISSING_USER="$MISSING_USER|cargo install cargo-fuzz --locked"; fi
+sys_line() { echo "sudo apt install -y $(echo "$MISSING_SYS" | sed 's/^ *//')"; }
+if [ "$CHECK" = 1 ]; then
+  if [ -z "$MISSING_SYS" ] && [ -z "$MISSING_USER" ]; then
+    echo "SETUP_CHECK=OK (rustc ghim $RUSTV; LLVM ${LLVMDIR:-?}; python: ${PY:-?})"
+    [ -z "$OPT_SYS" ] || echo "  tuỳ chọn (TSan): sudo apt install -y $OPT_SYS"
+    exit 0
+  fi
+  echo "SETUP_CHECK=THIẾU"
+  [ -z "$MISSING_SYS" ] || echo "  gói hệ thống: $(sys_line)"
+  echo "$MISSING_USER" | tr '|' '
+' | sed '/^$/d; s/^/  cấp người dùng: /'
+  [ -z "$OPT_SYS" ] || echo "  tuỳ chọn (TSan): sudo apt install -y $OPT_SYS"
+  exit 1
 fi
-[ -n "$LLVMDIR" ] || die "không tìm thấy libLLVM-20.so (cài gói libllvm20 hoặc đặt GRIT_LLVM_LIB_DIR tới thư mục chứa nó)"
+# --- cài đặt thật ---
+if [ -n "$MISSING_SYS" ]; then
+  if [ "$SYS" = 1 ]; then
+    if [ "$(id -u)" = 0 ]; then apt-get update -qq && apt-get install -y -qq $MISSING_SYS || die "apt-get không cài được:$MISSING_SYS"
+    else sudo -n true 2>/dev/null || die "cần sudo không hỏi mật khẩu cho --install-system; Giang chạy: $(sys_line)"; sudo -n apt-get update -qq && sudo -n apt-get install -y -qq $MISSING_SYS || die "apt-get lỗi; Giang chạy: $(sys_line)"; fi
+  else
+    die "thiếu gói hệ thống; Giang chạy: $(sys_line)   (hoặc chạy lại với --install-system nếu có sudo -n)"
+  fi
+fi
+tick "gói hệ thống"
+if ! command -v rustup >/dev/null 2>&1; then curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none >/dev/null 2>&1 || die "không cài được rustup"; . "$HOME/.cargo/env"; fi
+rustup toolchain list 2>/dev/null | grep -q "^$RUSTV" || rustup toolchain install "$RUSTV" --profile minimal -c rustfmt -c clippy >/dev/null 2>&1 || die "không cài được rustc $RUSTV"
+command -v cargo-audit >/dev/null 2>&1 || cargo install cargo-audit --locked >/dev/null 2>&1 || die "không cài được cargo-audit"
+[ "$FUZZ" = 1 ] && { command -v cargo-fuzz >/dev/null 2>&1 || cargo install cargo-fuzz --locked >/dev/null 2>&1 || die "không cài được cargo-fuzz"; }
+command -v cargo >/dev/null 2>&1 || die "cargo vẫn không có trong PATH"
+tick "Rust $(rustc --version 2>/dev/null | cut -d' ' -f2) (ghim $RUSTV), cargo-audit"
 export GRIT_LLVM_LIB_DIR="$LLVMDIR"
 tick "LLVM 20: $LLVMDIR"
 
