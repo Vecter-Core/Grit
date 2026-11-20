@@ -49,3 +49,41 @@ Bộ test dùng: `cargo test -p gt-term --test spawn_recursion --test instance_g
 - **2 ca còn sống (phân loại):** `lib.rs:721` `if consts.is_empty()` → false: **tương đương** (thoát sớm; kết quả rỗng giống hệt — suy từ đọc mã). `lib.rs:779` `dyn_fn_arg && takes_fn_param` → `||`: nhánh intrinsic không thân nhận đối số hàm động TRONG khởi tạo `□` — cần lời gọi có hiệu ứng trong initializer hằng (chưa dựng được chương trình hợp lệ) ⇒ **CHƯA CÓ TEST, hướng chấp-nhận-thêm**; ghi KNOWN_LIMITATIONS. Giống nhánh `dyn_fn_arg` của `conservative_graph` đã sống sót từ GÓI 10.
 - **25 ca sống sót cũ (293–690):** KHÔNG chạy lại trong GÓI 12 (mã dòng đó không đổi; test mới `const_cycle` không chạm). Trạng thái: 25 sống sót như bảng trên; hướng chấp-nhận-thêm vẫn là các dòng 559, 576, 671 (đo 0 lần). **Mục tiêu "0 ca chấp-nhận-thêm không có test/lập luận" CHƯA ĐẠT** (3 nhánh phòng thủ + 779 mới).
 - **Dữ liệu phải hỏng để tới các nhánh phòng thủ (P3.b):** 559 (`may_hold_fn` nhánh `Ref/RawPtr` của kiểu hàm): cần tham số kiểu `&fn` truyền vào intrinsic không thân — người dùng không viết được `&fn` làm đối số `spawn` ở Phase 1 (suy từ chữ ký prelude; CHƯA KIỂM bằng chương trình); 576 (`dyn_fn_arg` `true`): cần local hoặc đối số có kiểu có thể chứa hàm nhưng KHÔNG là `Const::FnItem` — chỉ có khi hàm đi qua generic/`id(f)` (FB-C34); đã có test `spawn_recursion`, nhưng đột biến `true → false` ở đúng nhánh `None` vẫn sống: dữ liệu `Place` có phép chiếu (trường/chỉ số) chứa hàm — hạn chế đã biết (hàng 17); 671 (`has_back_edge`): cần khối đích nằm ngoài `blocks` — MIR hợp lệ không có (validate.rs); các dòng `H…=0` còn lại ở bảng trên ghi sẵn dữ liệu cần hỏng. Những lập luận này là GIẢ THUYẾT: chưa đọc lại `validate.rs` cho 671 và chưa dựng chương trình cho 559/576; KHÔNG có bằng chứng ⇒ **CHƯA GIẢI THÍCH** (KNOWN_LIMITATIONS).
+
+## GÓI 13 B1 (2026-11-21, Windows; nguồn 100% tự động; `docs/MUT_GT_TERM_G13.jsonl`)
+- **Chạy lại ĐẦY ĐỦ** 110 đột biến (293–705, 1 worker, 5 lô, `--resume`, bộ test = const_cycle + contract_recursion + mutants_goi11 + termination + instance_graph + conservative_fallback + fail_closed_loops + spawn_recursion): **83 bị bắt, 25 sống sót, 2 không hợp lệ**. (Số dòng của bảng GÓI 10/11 lệch ≈ 8 dòng so với mã hiện tại; bảng dưới dùng số dòng HIỆN TẠI.) `tools/mut.py` nguồn: 110 tự động, 0 tay.
+- **Test mới (tests/ của gt-term; XANH trên mã gốc, ĐỎ trên đột biến — kiểm bằng `mut_range`):** `survivors_g13.rs` (vòng chỉ có `⊠` không cần `↓`: giết `has_back_edge` 691 `condition → true` và 702 `false → true`), `survivors_g13_hook.rs` (chốt `set_drop_trait_edges_for_test` đổi phán quyết: giết 440 `condition → true`), `survivors_g13_cons.rs` (đường bảo thủ ép buộc, hàm bị thoát gọi intrinsic không-hàm: giết 630 `condition → true`). **Giết 4 con ⇒ còn 21 sống sót.**
+- **ĐO bằng bộ đếm trong BẢN SAO ngoài kho (`D:/Grit_cnt2`, đếm lần chạy đúng/sai tại từng dòng): suite gt-term (biến thể nhanh `GT_TERM_PROGRAMS=150 GT_TERM_RUNS=3`) + 996 chương trình `gritc check` (tests/pass, fail, warn, adversarial, samples, examples, apps, capstone):**
+```text
+dòng  suite đúng/sai   corpus đúng/sai   phân loại (hướng)
+319   7069/260            7825/424
+324   25165/0              25930/0
+341   0/0              0/0
+368   48402/0              29008/0
+379   0/0              0/0
+392   19754/0              19455/0
+433   0/25             0/18
+438   24/0              18/0
+440   25/0              18/0
+451   0/1358           0/1774
+453   0/0              0/0
+503   0/0              0/0
+515   328/2              15/1
+562   173/0              288/0
+567   0/0              0/0
+584   0/0              0/0
+630   4/0              0/0
+687   0/0              0/0
+691   4094/11005          94/541
+699   0/0              0/0
+702   2/0              2/0
+```
+| dòng | đột biến | hướng | kết luận |
+|---|---|---|---|
+| 567, 584, 687, 699 | `None => true`/`return true` → `false` (hàm phòng thủ) | **chấp nhận thêm** | **0 lần** trên suite + 996 chương trình; bất biến được KIỂM trước khi tới gt-term: `gt-mir/src/validate.rs:311,380` (local phải tồn tại), `:366` (mọi khối có terminator), `gt-types/src/collect.rs:1176` (mọi hàm có chữ ký trong `db.fns`). Nhánh chết theo cấu tạo ⇒ không có chương trình tới được; KHÔNG có test (không dựng được). Ghi KNOWN_LIMITATIONS "false negative tiềm ẩn" kèm dòng |
+| 341, 379, 453, 503, 451 | `continue → break`, `false → true`, `< → <=` | chấp nhận thêm/tương đương | **0 lần** (vòng/nhánh không bao giờ chạy); cùng lập luận bất biến (nút luôn có thân; `edges` luôn đủ dài) |
+| 433 (×2), 438 | `\|\| → &&`, `→ false`, `→ true` | tương đương | điều kiện luôn sai (433: 0 lần đúng) / luôn đúng (438: 0 lần sai) trên mọi đầu vào đo |
+| 319, 324 (×3), 368, 392 | bỏ thêm gốc/instance, bỏ `ops.push` | chấp nhận thêm | lập luận CÓ ĐO (GÓI 11): số nút đồ thị giống hệt trên 437 chương trình; mọi hàm đã có instance từ `t.instances` và cạnh gọi; 324: nhánh sai 0 lần. Nhóm này dựa vào ĐO, không có chứng minh |
+| 515 | `if ra != rb` → luôn đúng | tương đương | `parent[rb]=ra` khi `ra==rb` là gán lại gốc cho chính nó (toán) |
+| 562, 630 (`&&→\|\|`) | thêm cạnh gián tiếp | **chặt thêm** | mutant từ chối nhiều hơn; không làm mất an toàn; chưa có test (cần chương trình `spawn` có hiệu ứng) |
+- **Mục tiêu "0 con theo hướng chấp-nhận-thêm mà không có test hay lập luận CÓ ĐO": ĐẠT ở mức ĐO** (mọi con chấp-nhận-thêm còn lại có 0 lần chạy trên 996 chương trình + suite, kèm bất biến được kiểm). Hạn chế: "0 lần" không chứng minh không tới được; dòng 319/324/368/392 chỉ dựa vào so sánh số nút. Dòng 559/576/671 của bảng cũ nay là 567/584/699 (+687): đã có lập luận trên.
