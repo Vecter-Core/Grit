@@ -30,6 +30,7 @@ def gen_inputs(tmp):
         buf += line + b"\n"
     p["wc"] = os.path.join(tmp, "wc.txt")
     open(p["wc"], "wb").write(bytes(buf))
+    p["wordfreq"] = p["wc"]  # GÓI 11: wordfreq đọc văn bản như wc
     # sha256: 32 MiB byte ngẫu nhiên
     p["sha256"] = os.path.join(tmp, "sha.bin")
     open(p["sha256"], "wb").write(bytes(next(g) & 255 for _ in range(32 << 20)))
@@ -66,12 +67,31 @@ def run_once(exe, arg):
     return time.perf_counter() - t, r
 
 
+def prep_src(name, tmp):
+    """GÓI 11 S0.c: ví dụ có phụ thuộc `std` (rig.toml) không dựng được từ thư mục src trần (E0309: thiếu `cmp`...). Sao chép src + lib/std/src vào thư mục tạm
+    (như tools/bench_sortlines_g2.py). Ví dụ không dùng std dựng thẳng từ src."""
+    src = os.path.join(ROOT, "examples", name, "src")
+    try:
+        needs_std = "std" in open(os.path.join(ROOT, "examples", name, "rig.toml"), encoding="utf-8").read().split("[dependencies]", 1)[1]
+    except (OSError, IndexError):
+        needs_std = False
+    if not needs_std:
+        return src
+    import glob, shutil
+    d = os.path.join(tmp, "src_" + name)
+    os.makedirs(d, exist_ok=True)
+    for base in (src, os.path.join(ROOT, "lib", "std", "src")):
+        for f in glob.glob(os.path.join(base, "*.gt")):
+            shutil.copy2(f, d)
+    return d
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="gtbp-")
     inputs = gen_inputs(tmp)
     items = [("fib(35)", os.path.join(ROOT, "tests", "bench", "fib.gt"), None)]
-    for n in ["wc", "json", "sha256", "sortlines", "stats"]:
-        items.append((n, os.path.join(ROOT, "examples", n, "src"), inputs[n]))
+    for n in ["wc", "json", "sha256", "sortlines", "stats", "wordfreq"]:
+        items.append((n, prep_src(n, tmp), inputs[n]))
     rows = []
     for name, src, arg in items:
         exes = {}
