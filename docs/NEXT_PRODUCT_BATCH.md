@@ -9,8 +9,8 @@ Mã sản phẩm (`crates/`, `runtime/`, `lib/`) ĐÓNG BĂNG sau cổng xanh rc
 | 2 | Đường siết spawn: cho phép khai `{detach}` ở mã người dùng (E1002 hiện chặn) rồi bắt buộc hàm gọi `spawn` khai `detach` | `! ∅` hiện không bảo đảm "không có luồng" | ADR-C12 | CHỜ — cần ADR riêng, làm TRƯỚC kênh có kiểu |
 | 3 | `declassify` không có `Cap<Secret>` ⇒ lỗi kiểu ĐỎ (hiện chỉ cảnh báo S201) | D28: dùng năng lực cần `Cap` | ADR-C13 | HOÃN — thay đổi phá vỡ; bán kính chưa đo bằng chạy thật (27 tệp theo `grep`) |
 | 4 | Xoá `Secret<T>` có bảo đảm (`secret_wipe`) | hiện không có chỗ nào xoá | `PHASE2_ADR_DRAFTS.md` ADR-P2-03 | ĐỀ XUẤT |
-| 5 | Phát hiện từ S1 (cổng Linux WSL) | — | GÓI 10 S1 | KHÔNG CÓ (S1 bỏ qua: chưa có WSL Ubuntu) |
-| 6 | Phát hiện từ S3 (FB-C34 tắt bản sửa, đột biến S1d) | — | GÓI 10 S3 | KHÔNG CÓ (S3.a–c chưa chạy: preflight đỏ) |
+| 5 | Phát hiện từ S1 (cổng Linux WSL) | — | GÓI 10 S1 | KHÔNG có lỗi mã: cổng Linux GREEN. Chỉ lệch môi trường (toolchain, `python`, `libffi-dev`) — sửa `tools/setup_cloud.sh` là việc công cụ, không phải mã sản phẩm |
+| 6 | Phát hiện từ S3: FB-C34 tắt bản sửa ⇒ ĐỎ (đúng). Đột biến S1d: 27/110 sống sót; cần THÊM TEST (tests/ của gt-term) để giết ~22 ca hướng chấp-nhận-thêm | GÓI 10 S3.a/b | `docs/MUT_GT_TERM_GOI10.md` | CHỜ (thêm test không đổi mã sản phẩm; làm được ngay khi có phiên) |
 | 7 | Kết quả R11c (Opus đọc mã) | — | sau này | CHƯA CÓ |
 
 Số mục đang chờ thật (1–4): **4** (mục 5–7 là chỗ giữ chỗ).

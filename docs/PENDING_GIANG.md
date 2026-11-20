@@ -5,7 +5,7 @@
 2. Đọc thông báo đình chỉ GitHub (xem `docs/GITHUB_SUSPENSION.md`).
 3. Tuỳ chọn: tạo kho RIÊNG TƯ ở dịch vụ khác bằng tài khoản của CHÍNH Giang (GitLab, Codeberg…), rồi Giang TỰ chạy `git remote add backup <url>`, `git push backup --all`, `git push backup --tags`. Agent KHÔNG giữ thông tin đăng nhập và KHÔNG đẩy. Đây là sao lưu, không thay GitHub.
 
-## CỔNG LINUX CỤC BỘ (GÓI 10 S1.b): CẦN GIANG CÀI WSL UBUNTU
+## CỔNG LINUX CỤC BỘ: ĐÃ XONG (GÓI 10, Giang cho phép cài Ubuntu 24.04; GREEN, xem `docs/CLOUD_GATE_RESULT.md`). Phần dưới là lịch sử:
 `wsl -l -v` (2026-11-20) chỉ có `docker-desktop` (Stopped; bản nội bộ của Docker, không dùng được) và `OpenClawGateway` (Running; KHÔNG phải của agent, agent không đụng). KHÔNG có bản Ubuntu/Debian dùng chung ⇒ cổng Linux (S1.c–e) BỎ QUA. Agent không cài hộ và không đổi cấu hình hệ thống. Các bước cho Giang (PowerShell thường):
 ```text
 wsl --install -d Ubuntu-24.04      # cần tạo tên người dùng/mật khẩu WSL; có thể phải khởi động lại

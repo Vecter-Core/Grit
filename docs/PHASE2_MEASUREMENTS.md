@@ -1,18 +1,20 @@
 # PHASE2_MEASUREMENTS — đo cho Giai đoạn 2 (GÓI 10 S2; 2026-11-20)
 
-Trạng thái: **CHƯA ĐO** các phép cần cargo/bench/gate: `tools/preflight.sh` ĐỎ cả 3 lần, ở 3 thời điểm khác nhau trong gói (bộ nhớ ảo khả dụng 2 119 232 → 2 643 856 KB < 4 GB; `Win32_OperatingSystem.FreeVirtualMemory` ≈ 2,19 GB trên tổng 33,2 GB). Nghi nguyên nhân (CHƯA KIỂM): tiến trình `vmmemWSL` giữ ≈ 4 GB commit vì phân phối WSL `OpenClawGateway` đang chạy (không phải của agent; agent KHÔNG tắt: `wsl --shutdown` sẽ dừng nó). Theo điều kiện dừng (b) không chạy lô nặng. Không có số đo nào dưới đây được bịa.
+Trạng thái (cập nhật sau khi Giang đóng WSL `OpenClawGateway`, preflight PASS): đã đo được mục 1, 5, 8 và một phần 6; các mục 2, 3, 4, 7, 9 CHƯA ĐO (lý do ở từng dòng). Số nào cũng ghi nguồn ĐO hay SUY RA. Máy: i5-12450H, Windows 11; nhiễu Windows Defender; một cargo tại một thời điểm, `CARGO_BUILD_JOBS=2`. `gritc` bản release dựng từ `08a4931` (mã sản phẩm = rc6).
 
-| # | Phép đo (FACTCHECK mục 10) | Kết quả | Nhãn |
+| # | Phép đo | Kết quả | Nhãn |
 |---|---|---|---|
-| 1 | Thời gian dựng `gritc` release; bench với gritc release | CHƯA ĐO (cần cargo; preflight đỏ) | — |
-| 2 | Profile `sortlines` | CHƯA ĐO | — |
-| 3 | Phần `memcpy` trong `Vec::push` | CHƯA ĐO. Hệ quả cho D4 (`PHASE2_PLAN.md`): chưa đủ điều kiện | — |
-| 4 | Cỡ enum thực trong IR của công cụ | CHƯA ĐO (cần `gritc build` + đọc `.ll`; chưa chạy). Từ ĐỌC MÃ: `8 + 8k` byte, cỡ mọi biến thể bằng nhau (`PHASE2_FACTCHECK.md` mục 2) | SUY RA từ mã, không phải đo |
-| 5 | Dev vs release-o2 vs Rust `-O`, hai lượt (lưu ý `bench_profile.py` không có `wordfreq`) | CHƯA ĐO | — |
-| 6 | Tần suất lỗi đảo đối số (`USER_BUGS.md`, `apps/`) | **0 ca xác nhận** trong `docs/USER_BUGS.md` (23 dòng, chỉ có mẫu, 0 mục), `docs/APPS_LOG.md`, `docs/CAPSTONE_LOG.md`, `docs/RUN_REPORTS.md`. Tìm 15 mẫu từ khoá (swap, đổi chỗ, thứ tự đối số, nhầm đối số, argument order, sai thứ tự, đối số ngược, đảo hai, hoán vị, …) ⇒ 0 khớp. "đảo" ở `RUN_REPORTS.md:42,133` là "hoàn nguyên", không phải đảo đối số. Các dòng nhắc "đối số" (`APPS_LOG.md:12,30`, `CAPSTONE_LOG.md:19,22`) là ca thiếu/thừa đối số dòng lệnh, `&![T]`→`&[T]` (E0301), mượn hai pha: KHÔNG phải đảo đối số. | ĐO (đọc từng dòng khớp) |
-| 7 | Oracle ghi thẳng vào đích khi abort giữa chừng | KHÔNG ĐO được ngoài cây (cần bản thử `lower.rs` + cargo) | — |
-| 8 | `cargo build --no-default-features -p gt-driver` (không LLVM) | CHƯA ĐO (cargo) | — |
-| 9 | Commit charge của Arena đặt trước | KHÔNG ĐO (không an toàn khi bộ nhớ ảo đã gần cạn: nguyên mẫu `VirtualAlloc` thêm áp lực lên đúng tài nguyên đang thiếu) | — |
+| 1 | Dựng `gritc` release nguội (`cargo build --release -p gt-driver`, clone sạch) | **1 m 39,8 s** (một lần; không có min/trung vị). Tệp `gritc.exe` 5 854 720 B, trùng cỡ với bản dựng trước ở cây chính | ĐO |
+| 1 | `bench_profile.py 7` với gritc release (trung vị 7 lần, giây; cột "release" = hồ sơ `release`) | fib(35): dev 1,097 / release 1,109 · wc: 1,319 / 1,304 · json: 1,196 / 1,073 · sha256: 2,440 / 3,337 (release CHẬM hơn dev; chưa giải thích, có thể nhiễu; CHƯA lặp) · đầu ra dev = release ở cả 4. min không in được vì bench dừng ở `sortlines` | ĐO |
+| 1 | `bench_profile.py` với `sortlines` và `stats` | **LỖI CÔNG CỤ:** `gritc build examples/sortlines/src` ⇒ `E0309 không có phương thức cmp` (thư mục không có gói `std`; `bench_sortlines_g2.py` sao chép `lib/std/src` cạnh nguồn nên chạy được). Bench này hỏng ở `sortlines` từ trước; CHƯA sửa công cụ | ĐO (lỗi) |
+| 5 | `bench_sortlines_g2.py` (33 554 438 B, 1 636 921 dòng; 5 lần; giây) | grit dev: trung vị 2,831 (min 2,632) · grit release-o2: 1,253 (min 1,250) · Rust -O0: 2,207 (min 2,085) · Rust -O: 0,968 (min 0,917). SHA-256 đầu ra GIỐNG nhau ở cả 4 (`45459d06…ef51`). Tỷ lệ release-o2 / Rust -O ≈ 1,29 (SUY RA từ trung vị) | ĐO |
+| 5 | `arena_scaling` (hồ sơ theo script, CHƯA xác minh) | 100 000 dòng 0,179 s; 400 000: 0,597 s; 1 636 921: 2,741 s (trung vị 3 lần) | ĐO |
+| 8 | `cargo build --no-default-features -p gt-driver` | **XANH** (5,0 s trên cache phụ thuộc có sẵn, nên KHÔNG phải thời gian nguội); `gritc --version` ⇒ "backend mặc định: interpreter"; chạy với PATH KHÔNG có LLVM: `gritc check` trên **433/433** tệp `tests/pass/*.gt` ⇒ green/yellow, 0 ca khác | ĐO |
+| 2 | Profile `sortlines` (WPR/xperf) | CHƯA ĐO (không có công cụ profile trên máy; không cài thêm) | — |
+| 3 | Phần `memcpy` trong `Vec::push` | CHƯA ĐO (cần bộ đếm trong bản dựng thử runtime). SUY RA từ mã: tăng ×2 sàn 4 ⇒ tổng byte sao chép ≤ cỡ cuối (khuếch đại khấu hao ≤ 2×); `sortlines` gọi `reserve` một lần nên không đại diện. D4 vẫn CHƯA ĐỦ ĐIỀU KIỆN | SUY RA |
+| 4 | Cỡ enum thực trong IR | KHÔNG ĐO được: `gritc build` không có tuỳ chọn phát IR (`--help`); cần thêm mã hoặc test mới | — |
+| 6 | Đảo đối số | 0 ca xác nhận trong 4 nhật ký (xem bên dưới) | ĐO (đọc) |
+| 7 | Oracle "ghi thẳng vào đích" | KHÔNG ĐO được ngoài cây | — |
+| 9 | Commit charge Arena đặt trước | CHƯA ĐO | — |
 
-**Cảnh báo đánh giá (mục 6):** lỗi đảo hai đối số cùng kiểu KHÔNG phải lỗi biên dịch, chỉ lộ thành đầu ra sai; đếm lỗi biên dịch luôn ra 0 và vô nghĩa. Con số 0 ở trên là "chưa thấy ca đảo nào trong các nhật ký đã đọc" — các nhật ký rất ngắn (35 và 28 dòng, hai phiên capstone chưa có hai bản sạch theo ngưỡng của N9), nên đây KHÔNG phải bằng chứng rằng lỗi không xảy ra. N9 giữ HOÃN theo `PHASE2_PLAN.md`.
-**Máy:** i5-12450H, Windows 11 (số của `BENCHMARK.md`); Windows Defender làm lệch lần chạy đầu ⇒ dùng min. Khi preflight xanh: chạy `tools/bench_profile.py` (min và trung vị) theo `PHASE2_FACTCHECK.md` mục 10.
+Phép đo 6 (từ lần đọc đầu, không đổi): 0 ca đảo đối số xác nhận trong `docs/USER_BUGS.md` (0 mục), `APPS_LOG.md`, `CAPSTONE_LOG.md`, `RUN_REPORTS.md`; 15 mẫu từ khoá đều 0 khớp. Cảnh báo: lỗi đảo hai đối số cùng kiểu KHÔNG phải lỗi biên dịch, chỉ lộ thành đầu ra sai; nhật ký rất ngắn nên 0 không chứng minh lỗi không xảy ra. N9 giữ HOÃN.
