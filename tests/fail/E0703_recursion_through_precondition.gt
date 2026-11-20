@@ -1,0 +1,5 @@
+// expect: fail E0703
+// note: FB-C35 — đệ quy qua tiền điều kiện: f ⊳ g(n), g gọi lại f (kiểm tra lúc chạy chèn sau M8); trước sửa: XANH và không dừng
+ƒ f(n: u32) → u32 ! ∅ ⊳ g(n) { n }
+ƒ g(n: u32) → bool ! ∅ { f(n) > 0u32 }
+ƒ main() → i32 ! ∅ { r ≔ f(1u32); 0 }
