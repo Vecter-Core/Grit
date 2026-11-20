@@ -38,7 +38,15 @@ status=ok; [ "$code" -ne 0 ] && status=fail
 # băm NGUỒN của chính crate (và phụ thuộc) để tích luỹ chỉ tính trên mã hiện tại (P3.a)
 case "$T" in lex) SRCDIRS="crates/gt-lexer/src crates/gt-lexer/fuzz/fuzz_targets";; parse) SRCDIRS="crates/gt-parser/src crates/gt-parser/fuzz/fuzz_targets crates/gt-lexer/src crates/gt-ast/src crates/gt-span/src crates/gt-diag/src";; *) SRCDIRS="crates/gt-driver/src";; esac
 SRCH="$(cd "$ROOT" && git ls-files -s $SRCDIRS | sha1sum | cut -c1-12)"
-echo "{\"ts\":\"$(ts)\",\"target\":\"$T\",\"status\":\"$status\",\"seconds\":$SEC,\"runs\":$runs,\"exit\":$code,\"src\":\"$SRCH\"}" >> "$LOG"
+# GÓI 12 P2.a: trên Linux ghi thêm nguồn + nền (WSL ⇒ "wsl-linux"; Linux khác ⇒ "linux-local"), bản hệ điều hành và nhân. Windows giữ định dạng cũ (không có `source` = "windows").
+EXTRA=""
+case "$(uname -s)" in
+  Linux)
+    SRCNAME=linux-local; grep -qi microsoft /proc/version 2>/dev/null && SRCNAME=wsl-linux
+    OSNAME="$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-linux}" | tr -d '"\\')"; KERN="$(uname -r | tr -d '"\\')"
+    EXTRA=",\"source\":\"$SRCNAME\",\"os\":\"$OSNAME\",\"kernel\":\"$KERN\"" ;;
+esac
+echo "{\"ts\":\"$(ts)\",\"target\":\"$T\",\"status\":\"$status\",\"seconds\":$SEC,\"runs\":$runs,\"exit\":$code,\"src\":\"$SRCH\"$EXTRA}" >> "$LOG"
 # lưới tệp-đã-theo-dõi: phiên fuzz không được đổi gì ngoài FUZZ_LOG (ghi nối có chủ ý)
 if [ -n "${TRACK_SNAP_FUZZ:-}" ]; then TRACK_IGNORE='docs/FUZZ_LOG.jsonl' bash "$ROOT/tools/track_guard.sh" verify "$TRACK_SNAP_FUZZ" "$ROOT" || echo "!!!!! fuzz_session: tệp đã theo dõi bị đổi"; fi
 echo "phiên $T: $status, $runs lượt, ${SEC}s"
