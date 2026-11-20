@@ -1,4 +1,5 @@
 E0401_assign_field_after_move | E0401 | `b.v ← 1;` | [giá trị bị move ở đây @ `b`] | ghi vào một phần của `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_cap_used_twice | E0401 | `use1(c)` | [giá trị bị move ở đây @ `c`] | dùng `c` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_chain_moves | E0401 | `b` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_dup_arena_reuse_demo | E0401 | `(x, x)` | [giá trị bị move ở đây @ `(x, x)`] | dùng `x` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_dup_arena_use_after_reset | E0401 | `(x, x)` | [giá trị bị move ở đây @ `(x, x)`] | dùng `x` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
