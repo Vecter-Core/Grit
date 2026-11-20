@@ -271,3 +271,4 @@ Guard coi mọi tên `llvm.*` là hợp lệ nếu LLVM verifier nhận lời g�
 - **Vi phạm:** D12 (mọi đệ quy phải có `↓` hoặc `div`).
 - **Test ĐỎ trước:** `crates/gt-term/tests/contract_recursion.rs` (4 chương trình bị chấp nhận sai + 1 đối chứng).
 - **Mức:** âm tính giả của kiểm an toàn ⇒ nghiêm trọng nhất theo grit-contract §3.3 ⇒ sửa ngay theo luật đóng băng (rc7, cổng đầy đủ lại).
+- **ĐÃ SỬA (GÓI 11, commit `7c6334c`; rc7 `41ae5e7`):** `gt-term` gộp cạnh gọi của thân `Pre`/`Post` vào nút của hàm sở hữu (cả đồ thị instance và bảo thủ). Test: `contract_recursion` 6 xanh; bộ sinh 5 hình dạng × 32 = 160 chương trình: **tắt bản sửa ⇒ 160/160 bị chấp nhận sai; bật ⇒ 0/160**. Regression: toàn bộ test gt-term xanh; `gritc check` trên 437 tệp tests/pass+samples: 0 đỏ mới. Cổng đầy đủ rc7: xem RUN_REPORTS GÓI 11.
