@@ -14,8 +14,25 @@ has_nul() {
   [ -f "$1" ] || return 1
   [ "$(tr -cd '\000' < "$1" | wc -c)" -gt 0 ]
 }
+# GÓI 11 S0.a: phiên bản rustc phải KHỚP dòng `rustc=` của tools/TOOLCHAIN (rustc 1.100 làm clippy -D warnings đỏ ở cổng WSL đầu tiên).
+# Không có tools/TOOLCHAIN trong thư mục dự án ⇒ bỏ qua (kho tạm của test). PREFLIGHT_RUSTC_VERSION chỉ để KIỂM THỬ (giả lập đầu ra `rustc --version`).
+check_toolchain() {
+  local f="$dir/tools/TOOLCHAIN" want have
+  [ -f "$f" ] || return 0
+  want=$(awk -F= '$1=="rustc" {gsub(/[[:space:]]/,"",$2); print $2}' "$f")
+  [ -n "$want" ] || { echo "PREFLIGHT: tools/TOOLCHAIN không có dòng rustc="; return 1; }
+  if [ -n "${PREFLIGHT_RUSTC_VERSION:-}" ]; then have="$PREFLIGHT_RUSTC_VERSION"
+  else have=$( (cd "$dir" && rustc --version 2>/dev/null) | awk '{print $2}'); fi
+  [ -n "$have" ] || { echo "PREFLIGHT: không chạy được rustc (cài rustup rồi: rustup toolchain install $want --profile minimal -c rustfmt -c clippy)"; return 1; }
+  if [ "$have" != "$want" ]; then
+    echo "PREFLIGHT: rustc $have KHÁC bản ghim $want (tools/TOOLCHAIN). Sửa: rustup toolchain install $want --profile minimal -c rustfmt -c clippy (rust-toolchain.toml sẽ tự chọn nó trong kho), hoặc đặt RUSTUP_TOOLCHAIN=$want"
+    return 1
+  fi
+  return 0
+}
 check_once() {
   local bad=0 g="$dir/.git"
+  check_toolchain || return 1
   [ -d "$g" ] || { echo "PREFLIGHT: không có $g"; return 1; }
   # index là nhị phân nên kiểm chữ ký DIRC; các tệp cấu trúc văn bản phải không rỗng và không có NUL.
   if [ ! -s "$g/index" ]; then echo "PREFLIGHT: $g/index rỗng hoặc thiếu"; bad=1

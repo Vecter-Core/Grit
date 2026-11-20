@@ -1,0 +1,7 @@
+# tools/TOOLCHAIN — phiên bản công cụ ĐÃ SINH ra các cổng xanh (GÓI 11). preflight.sh SO `rustc --version` với dòng `rustc=`; lệch ⇒ ĐỎ.
+# Nâng toolchain là việc RIÊNG, có cổng riêng: đổi tệp này, rust-toolchain.toml và docs/ENVIRONMENT.md CÙNG commit.
+rustc=1.98.1
+cargo=1.98.1
+cargo-audit-min=0.22.2
+llvm=20.1.8
+python-min=3.10

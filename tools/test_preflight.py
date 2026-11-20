@@ -91,5 +91,27 @@ class Preflight(unittest.TestCase):
         self.assertTrue("D:" in r.stdout or "ổ chứa kho" in r.stdout, r.stdout)
 
 
+class PreflightToolchain(Preflight):
+    """GÓI 11 S0.a: tools/TOOLCHAIN ghim rustc; lệch ⇒ ĐỎ kèm cách sửa; khớp ⇒ OK (giả lập qua PREFLIGHT_RUSTC_VERSION)."""
+
+    def run_pf_with(self, have):
+        os.makedirs(os.path.join(self.d, "tools"), exist_ok=True)
+        with open(os.path.join(self.d, "tools", "TOOLCHAIN"), "w", newline="\n") as f:
+            f.write("rustc=1.98.1\n")
+        env = dict(os.environ, PREFLIGHT_SKIP_RESOURCES="1", PREFLIGHT_TRIES="1", PREFLIGHT_SLEEP="0", PREFLIGHT_RUSTC_VERSION=have)
+        return subprocess.run([BASH, SCRIPT, self.d.replace("\\", "/")], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              env=env, stdin=subprocess.DEVNULL)
+
+    def test_matching_rustc_is_ok(self):
+        r = self.run_pf_with("1.98.1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_newer_rustc_is_red_with_fix_hint(self):
+        r = self.run_pf_with("1.100.0")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("1.100.0", r.stdout)
+        self.assertIn("rustup toolchain install 1.98.1", r.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
