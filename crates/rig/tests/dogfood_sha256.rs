@@ -66,10 +66,31 @@ fn tool(exe: &Path, p: &Path) -> String {
     String::from_utf8_lossy(&o.stdout).into_owned()
 }
 
+/// GÓI 11 S0.b: tìm Python: biến PYTHON → `python` → `python3` (Ubuntu không có `python` nếu thiếu python-is-python3).
+fn python_cmd() -> String {
+    let ok = |c: &str| {
+        Command::new(c)
+            .arg("--version")
+            .output()
+            .is_ok_and(|o| o.status.success())
+    };
+    if let Ok(p) = std::env::var("PYTHON") {
+        if ok(&p) {
+            return p;
+        }
+    }
+    for c in ["python", "python3"] {
+        if ok(c) {
+            return c.to_string();
+        }
+    }
+    panic!("không tìm thấy Python (PYTHON, python, python3); Ubuntu: sudo apt install python3")
+}
+
 /// hashlib (Python/OpenSSL) cho một loạt tệp: trả dãy hex theo thứ tự.
 fn hashlib(paths: &[PathBuf]) -> Vec<String> {
     let script = "import hashlib,sys\nfor p in sys.argv[1:]:\n    print(hashlib.sha256(open(p,'rb').read()).hexdigest())";
-    let o = Command::new("python")
+    let o = Command::new(python_cmd())
         .args(["-I", "-c", script])
         .args(paths)
         .output()
