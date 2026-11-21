@@ -864,7 +864,14 @@ fn invariant_violations(t: &TypesOutput, m: &MirOutput) -> Vec<(NodeId, Span, St
                         gt_mir::Rvalue::CastFits(o, _) | gt_mir::Rvalue::UnaryOp(_, o) => vec![o],
                         gt_mir::Rvalue::BinaryOp(_, a, c)
                         | gt_mir::Rvalue::CheckedBinaryOp(_, a, c) => vec![a, c],
-                        _ => Vec::new(),
+                        // hàm HỢP LỆ làm toán hạng của các dạng này (gán, ép kiểu, gộp) hoặc không có toán hạng: không phải vi phạm
+                        gt_mir::Rvalue::Use(_)
+                        | gt_mir::Rvalue::Repeat(..)
+                        | gt_mir::Rvalue::Cast(..)
+                        | gt_mir::Rvalue::Aggregate(..)
+                        | gt_mir::Rvalue::Ref(..)
+                        | gt_mir::Rvalue::Len(_)
+                        | gt_mir::Rvalue::Discriminant(_) => Vec::new(),
                     };
                     if arith
                         .iter()

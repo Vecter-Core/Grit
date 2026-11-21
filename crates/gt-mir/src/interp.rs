@@ -96,7 +96,15 @@ fn holds_ref(v: &V) -> bool {
     match v {
         V::Ref(..) => true,
         V::Tuple(x) | V::Array(x) | V::Adt(_, x) => x.iter().any(holds_ref),
-        _ => false,
+        // liệt kê đủ (không `_`): biến thể `V` mới có thể mang tham chiếu buộc người sửa xem lại
+        V::Int(..)
+        | V::Bool(_)
+        | V::Char(_)
+        | V::Float(_)
+        | V::Str(_)
+        | V::Unit
+        | V::Fn(_)
+        | V::Uninit => false,
     }
 }
 
