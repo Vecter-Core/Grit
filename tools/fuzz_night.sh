@@ -24,7 +24,7 @@ case "$cmd" in
     hours="${2:-26}"; mode="--parallel"
     for a in "$@"; do [ "$a" = "--sequential" ] && mode=""; done
     case "$hours" in --*) hours=26;; esac
-    wsl_run "set -e; [ -d $CLONE/.git ] || git clone -q /mnt/d/Grit $CLONE; cd $CLONE; git config core.autocrlf false; git fetch -q /mnt/d/Grit integration; cp -f docs/FUZZ_LOG.jsonl \$HOME/.fuzz_log.keep 2>/dev/null; git checkout -q -f FETCH_HEAD; if [ -f \$HOME/.fuzz_log.keep ]; then awk 'NR==FNR{s[\$0]=1;next} !(\$0 in s)' docs/FUZZ_LOG.jsonl \$HOME/.fuzz_log.keep >> docs/FUZZ_LOG.jsonl; fi; echo \"fuzz_night: clone \$(pwd) tại \$(git rev-parse --short HEAD)\"; FUZZ_TOOLCHAIN=$TC FUZZ_PAR_MIN_GB=$PARMIN FUZZ_SESSION_SEC=$SESSEC bash tools/fuzz_loop.sh $hours $mode 2>&1 | tee -a \$HOME/fuzz.out"
+    wsl_run "set -e; [ -d $CLONE/.git ] || git clone -q /mnt/d/Grit $CLONE; cd $CLONE; git config core.autocrlf false; git fetch -q /mnt/d/Grit integration; cp -f docs/FUZZ_LOG.jsonl \$HOME/.fuzz_log.keep 2>/dev/null; git checkout -q -f FETCH_HEAD; if [ -f \$HOME/.fuzz_log.keep ]; then awk 'NR==FNR{s[\$0]=1;next} !(\$0 in s)' docs/FUZZ_LOG.jsonl \$HOME/.fuzz_log.keep >> docs/FUZZ_LOG.jsonl; fi; echo \"fuzz_night: clone \$(git rev-parse --show-toplevel) tại \$(git rev-parse --short HEAD)\"; FUZZ_TOOLCHAIN=$TC FUZZ_PAR_MIN_GB=$PARMIN FUZZ_SESSION_SEC=$SESSEC bash tools/fuzz_loop.sh $hours $mode 2>&1 | tee -a \$HOME/fuzz.out"
     ;;
   status)
     wsl_run "cd $CLONE && python3 tools/fuzz_total.py --summary && echo '--- 5 dòng cuối ~/fuzz.out:' && tail -5 \$HOME/fuzz.out"
