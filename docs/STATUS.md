@@ -22,7 +22,7 @@ Nhãn hiện hành: **`1.0.0-rc7`** (ứng viên, **CHƯA** phải `1.0.0-seed`)
 | CI GitHub | **KHOÁ**: tài khoản `gn3305970-lang` bị đình chỉ (HTTP 403), Actions HTTP 422 (2026-11-20). Run xanh cuối: Linux rc4 trên `1793b7f` (1028/0/207, 2026-11-19) |
 | Nhánh (ĐO 2026-11-21 trong clone này) | `origin` = `Vecter-Core/Grit`; `main` = `origin/main` = `e8a8ae5` = điểm xuất phát của nhánh phiên `claude/cool-cray-hqha6n`. Tài liệu cũ ghi `main` = `e450c69`/`17beed4` cho kho `gn3305970-lang` (đã đình chỉ): **hai kho, hai số, chưa đối chiếu được** — `CHƯA KIỂM`. Quy tắc `main` (chỉ fast-forward sau CI xanh; chỉ Giang đẩy): AGENTS.md |
 | Máy này (đo 2026-11-21) | Linux, `cargo 1.98.1` (đúng bản ghim): dựng `gritc` **không-LLVM** được; thiếu LLVM 20 (có 17/18) ⇒ backend `llvm` và test chạy nhị phân thật **CHƯA dựng được ở đây** |
-| Test không-LLVM (ĐO 2026-11-21) | trước dọn: 194 bộ/903 test đạt/0 lỗi (≈ 2.329 s; 5 bộ chiếm 82% thời gian); sau dọn: 821 test (−111). Chi tiết, cách đo và việc còn dở: `docs/HISTORY.md` mục 7. Cổng đầy đủ và test LLVM **CHƯA chạy** |
+| Test không-LLVM (ĐO 2026-11-21) | trước dọn: 181 bộ/863 test đạt/0 lỗi (≈ 2.263 s; 5 bộ chiếm 89,7% thời gian); sau dọn: 931 ⇒ 821 test; 781 đạt, 37 lỗi (tất cả ở 7 bộ `rig`, cần LLVM), `comments.rs` 1.337 s ⇒ 695 s. Chi tiết, cách đo và việc còn dở: `docs/HISTORY.md` mục 7. Cổng đầy đủ và test LLVM **CHƯA chạy** |
 
 ## 3. Luật làm việc (bản đầy đủ: `AGENTS.md`, `.claude/skills/grit-contract.md`)
 - Chỉ báo số liệu THẬT từ lệnh đã chạy; ghi `CHƯA KIỂM` cho phần chưa kiểm. Không báo xong khi chưa có cổng liền mạch xanh trên đúng mã đó.
