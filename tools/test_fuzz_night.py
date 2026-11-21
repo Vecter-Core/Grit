@@ -16,25 +16,68 @@ def run(*args, **env):
     return p.returncode, p.stdout + p.stderr
 
 
+def sh(*a, cwd=None):
+    return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=cwd, capture_output=True, text=True, encoding="utf-8", check=True).stdout
+
+
+class SyncClone(unittest.TestCase):
+    """tools/fuzz_sync_clone.sh bằng kho nguồn giả: dòng log chỉ có ở clone được GIỮ, HEAD tiến lên, chạy lại không nhân đôi."""
+
+    def test_keeps_local_rows_advances_head_and_is_idempotent(self):
+        import tempfile
+        tmp = tempfile.mkdtemp(prefix="fuzz-sync-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        src, clone = os.path.join(tmp, "src").replace(chr(92), "/"), os.path.join(tmp, "clone").replace(chr(92), "/")
+        os.makedirs(os.path.join(src, "docs"))
+        sh("init", "-q", "-b", "integration", cwd=src)
+        log = os.path.join(src, "docs", "FUZZ_LOG.jsonl")
+        with open(log, "w", encoding="utf-8", newline=chr(10)) as f:
+            f.write('{"ts":"A"}'+chr(10)+'{"ts":"B"}'+chr(10))
+        sh("add", "-A", cwd=src)
+        sh("commit", "-q", "-m", "c1", cwd=src)
+        script = os.path.join(ROOT, "tools", "fuzz_sync_clone.sh").replace(chr(92), "/")
+
+        def sync():
+            p = subprocess.run([BASH, script, clone, src, "integration"], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            return p.stdout
+
+        sync()
+        with open(os.path.join(clone, "docs", "FUZZ_LOG.jsonl"), "a", encoding="utf-8", newline=chr(10)) as f:
+            f.write('{"ts":"LOCAL1"}'+chr(10)+'{"ts":"LOCAL2"}'+chr(10))
+        with open(log, "a", encoding="utf-8", newline=chr(10)) as f:  # kho chính tiến lên (nhập thêm một dòng)
+            f.write('{"ts":"C"}'+chr(10))
+        sh("commit", "-q", "-am", "c2", cwd=src)
+        out = sync()
+        with open(os.path.join(clone, "docs", "FUZZ_LOG.jsonl"), encoding="utf-8") as f:
+            rows = f.read().split()
+        self.assertEqual(rows, ['{"ts":"A"}', '{"ts":"B"}', '{"ts":"C"}', '{"ts":"LOCAL1"}', '{"ts":"LOCAL2"}'], out)
+        sync()  # lần hai: không nhân đôi
+        with open(os.path.join(clone, "docs", "FUZZ_LOG.jsonl"), encoding="utf-8") as f:
+            self.assertEqual(len(f.read().split()), 5)
+
+
 class Night(unittest.TestCase):
     def test_start_defaults_to_parallel_26_hours_pinned_nightly_and_syncs_the_clone(self):
         rc, out = run("start")
         self.assertEqual(rc, 0, out)
         self.assertIn("fuzz_loop.sh 26 --parallel", out)
         self.assertIn("FUZZ_TOOLCHAIN=nightly-2026-10-04", out)
-        self.assertIn("git fetch -q /mnt/d/Grit integration", out)
-        self.assertIn("core.autocrlf false", out)
+        self.assertIn("fuzz_sync_clone.sh $HOME/grit_fuzz /mnt/d/Grit integration", out)
         self.assertIn("tee -a", out)
         self.assertIn("WSL[Ubuntu-24.04]", out)
         self.assertIn("(git rev-parse --show-toplevel)", out)  # thoát ký tự để chạy TRONG WSL; không dùng $PWD (đo: $PWD trong `wsl -- bash -lc` sai = thư mục Windows)
 
-    def test_resync_keeps_the_clone_local_log_rows_instead_of_aborting_on_a_dirty_log(self):
-        """Lỗi tìm thấy khi kiểm tay (GÓI 14): `git checkout FETCH_HEAD` từ chối vì docs/FUZZ_LOG.jsonl của clone khác HEAD ⇒ lệnh qua đêm không chạy được lần thứ hai."""
+    def test_start_syncs_through_the_script_file_not_a_long_inline_string(self):
+        rc, out = run("start", FUZZ_REPO_WSL="/mnt/q/Kho")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("bash /mnt/q/Kho/tools/fuzz_sync_clone.sh", out)
+        self.assertIn("/mnt/q/Kho integration", out)
+
+    def test_default_repo_path_is_converted_from_windows_to_wsl(self):
         rc, out = run("start")
         self.assertEqual(rc, 0, out)
-        self.assertIn("git checkout -q -f FETCH_HEAD", out)
-        self.assertIn(".fuzz_log.keep", out)
-        self.assertIn(">> docs/FUZZ_LOG.jsonl", out)
+        self.assertIn("bash /mnt/", out)  # D:/Grit ⇒ /mnt/d/Grit
 
     def test_hours_and_sequential_flag(self):
         rc, out = run("start", "0.05", "--sequential")

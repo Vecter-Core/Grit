@@ -15,6 +15,10 @@ TC="${FUZZ_TOOLCHAIN:-nightly-2026-10-04}"
 PARMIN="${FUZZ_PAR_MIN_GB:-6}"
 SESSEC="${FUZZ_SESSION_SEC:-600}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# đường dẫn kho chính nhìn từ WSL: D:/Grit ⇒ /mnt/d/Grit (đặt FUZZ_REPO_WSL để ghi đè)
+if [ -n "${FUZZ_REPO_WSL:-}" ]; then REPO_WSL="$FUZZ_REPO_WSL"
+elif command -v cygpath >/dev/null 2>&1; then w="$(cygpath -m "$ROOT")"; d="$(echo "${w%%:*}" | tr 'A-Z' 'a-z')"; REPO_WSL="/mnt/$d${w#*:}"
+else REPO_WSL="$ROOT"; fi
 wsl_run() { # $1 = chuỗi lệnh bash chạy trong WSL (shell đăng nhập để có cargo)
   if [ "${FUZZ_NIGHT_DRY:-0}" = 1 ]; then echo "WSL[$DISTRO]: $1"; return 0; fi
   wsl.exe -d "$DISTRO" -- bash -lc "$1"
@@ -24,7 +28,7 @@ case "$cmd" in
     hours="${2:-26}"; mode="--parallel"
     for a in "$@"; do [ "$a" = "--sequential" ] && mode=""; done
     case "$hours" in --*) hours=26;; esac
-    wsl_run "set -e; [ -d $CLONE/.git ] || git clone -q /mnt/d/Grit $CLONE; cd $CLONE; git config core.autocrlf false; git fetch -q /mnt/d/Grit integration; cp -f docs/FUZZ_LOG.jsonl \$HOME/.fuzz_log.keep 2>/dev/null; git checkout -q -f FETCH_HEAD; if [ -f \$HOME/.fuzz_log.keep ]; then awk 'NR==FNR{s[\$0]=1;next} !(\$0 in s)' docs/FUZZ_LOG.jsonl \$HOME/.fuzz_log.keep >> docs/FUZZ_LOG.jsonl; fi; echo \"fuzz_night: clone \$(git rev-parse --show-toplevel) tại \$(git rev-parse --short HEAD)\"; FUZZ_TOOLCHAIN=$TC FUZZ_PAR_MIN_GB=$PARMIN FUZZ_SESSION_SEC=$SESSEC bash tools/fuzz_loop.sh $hours $mode 2>&1 | tee -a \$HOME/fuzz.out"
+    wsl_run "bash $REPO_WSL/tools/fuzz_sync_clone.sh $CLONE $REPO_WSL integration && cd $CLONE && FUZZ_TOOLCHAIN=$TC FUZZ_PAR_MIN_GB=$PARMIN FUZZ_SESSION_SEC=$SESSEC bash tools/fuzz_loop.sh $hours $mode 2>&1 | tee -a \$HOME/fuzz.out"
     ;;
   status)
     wsl_run "cd $CLONE && python3 tools/fuzz_total.py --summary && echo '--- 5 dòng cuối ~/fuzz.out:' && tail -5 \$HOME/fuzz.out"
