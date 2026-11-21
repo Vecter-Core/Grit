@@ -1,0 +1,15 @@
+// expect: pass
+// note: luật chia/dư khi kết quả qua BIẾN TRUNG GIAN (ADR-C16, giết đột biến nhánh đích ≠ toán hạng): `y ≔ x / 10; x ← y` giảm chặt;
+// `y ≔ x % 100; x ← y; x ← x - 1` giảm nhờ `x % 100 ≤ x` (không chặt) rồi trừ 1
+ƒ digits(n: u32) → u32 ! ∅ {
+  μx ≔ n;
+  μc ≔ 0u32;
+  ⟳ x > 0u32 ↓ x { y ≔ x / 10u32; x ← y; c ← c +% 1u32; }
+  c
+}
+ƒ shrink(n: u32) → u32 ! ∅ {
+  μx ≔ n;
+  ⟳ x > 0u32 ↓ x { y ≔ x % 100u32; ⎇ y == 0u32 { ⊠; } ⇝ { } x ← y - 1u32; }
+  x
+}
+ƒ main() → u32 ! ∅ { digits(90210u32) +% shrink(250u32) }

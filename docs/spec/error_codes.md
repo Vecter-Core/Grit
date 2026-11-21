@@ -46,7 +46,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | E0603 | Chỉ số ngoài biên chắc chắn | M7 | E0603_const_oob |
 | E0604 | Ép kiểu mất thông tin chắc chắn | M7 | — |
 | E0701 | Vòng lặp thiếu `↓` (D12) | M8 | E0701_loop_no_variant, E0701_infinite_no_div, E0701_disjunction_cond |
-| E0702 | `↓` không giảm nghiêm ngặt hoặc không bị chặn dưới | M8 | E0702_variant_not_decreasing, E0702_variant_unbounded, E0702_variant_stationary, E0702_ghost_limit_stale_ghost, E0702_loop_divide_by_one, E0702_loop_halving_stuck_at_zero, E0702_loop_halving_negative, E0702_recursion_rem_swapped, E0702_loop_halving_negative_then_decrement |
+| E0702 | `↓` không giảm nghiêm ngặt hoặc không bị chặn dưới | M8 | E0702_variant_not_decreasing, E0702_variant_unbounded, E0702_variant_stationary, E0702_ghost_limit_stale_ghost, E0702_loop_divide_by_one, E0702_loop_halving_stuck_at_zero, E0702_loop_halving_negative, E0702_recursion_rem_swapped, E0702_loop_halving_negative_then_decrement, E0702_loop_rem_through_temporary_no_decrease, E0702_loop_halving_through_temporary_stuck_at_zero |
 | E0703 | Đệ quy thiếu `↓` (hoặc `div`) | M8 | E0703_self_recursion, E0703_recursion_through_precondition, E0703_recursion_through_postcondition, E0703_spawn_self_recursion, E0703_spawn_mutual_no_variant, E0703_spawn_recursion_const_variant, E0703_mutual_recursion, E0703_partial_cycle, E0703_trait_cycle_through_generic_impl, E0703_trait_cycle_two_traits_through_generic_impl, E0703_trait_cycle_three_levels_through_generic_impl |
 | E0801 | Hiệu ứng suy ra ⊄ khai báo (kể cả hàm `∅` gọi hàm có hiệu ứng) | M8 | E0801_effect_undeclared, E0801_spawn_worker_mem_in_empty |
 | E0802 | Thành viên impl khai hiệu ứng ngoài tập mà thành viên trait cho phép | M8 | E0802_impl_more_effects |

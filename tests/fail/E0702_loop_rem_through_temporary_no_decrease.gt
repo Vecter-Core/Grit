@@ -1,0 +1,4 @@
+// expect: fail E0702
+// note: `x % 5` KHÔNG nhỏ hơn `x` khi x < 5 (3 % 5 = 3): vòng không dừng với x ∈ 1..4 — luật chỉ cho `a % b ≤ a`, không cho `< a`
+ƒ f(n: u32) → u32 ! ∅ { μx ≔ n; ⟳ x > 0u32 ↓ x { y ≔ x % 5u32; x ← y; } x }
+ƒ main() ! ∅ { f(3u32); }
