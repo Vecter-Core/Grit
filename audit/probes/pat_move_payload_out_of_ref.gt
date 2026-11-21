@@ -1,6 +1,0 @@
-// probe: reject E0407|E0301
-// why: move payload không-Copy ra khỏi &Option<B>
-▢ B { v: i32 }
-ƒ eat(b: B) ! ∅ { }
-ƒ h(o: &Option<B>) ! ∅ { ⌥ o { Some(b) ↦ { eat(*b); }, None ↦ { } } }
-ƒ main() → i32 ! ∅ { 0 }

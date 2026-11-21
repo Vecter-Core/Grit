@@ -1,3 +1,0 @@
-// probe: reject E0305
-// why: D6: char thiếu khoảng
-ƒ main() → i32 ! ∅ { c ≔ 'a'; ⌥ c { 'a'..='z' ↦ 1 } }

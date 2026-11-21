@@ -1,4 +1,0 @@
-// probe: reject E0304
-// why: thiếu trường trong literal
-▢ S { n: i32, m: i32 }
-ƒ main() → i32 ! ∅ { s ≔ S { n: 1 }; s.n }

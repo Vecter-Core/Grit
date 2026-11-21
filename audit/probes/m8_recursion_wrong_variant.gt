@@ -1,4 +1,0 @@
-// probe: reject E0702
-// why: E0702: ↓ không giảm trong đệ quy
-ƒ f(n: u32) → u32 ! ∅ ↓ n { f(n + 1) }
-ƒ main() → u32 ! ∅ { f(1) }

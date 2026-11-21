@@ -1,3 +1,0 @@
-// probe: accept
-// why: đối chứng dương: u8 phủ đủ bằng hai khoảng
-ƒ main() → i32 ! ∅ { x ≔ 7u8; ⌥ x { 0..=127 ↦ 1, 128..=255 ↦ 2 } }

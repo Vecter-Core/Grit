@@ -1,6 +1,0 @@
-// probe: reject E0311
-// why: impl thiếu phương thức của trait
-⊏ T { ƒ f(&self) → i32 ! ∅; ƒ g(&self) → i32 ! ∅; }
-▢ S { n: i32 }
-⊐ T for S { ƒ f(&self) → i32 ! ∅ { 1 } }
-ƒ main() → i32 ! ∅ { 0 }

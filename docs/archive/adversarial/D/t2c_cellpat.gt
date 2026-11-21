@@ -1,4 +1,0 @@
-ƒ main() → u32 ! ∅ {
-  c ≔ Cell::new(4u32);
-  ⌥ c { Cell { v } ↦ v }
-}

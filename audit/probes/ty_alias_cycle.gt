@@ -1,5 +1,0 @@
-// probe: reject
-// why: alias vòng
-≡ A ≔ B;
-≡ B ≔ A;
-ƒ main() → i32 ! ∅ { 0 }

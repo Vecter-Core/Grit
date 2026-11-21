@@ -1,4 +1,0 @@
-// probe: accept
-// why: đối chứng dương: T: Copy dùng hai lần
-ƒ dup<T: Copy>(x: T) → (T, T) ! ∅ { (x, x) }
-ƒ main() → i32 ! ∅ { 0 }

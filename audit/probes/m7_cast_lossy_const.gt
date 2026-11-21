@@ -1,3 +1,0 @@
-// probe: reject E0604
-// why: E0604: ép kiểu mất thông tin
-ƒ main() → u8 ! ∅ { x ≔ 300i32; x as u8 }

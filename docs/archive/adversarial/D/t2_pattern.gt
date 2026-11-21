@@ -1,4 +1,0 @@
-ƒ main() → i32 ! {mem} {
-  a ≔ Arena::new();
-  ⌥ a { Arena { x } ↦ x }
-}

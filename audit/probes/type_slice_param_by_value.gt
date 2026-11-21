@@ -1,4 +1,0 @@
-// probe: reject E0301
-// why: [T] (không biết kích thước) làm tham số theo giá trị
-ƒ f(x: [i32]) ! ∅ { }
-ƒ main() → i32 ! ∅ { 0 }

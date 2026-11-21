@@ -1,8 +1,0 @@
-⊐ Copy for Cell<u32> { }
-■ M: Atomic<u32> ≔ Atomic::new(0u32);
-ƒ main() → u32 ! ∅ {
-  c ≔ Cell::new(4u32);
-  d ≔ c;
-  e ≔ c;
-  d.get() + e.get()
-}

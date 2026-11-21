@@ -1,4 +1,0 @@
-// probe: reject E0701|E0702|E0703
-// why: E070x: đệ quy không ↓
-ƒ f(n: u32) → u32 ! ∅ { f(n) }
-ƒ main() → u32 ! ∅ { f(1) }

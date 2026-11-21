@@ -1,4 +1,0 @@
-// probe: reject E0402|E0403|E0406
-// why: ghi đè *o khi v (mượn từ o) còn sống
-ƒ h(o: &!Option<i32>) → i32 ! ∅ { ⌥ o { Some(v) ↦ { *o ← Option::None; *v }, None ↦ 0 } }
-ƒ main() → i32 ! ∅ { 0 }

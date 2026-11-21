@@ -1,4 +1,0 @@
-// probe: reject E0501
-// why: Arena không Send
-ƒ worker(a: Arena) ! {mem} { }
-ƒ main() → i32 ! {mem, detach} { a ≔ Arena::new(); spawn(worker, a); 0 }

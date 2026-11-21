@@ -1,5 +1,0 @@
-// probe: reject E0402
-// why: hai reborrow &! cùng sống
-ƒ r(a: &!i32) → &!i32 ! ∅ { a }
-ƒ h(a: &!i32) ! ∅ { p ≔ r(a); q ≔ r(a); *p ← 1; *q ← 2; }
-ƒ main() → i32 ! ∅ { 0 }

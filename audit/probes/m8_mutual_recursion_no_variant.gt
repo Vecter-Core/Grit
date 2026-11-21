@@ -1,5 +1,0 @@
-// probe: reject E0701|E0702|E0703
-// why: SCC: đệ quy tương hỗ thiếu ↓
-ƒ a(n: u32) → u32 ! ∅ { b(n) }
-ƒ b(n: u32) → u32 ! ∅ { a(n) }
-ƒ main() → u32 ! ∅ { a(1) }

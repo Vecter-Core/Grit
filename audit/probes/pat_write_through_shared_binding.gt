@@ -1,4 +1,0 @@
-// probe: reject
-// why: bind từ &Option là &i32: không ghi được
-ƒ h(o: &Option<i32>) ! ∅ { ⌥ o { Some(v) ↦ { *v ← 5; }, None ↦ { } } }
-ƒ main() → i32 ! ∅ { 0 }

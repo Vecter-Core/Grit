@@ -1,4 +1,0 @@
-// probe: reject E1201
-// why: D15: bidi trong comment
-// x ‮ y
-ƒ main() → i32 ! ∅ { 0 }

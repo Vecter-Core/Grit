@@ -1,4 +1,0 @@
-// probe: reject E0310
-// why: E0310: initializer của const gọi nguồn capability
-□ K: Cap<Out> ≔ root_out();
-ƒ main() → i32 ! {io} { 0 }

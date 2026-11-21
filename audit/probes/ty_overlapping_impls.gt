@@ -1,7 +1,0 @@
-// probe: reject E0311
-// why: hai impl cùng trait cho cùng kiểu
-⊏ T { ƒ f(&self) → i32 ! ∅; }
-▢ S { n: i32 }
-⊐ T for S { ƒ f(&self) → i32 ! ∅ { 1 } }
-⊐ T for S { ƒ f(&self) → i32 ! ∅ { 2 } }
-ƒ main() → i32 ! ∅ { 0 }

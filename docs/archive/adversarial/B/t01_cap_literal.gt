@@ -1,8 +1,0 @@
-ƒ forge() → Cap<Out> ! ∅ {
-  Cap { v: Out { x: 0 } }
-}
-ƒ helper() ! {io} {
-  o ≔ forge();
-  o.write_str("forged\n");
-}
-ƒ main() ! {io} { helper(); }

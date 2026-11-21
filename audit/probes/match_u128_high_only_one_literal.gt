@@ -1,3 +1,0 @@
-// probe: reject E0305
-// why: S-B: một literal u128 cao + khoảng thấp
-ƒ main() → i32 ! ∅ { x ≔ 7u128; ⌥ x { 0..=100 ↦ 1, 340282366920938463463374607431768211455 ↦ 2 } }

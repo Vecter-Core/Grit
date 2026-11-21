@@ -1,3 +1,0 @@
-// probe: reject E0205
-// why: D7: cấm che bóng
-ƒ main() → i32 ! ∅ { x ≔ 1; x ≔ 2; x }

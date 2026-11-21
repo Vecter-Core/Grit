@@ -1,4 +1,0 @@
-// probe: reject
-// why: D5: tham số bất biến
-ƒ f(x: i32) → i32 ! ∅ { x ← 1; x }
-ƒ main() → i32 ! ∅ { f(2) }

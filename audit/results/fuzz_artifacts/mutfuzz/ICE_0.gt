@@ -1,3 +1,0 @@
-// ICE: lỗi nội bộ của compiler (ICE): MIR của `m_82a9f937fa46::pass_through` không hợp lệ: kiểu chưa giải quyết (Err/Infer) trong MIR (M4 phải chặn trước)
-// expect: pass
-ƒ pass_through(k: Secret<i8>) → Secret<k> ! ∅ { k }

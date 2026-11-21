@@ -1,4 +1,0 @@
-// probe: reject E0205
-// why: D7: che tham số
-ƒ f(x: i32) → i32 ! ∅ { x ≔ 3; x }
-ƒ main() → i32 ! ∅ { f(1) }

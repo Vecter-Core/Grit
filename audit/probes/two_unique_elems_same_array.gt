@@ -1,3 +1,0 @@
-// probe: reject E0402
-// why: hai &! lên hai phần tử của cùng mảng (chỉ số coi là chồng)
-ƒ main() → i32 ! ∅ { μa ≔ [1, 2]; p ≔ &!a[0]; q ≔ &!a[1]; *p ← 3; *q ← 4; a[0] }

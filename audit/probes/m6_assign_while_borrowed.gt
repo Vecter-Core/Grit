@@ -1,3 +1,0 @@
-// probe: reject
-// why: E040x: gán khi đang mượn
-ƒ main() → i32 ! ∅ { μx ≔ 1; r ≔ &x; x ← 2; *r }

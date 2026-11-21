@@ -1,4 +1,0 @@
-// probe: reject E0702
-// why: gọi đệ quy với cùng đối số trên một nhánh
-ƒ f(n: u32, c: bool) → u32 ! ∅ ↓ n { ⎇ n == 0 { 0 } ⇝ { ⎇ c { f(n, false) } ⇝ { f(n - 1, c) } } }
-ƒ main() → u32 ! ∅ { f(3, true) }

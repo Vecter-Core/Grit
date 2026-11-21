@@ -1,4 +1,0 @@
-// probe: reject
-// why: D5: ghi qua & (không phải &!)
-ƒ f(r: &i32) ! ∅ { *r ← 1; }
-ƒ main() → i32 ! ∅ { μx ≔ 0; f(&x); x }

@@ -1,9 +1,0 @@
-ƒ main() → u64 ! {mem} {
-  c ≔ Cell::new(Arena::new());
-  μa ≔ c.get();
-  μb ≔ c.get();
-  r ≔ a.alloc(111u64);
-  b.reset();
-  s ≔ b.alloc(222u64);
-  *r
-}

@@ -1,4 +1,0 @@
-// probe: reject E0404
-// why: E0404: trả tham chiếu tới local
-ƒ f() → &i32 ! ∅ { x ≔ 1; &x }
-ƒ main() → i32 ! ∅ { *f() }

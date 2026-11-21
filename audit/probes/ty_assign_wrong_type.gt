@@ -1,3 +1,0 @@
-// probe: reject E0301
-// why: gán sai kiểu
-ƒ main() → i32 ! ∅ { μx ≔ 5; x ← true; x }

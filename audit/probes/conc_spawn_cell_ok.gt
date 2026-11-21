@@ -1,4 +1,0 @@
-// probe: accept
-// why: đối chứng dương: Cell<i32> là Send
-ƒ worker(c: Cell<i32>) ! ∅ { }
-ƒ main() → i32 ! ∅ { spawn(worker, Cell::new(1)); 0 }

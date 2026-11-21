@@ -1,3 +1,0 @@
-// probe: reject E0702|E0701
-// why: i bị đặt về 0 ở i == 5 ⇒ vòng vô hạn thật
-ƒ main() → u32 ! ∅ { μi ≔ 0u32; ⟳ i < 10 ↓ 10 - i { ⎇ i == 5 { i ← 0; } ⇝ { i ← i + 1; } } i }

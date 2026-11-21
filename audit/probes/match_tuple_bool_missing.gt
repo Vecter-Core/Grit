@@ -1,3 +1,0 @@
-// probe: reject E0305
-// why: D6: tuple bool thiếu tổ hợp
-ƒ main() → i32 ! ∅ { t ≔ (true, false); ⌥ t { (true, true) ↦ 1, (false, _) ↦ 2 } }

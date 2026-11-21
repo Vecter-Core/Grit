@@ -1,7 +1,0 @@
-ƒ helper() → u64 ! {io} {
-  util::main()
-}
-ƒ main() ! {io} {
-  out ≔ root_out();
-  out.write_u64(helper());
-}

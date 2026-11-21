@@ -1,9 +1,0 @@
-ƒ main() ! {io, div} {
-  env ≔ root_env();
-  out ≔ root_out();
-  out.write_u64(env.arg_count() as u64);
-  out.write_str("|");
-  out.write_u64(env.arg(1usize).len() as u64);
-  out.write_str("\n");
-  core::exit(300u32)
-}

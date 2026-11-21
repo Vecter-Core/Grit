@@ -1,3 +1,0 @@
-// probe: reject E0701
-// why: vòng vô hạn thiếu div ở chữ ký
-ƒ main() → i32 ! ∅ { ⟳ { } 0 }

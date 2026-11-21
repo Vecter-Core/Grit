@@ -1,6 +1,0 @@
-ƒ h() ! {io} {
-  fs ≔ Host::fs();
-  out ≔ root_out();
-  out.write_u64(fs.read("/etc/hostname").len());
-}
-ƒ main() ! {io} { h(); }

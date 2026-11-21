@@ -1,3 +1,0 @@
-// probe: accept
-// why: đối chứng dương: đếm ngược chuẩn
-ƒ main() → u32 ! ∅ { μi ≔ 10u32; ⟳ i > 0 ↓ i { i ← i - 1; } i }

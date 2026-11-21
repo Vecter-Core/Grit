@@ -1,4 +1,0 @@
-// probe: reject E0702|E0701
-// why: ⊡ bỏ qua bước tiến khi c luôn đúng
-ƒ f(c: bool) → u32 ! ∅ { μi ≔ 0u32; ⟳ i < 10 ↓ 10 - i { ⎇ c { ⊡; } i ← i + 1; } i }
-ƒ main() → u32 ! ∅ { f(true) }

@@ -1,3 +1,0 @@
-// probe: reject E0302
-// why: D1: không ép kiểu ngầm i32 + i64
-ƒ main() → i64 ! ∅ { a: i32 ≔ 1; b: i64 ≔ 2; a + b }

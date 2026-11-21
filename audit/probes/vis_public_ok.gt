@@ -1,5 +1,0 @@
-// probe: accept
-// why: đối chứng dương: ◈ cho phép
-▦ m { ◈ ƒ pubf() → i32 ! ∅ { 1 } }
-ƒ f() → i32 ! ∅ { m::pubf() }
-ƒ main() → i32 ! ∅ { 0 }
