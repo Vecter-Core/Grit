@@ -2,6 +2,11 @@
 
 Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng 2026-11-18, xem `docs/RUN_REPORTS.md`).
 
+## 1.0.0-rc9 — GÓI 14: thông dịch đọc □/■ (không còn ICE), gt-term ICE tường minh cho nhánh phòng thủ, công cụ (2026-11-21)
+- **Thông dịch (`--backend=interpreter`):** đọc `□`/`■` (tính một lần, ghi nhớ; `■` khởi tạo trước `main` như LLVM). Vòng khởi tạo giữa các `■` hoặc giá trị chứa tham chiếu ⇒ "chưa hỗ trợ", mã thoát 3 (cùng loại với LLVM `build`), KHÔNG ICE mã 2. Bộ sinh ba nguồn (mô hình/thông dịch/LLVM) thêm 4 loại đọc hằng, 128 chương trình khớp.
+- **gt-term:** hai `_ => {}` ở dựng cạnh → liệt kê đủ biến thể `Rvalue`; bốn nhánh phòng thủ (hàm làm toán hạng phép tính, đối số ngoài `locals`, callee không thân/chữ ký, khối không terminator) ⇒ ICE E9901 tường minh.
+- Công cụ: `gt-fmt` vào `GATE_SPLIT_PKGS` + đơn vị dài chạy MỘT MÌNH (`GATE_SOLO_UNITS`); `tools/corpus_owner_check.py` (A2); `tools/fuzz_total.py --summary`, `tools/fuzz_night.sh` (một lệnh qua đêm).
+
 ## 1.0.0-rc8 — GÓI 12: FB-C36 (chu trình qua hằng □ được chấp nhận; gt-term thêm cạnh Const::Item), cổng Linux rc7, công cụ (2026-11-20)
 - **Sửa soundness (FB-C36):** hằng `□` được hạ thành LỜI GỌI hàm ở mỗi chỗ dùng; `□ C ≔ C`, vòng hằng và `□ C ≔ f()` với `f` đọc `C` (kể cả qua `⊳` hoặc phương thức trait) từng `check` XANH và tràn ngăn xếp khi chạy. Nay E0703. `gt-term` `const_cycles`; test `const_cycle` (12; bộ sinh 160 chương trình: tắt sửa 160/160 chấp nhận sai, bật 0/160), 3 tệp `tests/fail` + 1 `tests/pass`.
 - Công cụ: `tools/gate.sh` chia gói `gt-driver` theo mục tiêu (`GATE_SPLIT_PKGS`, in `secs=`); `tools/fuzz_import_local.py`; `FUZZ_TOOLCHAIN`; log fuzz ghi `source`/`os`/`kernel` trên Linux.

@@ -1,6 +1,6 @@
 # Grit
 
-**Trạng thái: `1.0.0-rc8` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
+**Trạng thái: `1.0.0-rc9` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
 
 **Nhãn `main` trên GitHub (`Vecter-Core/Grit`):** `main` = `e8a8ae5` (rc7): cổng Windows XANH, cổng Linux XANH (WSL2 cục bộ, không phải CI) trên `4ef044e`; cây `main` khác `4ef044e` đúng một dòng `license` (`docs/REMOTE_STATE.md`). Cây `main` KHÔNG áp dụng `GATE_TREE` rc7 nguyên văn; giai đoạn nhẹ trên đúng cây `main`: Windows và WSL GREEN, `GATE_TREE=aa9510e7…` (`docs/REMOTE_STATE.md` mục 8); cổng đầy đủ trên cây này CHƯA chạy. rc8 (bản cục bộ ở trên) CHƯA lên `main`.
 
