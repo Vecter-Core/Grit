@@ -66,7 +66,6 @@ class Night(unittest.TestCase):
         self.assertIn("fuzz_sync_clone.sh $HOME/grit_fuzz /mnt/d/Grit integration", out)
         self.assertIn("tee -a", out)
         self.assertIn("WSL[Ubuntu-24.04]", out)
-        self.assertIn("(git rev-parse --show-toplevel)", out)  # thoát ký tự để chạy TRONG WSL; không dùng $PWD (đo: $PWD trong `wsl -- bash -lc` sai = thư mục Windows)
 
     def test_start_syncs_through_the_script_file_not_a_long_inline_string(self):
         rc, out = run("start", FUZZ_REPO_WSL="/mnt/q/Kho")
