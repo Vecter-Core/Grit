@@ -94,10 +94,10 @@ S0 xong (main `17beed4`, sau khi Giang tự hợp nhất hai PR trên GitHub). S
 ## GÓI 7 (2026-11-19) — XONG trừ phần CHẶN/CHƯA (xem docs/RUN_REPORTS.md)
 S0 xong (kho CÔNG KHAI, quét bí mật: không thấy bí mật thật; SECURITY.md). S1 **CHẶN** (Actions vẫn khoá). S2.a FB-C32 sửa (+ FB-C33 do phiên kiểm toán tìm, sửa). S2.b thí nghiệm biên 32 768 khối và ngân sách theo loại nghĩa vụ. S2.c nhóm D một phần, độ phủ CHƯA đo. S3 AI_PITFALLS. S4 workflow fuzz + fuzz_ingest viết xong, CHƯA chạy thử. S5 rc5: cổng đầy đủ CHƯA xanh liền mạch (preflight đỏ 3 lần: bộ nhớ ảo); không thẻ, không đẩy main.
 
-## GÓI 14 (2026-11-21) — ĐANG LÀM (cập nhật sau từng mục)
+## GÓI 14 (2026-11-21) — XONG MỘT PHẦN (xem RUN_REPORTS "GÓI 14")
 - [x] A2 `tools/corpus_owner_check.py` + `tests/corpus_stage.tsv` (commit f3220b5; tái hiện E0203_private_field_in_pattern ⇒ ĐỎ trong clone tạm). [x] A3 cải chính TSan (8faa080).
-- [~] A1 `gt-fmt` vào `GATE_SPLIT_PKGS` (sửa gate.sh + test; đang đo thời gian từng bộ Windows — chưa commit).
-- [ ] B1 thông dịch đọc □/■ (kế hoạch: `Interp::operand` &mut + bộ nhớ đệm + phát hiện vòng ⇒ "chưa hỗ trợ" mã 3). [ ] B2. [ ] B3/C. [ ] D1–D3. [ ] E1–E3.
+- [x] A1 (gt-fmt chia + đơn vị dài chạy một mình).
+- [x] B1, B2, B3 (rc9 `44c087a`). [ ] **C cổng đầy đủ rc9 hai nền CHƯA** (Windows bị ngắt + preflight bộ nhớ ảo < 4 GB; Linux chưa chạy). [x] D1 (partial: 11 chạy lại), [~] D2 (3 nhánh thí nghiệm), [ ] D3 CHƯA. [x] E1, [x] E2, [ ] E3 (thiếu clang).
 
 ## GÓI 13 (2026-11-21/22) — XONG MỘT PHẦN (xem docs/RUN_REPORTS.md "GÓI 13")
 - [x] A1–A3. [x] B1 (21 sống, mục tiêu ở mức ĐO). [x] B2 (0 FB, bộ sinh +64). [ ] **B3 TSan CHƯA: thiếu clang (Giang cài).** [~] B4: gt-oblig XONG (20); nhóm D còn ≈ 21/23 chưa thí nghiệm.

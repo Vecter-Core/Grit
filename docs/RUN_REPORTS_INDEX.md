@@ -54,5 +54,6 @@ Sinh bởi `tools/reports_index.py` từ `RUN_REPORTS.md`. Mục KHÔNG theo th�
 | 48 | GÓI 6 (2026-11-19; Claude Sonnet 5.5) | 2026-11-19 | 303 | 10 |
 | 49 | GÓI 7 (2026-11-19; Claude Sonnet 5.5) | 2026-11-19 | 313 | 14 |
 | 50 | GÓI 8 (2026-11-19; Claude Haiku 5.5 — model đổi giữa phiên; commit ghi Author-Model thật) | 2026-11-19 | 327 | 97 |
+| 51 | GÓI 14 — 2026-11-21 (Windows; WSL2 cục bộ cho fuzz; mã sản phẩm đổi → `1.0.0-rc9`) | 2026-11-21 | 424 | 7 |
 
-Tổng: 50 mục.
+Tổng: 51 mục.

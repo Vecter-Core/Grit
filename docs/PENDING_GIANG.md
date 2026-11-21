@@ -107,3 +107,8 @@ Mỗi mục: đề xuất của kiến trúc sư/agent và **hành vi mặc đ�
 
 | 15 | **GitHub Actions bị tắt cho tài khoản** (GÓI 6): `Actions has been disabled for this user`; mọi run cũ biến mất | kiểm Settings → Billing and plans / Actions; bật lại; xem `docs/CI_REPORT.md` mục GÓI 6; sau đó chạy cổng đầy đủ rc4 (`only=all`, `full=true`) | không có CI mới cho `d1e36b7` trở đi |
 | 16 | Đọc `docs/SEED_FINISH_LINE.md` (đích của nhãn Seed: cái gì CHẶN Seed, cái gì chỉ chặn Giai đoạn 2) | đọc rồi quyết ưu tiên | — |
+
+## GÓI 14 (2026-11-21) — việc cho Giang
+- **Đóng trình duyệt/ứng dụng nặng rồi báo để chạy cổng đầy đủ rc9** (preflight đỏ: bộ nhớ ảo khả dụng ≈ 2 GB < 4 GB; có thể thêm `[wsl2] memory=10GB swap=8GB` vào `%UserProfile%\.wslconfig`, hiện KHÔNG có tệp).
+- **Fuzz qua đêm: một lệnh** `bash tools/fuzz_night.sh start` (xem đầu `HANDOFF.md`); TSan WSL cần `wsl -d Ubuntu-24.04 -- sudo apt install -y clang` (chỉ tái lập cục bộ, không chặn Seed).
+- Thư mục tạm GÓI 14 để xoá (agent không xoá): `D:\Grit_g14b`, `D:\Grit_g14w`, `D:\Grit_cnt2`, `D:\Grit_off`, `D:\Grit_g13w`, `D:\Grit_g13L`, `D:\Grit_main1`, `D:\Grit_mut`, `D:\Grit_export\p14_*`, WSL `~/grit_fuzz`.

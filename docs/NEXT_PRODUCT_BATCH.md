@@ -53,3 +53,7 @@ Số mục đang chờ thật (1–4): **4** (mục 5–7 là chỗ giữ chỗ)
 | 4 | gt-term nhánh phòng thủ 567/584/687/699 | đổi `None => true` thành ICE tường minh (E9901) thay vì lặng lẽ | thấp–trung bình | biến false negative tiềm ẩn thành lỗi nếu bất biến bị phá; có thể làm cùng #11 |
 | 5 | #1, #2 (spawn/`detach`), #3, #4 (`declassify`, `secret_wipe`) | đổi hợp đồng TCB/ngữ nghĩa | **cao**, cần duyệt kiến trúc sư/Giang | KHÔNG gom vào rc9 trừ khi có quyết định |
 Ước lượng: mục 1+4 cùng gt-term (một cổng gt-term + toàn bộ); mục 2 gt-driver; mục 3 gt-types/gt-term/docs spec. Một nhãn rc9 + MỘT cổng đầy đủ hai nền (≈ 3 giờ).
+
+## Cập nhật GÓI 14 (2026-11-21) — lô rc9 ĐÃ ÁP DỤNG (kiến trúc sư duyệt trong lệnh GÓI 14)
+- XONG (rc9): #11 (match vét cạn gt-term), #13 (thông dịch đọc `□`/`■`; vòng static/giá trị chứa tham chiếu ⇒ mã 3, không ICE), D3 mục 4 (4 nhánh phòng thủ gt-term ⇒ E9901 tường minh). Chưa có cổng đầy đủ rc9 trên một nền nào xong liền mạch trừ khi `READINESS.md` GÓI 14 ghi khác.
+- HOÃN: #12 (kiểm vòng khởi tạo static ở `check`, cần ADR mã lỗi mới; `static_const_init_pin.rs` vẫn ghim `check` XANH). Còn #1–#4: không đổi.
