@@ -196,8 +196,14 @@ fn ice(msg: &str, resolve: ResolveOutput) -> TypesOutput {
             format!("lỗi nội bộ của compiler (ICE): {msg}"),
         ));
     }
+    empty_output(bag.finish(), resolve)
+}
+
+/// `TypesOutput` không có bảng nào (chỉ báo cáo + kết quả giải tên): dùng khi dừng sớm (giải tên lỗi) hoặc ICE.
+/// MỘT chỗ dựng duy nhất (GÓI 12): thêm trường mới vào `TypesOutput` chỉ cần sửa ở đây.
+fn empty_output(report: Report, resolve: ResolveOutput) -> TypesOutput {
     TypesOutput {
-        report: bag.finish(),
+        report,
         resolve,
         types: BTreeMap::new(),
         locals: BTreeMap::new(),
@@ -221,24 +227,7 @@ pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesO
     let mut resolve = resolve_program(inputs, prelude)?;
     if !resolve.report.diagnostics.is_empty() {
         let report = std::mem::replace(&mut resolve.report, Diagnostics::new(LIMIT).finish());
-        return Ok(TypesOutput {
-            report,
-            resolve,
-            types: BTreeMap::new(),
-            locals: BTreeMap::new(),
-            methods: BTreeMap::new(),
-            pat_modes: BTreeMap::new(),
-            unsize: BTreeMap::new(),
-            instances: Vec::new(),
-            fn_keys: BTreeMap::new(),
-            regions: BTreeMap::new(),
-            db: TypeDb::default(),
-            sites: BTreeMap::new(),
-            def_by_node: BTreeMap::new(),
-            bodies: Vec::new(),
-            prelude_contracts: Vec::new(),
-            file_names: Vec::new(),
-        });
+        return Ok(empty_output(report, resolve));
     }
     let mut names: Vec<String> = inputs.iter().map(|i| i.name.clone()).collect();
     names.sort();

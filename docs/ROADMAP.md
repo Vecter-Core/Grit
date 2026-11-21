@@ -22,6 +22,29 @@
 
 Hai mục tôi **thêm** vào vì danh sách bỏ sót: (a) khoảng cách `check` xanh ↔ `build` đỏ (mục 1.1) là vấn đề trung thực của sản phẩm, không chỉ thiếu tính năng; (b) fuzz typechecker: đã có target `crates/gt-driver/fuzz/fuzz_targets/check.rs` nhưng `.github/workflows/fuzz.yml` chỉ chạy `lex` và `parse` ⇒ điều kiện cứng #2 chưa thể đạt.
 
+## 0b. Kế hoạch hoàn thiện Giai đoạn 1 THEO TỪNG M (lệnh Giang 2026-11-21: "chỗ nào thừa gộp, chỗ nào thiếu viết", Giai đoạn 2 để sau)
+Cách đo: viết chương trình theo idiom của Rust (thứ người viết sẽ thử trước), chạy `gritc check`, đếm cái bị từ chối oan; đọc nhật ký lỗi thật
+(capstone/apps/USER_BUGS: E0702 ×11, E0902 ×4, E0301 ×3, E0403 ×2); dò mã lặp (cửa sổ 8 dòng chuẩn hoá trên `crates/*/src`: **2,6%** dòng —
+mã nguồn KHÔNG thừa nhiều; phần thừa thật nằm ở test/tài liệu và đã dọn ở GÓI 12 phần đầu).
+
+| M | Trạng thái | ĐÃ LÀM trong GÓI 12 (có test) | CÒN THIẾU — việc kế, theo thứ tự | Thừa / gộp |
+|---|---|---|---|---|
+| M1 lexer | đạt, đóng băng | golden `tests/lexer/all_tokens` (91 token) thay 2 test nội bộ | fuzz 24 giờ (điều kiện #2) | — |
+| M2 parser/fmt | đạt, đóng băng | 11 mẫu compile-fail cho nhánh thông báo lỗi; bỏ test hình-dạng-AST | (edition) or-pattern `A \| B`, guard `⎇` trong nhánh, phân rã `(a, b) ≔`, `?` (Q85 hoãn): mỗi cái một ADR, gom MỘT đợt | — |
+| M3 giải tên | đạt | — | — | — |
+| M4 kiểu | đạt | **ép `&[T; N]` → `&[T]`** (ADR-C15) | `==`/`≠` cho tuple/`Option`/struct (E0301 ×3 trong nhật ký): suy `Eq` theo cấu trúc như `Copy` (ADR); `Ord` dùng toán tử `<` trên `T: Ord`; ép ở đuôi khối thân hàm | `TypesOutput` rỗng dựng 1 chỗ (`empty_output`) thay 2 |
+| M5 MIR | đạt | hạ MIR khớp đặc tả §3a cho autoref/reborrow (gộp `stabilize`/`snapshot`) | — | — |
+| **M6 mượn** | đạt có điều kiện | **mượn hai pha** (ADR-C14). Đo: 14/15 idiom Rust NLL đã qua TRƯỚC khi sửa; lỗ duy nhất là hai pha. Nay 15/15 | bộ sinh oracle sinh dạng `x.m(x.f)`; "problem case #3" (Polonius; Rust cũng từ chối) KHÔNG làm; region theo trường ADT (đang gộp mọi region của ADT: chặn oan hiếm) | — |
+| M7 nghĩa vụ | đạt có điều kiện | quan hệ `/`, `%` (ADR-C16) | E0902 ×4: hợp đồng trên đối số KHÔNG Copy không hạ được lúc chạy ⇒ cho phép khi chứng minh được ở chỗ gọi, còn lại ĐỎ như cũ; nhân hằng (`x * 2`) bằng quan hệ tuyến tính có hệ số; đột biến tự động cho mã mới (đang chạy) | — |
+| **M8 dừng** | đạt có điều kiện | vòng `x ← x / k`, Euclid `gcd(b, a % b)` | E0702 vòng nhân đôi (`x ← x * 2` tới cận); ngân sách 24 biến/hàm (AI_PITFALLS #2): cấp chỗ zone theo vòng thay vì theo hàm; vòng theo cờ bool (đúng là phải ĐỎ trừ khi có nhiên liệu) | — |
+| M9 gritc/secret | đạt | — | — | — |
+| M10 LLVM | đạt có điều kiện | — | **khai báo mà không hạ được** (`check` XANH, `build` mã 3): `Env::var`, `Clock::now`, `Fs::sub` (hạ), `Net::connect` (gỡ tới Giai đoạn 2), `Option::is_some/unwrap`; nhân/chia 128 bit; vòng khởi tạo `■` (NEXT_PRODUCT_BATCH #8) | — |
+| M11 rig | đạt | — | — (kho gói là Giai đoạn 2) | — |
+| M12 std | dở | — | `Drop` người dùng được hạ ⇒ `Vec`/`HashMap` phần tử không-Copy; `split/trim/find/parse`, in/đọc `f64`, `read_line`, bộ ghi đệm opt-in (Q75 giữ mặc định) | — |
+| M13 LSP | tối thiểu | — | hover kiểu, đi tới biến cục bộ (điều kiện #8) | — |
+
+Những gì KHÔNG làm trong Giai đoạn 1 (đúng lệnh "Giai đoạn 2 cứ từ từ"): FFI, closure bắt biến, `async`/`dyn`, kho gói, SMT/kernel, backend x64, tối ưu ±5%.
+
 ## 1. Nguyên tắc xếp thứ tự
 1. **Đóng khoảng "khai báo ≠ hạ được" trước khi thêm khai báo mới.** Một hàm trong prelude hoặc chạy được ở `build`, hoặc `check` phải ĐỎ.
 2. **An toàn/bằng chứng trước tính năng**; cú pháp mới chỉ vào MỘT đợt "edition" (ADR-P2-01, đã ủy quyền 2026-11-20) sau khi lexer/parser mở băng và fuzz 24 giờ.
