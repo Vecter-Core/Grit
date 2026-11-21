@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: escape không hợp lệ trong literal KÝ TỰ có dấu đóng (nhánh khác với chuỗi): lexer báo lỗi một lần và đặt token neo UNKNOWN
+ƒ main() ! ∅ { c ≔ '\q'; }

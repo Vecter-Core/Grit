@@ -1,0 +1,4 @@
+// expect: pass
+// note: danh sách tham số kiểu rỗng `<>` và tập hiệu ứng rỗng `! { }` đều hợp lệ
+ƒ f<>() ! { } { }
+ƒ main() ! ∅ { f(); }

@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: `..` đơn lẻ chỉ hợp lệ trong danh sách tuple/variant/struct, không phải một pattern riêng
+ƒ main() ! ∅ { ⌥ 1 { .. ↦ 1, _ ↦ 2 }; }

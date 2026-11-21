@@ -1,0 +1,4 @@
+// expect: fail E0101
+// note: trước `for` trong ⊐ phải là đường dẫn trait
+▢ S { v: i32 }
+⊐ &S for S { }

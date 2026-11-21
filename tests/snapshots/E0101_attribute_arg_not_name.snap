@@ -1,0 +1,10 @@
+# tests/fail/E0101_attribute_arg_not_name.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi đối số thuộc tính (tên hoặc chuỗi), gặp số `1`
+ --> tests/fail/E0101_attribute_arg_not_name.gt:3:7
+  |
+3 | #lang(1)
+  |       ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi đối số thuộc tính (tên hoặc chuỗi), gặp số `1`","file":"tests/fail/E0101_attribute_arg_not_name.gt","span":{"start":{"offset":114,"line":3,"col":7},"end":{"offset":115,"line":3,"col":8}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

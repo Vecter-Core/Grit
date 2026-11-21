@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: nhánh match hỏng được bỏ qua tới dấu `,` rồi parser đi tiếp (khôi phục lỗi)
+ƒ main() ! ∅ { ⌥ 1 { ) ↦ 1, _ ↦ 2 }; }

@@ -1,0 +1,10 @@
+# tests/fail/E0101_invalid_string_escape.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: escape không hợp lệ (chấp nhận \n \r \t \0 \\ \' \" \u{…})
+ --> tests/fail/E0101_invalid_string_escape.gt:3:21
+  |
+3 | ƒ main() ! ∅ { s ≔ "\q"; }
+  |                     ^^
+## [1] json
+{"code":"E0101","level":"error","message":"escape không hợp lệ (chấp nhận \\n \\r \\t \\0 \\\\ \\' \\\" \\u{…})","file":"tests/fail/E0101_invalid_string_escape.gt","span":{"start":{"offset":95,"line":3,"col":21},"end":{"offset":97,"line":3,"col":23}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

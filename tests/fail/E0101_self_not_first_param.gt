@@ -1,0 +1,4 @@
+// expect: fail E0101
+// note: `self` chỉ được làm tham số ĐẦU của hàm trong ⊏/⊐
+▢ S { v: i32 }
+⊐ S { ƒ f(x: i32, self) ! ∅ { } }

@@ -1,0 +1,10 @@
+# tests/fail/E0101_two_rest_patterns.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: chỉ được có một `..` trong danh sách pattern
+ --> tests/fail/E0101_two_rest_patterns.gt:3:28
+  |
+3 | ƒ main() ! ∅ { ⌥ (1, 2) { (.., .., a) ↦ 1 }; }
+  |                            ^^
+## [1] json
+{"code":"E0101","level":"error","message":"chỉ được có một `..` trong danh sách pattern","file":"tests/fail/E0101_two_rest_patterns.gt","span":{"start":{"offset":118,"line":3,"col":28},"end":{"offset":120,"line":3,"col":30}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

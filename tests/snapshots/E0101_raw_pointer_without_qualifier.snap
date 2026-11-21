@@ -1,0 +1,10 @@
+# tests/fail/E0101_raw_pointer_without_qualifier.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi `□` hoặc `μ` sau `*` (con trỏ thô), gặp `i32`
+ --> tests/fail/E0101_raw_pointer_without_qualifier.gt:3:12
+  |
+3 | ƒ main(p: *i32) ! ∅ { }
+  |            ^^^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi `□` hoặc `μ` sau `*` (con trỏ thô), gặp `i32`","file":"tests/fail/E0101_raw_pointer_without_qualifier.gt","span":{"start":{"offset":110,"line":3,"col":12},"end":{"offset":113,"line":3,"col":15}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

@@ -1,0 +1,3 @@
+// expect: lexer
+// note: MỌI loại token của bảng tên chính thức (ADR-010) trong một tệp; `.tokens` khoá từng tên (thay crates/gt-lexer/tests/token_names.rs)
+\fn \mut \if \else \match \ret \struct \enum \mod \use \pub \trait \impl \break \cont \type \const \static \unsafe \extern \where self Self as for in true false _ := <- -> => \loop \dec \pre \post \inv \proof \nil \implies \in \forall \exists <= >= != \land \lor \neg & &! == < > + - * / % +% -% *% +^ -^ *^ +? -? *? ; : , . .. ..= { } ( ) [ ] :: # ! ident 'life 12 1.5 "s" 'c' /// doc

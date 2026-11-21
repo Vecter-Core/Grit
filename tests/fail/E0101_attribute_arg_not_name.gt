@@ -1,0 +1,4 @@
+// expect: fail E0101
+// note: đối số thuộc tính phải là tên hoặc chuỗi, không phải số
+#lang(1)
+ƒ main() ! ∅ { }

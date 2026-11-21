@@ -1,0 +1,19 @@
+# tests/fail/E0101_self_not_first_param.gt: 2 chẩn đoán
+
+## [1] human
+error[E0101]: `self` chỉ được làm tham số đầu của hàm trong `⊏`/`⊐`
+ --> tests/fail/E0101_self_not_first_param.gt:4:19
+  |
+4 | ⊐ S { ƒ f(x: i32, self) ! ∅ { } }
+  |                   ^^^^
+## [1] json
+{"code":"E0101","level":"error","message":"`self` chỉ được làm tham số đầu của hàm trong `⊏`/`⊐`","file":"tests/fail/E0101_self_not_first_param.gt","span":{"start":{"offset":138,"line":4,"col":19},"end":{"offset":142,"line":4,"col":23}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [2] human
+error[E0101]: mong đợi item (`ƒ`, `▢`, `⊔`, `⊏`, `⊐`, `▦`, `⇲`, `≡`, `□`, `■`), gặp `}`
+ --> tests/fail/E0101_self_not_first_param.gt:4:33
+  |
+4 | ⊐ S { ƒ f(x: i32, self) ! ∅ { } }
+  |                                 ^
+## [2] json
+{"code":"E0101","level":"error","message":"mong đợi item (`ƒ`, `▢`, `⊔`, `⊏`, `⊐`, `▦`, `⇲`, `≡`, `□`, `■`), gặp `}`","file":"tests/fail/E0101_self_not_first_param.gt","span":{"start":{"offset":154,"line":4,"col":33},"end":{"offset":155,"line":4,"col":34}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

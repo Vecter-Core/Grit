@@ -1,0 +1,10 @@
+# tests/fail/E0101_comparison_chain.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: so sánh không kết hợp (`a < b < c`): dùng `∧` hoặc ngoặc
+ --> tests/fail/E0101_comparison_chain.gt:3:26
+  |
+3 | ƒ main() ! ∅ { x ≔ 1 < 2 < 3; }
+  |                          ^
+## [1] json
+{"code":"E0101","level":"error","message":"so sánh không kết hợp (`a < b < c`): dùng `∧` hoặc ngoặc","file":"tests/fail/E0101_comparison_chain.gt","span":{"start":{"offset":151,"line":3,"col":26},"end":{"offset":152,"line":3,"col":27}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

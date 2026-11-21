@@ -1,0 +1,145 @@
+# tests/fail/E0101_unexpected_tokens_described.gt: 16 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi biểu thức, gặp `←`
+ --> tests/fail/E0101_unexpected_tokens_described.gt:4:7
+  |
+4 |   a ≔ ← 1;
+  |       ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `←`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":203,"line":4,"col":7},"end":{"offset":206,"line":4,"col":8}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [2] human
+error[E0101]: mong đợi biểu thức, gặp `→`
+ --> tests/fail/E0101_unexpected_tokens_described.gt:5:7
+  |
+5 |   b ≔ → 1;
+  |       ^
+## [2] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `→`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":218,"line":5,"col":7},"end":{"offset":221,"line":5,"col":8}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [3] human
+error[E0101]: mong đợi biểu thức, gặp `↦`
+ --> tests/fail/E0101_unexpected_tokens_described.gt:6:7
+  |
+6 |   c ≔ ↦ 1;
+  |       ^
+## [3] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `↦`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":233,"line":6,"col":7},"end":{"offset":236,"line":6,"col":8}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [4] human
+error[E0101]: mong đợi biểu thức, gặp `!`
+ --> tests/fail/E0101_unexpected_tokens_described.gt:7:7
+  |
+7 |   d ≔ ! 1;
+  |       ^
+## [4] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `!`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":248,"line":7,"col":7},"end":{"offset":249,"line":7,"col":8}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [5] human
+error[E0101]: mong đợi biểu thức, gặp `.`
+ --> tests/fail/E0101_unexpected_tokens_described.gt:8:7
+  |
+8 |   e ≔ . 1;
+  |       ^
+## [5] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `.`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":261,"line":8,"col":7},"end":{"offset":262,"line":8,"col":8}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [6] human
+error[E0101]: mong đợi biểu thức (`..=` cần có cận đầu), gặp `..=`
+ --> tests/fail/E0101_unexpected_tokens_described.gt:9:7
+  |
+9 |   f ≔ ..= 1;
+  |       ^^^
+## [6] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức (`..=` cần có cận đầu), gặp `..=`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":274,"line":9,"col":7},"end":{"offset":277,"line":9,"col":10}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [7] human
+error[E0101]: mong đợi biểu thức, gặp `μ`
+  --> tests/fail/E0101_unexpected_tokens_described.gt:10:7
+   |
+10 |   g ≔ μ 1;
+   |       ^
+## [7] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `μ`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":289,"line":10,"col":7},"end":{"offset":291,"line":10,"col":8}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [8] human
+error[E0101]: mong đợi biểu thức, gặp `as` (từ khoá cứng)
+  --> tests/fail/E0101_unexpected_tokens_described.gt:11:7
+   |
+11 |   h ≔ as 1;
+   |       ^^
+## [8] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `as` (từ khoá cứng)","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":303,"line":11,"col":7},"end":{"offset":305,"line":11,"col":9}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [9] human
+error[E0101]: mong đợi biểu thức, gặp `for` (từ khoá cứng)
+  --> tests/fail/E0101_unexpected_tokens_described.gt:12:7
+   |
+12 |   i ≔ for 1;
+   |       ^^^
+## [9] json
+{"code":"E0101","level":"error","message":"mong đợi biểu thức, gặp `for` (từ khoá cứng)","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":317,"line":12,"col":7},"end":{"offset":320,"line":12,"col":10}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [10] human
+error[E0101]: mong đợi `;`, gặp chuỗi
+  --> tests/fail/E0101_unexpected_tokens_described.gt:13:9
+   |
+13 |   j ≔ 1 "s";
+   |         ^^^
+## [10] json
+{"code":"E0101","level":"error","message":"mong đợi `;`, gặp chuỗi","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":334,"line":13,"col":9},"end":{"offset":337,"line":13,"col":12}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [11] human
+error[E0101]: mong đợi `;`, gặp ký tự
+  --> tests/fail/E0101_unexpected_tokens_described.gt:14:9
+   |
+14 |   k ≔ 1 'c';
+   |         ^^^
+## [11] json
+{"code":"E0101","level":"error","message":"mong đợi `;`, gặp ký tự","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":349,"line":14,"col":9},"end":{"offset":352,"line":14,"col":12}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [12] human
+error[E0101]: mong đợi `;`, gặp `..`
+  --> tests/fail/E0101_unexpected_tokens_described.gt:15:12
+   |
+15 |   l ≔ 1 .. ..;
+   |            ^^
+## [12] json
+{"code":"E0101","level":"error","message":"mong đợi `;`, gặp `..`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":367,"line":15,"col":12},"end":{"offset":369,"line":15,"col":14}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [13] human
+error[E0101]: mong đợi `;`, gặp `Self` (từ khoá cứng)
+  --> tests/fail/E0101_unexpected_tokens_described.gt:16:9
+   |
+16 |   m ≔ 1 Self;
+   |         ^^^^
+## [13] json
+{"code":"E0101","level":"error","message":"mong đợi `;`, gặp `Self` (từ khoá cứng)","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":381,"line":16,"col":9},"end":{"offset":385,"line":16,"col":13}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [14] human
+error[E0101]: mong đợi `{`, gặp `(`
+  --> tests/fail/E0101_unexpected_tokens_described.gt:18:11
+   |
+18 | ƒ p() ! ∅ ( )
+   |           ^
+## [14] json
+{"code":"E0101","level":"error","message":"mong đợi `{`, gặp `(`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":402,"line":18,"col":11},"end":{"offset":403,"line":18,"col":12}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [15] human
+error[E0101]: mong đợi `{`, gặp `[`
+  --> tests/fail/E0101_unexpected_tokens_described.gt:19:11
+   |
+19 | ƒ q() ! ∅ [ ]
+   |           ^
+## [15] json
+{"code":"E0101","level":"error","message":"mong đợi `{`, gặp `[`","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":419,"line":19,"col":11},"end":{"offset":420,"line":19,"col":12}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
+
+## [16] human
+error[E0101]: mong đợi pattern, gặp `self` (từ khoá cứng)
+  --> tests/fail/E0101_unexpected_tokens_described.gt:20:19
+   |
+20 | ƒ r() ! ∅ { ⌥ 1 { self ↦ 1 }; }
+   |                   ^^^^
+## [16] json
+{"code":"E0101","level":"error","message":"mong đợi pattern, gặp `self` (từ khoá cứng)","file":"tests/fail/E0101_unexpected_tokens_described.gt","span":{"start":{"offset":446,"line":20,"col":19},"end":{"offset":450,"line":20,"col":23}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}
