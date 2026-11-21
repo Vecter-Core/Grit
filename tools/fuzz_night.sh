@@ -38,7 +38,7 @@ case "$cmd" in
     [ "${FUZZ_NIGHT_DRY:-0}" = 1 ] && exit 0
     cd "$ROOT" || exit 2
     . tools/pyfind.sh; [ -n "$PY" ] || exit 2
-    $PY tools/fuzz_import_local.py /d/Grit_export/fuzz_clone_log.jsonl && echo "tiếp: git add docs/FUZZ_LOG.jsonl && git commit -m 'docs: nhập log fuzz WSL' (kèm Author-Model nếu do agent làm)"
+    PYTHONIOENCODING=utf-8 $PY tools/fuzz_import_local.py /d/Grit_export/fuzz_clone_log.jsonl && echo "tiếp: git add docs/FUZZ_LOG.jsonl && git commit -m 'docs: nhập log fuzz WSL' (kèm Author-Model nếu do agent làm)"
     ;;
   *)
     sed -n 2,6p "$0"; exit 2 ;;
