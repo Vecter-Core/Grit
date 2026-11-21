@@ -28,6 +28,14 @@ class Night(unittest.TestCase):
         self.assertIn("WSL[Ubuntu-24.04]", out)
         self.assertIn("(pwd)", out)  # phải thoát ký tự để chạy TRONG WSL, không phải ở Git Bash
 
+    def test_resync_keeps_the_clone_local_log_rows_instead_of_aborting_on_a_dirty_log(self):
+        """Lỗi tìm thấy khi kiểm tay (GÓI 14): `git checkout FETCH_HEAD` từ chối vì docs/FUZZ_LOG.jsonl của clone khác HEAD ⇒ lệnh qua đêm không chạy được lần thứ hai."""
+        rc, out = run("start")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("git checkout -q -f FETCH_HEAD", out)
+        self.assertIn(".fuzz_log.keep", out)
+        self.assertIn(">> docs/FUZZ_LOG.jsonl", out)
+
     def test_hours_and_sequential_flag(self):
         rc, out = run("start", "0.05", "--sequential")
         self.assertEqual(rc, 0, out)
