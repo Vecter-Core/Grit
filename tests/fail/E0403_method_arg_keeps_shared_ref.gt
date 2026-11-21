@@ -1,0 +1,6 @@
+// expect: fail E0403
+// note: mượn hai pha KHÔNG cho phép đối số còn GIỮ tham chiếu chung vào người nhận khi `&!self` được tạo (tham chiếu sống qua lời gọi)
+▢ St { pos: usize }
+⊐ St { ƒ adv2(&!self, k: &usize) ! ∅ { } }
+ƒ keep(s: &St) → &usize ! ∅ { &s.pos }
+ƒ main() ! ∅ { μs ≔ St { pos: 1usize }; s.adv2(keep(&s)); }

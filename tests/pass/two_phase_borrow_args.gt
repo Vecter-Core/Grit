@@ -1,0 +1,18 @@
+// expect: pass
+// note: mượn hai pha (như rustc two-phase borrows): đối số chỉ-đọc dùng chính người nhận/đối số `&!` — autoref của `&!self` và reborrow ngầm của đối số `&!` tạo SAU các đối số (semantics §3a)
+▢ St { pos: usize, n: usize }
+⊐ St {
+  ƒ adv(&!self, k: usize) ! ∅ { self.n ← k; }
+  ƒ get(&self) → usize ! ∅ { self.pos }
+}
+ƒ step(st: &!St, p: usize) → usize ! ∅ { st.n ← p; p }
+ƒ go(st: &!St) → usize ! ∅ {
+  st.adv(st.pos);
+  step(st, st.pos + 1usize)
+}
+ƒ main() ! ∅ {
+  μs ≔ St { pos: 1usize, n: 0usize };
+  s.adv(s.pos);
+  s.adv(s.get());
+  go(&!s);
+}

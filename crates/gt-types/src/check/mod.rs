@@ -120,6 +120,8 @@ pub(crate) struct Checker<'e, 'a> {
     /// chế độ tham chiếu của pattern đang kiểm (ADR-040): `Some(duy nhất?)`
     pub pat_ref: Option<bool>,
     pub pat_modes: Vec<(NodeId, bool)>,
+    /// ép unsize ghi nhận trong thân này (GÓI 12)
+    pub unsize: Vec<(NodeId, bool)>,
     /// đang bind biến của pattern đã lỗi: biến nhận kiểu `Err` (chặn lỗi dây chuyền)
     pub pat_poison: bool,
     pub unresolved_reported: bool,
@@ -159,6 +161,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             in_contract: 0,
             pat_ref: None,
             pat_modes: Vec::new(),
+            unsize: Vec::new(),
             pat_poison: false,
             unresolved_reported: false,
         }
@@ -320,6 +323,28 @@ impl<'e, 'a> Checker<'e, 'a> {
             return;
         }
         self.mismatch(&f, to, node, span, end);
+    }
+
+    /// Ép UNSIZE (như Rust, GÓI 12) tại điểm ép kiểu của MỘT NÚT BIỂU THỨC: `&[T; N]` → `&[T]`, `&![T; N]` → `&![T]` hoặc `&[T]`.
+    /// Chỉ khi cả hai phía đã là tham chiếu cụ thể (không đoán từ biến suy luận) và kiểu phần tử hợp nhất được. MIR hạ thành `&(*e)[0..]`
+    /// (cùng dạng với lát con người dùng viết, nên mọi backend đã hỗ trợ). Không bao giờ ép `&[T; N]` → `&![T]` (thêm quyền ghi).
+    pub(crate) fn try_unsize(&mut self, from: &Ty, to: &Ty, node: NodeId) -> bool {
+        let (f, t) = (self.infer.shallow(from), self.infer.shallow(to));
+        let (Ty::Ref(fm, fa), Ty::Ref(tm, ts)) = (&f, &t) else {
+            return false;
+        };
+        if *tm && !*fm {
+            return false;
+        }
+        let (Ty::Array(fe, _), Ty::Slice(te)) = (self.infer.shallow(fa), self.infer.shallow(ts))
+        else {
+            return false;
+        };
+        if !self.infer.unify(&fe, &te) {
+            return false;
+        }
+        self.unsize.push((node, *tm));
+        true
     }
 
     pub(crate) fn mismatch(&mut self, from: &Ty, to: &Ty, node: NodeId, span: Span, end: u32) {
@@ -692,6 +717,9 @@ impl<'e, 'a> Checker<'e, 'a> {
         for (n, m) in std::mem::take(&mut self.pat_modes) {
             self.env.out_pat_modes.insert(n, m);
         }
+        for (n, m) in std::mem::take(&mut self.unsize) {
+            self.env.out_unsize.insert(n, m);
+        }
         let ms = std::mem::take(&mut self.methods);
         for (n, m) in ms {
             self.env.out_methods.insert(n, m);
@@ -832,7 +860,9 @@ impl<'e, 'a> Checker<'e, 'a> {
                     Some(a) => {
                         let a2 = a.clone();
                         let t = self.expr(init, Some(&a2));
-                        self.coerce(&t, a, init.id, init.span, init.span.end);
+                        if !self.try_unsize(&t, a, init.id) {
+                            self.coerce(&t, a, init.id, init.span, init.span.end);
+                        }
                         a.clone()
                     }
                     None => self.expr(init, None),

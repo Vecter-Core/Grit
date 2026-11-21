@@ -66,6 +66,8 @@ pub(crate) struct Builder<'t> {
     pub(crate) pending_loop: Option<(Span, NodeId, Option<Expr>, Option<Expr>)>,
     /// Nút AST đang hạ (cho `SourceInfo`).
     pub(crate) at: (Span, NodeId),
+    /// nút đang được ép unsize (chặn đệ quy: phần hạ bên trong của chính nút đó không ép lại)
+    pub(crate) unsize_busy: std::collections::BTreeSet<NodeId>,
 }
 
 impl<'t> Builder<'t> {
@@ -109,6 +111,7 @@ impl<'t> Builder<'t> {
             in_contract: 0,
             pending_loop: None,
             at: (span, node),
+            unsize_busy: std::collections::BTreeSet::new(),
         }
     }
 

@@ -80,7 +80,7 @@ cannot open
 - `+ - *` abort `overflow` khi tràn; `/ %` abort khi chia 0 — gritc chứng minh được thì bỏ kiểm, không thì giữ (ghi chú N0601): đó là BÌNH THƯỜNG. Muốn không abort: `a +% b` (quấn vòng), `a +^ b` (bão hoà), `a +? b` → `Option` (None khi tràn); tương tự `-% *% -^ *^ -? *?`.
 - Bool `∧ ∨ ¬` ngắn mạch. `==` CHỈ cho số nguyên, bool, char, **`&str`**; tuple/`&T`/Option/struct/lát: E0301 — dùng `*a == *b`, so từng trường, `cmp(..).is_eq()` (kiểu `Ord`) hoặc `a.equals(b)` cho `&[u8]`. Số thực `f64`: `==` bị cấm (E0303).
 - `&str`: literal `"..."` (escape `\n \t \\ \"`), `s.len()`, `s.as_bytes()`, `s.slice(i, j)` (abort nếu cắt giữa ký tự UTF-8); std thêm `starts_with ends_with find parse_u64 parse_i64`. Xử lý văn bản = xử lý **BYTE** (`&[u8]`): `b[i]` là `u8`, `b'a'` KHÔNG có (dùng `97u8`).
-- Mảng `[0u8; 24]`, `[1u32, 2u32]`; lát `&a[i..j]` / `&!a[i..j]` (độ dài kiểm lúc chạy). `&[T; N]` KHÔNG tự thành `&[T]` khi truyền vào hàm (E0301): viết `&a[0usize..N]` (N là hằng độ dài); `⟳ x in &a` thì được. Tuple `(1u32, true)`, truy cập `.0 .1`; KHÔNG có phân rã `(a, b) ≔ f();` — viết `t ≔ f(); a ≔ t.0;`.
+- Mảng `[0u8; 24]`, `[1u32, 2u32]`; lát `&a[i..j]` / `&!a[i..j]` (độ dài kiểm lúc chạy). `&a` (mảng) tự ép thành `&[T]` ở đối số/`≔` có kiểu/`⏎`/trường (GÓI 12); không thêm quyền ghi (`&a` ↛ `&![T]`, dùng `&!a`). `⟳ x in &a` cũng được. Tuple `(1u32, true)`, truy cập `.0 .1`; KHÔNG có phân rã `(a, b) ≔ f();` — viết `t ≔ f(); a ≔ t.0;`.
 - struct / enum / impl / const:
 ```grit run value=130
 □ LIMIT: u32 ≔ 10;
@@ -300,7 +300,7 @@ cannot open
   ⎇ count { root_out().write_str("count\n"); } ⇝ { }
 }
 ```
-- **Trạng thái dùng chung qua `&!Struct`**: `▢ St<'a> { b: &'a [u8], pos: usize }`; hàm nhận `st: &!St` ghi `st.pos ← st.pos + 1usize;` và truyền tiếp `st` cho hàm con (tự mượn lại, KHÔNG viết `&!st`). BẪY: `f(st, st.pos)` với `st: &!St` là **E0403** (đối số thứ nhất đã mượn độc quyền `st`, đối số thứ hai lại đọc `st.pos`; không có "mượn hai pha"): đọc trường vào biến trước (`p ≔ st.pos; f(st, p)`) hoặc để hàm con tự đọc `st.pos`.
+- **Trạng thái dùng chung qua `&!Struct`**: `▢ St<'a> { b: &'a [u8], pos: usize }`; hàm nhận `st: &!St` ghi `st.pos ← st.pos + 1usize;` và truyền tiếp `st` cho hàm con (tự mượn lại, KHÔNG viết `&!st`). Mượn hai pha (GÓI 12, như Rust): `f(st, st.pos)` và `st.m(st.pos)` HỢP LỆ (đối số sau chỉ đọc); `f(st, g(st))` (đối số sau lại mượn `&!`) vẫn là E0402.
 - **Ghi vào lát khả biến**: `μsl ≔ v.as_mut_slice(); sl[i] ← x;` (lấy `as_mut_slice` SAU lần `push` cuối).
 - **`i64::MIN`**: `-9223372036854775807i64 - 1i64`. Số học kiểm tràn không abort trả Option, dùng trực tiếp làm đối tượng `⌥`: `⌥ a *? b { Some(x) ↦ …, None ↦ { …overflow… } }`.
 - **`core::exit` ở vị trí biểu thức**: kiểu `!` khớp mọi kiểu nên được dùng làm một nhánh: `data ≔ ⌥ inp.read_all() { Ok(f) ↦ f.bytes(), Err(_) ↦ { err.write_str("lỗi\n"); core::exit(2u32) } };`.

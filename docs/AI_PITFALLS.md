@@ -142,21 +142,15 @@ SAU:
 ƒ main() → i32 ! ∅ { has(Some(1usize)); 0 }
 ```
 
-## 5. E0403 — truyền `st` và đọc `st.field` trong cùng lời gọi (mượn hai pha)
-Vì sao: `f(st, st.pos + 1)` với `st: &!St` mượn `st` độc quyền rồi đọc `st.pos` khi mượn còn sống.
-Viết đúng: tính giá trị ra biến cục bộ trước.
-TRƯỚC:
-```grit fail=E0403
-▢ St { pos: u32 }
-ƒ step(st: &!St, p: u32) → u32 ! ∅ { p }
-ƒ go(st: &!St) → u32 ! ∅ { step(st, st.pos + 1u32) }
-ƒ main() → i32 ! ∅ { μs ≔ St { pos: 1u32 }; go(&!s); 0 }
-```
-SAU:
+## 5. (ĐÃ HẾT, GÓI 12) E0403 — truyền `st` và đọc `st.field` trong cùng lời gọi
+Trước GÓI 12, `step(st, st.pos + 1u32)` (với `st: &!St`) và `s.adv(s.pos)` (phương thức `&!self`) bị E0403. Nay Grit có **mượn hai pha** như Rust:
+autoref `&self`/`&!self` và reborrow ngầm của một biến `&!` được tạo SAU các đối số chỉ-đọc (semantics §3a), nên hai dạng trên được chấp nhận.
+Vẫn bị từ chối (đúng): đối số sau lại mượn `&!` cùng chỗ (`step(st, other(st))` ⇒ E0402) hoặc còn GIỮ tham chiếu vào người nhận qua lời gọi
+(`s.adv2(keep(&s))` ⇒ E0403).
 ```grit
 ▢ St { pos: u32 }
 ƒ step(st: &!St, p: u32) → u32 ! ∅ { p }
-ƒ go(st: &!St) → u32 ! ∅ { p ≔ st.pos + 1u32; step(st, p) }
+ƒ go(st: &!St) → u32 ! ∅ { step(st, st.pos + 1u32) }
 ƒ main() → i32 ! ∅ { μs ≔ St { pos: 1u32 }; go(&!s); 0 }
 ```
 

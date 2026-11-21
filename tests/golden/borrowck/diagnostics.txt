@@ -52,6 +52,7 @@ E0401_write_index_of_moved_array | E0401 | `a[0] ← mk();` | [giá trị bị m
 E0401_write_through_moved_unique_ref | E0401 | `*a ← 2;` | [giá trị bị move ở đây @ `a`] | ghi qua `a` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0402_array_elements_conservative | E0402 | `&!a[1]` | [khoản mượn bắt đầu ở đây @ `&!a[0]`] | hai khoản mượn duy nhất `&!` chồng nhau trên `a`: khoản mượn trước còn được dùng về sau
 E0402_borrow_field_then_whole | E0402 | `&!w` | [khoản mượn bắt đầu ở đây @ `&!w.b`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
+E0402_call_arg_reborrows_unique_again | E0402 | `st` | [khoản mượn bắt đầu ở đây @ `st`] | hai khoản mượn duy nhất `&!` chồng nhau trên `st`: khoản mượn trước còn được dùng về sau
 E0402_double_unique | E0402 | `&!x` | [khoản mượn bắt đầu ở đây @ `&!x`] | hai khoản mượn duy nhất `&!` chồng nhau trên `x`: khoản mượn trước còn được dùng về sau
 E0402_element_after_whole_in_loop | E0402 | `&!a[0]` | [khoản mượn bắt đầu ở đây @ `&!a`] | hai khoản mượn duy nhất `&!` chồng nhau trên `a`: khoản mượn trước còn được dùng về sau
 E0402_field_unique_held_across_call | E0402 | `&!w` | [khoản mượn bắt đầu ở đây @ `&!w.n`] | hai khoản mượn duy nhất `&!` chồng nhau trên `w`: khoản mượn trước còn được dùng về sau
@@ -88,6 +89,7 @@ E0403_loop_unique_carried_shared_inside | E0403 | `&x` | [khoản mượn bắt 
 E0403_match_scrutinee_read_while_unique | E0403 | `⌥ m { A ↦ { }, N ↦ { } }` | [khoản mượn bắt đầu ở đây @ `&!m`] | dùng/mượn chung `m` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_match_scrutinee_read_while_unique | E0403 | `A ↦ { }` | [khoản mượn bắt đầu ở đây @ `&!m`] | dùng/mượn chung `m` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_match_scrutinee_read_while_unique | E0403 | `N ↦ { }` | [khoản mượn bắt đầu ở đây @ `&!m`] | dùng/mượn chung `m` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_method_arg_keeps_shared_ref | E0403 | `s.adv2(keep(&s))` | [khoản mượn bắt đầu ở đây @ `&s`] | mượn duy nhất `&!` `s` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_method_shared_then_unique_self | E0403 | `b.inc()` | [khoản mượn bắt đầu ở đây @ `b.refv()`] | mượn duy nhất `&!` `b` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_mix_call | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_nested_block | E0403 | `&x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
@@ -221,6 +223,7 @@ E0406_move_via_method_self_while_borrowed | E0406 | `b.take()` | [khoản mượ
 E0406_move_while_borrowed | E0406 | `eat(b)` | [khoản mượn bắt đầu ở đây @ `&b`] | move `b` ra trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
 E0406_q87_bind_shared_then_overwrite_root | E0406 | `v ← E::C;` | [khoản mượn bắt đầu ở đây @ `&v`] | gán vào `v` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
 E0406_q87_bind_unique_then_overwrite_root | E0406 | `(*p).x ← 5;` | [khoản mượn bắt đầu ở đây @ `P { x, y } ↦ { (*p).x ← 5; *x }`] | gán vào `p` trong khi nó đang bị mượn (mượn duy nhất `&!`) và khoản mượn còn được dùng về sau
+E0406_unsized_slice_alive_while_array_written | E0406 | `a[0usize] ← 5u32;` | [khoản mượn bắt đầu ở đây @ `&a`] | gán vào `a` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
 E0406_write_through_origin_while_reborrowed | E0406 | `*p ← 1;` | [khoản mượn bắt đầu ở đây @ `&*p`] | gán vào `p` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
 E0407_array_element | E0407 | `eat(a[0])` | [] | không thể move ra khỏi `a`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
 E0407_array_element_in_let | E0407 | `a[1]` | [] | không thể move ra khỏi `a`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
