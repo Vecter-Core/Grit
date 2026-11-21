@@ -1,3 +1,0 @@
-// probe: reject E0602
-// why: E0602: chia 0
-ƒ main() → i32 ! ∅ { a ≔ 5; b ≔ 0; a / b }

@@ -156,29 +156,6 @@ fn recursion_needs_a_decreasing_variant_or_div() {
 }
 
 #[test]
-#[ignore = "công cụ gỡ lỗi: in kết quả chứng minh dừng cho GT_SRC, không khẳng định gì"]
-fn dump_term() {
-    let src = std::env::var("GT_SRC").expect("GT_SRC");
-    let (t, m) = common::mir(&src);
-    let info = build_prog_info(&t, &m);
-    let o = check_termination(&t, &m, &info, &mut ZoneProver::new(24));
-    for r in &o.per_body {
-        for j in &r.judged {
-            if j.tag.is_some() || j.ob.kind == gt_oblig::ir::ObKind::Variant {
-                eprintln!(
-                    "{} {:?} {:?}\n goal {}\n hyps {:?}",
-                    j.ob.id,
-                    j.ob.kind,
-                    j.status,
-                    j.ob.goal.to_text(),
-                    j.ob.hyps.iter().map(|h| h.to_text()).collect::<Vec<_>>()
-                );
-            }
-        }
-    }
-}
-
-#[test]
 fn methods_multiplication_and_leading_conjuncts() {
     // đệ quy qua phương thức trong impl
     ok(

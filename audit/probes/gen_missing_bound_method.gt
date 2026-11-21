@@ -1,5 +1,0 @@
-// probe: reject E0309
-// why: gọi phương thức trait khi T thiếu ràng buộc
-⊏ Show { ƒ show(&self) → i32 ! ∅; }
-ƒ f<T>(x: &T) → i32 ! ∅ { x.show() }
-ƒ main() → i32 ! ∅ { 0 }

@@ -6,11 +6,11 @@
 ## Loại A — chỉ đổi nhãn (đã tự kiểm bằng chứng tồn tại trong kho, 2026-11-18)
 | # | Điểm | Kết quả | Bằng chứng tìm thấy |
 |---|---|---|---|
-| A1 | Q23 | ĐÃ DUYỆT 2026-10-06 — nhãn sửa | `PROGRESS.md:171` "M4 HOÀN THÀNH (Giang duyệt Q23 và 4 điểm sai khác, 2026-10-06)" |
+| A1 | Q23 | ĐÃ DUYỆT 2026-10-06 — nhãn sửa | `HISTORY.md:171` "M4 HOÀN THÀNH (Giang duyệt Q23 và 4 điểm sai khác, 2026-10-06)" |
 | A2 | Q34 (ADR-022) | ĐÃ DUYỆT 2026-10-06 — nhãn sửa | `DECISIONS.md:341` tiêu đề "Giang DUYỆT 2026-10-06, Q34" |
 | A3 | Q35–Q42 (ADR-025) | ĐÃ DUYỆT 2026-10-07 — nhãn sửa | `DECISIONS.md:586` "Duyệt của Giang (2026-10-07)" |
 | A4 | Q79–Q82 | ĐÃ DUYỆT 2026-10-14 — nhãn sửa ở READINESS, BENCHMARK | `OPEN_QUESTIONS.md:53–56` |
-| A5 | ADR-038 / Q52 | duyệt theo từng bước (Q83–Q86, Q85 hoãn); Q52 cho `spawn` thuần — nhãn sửa | `HANDOFF.md:93`; `KNOWN_LIMITATIONS.md:190` |
+| A5 | ADR-038 / Q52 | duyệt theo từng bước (Q83–Q86, Q85 hoãn); Q52 cho `spawn` thuần — nhãn sửa | `STATUS.md:93`; `KNOWN_LIMITATIONS.md:190` |
 Không có bằng chứng nào bị thiếu ⇒ không mục nào phải giữ "CHỜ GIANG" vì lý do này. Lưu ý: bằng chứng cho Q83–Q86 chỉ là dòng "Đã QUYẾT" trong HANDOFF (không có ADR ghi chi tiết từng Q); Giang nên liếc lại nếu muốn.
 
 ## Loại B — quyết định (ỦY QUYỀN)

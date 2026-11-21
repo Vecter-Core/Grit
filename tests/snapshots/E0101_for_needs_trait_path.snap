@@ -1,0 +1,10 @@
+# tests/fail/E0101_for_needs_trait_path.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: trước `for` phải là đường dẫn trait
+ --> tests/fail/E0101_for_needs_trait_path.gt:4:3
+  |
+4 | ⊐ &S for S { }
+  |   ^^^^^^
+## [1] json
+{"code":"E0101","level":"error","message":"trước `for` phải là đường dẫn trait","file":"tests/fail/E0101_for_needs_trait_path.gt","span":{"start":{"offset":110,"line":4,"col":3},"end":{"offset":116,"line":4,"col":9}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

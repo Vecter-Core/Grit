@@ -1,0 +1,20 @@
+// expect: pass
+// note: ép `&[T; N]` → `&[T]` và `&![T; N]` → `&![T]`/`&[T]` ở điểm ép kiểu (đối số, `≔` có kiểu, `⏎`, trường struct), như Rust (GÓI 12)
+▢ View<'a> { xs: &'a [u32] }
+ƒ sum(xs: &[u32]) → u32 ! ∅ {
+  μt ≔ 0u32;
+  μi ≔ 0usize;
+  ⟳ i < xs.len() ↓ xs.len() - i { t ← t +% xs[i]; i ← i + 1usize; }
+  t
+}
+ƒ zero_first(xs: &![u32]) ! ∅ { ⎇ xs.len() > 0usize { xs[0usize] ← 0u32; } ⇝ { } }
+ƒ first<'a>(a: &'a [u32; 3]) → &'a [u32] ! ∅ { ⏎ a; }
+ƒ main() → u32 ! ∅ {
+  μa ≔ [1u32, 2u32, 3u32];
+  s1 ≔ sum(&a);
+  zero_first(&!a);
+  s: &[u32] ≔ &a;
+  v ≔ View { xs: &a };
+  f ≔ first(&a);
+  s1 +% sum(s) +% sum(v.xs) +% f.len() as u32
+}

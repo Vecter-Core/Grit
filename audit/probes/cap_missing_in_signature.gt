@@ -1,5 +1,0 @@
-// probe: reject
-// why: D28: dùng I/O mà chữ ký không có Cap
-ƒ w() ! {io} { }
-ƒ f() ! ∅ { w(); }
-ƒ main() → i32 ! {io} { f(); 0 }

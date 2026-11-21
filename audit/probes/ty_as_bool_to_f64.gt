@@ -1,3 +1,0 @@
-// probe: reject
-// why: ép bool → f64
-ƒ main() → i32 ! ∅ { x ≔ true as f64; 0 }

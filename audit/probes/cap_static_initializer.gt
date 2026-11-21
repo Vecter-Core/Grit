@@ -1,4 +1,0 @@
-// probe: reject E0310
-// why: E0310: initializer của static gọi nguồn capability
-■ G: Cap<Out> ≔ root_out();
-ƒ main() → i32 ! {io} { 0 }

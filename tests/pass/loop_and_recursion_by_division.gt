@@ -1,0 +1,18 @@
+// expect: pass
+// note: biến thể giảm qua phép chia/dư (GÓI 12): `x / c < x` khi x ≥ 1 và c ≥ 2; `a % b < b` khi a ≥ 0, b ≥ 1 — đếm chữ số, chia đôi, Euclid
+ƒ digits(n: u32) → u32 ! ∅ {
+  μx ≔ n;
+  μc ≔ 0u32;
+  ⟳ x > 0u32 ↓ x { x ← x / 10u32; c ← c +% 1u32; }
+  c
+}
+ƒ log2(n: u64) → u32 ! ∅ {
+  μx ≔ n;
+  μc ≔ 0u32;
+  ⟳ x > 1u64 { x ← x / 2u64; c ← c +% 1u32; }
+  c
+}
+ƒ gcd(a: u32, b: u32) → u32 ! ∅ ↓ b {
+  ⎇ b == 0u32 { a } ⇝ { gcd(b, a % b) }
+}
+ƒ main() → u32 ! ∅ { digits(12345u32) +% log2(1024u64) +% gcd(48u32, 18u32) }

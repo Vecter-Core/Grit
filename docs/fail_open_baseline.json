@@ -116,6 +116,8 @@
 "crates/gt-mir/src/build/expr.rs|_ =>|_ => ice(format!(\"⟳ in trên kiểu {ity:?}\")),",
 "crates/gt-mir/src/build/expr.rs|_ =>|_ => return None,",
 "crates/gt-mir/src/build/expr.rs|_ =>|_ => return ice(format!(\"literal với kiểu {ty:?}\")),",
+"crates/gt-mir/src/build/expr.rs|_ =>|_ => return ice(format!(\"ép unsize từ kiểu không phải mảng {src:?}\")),",
+"crates/gt-mir/src/build/expr.rs|_ =>|_ => return ice(format!(\"ép unsize từ kiểu không phải tham chiếu {src:?}\")),",
 "crates/gt-mir/src/build/expr.rs|_ =>|_ => self.operand_of(recv, &rty),",
 "crates/gt-mir/src/build/expr.rs|_ =>|_ => self.with_at(e, |b| {",
 "crates/gt-mir/src/build/expr.rs|_ =>|_ => true,",

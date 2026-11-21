@@ -1,3 +1,0 @@
-// probe: reject E0701
-// why: E0701: vòng while không biến thể suy được
-ƒ main() → i32 ! ∅ { μi ≔ 0u32; ⟳ i < 10 { i ← i + 0; } 0 }

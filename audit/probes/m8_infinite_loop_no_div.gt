@@ -1,3 +1,0 @@
-// probe: reject E0701
-// why: E0701: vòng vô hạn không div
-ƒ main() → i32 ! ∅ { ⟳ { } 0 }

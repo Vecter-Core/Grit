@@ -1,4 +1,0 @@
-// probe: accept
-// why: đối chứng dương: hai &! lên hai trường khác nhau
-▢ P { a: i32, b: i32 }
-ƒ main() → i32 ! ∅ { μp ≔ P { a: 1, b: 2 }; x ≔ &!p.a; y ≔ &!p.b; *x ← 3; *y ← 4; p.a }

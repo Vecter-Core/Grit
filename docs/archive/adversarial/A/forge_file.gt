@@ -1,5 +1,0 @@
-ƒ main() ! {io, div, mem} {
-  out ≔ root_out();
-  f ≔ File { x: 5 };
-  out.write_u64(f.len() as u64);
-}

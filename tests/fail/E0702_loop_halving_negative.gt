@@ -1,0 +1,4 @@
+// expect: fail E0702
+// note: số âm: `-3 / 2 = -1 > -3` (chia cắt về 0) — biến thể có dấu không bị chặn dưới, không được suy là giảm
+ƒ f(n: i32) → i32 ! ∅ { μx ≔ n; ⟳ x != 0i32 ↓ x { x ← x / 2i32; } x }
+ƒ main() ! ∅ { f(-3i32); }

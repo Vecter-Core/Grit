@@ -12,7 +12,7 @@ Tài liệu này nói đúng mức tin cậy mà dự án có bằng chứng. N�
 |---|---|---|
 | lỗi kiểu, thiếu đường trả về, `match` không vét cạn, gán vào biến bất biến | M4/M5 | corpus fail/pass theo mã `E03xx`; đột biến |
 | use-after-move, mượn chồng, tham chiếu sống lâu hơn dữ liệu, dùng sau `Arena::reset` | M6 (mượn + vùng đời) | corpus + **oracle động** (`gt-borrowck/tests`, bộ sinh chương trình) + đột biến có "tắt bản sửa" |
-| tràn số, chia 0, chỉ số/lát ngoài biên, ép kiểu mất thông tin | M7 (nghĩa vụ) + kiểm tra lúc chạy giữ lại | corpus + so sánh ba nguồn; **69 đột biến nguy hiểm của M7 còn sống ở thời điểm viết** (xem `docs/READINESS.md`) |
+| tràn số, chia 0, chỉ số/lát ngoài biên, ép kiểu mất thông tin | M7 (nghĩa vụ) + kiểm tra lúc chạy giữ lại | corpus + so sánh ba nguồn; **69 đột biến nguy hiểm của M7 còn sống ở thời điểm viết** (xem `docs/STATUS.md`) |
 | vòng lặp/đệ quy không chứng minh được dừng | M8 (`↓`, nhiên liệu) | corpus `E07xx`; đột biến |
 | hiệu ứng không khai báo, I/O không có capability | M8 effects + E0310 | corpus; điều kiện cứng #12 (mô hình capability) |
 | rò rỉ bí mật vào I/O, bí mật trong mã nguồn | M9 | corpus `S1xx/S2xx` |

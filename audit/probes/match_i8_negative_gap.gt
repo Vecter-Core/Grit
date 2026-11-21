@@ -1,3 +1,0 @@
-// probe: reject E0305
-// why: D6: i8 thiếu số âm
-ƒ main() → i32 ! ∅ { x ≔ 7i8; ⌥ x { 0..=127 ↦ 1 } }

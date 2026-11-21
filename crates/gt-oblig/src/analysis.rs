@@ -448,6 +448,29 @@ impl<'a> Ctx<'a> {
                 zone_dropped.push(n);
             }
         }
+        // GÓI 12: biến TẠM giữ kết quả `/` hay `%` số nguyên nhận chỗ zone CHỈ khi còn ngân sách SAU mọi biến có tên (không bao giờ đẩy
+        // biến người dùng ra), để quan hệ `t ≤ a`, `t < a`, `t < b` (xem `div_rem_facts`) truyền qua bao đóng sang biến được gán `x ← t`.
+        if use_zone {
+            for bb in &body.blocks {
+                for st in &bb.statements {
+                    if let StatementKind::Assign(p, Rvalue::BinaryOp(BinOp::Div | BinOp::Rem, ..)) =
+                        &st.kind
+                    {
+                        let l = p.local.index();
+                        let v = l as VarId;
+                        if p.projection.is_empty()
+                            && matches!(body.locals[l].kind, LocalKind::Temp)
+                            && itys[l].is_some()
+                            && !aliased[l]
+                            && zvars.len() < ZONE_MAX_VARS
+                            && !zvars.contains(&v)
+                        {
+                            zvars.push(v);
+                        }
+                    }
+                }
+            }
+        }
         // biến bóng cho biến thể của vòng lặp (M8): thêm vào zone ngoài ZONE_MAX_VARS
         let mut ghosts: BTreeMap<usize, Vec<(VarId, VarId)>> = BTreeMap::new();
         let mut specs: BTreeMap<usize, Vec<LoopSpec>> = BTreeMap::new();
@@ -717,6 +740,56 @@ impl<'a> Ctx<'a> {
         ])
     }
 
+    /// GÓI 12 — bất đẳng thức ĐÚNG TOÁN HỌC của chia/dư CẮT VỀ 0 trên giá trị toán học (đường chia 0/tràn đã abort): chỉ THU HẸP, không tạo
+    /// kiểm mới. Với `a ≥ 0`, `b ≥ 1`: `a / b ≤ a`, `a % b ≤ a`, `a % b ≤ b − 1`; thêm `a ≥ 1`, `b ≥ 2`: `a / b ≤ a − 1`
+    /// (`⌊a/b⌋ ≤ ⌊a/2⌋ ≤ a − 1`). Mệnh đề nhắc `dst` (giá trị MỚI) và các biến KHÁC `dst` (giá trị hiện tại, không đổi bởi phép gán này);
+    /// toán hạng nhắc chính `dst` ⇒ bỏ (sau gán, `Var(dst)` không còn là giá trị cũ). `a < 0` có thể (chia cắt về 0 làm số âm TĂNG) ⇒ không gì.
+    fn div_rem_facts(
+        op: BinOp,
+        dst: usize,
+        ta: Option<Term>,
+        tb: Option<Term>,
+        ia: &Interval,
+        ib: &Interval,
+    ) -> (Vec<Prop>, Option<i128>) {
+        let at_least = |iv: &Interval, k: i128| iv.lo >= B::from_i128(k);
+        let mut out = Vec::new();
+        if !(at_least(ia, 0) && at_least(ib, 1)) {
+            return (out, None);
+        }
+        let is_dst = |t: &Option<Term>| *t == Some(Term::Var(dst as VarId));
+        // toán hạng CHÍNH LÀ `dst` (tự gán): `x ← x / k` ⇒ x_mới ≤ x_cũ (+ −1 nếu x ≥ 1, k ≥ 2); `x ← x % b` ⇒ ≤ x_cũ; `x ← a % x` ⇒ ≤ x_cũ − 1
+        let shift = match op {
+            BinOp::Div if is_dst(&ta) => Some(if at_least(ia, 1) && at_least(ib, 2) {
+                -1
+            } else {
+                0
+            }),
+            BinOp::Rem if is_dst(&tb) => Some(-1),
+            BinOp::Rem if is_dst(&ta) => Some(0),
+            _ => None,
+        };
+        let free_of_dst = |t: &Term| {
+            let mut vs = Vec::new();
+            t.vars(&mut vs);
+            !vs.contains(&(dst as VarId))
+        };
+        let d = Term::Var(dst as VarId);
+        if let Some(ta) = ta.filter(free_of_dst) {
+            if op == BinOp::Div && at_least(ia, 1) && at_least(ib, 2) {
+                out.push(Prop::Lt(d.clone(), ta));
+            } else {
+                out.push(Prop::Le(d.clone(), ta));
+            }
+        }
+        if op == BinOp::Rem
+            && let Some(tb) = tb.filter(free_of_dst)
+        {
+            out.push(Prop::Lt(d, tb));
+        }
+        (out, shift)
+    }
+
     fn arith_term(op: BinOp, a: Term, b: Term) -> Option<Term> {
         match op {
             BinOp::Add | BinOp::AddWrap | BinOp::AddSat => Some(Term::add(a, b)),
@@ -748,6 +821,9 @@ impl<'a> Ctx<'a> {
         enum Val {
             Int(Term),
             Interval(Interval),
+            /// khoảng + các mệnh đề ĐÚNG về giá trị mới của `dst` (chỉ nhắc biến khác `dst`), giả định sau khi gán; và (nếu có)
+            /// `dst_mới ≤ dst_cũ + c` khi toán hạng CHÍNH LÀ `dst` (GÓI 12)
+            IntervalRel(Interval, Vec<Prop>, Option<i128>),
             Bool(Prop),
             Chk(Term, Prop),
             RefOf(usize),
@@ -799,7 +875,24 @@ impl<'a> Ctx<'a> {
                             } else {
                                 ia.rem_trunc_nz(ib)
                             };
-                            r.map_or(Val::Unknown, Val::Interval)
+                            match r {
+                                Some(iv) => {
+                                    let (facts, shift) = Self::div_rem_facts(
+                                        *op,
+                                        dst,
+                                        self.term_of(st, a),
+                                        self.term_of(st, b),
+                                        &ia,
+                                        &ib,
+                                    );
+                                    if facts.is_empty() && shift.is_none() {
+                                        Val::Interval(iv)
+                                    } else {
+                                        Val::IntervalRel(iv, facts, shift)
+                                    }
+                                }
+                                None => Val::Unknown,
+                            }
                         }
                         (_, Some(ta), Some(tb)) => match Self::arith_term(*op, ta, tb) {
                             Some(t) => {
@@ -908,6 +1001,15 @@ impl<'a> Ctx<'a> {
         match &val {
             Val::Int(t) if tracked => st.env.assign(dst as VarId, t),
             Val::Interval(iv) if tracked => st.env.assign_interval(dst as VarId, *iv),
+            Val::IntervalRel(iv, facts, shift) if tracked => {
+                match shift {
+                    Some(c) => st.env.assign_interval_upper_shift(dst as VarId, *iv, *c),
+                    None => st.env.assign_interval(dst as VarId, *iv),
+                }
+                for p in facts {
+                    st.env.assume(p, true);
+                }
+            }
             _ => {
                 if self.itys[dst].is_some() {
                     st.env.forget(dst as VarId);

@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: ép unsize đòi CÙNG kiểu phần tử: `&[u8; 2]` không thành `&[u32]`
+ƒ sum(xs: &[u32]) → u32 ! ∅ { 0u32 }
+ƒ main() ! ∅ { a ≔ [1u8, 2u8]; sum(&a); }

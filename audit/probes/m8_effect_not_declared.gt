@@ -1,5 +1,0 @@
-// probe: reject E0801
-// why: E0801: thân dùng hiệu ứng chưa khai báo
-ƒ w(c: &Cap<Out>) ! {io} { c.write_u64(1); }
-ƒ pure(c: &Cap<Out>) ! ∅ { w(c); }
-ƒ main() → i32 ! {io} { o ≔ root_out(); pure(&o); 0 }

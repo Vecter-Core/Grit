@@ -1,0 +1,7 @@
+// expect: fail E0402
+// note: mượn hai pha chỉ áp dụng khi các đối số sau CHỈ ĐỌC; đối số sau mượn `&!` lại cùng chỗ thì vẫn là hai khoản mượn duy nhất chồng nhau
+▢ St { pos: usize }
+ƒ step(st: &!St, p: usize) → usize ! ∅ { p }
+ƒ other(s: &!St) → usize ! ∅ { s.pos ← 3usize; 1usize }
+ƒ go(st: &!St) → usize ! ∅ { step(st, other(st)) }
+ƒ main() ! ∅ { μs ≔ St { pos: 1usize }; go(&!s); }

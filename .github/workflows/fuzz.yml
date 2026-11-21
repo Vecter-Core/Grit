@@ -1,7 +1,7 @@
 # Fuzz lexer/parser trên Linux (GÓI 7 S4). CHỈ chạy thủ công (workflow_dispatch): KHÔNG cron, KHÔNG tự gọi lại; quyền chỉ đọc; không secret; action ghim SHA.
 # Mỗi lần bấm chạy `minutes` phút (mặc định 330) cho CẢ HAI mục tiêu song song. Cần ≈ 5 lần để đủ 24 giờ mỗi mục tiêu trên băm nguồn hiện tại.
 # Kết quả: artifact `fuzz-<mục tiêu>` chứa fuzz-log.jsonl (đồng hồ treo tường, số lượt, băm nguồn, runner, ngày, mã thoát) và mọi crash.
-# Nạp vào docs/FUZZ_LOG.jsonl: `gh run download <run-id> -D /tmp/fz && python tools/fuzz_ingest.py /tmp/fz` (xem docs/HANDOFF.md).
+# Nạp vào docs/FUZZ_LOG.jsonl: `gh run download <run-id> -D /tmp/fz && python tools/fuzz_ingest.py /tmp/fz` (xem docs/STATUS.md).
 name: fuzz
 
 on:

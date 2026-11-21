@@ -14,9 +14,8 @@ Tài liệu cho NGƯỜI DÙNG (và AI viết Grit). Chi tiết kỹ thuật, b�
 | toán tử `?`, phân rã tuple `(a, b) ≔ f()` | `⌥ r { Ok(v) ↦ …, Err(e) ↦ … }`; `t ≔ f(); a ≔ t.0;` (cả bốn capstone viết được không cần chúng) |
 | `Option::unwrap`, `is_some`, `Cap<Fs>::sub` chạy được | `⌥`, `unwrap_or`, `is_none` (std). `check` XANH nhưng backend từ chối (mã 3) |
 | `==` trên tuple/`&T`/Option/struct/lát | so từng trường; `*a == *b`; `cmp(..).is_eq()`; `[u8]::equals` |
-| mượn hai pha (`f(st, st.pos)` với `st: &!St`) | đọc trường vào biến trước |
-| bộ giải không chứng minh được `a % b < b`, `x ← x / 10` giảm | nhiên liệu (`core::fuel_left`) hoặc ngân sách độ sâu |
-| `&[T; N]` → `&[T]` tự động; mảng `.len()` | `&a[0usize..N]` |
+| bộ giải không chứng minh được bước PHI TUYẾN (`x ← x * 2` tiến tới cận); `x / k`, `a % b` thì ĐƯỢC từ GÓI 12 (ADR-C16) | nhiên liệu (`core::fuel_left`) hoặc ngân sách độ sâu |
+| mảng `.len()` | `&a[0usize..N]` hoặc truyền `&a` vào hàm nhận `&[T]` (ép unsize có từ GÓI 12) |
 | `u128` trong `⌥` thiếu nhánh `_` | luôn thêm `_` |
 
 ## Thư viện

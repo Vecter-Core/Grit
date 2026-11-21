@@ -1,3 +1,0 @@
-// probe: reject E1201
-// why: D15: bidi trong chuỗi
-ƒ main() → i32 ! ∅ { s ≔ "a‮b"; 0 }

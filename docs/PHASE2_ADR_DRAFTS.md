@@ -1,11 +1,11 @@
 # PHASE2_ADR_DRAFTS — bản nháp ADR Giai đoạn 2 (trạng thái: **ĐỀ XUẤT**; GÓI 9, 2026-11-20)
 
-> Bốn bản nháp. KHÔNG thêm vào `docs/DECISIONS.md`; KHÔNG thêm dòng nào vào `docs/TCB_INTRINSICS.md`. Chỉ có hiệu lực khi Giang duyệt từng cái. Nguồn: `docs/PHASE2_PLAN.md`, `docs/PHASE2_FACTCHECK.md`, `docs/PHASE2_PROPOSAL_OPUS.md`.
+> Bốn bản nháp. KHÔNG thêm vào `docs/DECISIONS.md`; KHÔNG thêm dòng nào vào `docs/TCB_INTRINSICS.md`. Chỉ có hiệu lực khi Giang duyệt từng cái. Nguồn: `docs/PHASE2_PLAN.md`, `docs/PHASE2_FACTCHECK.md`, `docs/PHASE2_PLAN.md`.
 
 ## ADR-P2-00 — Cấu trúc Giai đoạn 2 và điều kiện vào (ĐỀ XUẤT)
 **Bối cảnh.** `GRIT_PLAN.md` §8 liệt kê 8.A–8.H; Opus 5.5 đề xuất bổ sung (backend độc lập, bảo đảm, dùng được cho AI, hiệu năng). Cần một cấu trúc để không làm rời rạc và không mở mã trước khi seed đạt.
 **Đề xuất.** (1) Bốn dòng việc: A Bảo đảm, B Độc lập backend, C Dùng được cho AI, D Hiệu năng (`PHASE2_PLAN.md` mục 2). (2) Năm giai đoạn con 2.0–2.4 theo `PHASE2_PLAN.md` mục 4; thứ tự "an toàn trước hiệu năng". (3) ĐIỀU KIỆN VÀO: nhãn `1.0.0-seed` đạt/đạt có điều kiện do Giang ký; điều kiện `GRIT_PLAN.md` §7 còn lại có bằng chứng; cổng rc6 xanh (Windows và Linux); lệnh văn bản của Giang. (4) Mỗi mục: ADR trước mã; dòng TCB trước intrinsic; test đỏ trước; cổng liền mạch xanh trên đúng mã; không mốc ngày. (5) Trước điều kiện vào chỉ làm tài liệu và phép đo (`PHASE2_FACTCHECK.md` mục 10).
-**Hệ quả.** `SEED_FINISH_LINE.md` #14 giữ "cấm khi chưa có lệnh". **Không làm:** các mục ở `PHASE2_PLAN.md` mục 5. **CHƯA KIỂM:** mọi con số công sức; mọi lợi ích hiệu năng (cần đo).
+**Hệ quả.** `STATUS.md` #14 giữ "cấm khi chưa có lệnh". **Không làm:** các mục ở `PHASE2_PLAN.md` mục 5. **CHƯA KIỂM:** mọi con số công sức; mọi lợi ích hiệu năng (cần đo).
 
 ## ADR-P2-01 — Gom cú pháp và khoá `edition` (ĐỀ XUẤT)
 **Bối cảnh.** Cú pháp/ngữ nghĩa lõi đóng băng (`docs/spec/FREEZE.md`, ADR-C04); lexer/parser đóng băng cho tới 24 giờ fuzz mỗi cái (`FREEZE.md:30-31`), và MỖI lần sửa làm mất giờ đã tích luỹ. Các mục N2, N3, N4, N5, N6, N7, N9 cần cú pháp hoặc ngữ nghĩa mới.

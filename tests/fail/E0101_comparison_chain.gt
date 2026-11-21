@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: so sánh không kết hợp (Q15c): `a < b < c` phải viết bằng `∧` hoặc ngoặc
+ƒ main() ! ∅ { x ≔ 1 < 2 < 3; }

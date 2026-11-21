@@ -4,7 +4,7 @@
 //! - Ngược lại ngoặc là cần → fmt(`with`) phải GIỮ đúng số ngoặc, và đọc lại cho cùng AST.
 //!
 //! Không nhúng bảng ưu tiên của printer vào test: mọi sai lệch (độ ưu tiên, kết hợp, `as T <`, tuple-index sau literal…) bị phát hiện
-//! bởi chính parser. Viết sau khi đột biến sống sót cho thấy bảng kiểm thủ công quá thưa (xem PROGRESS.md).
+//! bởi chính parser. Viết sau khi đột biến sống sót cho thấy bảng kiểm thủ công quá thưa (xem HISTORY.md).
 mod common;
 use common::*;
 

@@ -1,3 +1,0 @@
-// case: đệ quy sâu 2 triệu tầng, CÓ ↓ n và dừng (hợp lệ, check XANH) — M8 chứng minh DỪNG, không chứng minh cận ngăn xếp
-ƒ rec(n: u64) → u64 ! ∅ ↓ n { ⎇ n == 0 { 0 } ⇝ { 1 + rec(n - 1) } }
-ƒ main() → u64 ! ∅ { rec(2000000) }

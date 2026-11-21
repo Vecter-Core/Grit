@@ -40,7 +40,7 @@ Tệp: grit-$h.bundle (toàn bộ lịch sử), grit-$h-tree.tar (chỉ cây mã
 
 Dựng: cần Rust (rustup, bản trong rust-toolchain nếu có) và LLVM 20.1.8 (đặt biến GRIT_LLVM_DIR, vd D:/Tools/llvm-20.1.8 trên Windows).
 Dựng runtime trước: cargo build --release --manifest-path runtime/gt-rt/Cargo.toml
-Gate: bash tools/preflight.sh <thư mục>; bash tools/gate.sh <thư mục> (chi tiết: docs/ENVIRONMENT.md, docs/HANDOFF.md mục 8).
+Gate: bash tools/preflight.sh <thư mục>; bash tools/gate.sh <thư mục> (chi tiết: docs/ENVIRONMENT.md, docs/STATUS.md mục 8).
 EOF
 if command -v sha256sum >/dev/null 2>&1; then
   ( cd "$absout" && sha256sum "grit-$h.bundle" "grit-$h-tree.tar" REFS.txt RESTORE.md > SHA256SUMS )

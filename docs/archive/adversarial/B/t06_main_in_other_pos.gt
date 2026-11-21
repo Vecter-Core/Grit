@@ -1,4 +1,0 @@
-ƒ main() ! {io} {
-  out ≔ root_out();
-  out.write_str("ok\n");
-}

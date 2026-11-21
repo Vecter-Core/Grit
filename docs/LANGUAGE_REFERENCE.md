@@ -205,16 +205,16 @@ Quy tắc nền:
 ƒ main() → i32 ! ∅ { x ≔ 1.5f64; ⎇ x { 1 } ⇝ { 0 } }
 ```
 
-Mảng và lát: mảng **không** tự chuyển thành lát khi truyền `&a`; cắt `&a[..]` (hoặc `&a[1..]`) để có `&[T]`. Mảng không có phương thức `len`; lát có.
+Mảng và lát: ở điểm ép kiểu (đối số, `≔` có kiểu, `⏎`, trường struct, phần tử) `&a` (kiểu `&[T; N]`) tự ép thành `&[T]`, và `&!a` thành `&![T]` hoặc `&[T]` (ADR-C15, GÓI 12; như Rust). Ép KHÔNG thêm quyền ghi: `&a` không thành `&![T]`. Cắt `&a[1..]` vẫn dùng như cũ. Mảng không có phương thức `len`; lát có.
 
 ```grit value=3
 ƒ len_of(xs: &[i32]) → usize ! ∅ { xs.len() }
-ƒ main() → usize ! ∅ { a ≔ [1, 2, 3]; len_of(&a[..]) }
+ƒ main() → usize ! ∅ { a ≔ [1, 2, 3]; len_of(&a) }
 ```
 
 ```grit fail=E0301
-ƒ len_of(xs: &[i32]) → usize ! ∅ { xs.len() }
-ƒ main() → usize ! ∅ { a ≔ [1, 2, 3]; len_of(&a) }
+ƒ zero(xs: &![i32]) ! ∅ { }
+ƒ main() → usize ! ∅ { a ≔ [1, 2, 3]; zero(&a); 0 }
 ```
 
 ---

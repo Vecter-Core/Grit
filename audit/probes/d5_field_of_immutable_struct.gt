@@ -1,4 +1,0 @@
-// probe: reject
-// why: D5: ghi trường của struct bất biến
-▢ P { a: i32, b: i32 }
-ƒ main() → i32 ! ∅ { p ≔ P { a: 1, b: 2 }; p.a ← 5; p.a }

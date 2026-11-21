@@ -1,6 +1,6 @@
 # PHASE2_PLAN — kế hoạch hợp nhất Giai đoạn 2 (ĐỀ XUẤT, CHƯA DUYỆT; GÓI 9, 2026-11-20)
 
-> Trạng thái: **ĐỀ XUẤT của kiến trúc sư (Claude) cho Giang duyệt.** Không có mục nào ở đây là quyết định cho tới khi Giang ký. Không có dòng mã Giai đoạn 2 nào được viết trước khi điều kiện vào (mục 1) đạt. Không có mốc ngày. Nguồn: `docs/PHASE2_PROPOSAL_OPUS.md` (Opus 5.5, ĐỀ XUẤT) đối chiếu mã ở `docs/PHASE2_FACTCHECK.md`; `GRIT_PLAN.md` §8.
+> Trạng thái: **ĐỀ XUẤT của kiến trúc sư (Claude) cho Giang duyệt.** Không có mục nào ở đây là quyết định cho tới khi Giang ký. Không có dòng mã Giai đoạn 2 nào được viết trước khi điều kiện vào (mục 1) đạt. Không có mốc ngày. Nguồn: `docs/PHASE2_PLAN.md` (Opus 5.5, ĐỀ XUẤT) đối chiếu mã ở `docs/PHASE2_FACTCHECK.md`; `GRIT_PLAN.md` §8.
 
 ## 0. Tóm tắt cho Giang (≤ 1 trang)
 1. **Việc gì:** gộp đề xuất của Opus vào MỘT kế hoạch có thứ tự, theo bốn dòng việc: **A. Bảo đảm**, **B. Độc lập backend**, **C. Dùng được cho AI**, **D. Hiệu năng**.
@@ -9,18 +9,18 @@
 4. **Quy tắc cú pháp:** mọi thứ cần cú pháp mới (`old`, bất biến kiểu, kiểu khoảng, mã ma, `?`, nhãn đối số, tuyến tính) vào **MỘT đợt "edition" duy nhất**, sau khoá edition + `gritc fix`; lexer/parser khởi động lại đóng băng và fuzz 24 giờ MỘT lần sau đợt đó.
 5. **Hai đường hạ (L1):** khi chuyển hạ LLVM sang GLIR, GIỮ CẢ HAI đường dưới cờ chỉ có trong test, so IR và kết quả trên toàn bộ corpus + mọi bộ sinh; chỉ bỏ đường cũ khi trùng.
 6. **Backend x64 (nếu làm) là để ĐA DẠNG** (vi sai hai backend, bỏ phụ thuộc LLVM, dịch nhanh, không unwinding), KHÔNG vì "đáng tin hơn LLVM -O0". Mỗi backend giữ lớp kiểm sau cùng của riêng nó; COFF (Windows) xong TRƯỚC khi xét đổi mặc định dev.
-7. **Giang cần duyệt:** 5 điểm ở `docs/PENDING_GIANG.md` (cấu trúc, gom cú pháp, thứ tự, hai đường hạ, đổi mặc định sau này). Bốn ADR nháp ở `docs/PHASE2_ADR_DRAFTS.md`.
+7. **Giang cần duyệt:** 5 điểm ở `docs/STATUS.md` (cấu trúc, gom cú pháp, thứ tự, hai đường hạ, đổi mặc định sau này). Bốn ADR nháp ở `docs/PHASE2_ADR_DRAFTS.md`.
 
 ## 1. ĐIỀU KIỆN VÀO Giai đoạn 2 (ĐỀ XUẤT)
 Không bắt đầu mã Giai đoạn 2 trước khi ĐỒNG THỜI có:
-- nhãn `1.0.0-seed` đạt, hoặc đạt có điều kiện **do Giang ký** (`docs/SEED_FINISH_LINE.md`);
-- các điều kiện còn lại của `GRIT_PLAN.md` §7 (cổng chuyển giai đoạn) đã được kiểm từng cái và ghi bằng chứng (hiện còn mở: cổng Linux, fuzz 24 giờ, mục chặn khác — xem `SEED_FINISH_LINE.md`);
+- nhãn `1.0.0-seed` đạt, hoặc đạt có điều kiện **do Giang ký** (`docs/STATUS.md`);
+- các điều kiện còn lại của `GRIT_PLAN.md` §7 (cổng chuyển giai đoạn) đã được kiểm từng cái và ghi bằng chứng (hiện còn mở: cổng Linux, fuzz 24 giờ, mục chặn khác — xem `STATUS.md`);
 - cổng đầy đủ rc6 xanh (Windows XANH ở `16c37f0`; Linux CHƯA: `docs/CLOUD_GATE_PROMPT.md`);
-- Giang ra lệnh bằng văn bản mở Giai đoạn 2 (`SEED_FINISH_LINE.md` #14: "cấm khi chưa có lệnh").
+- Giang ra lệnh bằng văn bản mở Giai đoạn 2 (`STATUS.md` #14: "cấm khi chưa có lệnh").
 Trước đó chỉ làm được TÀI LIỆU/ĐO (mục 4, giai đoạn 2.0).
 
 ## 2. BỐN DÒNG VIỆC (mỗi mục: nguồn, ADR, dòng TCB, cổng, rủi ro, phụ thuộc, cú pháp mới?)
-Ký hiệu nguồn: "Opus §x" = `PHASE2_PROPOSAL_OPUS.md`; "GP 8.x" = `GRIT_PLAN.md`. Mọi mục ghi **ĐỀ XUẤT**.
+Ký hiệu nguồn: "Opus §x" = `PHASE2_PLAN.md`; "GP 8.x" = `GRIT_PLAN.md`. Mọi mục ghi **ĐỀ XUẤT**.
 
 ### A. Bảo đảm (assurance)
 | Mục | Nguồn | ADR cần | Dòng TCB | Bằng chứng cổng | Rủi ro / phụ thuộc | Cú pháp mới? |

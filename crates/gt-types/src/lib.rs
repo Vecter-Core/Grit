@@ -65,6 +65,8 @@ pub struct TypesOutput {
     pub methods: BTreeMap<NodeId, MethodRes>,
     /// Chế độ khớp qua tham chiếu (ADR-040) tại pattern gốc của mỗi chuỗi tham chiếu: `true` = `&!`. MIR PHẢI suy ra cùng chế độ, lệch ⇒ ICE.
     pub pat_modes: BTreeMap<NodeId, bool>,
+    /// Ép `&[T; N]`/`&![T; N]` → `&[T]`/`&![T]` (unsize, như Rust) tại nút biểu thức này: `NodeId` → đích là `&!`? (GÓI 12).
+    pub unsize: BTreeMap<NodeId, bool>,
     /// Bảng instance đã sắp xếp (lazy mono).
     pub instances: Vec<Instance>,
     /// Key of every fn with a body by NodeId (to read the instance table).
@@ -194,13 +196,20 @@ fn ice(msg: &str, resolve: ResolveOutput) -> TypesOutput {
             format!("lỗi nội bộ của compiler (ICE): {msg}"),
         ));
     }
+    empty_output(bag.finish(), resolve)
+}
+
+/// `TypesOutput` không có bảng nào (chỉ báo cáo + kết quả giải tên): dùng khi dừng sớm (giải tên lỗi) hoặc ICE.
+/// MỘT chỗ dựng duy nhất (GÓI 12): thêm trường mới vào `TypesOutput` chỉ cần sửa ở đây.
+fn empty_output(report: Report, resolve: ResolveOutput) -> TypesOutput {
     TypesOutput {
-        report: bag.finish(),
+        report,
         resolve,
         types: BTreeMap::new(),
         locals: BTreeMap::new(),
         methods: BTreeMap::new(),
         pat_modes: BTreeMap::new(),
+        unsize: BTreeMap::new(),
         instances: Vec::new(),
         fn_keys: BTreeMap::new(),
         regions: BTreeMap::new(),
@@ -218,23 +227,7 @@ pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesO
     let mut resolve = resolve_program(inputs, prelude)?;
     if !resolve.report.diagnostics.is_empty() {
         let report = std::mem::replace(&mut resolve.report, Diagnostics::new(LIMIT).finish());
-        return Ok(TypesOutput {
-            report,
-            resolve,
-            types: BTreeMap::new(),
-            locals: BTreeMap::new(),
-            methods: BTreeMap::new(),
-            pat_modes: BTreeMap::new(),
-            instances: Vec::new(),
-            fn_keys: BTreeMap::new(),
-            regions: BTreeMap::new(),
-            db: TypeDb::default(),
-            sites: BTreeMap::new(),
-            def_by_node: BTreeMap::new(),
-            bodies: Vec::new(),
-            prelude_contracts: Vec::new(),
-            file_names: Vec::new(),
-        });
+        return Ok(empty_output(report, resolve));
     }
     let mut names: Vec<String> = inputs.iter().map(|i| i.name.clone()).collect();
     names.sort();
@@ -248,6 +241,7 @@ pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesO
             locals: o.locals,
             methods: o.methods,
             pat_modes: o.pat_modes,
+            unsize: o.unsize,
             instances: o.instances,
             fn_keys: o.fn_keys,
             regions: o.regions,
@@ -268,6 +262,7 @@ struct Outputs {
     locals: BTreeMap<LocalId, (String, String, Ty)>,
     methods: BTreeMap<NodeId, MethodRes>,
     pat_modes: BTreeMap<NodeId, bool>,
+    unsize: BTreeMap<NodeId, bool>,
     instances: Vec<Instance>,
     fn_keys: BTreeMap<NodeId, String>,
     regions: BTreeMap<NodeId, RegionSig>,
@@ -409,6 +404,7 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
         locals: env.out_locals,
         methods: env.out_methods,
         pat_modes: env.out_pat_modes,
+        unsize: env.out_unsize,
         instances,
         fn_keys,
         regions: env.region_sigs,

@@ -1,6 +1,6 @@
 # Grit
 
-**Trạng thái: `1.0.0-rc7` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/READINESS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
+**Trạng thái: `1.0.0-rc7` (bản ứng viên, CHƯA phải Seed).** Chưa đạt các điều kiện cứng còn mở trong `docs/STATUS.md`; đọc `docs/KNOWN_LIMITATIONS.md` trước khi dùng.
 
 **Nói thẳng về mức tin cậy:** Grit an toàn *bằng kiểm tra* (trình biên dịch fail-closed: không chứng minh được thì từ chối), corpus có oracle, đột biến và đọc mã cùng họ model. **Chưa có kiểm toán độc lập**, chưa có bằng chứng hình thức đầy đủ, và còn điều kiện cứng mở. Điều được và không được khẳng định: [`docs/SAFETY_CLAIMS.md`](docs/SAFETY_CLAIMS.md); giới hạn đã biết: [`docs/SEED_LIMITATIONS.md`](docs/SEED_LIMITATIONS.md). Báo lỗi an toàn (chấp nhận sai): xem [`SECURITY.md`](SECURITY.md). Giấy phép: GNU General Public License v3.0 only (`GPL-3.0-only`), xem [`LICENSE`](LICENSE).
 
@@ -53,6 +53,6 @@ python3 tools/check_expectations.py            # corpus tests/{pass,fail,warn} k
 
 ## Tài liệu
 
-**Muốn nắm toàn cảnh (dự án là gì, có mấy phần, đã tới đâu, cái gì cần duyệt): đọc `docs/PROJECT_STATUS.md`.**
+**Muốn nắm toàn cảnh (dự án là gì, có mấy phần, đã tới đâu, cái gì cần duyệt): đọc `docs/STATUS.md`.**
 
-`GRIT_PLAN.md` (kế hoạch), `docs/spec/` (ngữ pháp, ngữ nghĩa, bảng ký hiệu, mã lỗi), `docs/errors/<mã>.md` (từng mã lỗi), `docs/DECISIONS.md` (ADR), `docs/KNOWN_LIMITATIONS.md`, `docs/READINESS.md`, `examples/` (6 công cụ viết bằng Grit: wc, sha256, sortlines, stats, wordfreq, json).
+`GRIT_PLAN.md` (kế hoạch), `docs/spec/` (ngữ pháp, ngữ nghĩa, bảng ký hiệu, mã lỗi), `docs/errors/<mã>.md` (từng mã lỗi), `docs/DECISIONS.md` (ADR), `docs/KNOWN_LIMITATIONS.md`, `docs/STATUS.md`, `examples/` (6 công cụ viết bằng Grit: wc, sha256, sortlines, stats, wordfreq, json).

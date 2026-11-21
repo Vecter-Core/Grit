@@ -1,3 +1,0 @@
-// probe: reject E0319
-// why: Q70: as số thực → nguyên bị cấm
-ƒ main() → i64 ! ∅ { x ≔ 1.5f64; x as i64 }

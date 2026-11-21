@@ -1,4 +1,4 @@
-//! Mỗi test ở đây giết một đột biến SỐNG SÓT của đợt đột biến có mục tiêu cuối M4 (D1, D4, D5, `!`) — xem PROGRESS.md.
+//! Mỗi test ở đây giết một đột biến SỐNG SÓT của đợt đột biến có mục tiêu cuối M4 (D1, D4, D5, `!`) — xem HISTORY.md.
 mod common;
 use common::*;
 

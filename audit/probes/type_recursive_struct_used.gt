@@ -1,4 +1,0 @@
-// probe: reject
-// why: struct vô hạn kích thước (có dùng)
-▢ L { n: i32, next: Option<L> }
-ƒ main() → i32 ! ∅ { x ≔ L { n: 1, next: Option::None }; x.n }

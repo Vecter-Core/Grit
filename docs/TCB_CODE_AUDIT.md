@@ -68,5 +68,5 @@
 - Test hồi quy mới: trước sửa `0 passed; 1 failed`, panic tại assertion với `[]`; sau sửa `1 passed`.
 - `cargo test -p gt-guard --test guard -- --test-threads=2`: 35 passed, 0 failed.
 - G2.0.d `cargo test --manifest-path runtime/gt-rt/Cargo.toml`: 8 passed/0 failed; subprocess ép `GRITRT_TEST_FORCE_MAIN_STACK_FAILURE`, kiểm đúng mã 71 và stderr.
-- Các test H1–H10, runtime và driver bổ sung được ghi theo lệnh/kết quả trong mục G1.5 của `docs/RUN_REPORTS.md` và `docs/HANDOFF.md`.
-- **G1.6 full gate:** chạy liền mạch lần 2 trên HEAD `c5aa45b`, `GATE_RESULT=GREEN`, 1.017/0/202; runtime 7/7; fail-open 470/0 mới. READINESS §7 không được tự suy rộng từ kết quả gate; các giới hạn trên vẫn mở. Chi tiết cổng ở `docs/RUN_REPORTS.md`; tình trạng bundle/push ở HANDOFF/RUNLIST.
+- Các test H1–H10, runtime và driver bổ sung được ghi theo lệnh/kết quả trong mục G1.5 của `docs/HISTORY.md` và `docs/STATUS.md`.
+- **G1.6 full gate:** chạy liền mạch lần 2 trên HEAD `c5aa45b`, `GATE_RESULT=GREEN`, 1.017/0/202; runtime 7/7; fail-open 470/0 mới. READINESS §7 không được tự suy rộng từ kết quả gate; các giới hạn trên vẫn mở. Chi tiết cổng ở `docs/HISTORY.md`; tình trạng bundle/push ở HANDOFF/RUNLIST.

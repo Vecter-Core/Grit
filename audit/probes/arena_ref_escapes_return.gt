@@ -1,4 +1,0 @@
-// probe: reject E0405|E0404
-// why: trả tham chiếu Arena ra khỏi hàm sở hữu Arena
-ƒ f() → &i32 ! {mem} { a ≔ Arena::new(); a.alloc(5) }
-ƒ main() → i32 ! {mem} { *f() }

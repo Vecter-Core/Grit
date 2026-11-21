@@ -1,4 +1,0 @@
-// probe: reject
-// why: biến thể không tồn tại
-⊔ E { A, B }
-ƒ main() → i32 ! ∅ { e ≔ E::C; 0 }

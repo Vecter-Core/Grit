@@ -9,6 +9,9 @@ impl<'e, 'a> Checker<'e, 'a> {
     /// Kiểm `e` và ép sang `target` (điểm ép kiểu).
     pub(crate) fn expr_expect(&mut self, e: &Expr, target: &Ty) {
         let t = self.expr(e, Some(target));
+        if self.try_unsize(&t, target, e.id) {
+            return;
+        }
         self.coerce(&t, target, e.id, e.span, e.span.end);
     }
 

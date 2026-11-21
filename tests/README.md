@@ -13,7 +13,14 @@ bắt buộc là dòng kỳ vọng (đúng một dòng `// expect:` trong cả f
 Dòng `// note:` (tuỳ chọn) giải thích ý đồ của mẫu. File `.tokens`: mỗi dòng một token (`KIND` hoặc
 `KIND(giá trị)`), dòng bắt đầu bằng `#` là comment.
 
-Thư mục `golden/`, `fuzz/`, `bench/` dành cho milestone sau (plan §9) — hiện chỉ có `TASK.md` ghi chú.
+## Bộ chạy E2E duy nhất (GÓI 12)
+`cargo test -p gt-driver --test corpus_e2e` chạy TOÀN BỘ `tests/{pass,fail,warn}` bằng binary `gritc check --json` thật (≈ 20 giây cho ≈ 1.000 mẫu): `pass` ⇒ XANH; `fail Exxxx` ⇒ ĐỎ với ĐÚNG một mã (tập mã mức lỗi == `{Exxxx}`; ngoại lệ tường minh ở bảng `KNOWN_EXTRA`);
+`warn Sxxx` ⇒ VÀNG có `Sxxx`. Thêm hành vi mới = thêm một tệp `.gt` (và dòng ở `docs/spec/error_codes.md` cho `fail`/`warn`), KHÔNG viết Rust. Bộ này chỉ dùng giao diện JSON đóng băng, nên viết lại
+ruột compiler không làm vỡ nó. Thư mục `golden/` (MIR, nghĩa vụ) và `bench/` có test riêng; `tests/lexer/` được lexer corpus kiểm (`all_tokens.gt` khoá toàn bộ bảng tên token).
+
+## Khi nào viết test Rust
+Chỉ cho (1) oracle/bộ sinh so với mô hình độc lập, (2) test giết đột biến, (3) hồi quy của lỗi THẬT (FB/USER_BUG; đỏ trước, sửa sau). Không viết test chỉ kiểm hình dạng dữ liệu nội bộ (AST, `NodeId`, tên trường).
+Trước khi xoá một test, ĐO độ phủ dòng riêng của nó (xem `docs/HISTORY.md`, GÓI 12); nếu nó phủ riêng nhánh thông báo lỗi thì chuyển thành mẫu `fail` trước.
 
 ## Ca nhiều tệp (ADR-017b, M3)
 Một ca = **một thư mục** `tests/{pass,fail,warn}/<ca>/` chứa **≥2 tệp `*.gt`** và một tệp tên `expect` có đúng một dòng

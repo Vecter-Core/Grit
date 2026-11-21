@@ -1,4 +1,0 @@
-// probe: reject E0401
-// why: dup<T>(x: T) → (T, T) { (x, x) } — nhân đôi mọi kiểu affine (Cap/Arena/&!)
-ƒ dup<T>(x: T) → (T, T) ! ∅ { (x, x) }
-ƒ main() → i32 ! ∅ { 0 }

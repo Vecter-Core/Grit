@@ -1,3 +1,0 @@
-// probe: accept
-// why: đối chứng dương: &! giữ trong biến bất biến vẫn ghi được qua *
-ƒ main() → i32 ! ∅ { μx ≔ 1; r ≔ &!x; *r ← 2; x }

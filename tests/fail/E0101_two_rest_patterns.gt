@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: chỉ được có MỘT `..` trong danh sách pattern
+ƒ main() ! ∅ { ⌥ (1, 2) { (.., .., a) ↦ 1 }; }

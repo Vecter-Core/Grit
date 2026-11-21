@@ -1,5 +1,0 @@
-// probe: reject E0404
-// why: struct giữ tham chiếu sống lâu hơn biến
-▢ H<'a> { r: &'a i32 }
-ƒ mk() → H ! ∅ { x ≔ 5; H { r: &x } }
-ƒ main() → i32 ! ∅ { 0 }

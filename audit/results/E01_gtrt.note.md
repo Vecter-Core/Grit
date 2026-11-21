@@ -1,1 +1,0 @@
-- `runtime/gt-rt/src/lib.rs:10`: `compile_error!` cho mọi target ngoài `windows`+`x86_64`. Bản port Linux ở giai đoạn L01 thay `SRWLOCK` bằng khoá quay và bỏ cổng này: gt-rt dựng staticlib 22 MB và 6 test đạt.

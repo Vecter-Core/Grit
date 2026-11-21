@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: escape không hợp lệ trong chuỗi
+ƒ main() ! ∅ { s ≔ "\q"; }

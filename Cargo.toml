@@ -17,3 +17,18 @@ all = { level = "deny", priority = -1 }
 # Test vét cạn của gt-oblig (ADR-025 §12) chạy hàng chục triệu phép: tối ưu cho riêng crate này (giữ kiểm tràn của dev).
 [profile.dev.package.gt-oblig]
 opt-level = 2
+
+# GÓI 12 (đo 2026-11-21, `cargo test` dev, 2 luồng): `gt-fmt/tests/comments.rs` (chèn `// zz` sau MỌI token của MỌI mẫu corpus) chạy 1337 s = 57% thời gian cả bộ test không-LLVM,
+# oracle borrowck 295 s. Cùng cách với gt-oblig: tối ưu các crate nóng, VẪN giữ kiểm tràn số và debug-assertions của dev (opt-level không đổi hai cờ đó). Không đổi test nào.
+[profile.dev.package.gt-fmt]
+opt-level = 2
+[profile.dev.package.gt-lexer]
+opt-level = 2
+[profile.dev.package.gt-parser]
+opt-level = 2
+[profile.dev.package.gt-ast]
+opt-level = 2
+[profile.dev.package.gt-span]
+opt-level = 2
+[profile.dev.package.gt-diag]
+opt-level = 2

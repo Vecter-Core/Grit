@@ -1,9 +1,0 @@
-⊐ Copy for Arena { }
-ƒ main() → u64 ! {mem} {
-  μa ≔ Arena::new();
-  μb ≔ a;
-  r ≔ a.alloc(111u64);
-  b.reset();
-  s ≔ b.alloc(222u64);
-  *r
-}

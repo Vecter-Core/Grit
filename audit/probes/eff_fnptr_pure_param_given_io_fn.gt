@@ -1,5 +1,0 @@
-// probe: reject E0301|E0801
-// why: truyền hàm có io vào tham số kiểu hàm thuần
-ƒ io_fn(x: i32) → i32 ! {io} { x }
-ƒ apply(f: ƒ(i32) → i32 ! ∅, x: i32) → i32 ! ∅ { f(x) }
-ƒ main() → i32 ! ∅ { apply(io_fn, 1) }

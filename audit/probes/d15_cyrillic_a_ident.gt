@@ -1,3 +1,0 @@
-// probe: reject E1203
-// why: D15: định danh trộn bảng chữ
-ƒ main() → i32 ! ∅ { аb ≔ 1; ab ≔ 2; 0 }

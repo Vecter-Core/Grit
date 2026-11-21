@@ -1,3 +1,0 @@
-// probe: reject E0305
-// why: D6: Option lồng thiếu Some(None)
-ƒ main() → i32 ! ∅ { o ≔ Option::Some(Option::Some(1)); ⌥ o { Option::Some(Option::Some(v)) ↦ v, Option::None ↦ 0 } }

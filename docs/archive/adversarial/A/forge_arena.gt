@@ -1,6 +1,0 @@
-ƒ main() → u64 ! {mem} {
-  μa ≔ Arena::new();
-  b ≔ Arena { x: 0 };
-  c ≔ b.alloc(7u64);
-  *c
-}

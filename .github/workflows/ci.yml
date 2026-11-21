@@ -1,6 +1,6 @@
 # CI (GÓI 4 S0). Viết lại 2026-11-19: quyền tối thiểu, KHÔNG secret, KHÔNG pull_request_target, KHÔNG cron; action ghim theo SHA commit.
 # Chạy khi `push` (mọi nhánh) và thủ công (`workflow_dispatch`). Ngân sách phút (gói miễn phí repo riêng tư ≈ 2 000 phút/tháng, Windows tính gấp đôi):
-#   Linux = cổng đầy đủ; Windows = BẢN RÚT GỌN (không chạy toàn bộ test workspace: tốn nhiều phút ×2). Xem docs/CI_REPORT.md.
+#   Linux = cổng đầy đủ; Windows = BẢN RÚT GỌN (không chạy toàn bộ test workspace: tốn nhiều phút ×2). Xem docs/HISTORY.md.
 name: ci
 
 on:
@@ -196,7 +196,7 @@ jobs:
   windows-core:
     if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     # BẢN RÚT GỌN (windows-2022, phút tính gấp đôi): dựng, doctor, các giai đoạn cổng nhẹ (fmt, clippy, expect, doc, deletions, nul, failopen, track) và test lõi.
-    # KHÔNG chạy: audit, test toàn bộ workspace (gt-fmt riêng ≈ 17 phút, gt-driver ≈ 20 phút trên máy chính) — đã chạy trên máy Windows chính (docs/RUN_REPORTS.md).
+    # KHÔNG chạy: audit, test toàn bộ workspace (gt-fmt riêng ≈ 17 phút, gt-driver ≈ 20 phút trên máy chính) — đã chạy trên máy Windows chính (docs/HISTORY.md).
     runs-on: windows-2022
     timeout-minutes: 120
     defaults:

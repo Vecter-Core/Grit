@@ -36,8 +36,7 @@ def check(root: str, run_binary: bool = True) -> list[str]:
     spots = [
         ("CHANGELOG.md", r"^## (1\.0\.0-[a-z0-9]+)", re.M),
         ("docs/spec/FREEZE.md", r"`gritc --version` ⇒ `([^`]+)`", 0),
-        ("docs/READINESS.md", r"Nhãn hiện hành: \*\*`([^`]+)`\*\*", 0),
-        ("docs/PROJECT_STATUS.md", r"Bản hiện tại là \*\*`([^`]+)`\*\*", 0),
+        ("docs/STATUS.md", r"Nhãn hiện hành: \*\*`([^`]+)`\*\*", 0),
     ]
     for rel, pat, fl in spots:
         t = read(rel)

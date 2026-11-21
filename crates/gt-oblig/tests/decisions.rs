@@ -575,24 +575,3 @@ fn calls_overwrite_destinations_and_unmodelled_calls_are_unknown() {
         ),
     ]);
 }
-
-#[test]
-#[ignore = "công cụ gỡ lỗi: in quyết định cho nguồn GT_SRC, không khẳng định gì"]
-fn dump_one() {
-    let src = std::env::var("GT_SRC").expect("GT_SRC");
-    let (t, m) = common::mir(&src);
-    let o = analyze_program(&t, &m, &mut ZoneProver::new(24));
-    for r in &o.per_body {
-        for j in &r.judged {
-            eprintln!(
-                "{} {} {:?}\n goal {}\n hyps {:?}",
-                j.ob.id,
-                j.ob.kind.name(),
-                j.status,
-                j.ob.goal.to_text(),
-                j.ob.hyps.iter().map(|h| h.to_text()).collect::<Vec<_>>()
-            );
-        }
-    }
-    eprintln!("{}", common::text(&t, &m, "main::f"));
-}

@@ -1,5 +1,0 @@
-// probe: reject E0302
-// why: D1: usize dùng ở chỗ cần u32
-ƒ f(n: u32) → u32 ! ∅ { n }
-ƒ g(xs: &[u32]) → u32 ! ∅ { f(xs.len()) }
-ƒ main() → u32 ! ∅ { 0 }

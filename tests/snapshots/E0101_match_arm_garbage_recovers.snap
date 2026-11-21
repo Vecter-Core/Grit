@@ -1,0 +1,10 @@
+# tests/fail/E0101_match_arm_garbage_recovers.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi pattern, gặp `)`
+ --> tests/fail/E0101_match_arm_garbage_recovers.gt:3:22
+  |
+3 | ƒ main() ! ∅ { ⌥ 1 { ) ↦ 1, _ ↦ 2 }; }
+  |                      ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi pattern, gặp `)`","file":"tests/fail/E0101_match_arm_garbage_recovers.gt","span":{"start":{"offset":156,"line":3,"col":22},"end":{"offset":157,"line":3,"col":23}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

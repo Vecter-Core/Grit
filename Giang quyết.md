@@ -1,7 +1,7 @@
 # Giang quyết — các điểm cần chủ dự án quyết, kèm lựa chọn của kiến trúc sư
 
 > Viết ngày 2026-11-18 bởi Claude Opus 5.5 (vai kiến trúc sư), cho **Giang**. Nhánh `integration`, HEAD `869e819`.
-> Phạm vi: chỉ đọc **tài liệu chữ**, không đọc mã, không sửa mã, không commit. Nguồn: `docs/PENDING_GIANG.md`, `docs/PROJECT_STATUS.md` §5, `docs/OPEN_QUESTIONS.md`, `docs/READINESS.md`, `docs/DECISIONS.md` (ADR-018/022/025/036/037/038/C09), `docs/TCB_REVIEW_GUIDE.md`, `docs/TCB_CODE_AUDIT.md`, `docs/TCB_CODE_AUDIT_CLAUDE.md`, `docs/AUTHORSHIP.md`, `docs/KNOWN_LIMITATIONS_DIGEST.md`, `GRIT_PLAN.md` §7.
+> Phạm vi: chỉ đọc **tài liệu chữ**, không đọc mã, không sửa mã, không commit. Nguồn: `docs/STATUS.md`, `docs/OPEN_QUESTIONS.md`, `docs/DECISIONS.md` (ADR-018/022/025/036/037/038/C09), `docs/TCB_REVIEW_GUIDE.md`, `docs/TCB_CODE_AUDIT.md`, `docs/TCB_CODE_AUDIT_CLAUDE.md`, `docs/AUTHORSHIP.md`, `docs/KNOWN_LIMITATIONS.md`, `GRIT_PLAN.md` §7.
 > Mỗi mục có: **bối cảnh**, **các lựa chọn**, **lựa chọn của tôi** và lý do, rồi một dòng để bạn ký. Chỗ nào tôi chưa kiểm bằng lệnh thật thì ghi **CHƯA KIỂM**.
 
 ---
@@ -21,7 +21,7 @@ Có **17 điểm**. Chia làm ba loại:
    - R11b do Claude đọc, phủ phần 503 dòng của Codex.
    - Tài liệu hiện ghi "G1.5 không đạt" vì chỉ so người đọc với Codex. Xem mục **B3**.
 2. **Có hai cổng khác nhau đang bị gộp làm một:**
-   - Nhãn **`1.0.0-seed`**: 6 mục A1–A6, định nghĩa ở `docs/archive/SEED_PLAN.md`.
+   - Nhãn **`1.0.0-seed`**: 6 mục A1–A6, định nghĩa ở `git show e8a8ae5:docs/archive/SEED_PLAN.md`.
    - **Chuyển sang Giai đoạn 2**: 12 điều kiện của `GRIT_PLAN.md` §7.
    - M13 đầy đủ (inlay hint) chỉ bắt buộc cho **cổng thứ hai**. Xem mục **B8**.
 
@@ -38,11 +38,11 @@ Có **17 điểm**. Chia làm ba loại:
 
 | # | Điểm | Bằng chứng đã duyệt | Đề xuất |
 |---|---|---|---|
-| A1 | **Q23**: match số nguyên bằng khoảng; literal ngoài phạm vi là E0601; E0307 thuộc M5 | `docs/PROGRESS.md:171`: "M4 HOÀN THÀNH (Giang duyệt Q23 và 4 điểm sai khác, 2026-10-06)" | sửa nhãn ở `OPEN_QUESTIONS.md:25` thành ĐÃ DUYỆT 2026-10-06 |
+| A1 | **Q23**: match số nguyên bằng khoảng; literal ngoài phạm vi là E0601; E0307 thuộc M5 | `docs/HISTORY.md:171`: "M4 HOÀN THÀNH (Giang duyệt Q23 và 4 điểm sai khác, 2026-10-06)" | sửa nhãn ở `OPEN_QUESTIONS.md:25` thành ĐÃ DUYỆT 2026-10-06 |
 | A2 | **Q34** (ADR-022) | tiêu đề ADR-022: "Giang DUYỆT 2026-10-06, Q34". Dòng Q34 tự mâu thuẫn: vừa "ĐÃ DUYỆT" vừa "[CHỜ GIANG XÁC NHẬN]" | xoá đuôi "[CHỜ GIANG XÁC NHẬN]" |
 | A3 | **Q35–Q42** (bộ giải M7, ADR-025) | `DECISIONS.md` ADR-025 §12: "Duyệt của Giang (2026-10-07) … mục này THẮNG" | sửa nhãn `OPEN_QUESTIONS.md:40` thành ĐÃ DUYỆT 2026-10-07 (kèm §12) |
-| A4 | **Q79–Q82** (`f32`, `%` số thực, `instcombine`, O2) | cả bốn đã ghi "ĐÃ DUYỆT 2026-10-14" trong `OPEN_QUESTIONS.md`. `READINESS.md:56` và `BENCHMARK.md:47` vẫn ghi "chờ Giang" | sửa hai chỗ đó |
-| A5 | **ADR-038** (thư viện: Arena chia sẻ, HashMap, I/O…) | `HANDOFF.md:93`: "ADR-038 duyệt theo từng bước (Q83–Q86, Q85 hoãn)". Tiêu đề ADR vẫn ghi "CHỜ GIANG DUYỆT, CHƯA CÓ DÒNG MÃ NÀO" (sai: mã đã có) | thêm dòng trạng thái đầu ADR-038. Tương tự Q52 ở `KNOWN_LIMITATIONS.md:189` ("duyệt cho `spawn` thuần") |
+| A4 | **Q79–Q82** (`f32`, `%` số thực, `instcombine`, O2) | cả bốn đã ghi "ĐÃ DUYỆT 2026-10-14" trong `OPEN_QUESTIONS.md`. `STATUS.md:56` và `BENCHMARK.md:47` vẫn ghi "chờ Giang" | sửa hai chỗ đó |
+| A5 | **ADR-038** (thư viện: Arena chia sẻ, HashMap, I/O…) | `STATUS.md:93`: "ADR-038 duyệt theo từng bước (Q83–Q86, Q85 hoãn)". Tiêu đề ADR vẫn ghi "CHỜ GIANG DUYỆT, CHƯA CÓ DÒNG MÃ NÀO" (sai: mã đã có) | thêm dòng trạng thái đầu ADR-038. Tương tự Q52 ở `KNOWN_LIMITATIONS.md:189` ("duyệt cho `spawn` thuần") |
 
 **Lựa chọn của tôi:** ký cả năm. Không có rủi ro, vì mã đã cài và có test trong cổng xanh `13e2df9`. Đây chỉ là dọn nhãn, để danh sách "đang chờ" chỉ còn việc thật.
 
@@ -80,7 +80,7 @@ Có **17 điểm**. Chia làm ba loại:
   - Vậy G1.5 (GPT-6 đọc mã Claude viết) **là đọc chéo khác họ** cho phần lớn mã. R11b (Claude Sonnet 5.5 đọc 503 dòng Codex) phủ phần còn lại.
 - **Ba lỗ hổng của lập luận này (nói thẳng):**
   1. `AUTHORSHIP.md` đo ở HEAD cũ `9e9b54c`. Mã sửa **sau** G1.5 (vd FB-C31 do Claude viết) chưa có model khác họ đọc. **CHƯA KIỂM** con số tại HEAD hiện tại.
-  2. G1.5 đọc H1–H10, IR Guard và `gt-rt`. Nó **không** đọc các checker (M6 borrowck, M7 bộ giải, M8), mà các checker cũng thuộc TCB (`READINESS.md` mục d).
+  2. G1.5 đọc H1–H10, IR Guard và `gt-rt`. Nó **không** đọc các checker (M6 borrowck, M7 bộ giải, M8), mà các checker cũng thuộc TCB (`STATUS.md` mục d).
   3. Người đọc đều là model, chưa có con người. 7/13 nghi vấn của G2.2 còn "chưa kiểm": ARENA-01, VEC-01, ATOMIC-01, GUARD-02, ATTEST-01, UNSAFE-01 và argv end-to-end.
 - **Lựa chọn:**
   - (a) Giữ "chưa đạt" như hiện tại.
@@ -111,13 +111,13 @@ Có **17 điểm**. Chia làm ba loại:
 - **Tôi chọn (a).** (b) đáng làm nếu HashMap sau này dùng cho việc quan trọng, nhưng không chặn Seed.
 - **Ký:** ☐ (a) ☐ (b) ☐ (c)
 
-### B6. Điều kiện #6: bạn "xem" `KNOWN_LIMITATIONS.md` (≈100 KB) và `PROGRESS.md` (≈166 KB)
+### B6. Điều kiện #6: bạn "xem" `KNOWN_LIMITATIONS.md` (≈100 KB) và `HISTORY.md` (≈166 KB)
 - **Bối cảnh:** đọc hết khoảng 266 KB là không thực tế, và cũng không phải mục đích của điều kiện. Mục đích là chủ dự án **biết rủi ro nào đang được chấp nhận**.
 - **Lựa chọn:**
   - (a) Đọc hết.
   - (b) Đọc theo danh sách rút gọn dưới đây (khoảng 60–90 phút), rồi ghi một ADR "điều kiện #6 được hiểu là đọc các mục rủi ro sau…". Đây là bạn tự định nghĩa điều kiện của chính mình, nên hợp lệ, nhưng phải ghi rõ là định nghĩa lại.
   - (c) Bỏ điều kiện.
-- **Tôi chọn (b).** Danh sách đọc theo số dòng của `KNOWN_LIMITATIONS.md`, theo mục lục ở `KNOWN_LIMITATIONS_DIGEST.md`:
+- **Tôi chọn (b).** Danh sách đọc theo số dòng của `KNOWN_LIMITATIONS.md`, theo mục lục ở `KNOWN_LIMITATIONS.md`:
 
   | Dòng | Mục |
   |---|---|
@@ -133,7 +133,7 @@ Có **17 điểm**. Chia làm ba loại:
   | 333 | sự cố ghi NUL chưa rõ nguyên nhân |
   | 340–357 | nền tảng và Seed 1.0 |
 
-  `PROGRESS.md`: chỉ đọc dòng tiêu đề và trạng thái của từng mốc. Cuối cùng đọc `docs/SAFETY_CLAIMS.md` (lời hứa với người dùng) và `docs/SEED_LIMITATIONS.md`.
+  `HISTORY.md`: chỉ đọc dòng tiêu đề và trạng thái của từng mốc. Cuối cùng đọc `docs/SAFETY_CLAIMS.md` (lời hứa với người dùng) và `docs/SEED_LIMITATIONS.md`.
 - **Ký:** ☐ (a) ☐ (b) ☐ (c)
 
 ### B7. Hợp nhất `integration` vào `main`: khi nào, bằng cách nào
@@ -158,7 +158,7 @@ Có **17 điểm**. Chia làm ba loại:
 - **Ký:** ☐ (a) ☐ (b) ☐ (c)
 
 ### B9. Tên phiên bản: hai bản mã khác nhau cùng tên `rc2`
-- **Bối cảnh:** thẻ cục bộ `seed-1.0-rc2` gắn trên `13e2df9`, nhưng `READINESS.md` ghi "mã đã đổi sau rc2 gốc, KHÔNG đổi số phiên bản để khỏi lệch băm chứng thực/golden IR". Hai bản mã khác nhau mang cùng nhãn sẽ làm hỏng chính lời hứa tái lập (A4): người khác không biết "rc2" là bản nào.
+- **Bối cảnh:** thẻ cục bộ `seed-1.0-rc2` gắn trên `13e2df9`, nhưng `STATUS.md` ghi "mã đã đổi sau rc2 gốc, KHÔNG đổi số phiên bản để khỏi lệch băm chứng thực/golden IR". Hai bản mã khác nhau mang cùng nhãn sẽ làm hỏng chính lời hứa tái lập (A4): người khác không biết "rc2" là bản nào.
 - **Lựa chọn:**
   - (a) Giữ `rc2`.
   - (b) Đổi lên `1.0.0-rc3` trong **một commit riêng** (cập nhật chuỗi phiên bản, bless lại golden chứng thực, chạy cổng), rồi gắn thẻ `seed-1.0-rc3`. Thẻ cục bộ `seed-1.0-rc2` đổi tên trước khi đẩy.
@@ -201,7 +201,7 @@ Làm 5 bước ở `docs/QUICKSTART_VSCODE.md`. Kết quả quyết định B8. 
   - (b) **Tôi chọn:** khi repo đẩy được, chạy trên máy Linux đám mây. Trên Linux libFuzzer không bị giới hạn phiên ASan như Windows, nên chạy liên tục được, cả hai mục tiêu song song, xong trong khoảng một ngày.
   - Dù chọn cách nào, phải chạy trên **băm nguồn hiện tại** (công cụ đã kiểm).
 - **Thất bại khi tạo quá nhiều luồng** (3000 luồng × 256 MiB làm cạn tài nguyên máy, R11b): đề xuất `spawn` thất bại ⇒ abort có tên rõ (`spawn_failed`), tức là fail-closed. Đây là đổi hợp đồng runtime (H8), nên theo `AGENTS.md` phải ghi hợp đồng TCB trước, code sau. **Tôi chọn:** làm, mức ưu tiên thấp.
-- **Kho `audit/`, cắt `DECISIONS.md`/`PROGRESS.md`:** **tôi chọn không đụng.** Các tệp đó dài nhưng được nhiều nơi trỏ tới; cắt sẽ làm gãy liên kết bằng chứng.
+- **Kho `audit/`, cắt `DECISIONS.md`/`HISTORY.md`:** **tôi chọn không đụng.** Các tệp đó dài nhưng được nhiều nơi trỏ tới; cắt sẽ làm gãy liên kết bằng chứng.
 - **Giai đoạn 2:** không bắt đầu trước nhãn Seed. Khi bắt đầu, giữ thứ tự của kế hoạch: 8.A (SMT) rồi 8.B (kernel kiểm chứng). Hai hướng này giảm check lúc chạy **và** thu nhỏ TCB, đúng điểm yếu A2 hiện tại.
 
 ---

@@ -1,6 +1,6 @@
 # CHANGELOG
 
-Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng 2026-11-18, xem `docs/RUN_REPORTS.md`).
+Định dạng: mới nhất ở trên. Số phiên bản ở `gritc --version` / `Cargo.toml` (gt-driver, rig). Nền đã kiểm: Linux x86_64 (dòng Seed) và Windows x86_64 (cổng 2026-11-18, xem `docs/HISTORY.md`).
 
 ## 1.0.0-rc7 — GÓI 11: FB-C35 (đệ quy qua thân hợp đồng ⊳/⊲ được chấp nhận; gt-term gộp cạnh hợp đồng), ghim rustc 1.98.1, công cụ (2026-11-20)
 
@@ -14,20 +14,20 @@
 - Công cụ/tài liệu: `tools/secret_scan_history.py`, SECURITY.md, issue template, workflow `fuzz.yml` (chỉ dispatch), `tools/fuzz_ingest.py`, `docs/AI_PITFALLS.md`, `tools/limits_probe.py` + LIMITS_AUDIT cập nhật.
 
 ## 1.0.0-rc4 — GÓI 5/6: kiểm chứng CI, độ phủ nhánh, giới hạn kích cỡ (nhánh `integration`, 2026-11-19)
-Nhãn vẫn là **RC**, không phải `1.0.0-seed` (A2 chưa đạt; `docs/SEED_FINISH_LINE.md`).
+Nhãn vẫn là **RC**, không phải `1.0.0-seed` (A2 chưa đạt; `docs/STATUS.md`).
 - **Thay đổi mã sản phẩm duy nhất:** `gt-term` — thông báo E0702 của vòng lặp nêu nguyên nhân và gợi ý tách hàm khi hàm vượt giới hạn 24 biến/vòng lặp của bộ chứng minh (test ĐỎ trước `crates/gt-term/tests/limit_hint.rs`). KHÔNG đổi phán quyết nào.
 - **Golden:** `tests/golden_ll/{checked_add,slice_sum,static_atomic}.ll` chỉ đổi BĂM CHỨNG THỰC (6 dòng) do chuỗi phiên bản nằm trong băm.
 - Công cụ/tài liệu: `tools/{main_check.sh,coverage_branches.py,scale_probe.py,platform_tests.py,...}`, `apps/{csv2json,todo,difflite}`, `docs/{LIMITS_AUDIT,APPS_LOG,SEED_FINISH_LINE,PLATFORM_TESTS,DECISION_COVERAGE}.md`.
 
 ## 1.0.0-rc3 — hợp nhất hai dòng, Arena chia sẻ, kiểm chứng Windows (nhánh `integration`, 2026-11-18)
-Nhãn vẫn là **RC**, không phải `1.0.0-seed` (A2 an toàn chưa đạt: `docs/READINESS.md` mục "Seed 1.0"). **Sửa nhãn:** các tài liệu cũ ghi `gritc --version` là `1.0.0-rc2`, nhưng `crates/gt-driver/Cargo.toml` thực tế ở `1.0.0-rc1` (bản đổi rc2 không vào mã); rc3 là lần đầu số phiên bản KHỚP với mã. Thẻ cục bộ `seed-1.0-rc2` đã đổi tên `seed-1.0-rc2-old` (chưa từng đẩy).
+Nhãn vẫn là **RC**, không phải `1.0.0-seed` (A2 an toàn chưa đạt: `docs/STATUS.md` mục "Seed 1.0"). **Sửa nhãn:** các tài liệu cũ ghi `gritc --version` là `1.0.0-rc2`, nhưng `crates/gt-driver/Cargo.toml` thực tế ở `1.0.0-rc1` (bản đổi rc2 không vào mã); rc3 là lần đầu số phiên bản KHỚP với mã. Thẻ cục bộ `seed-1.0-rc2` đã đổi tên `seed-1.0-rc2-old` (chưa từng đẩy).
 - **Thay đổi hành vi:** `spawn` thất bại ⇒ abort `spawn_failed` (mã 70) thay vì `abort: unknown` (hợp đồng H8); runtime `gt-rt` có feature `test-fault` CHỈ cho kiểm thử.
 - **Công cụ/cổng:** điểm lưu của `tools/gate.sh` gắn BĂM CÂY (nội dung tệp mới), in `GATE_TREE`/`GATE_STAGE_TREE`; công cụ nặng (`run_guarded`, `mut_batch`, `mut.py run`, cổng đầy đủ) tự từ chối khi preflight FAIL; `tools/unsafe_inventory.py` + `docs/unsafe_baseline.json` trong cổng; `tools/stress_spawn.sh` (thủ công).
 - **Golden:** `tests/golden_ll/{checked_add,slice_sum,static_atomic}.ll` chỉ đổi BĂM CHỨNG THỰC (6 dòng) do chuỗi phiên bản nằm trong băm.
-- Chi tiết các giai đoạn: `docs/RUN_REPORTS.md` (P1.e–P4, GÓI 3).
+- Chi tiết các giai đoạn: `docs/HISTORY.md` (P1.e–P4, GÓI 3).
 
 ## 1.0.0-rc2 — Seed 1.0 (nhánh `claude/gallant-darwin-m251cq`, 2026-10-23)
-Nhãn là **RC**, không phải `1.0.0-seed`: danh sách điều kiện còn thiếu ở `docs/READINESS.md` (mục "Seed 1.0") và `docs/RUN_REPORTS.md` (S8).
+Nhãn là **RC**, không phải `1.0.0-seed`: danh sách điều kiện còn thiếu ở `docs/STATUS.md` (mục "Seed 1.0") và `docs/HISTORY.md` (S8).
 
 ### Thêm
 - **Ngôn ngữ / thư viện:** đủ để viết bốn capstone (`wc`, `json`, `kvstore`, `sortlines`…) mà KHÔNG cần `?`/phân rã tuple/closure (vẫn chưa có): `Vec`/`Text`/`HashMap` mở rộng, `[T]::sort`, băm, `core::exit`, đọc `Cap<In>::read_all`, ghi `Cap<Fs>::write`, `&str ==` bằng byte (`gritrt_bytes_eq`), `[u8]::equals`, `find_byte_or_end`… (xem `docs/STD_REFERENCE.md`, sinh tự động).
@@ -51,4 +51,4 @@ Nhãn là **RC**, không phải `1.0.0-seed`: danh sách điều kiện còn thi
 - Cổng xanh 53286a7, build tái lập (hai lần cùng SHA-256), capstone 8/8, `rig` + `setup_cloud.sh` + `gritc doctor`.
 
 ## trước đó
-- Lịch sử chi tiết: `docs/PROGRESS.md`, `docs/HANDOFF_ARCHIVE.md`, `git log`.
+- Lịch sử chi tiết: `docs/HISTORY.md`, `git log`.

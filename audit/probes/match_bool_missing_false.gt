@@ -1,3 +1,0 @@
-// probe: reject E0305
-// why: D6: thiếu nhánh false
-ƒ main() → i32 ! ∅ { b ≔ true; ⌥ b { true ↦ 1 } }

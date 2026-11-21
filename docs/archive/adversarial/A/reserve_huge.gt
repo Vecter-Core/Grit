@@ -1,7 +1,0 @@
-ƒ main() → u64 ! {mem} {
-  μa ≔ Arena::new();
-  μv ≔ Vec::new(&a);
-  v.push(1u64);
-  v.reserve(2305843009213693952usize);
-  v.len() as u64
-}

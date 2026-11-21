@@ -1,6 +1,6 @@
 # PHASE2_FACTCHECK — đối chiếu đề xuất Giai đoạn 2 của Opus 5.5 với mã (GÓI 9, 2026-11-20)
 
-**Phạm vi:** CHỈ ĐỌC mã và tài liệu (`git`, `grep`, đọc tệp); KHÔNG chạy cargo, KHÔNG đo, KHÔNG sửa đề xuất (`docs/PHASE2_PROPOSAL_OPUS.md`, thân giữ nguyên) và KHÔNG sửa mã. Cây mã: HEAD `cce0f13` (rc6 = `16c37f0`). Nhãn: **ĐÚNG** (khớp mã), **SAI** (mã nói khác), **ĐÚNG MỘT PHẦN** (ghi rõ phần sai), **KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ** (cần đo hoặc là nguồn ngoài/đọc nguồn chưa mở; ghi ở Q1.h hoặc mục 9). Dòng tham chiếu là số dòng của HEAD nêu trên.
+**Phạm vi:** CHỈ ĐỌC mã và tài liệu (`git`, `grep`, đọc tệp); KHÔNG chạy cargo, KHÔNG đo, KHÔNG sửa đề xuất (`docs/PHASE2_PLAN.md`, thân giữ nguyên) và KHÔNG sửa mã. Cây mã: HEAD `cce0f13` (rc6 = `16c37f0`). Nhãn: **ĐÚNG** (khớp mã), **SAI** (mã nói khác), **ĐÚNG MỘT PHẦN** (ghi rõ phần sai), **KHÔNG KIỂM ĐƯỢC BẰNG ĐỌC MÃ** (cần đo hoặc là nguồn ngoài/đọc nguồn chưa mở; ghi ở Q1.h hoặc mục 9). Dòng tham chiếu là số dòng của HEAD nêu trên.
 
 ## 1. Bảng khẳng định (mã hoá: số = mục của đề xuất)
 

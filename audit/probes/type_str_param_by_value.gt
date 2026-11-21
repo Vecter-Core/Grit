@@ -1,4 +1,0 @@
-// probe: reject E0301
-// why: str làm tham số theo giá trị
-ƒ f(x: str) ! ∅ { }
-ƒ main() → i32 ! ∅ { 0 }

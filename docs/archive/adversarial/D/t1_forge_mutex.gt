@@ -1,7 +1,0 @@
-#level("1")
-▢ Lo { }
-ƒ rd(v: &!u64, n: u64) → u64 ! ∅ { *v }
-ƒ main() → u64 ! {lock(Lo)} {
-  m ≔ Mutex { v: 5u64 };
-  m.with(rd, 0u64)
-}

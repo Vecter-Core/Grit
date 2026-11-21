@@ -1,5 +1,0 @@
-ƒ main() ! {io} {
-  out ≔ root_out();
-  f ≔ File { x: 7 };
-  out.write_u64(f.len());
-}

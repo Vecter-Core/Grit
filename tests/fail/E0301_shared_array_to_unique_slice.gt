@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: ép unsize KHÔNG được thêm quyền ghi: `&[T; N]` không thành `&![T]`
+ƒ zero_first(xs: &![u32]) ! ∅ { }
+ƒ main() ! ∅ { a ≔ [1u32, 2u32]; zero_first(&a); }

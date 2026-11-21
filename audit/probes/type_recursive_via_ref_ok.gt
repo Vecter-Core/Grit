@@ -1,4 +1,0 @@
-// probe: accept
-// why: đối chứng dương: tham chiếu phá đệ quy kích thước
-▢ L<'a> { n: i32, next: Option<&'a L<'a>> }
-ƒ main() → i32 ! ∅ { 0 }

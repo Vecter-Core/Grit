@@ -14,7 +14,7 @@ Tài liệu này là **hợp đồng kỹ thuật**. Agent phải tuân thủ:
 3. **Nguyên tắc fail-closed:** khi gritc không chắc → báo đỏ, không chạy. "Không biết" không bao giờ được coi là "an toàn".
 4. **Mọi quyết định thiết kế** ghi vào `docs/DECISIONS.md` dạng ADR ngắn (bối cảnh – quyết định – hệ quả). Không tự ý đổi mục 4 và mục 5 của tài liệu này; muốn đổi phải viết ADR và chờ chủ dự án (Giang) duyệt,sau khi code chuẩn thì git commit lại
 5. **Mỗi mã chẩn đoán (error code) phải có:** tài liệu `docs/errors/Exxxx.md`, ≥3 test **fail** (code sai phải bị chặn đúng mã đó), ≥3 test **pass** (code đúng không bị chặn nhầm).
-6. **Mỗi milestone kết thúc bằng:** chạy toàn bộ test + clippy + fmt + cập nhật `docs/PROGRESS.md` (làm gì, còn thiếu gì, rủi ro mới). Báo cáo trung thực, kể cả khi chưa đạt.
+6. **Mỗi milestone kết thúc bằng:** chạy toàn bộ test + clippy + fmt + cập nhật `docs/HISTORY.md` (làm gì, còn thiếu gì, rủi ro mới). Báo cáo trung thực, kể cả khi chưa đạt.
 7. **Rust:** edition mới nhất ổn định, `#![forbid(unsafe_code)]` ở mọi crate (ngoại lệ duy nhất cần ADR: ranh giới FFI với LLVM), `cargo clippy -- -D warnings`, `cargo deny`, `cargo audit` chạy trong CI. Output biên dịch phải **deterministic** (cùng input → cùng output byte-for-byte).
 8. Khi thấy mâu thuẫn hoặc lỗ hổng trong kế hoạch này: **dừng, ghi vào `docs/OPEN_QUESTIONS.md`, hỏi chủ dự án.** Không tự đoán rồi code tiếp.
 
@@ -287,7 +287,7 @@ grit/
   runtime/gt-rt/             runtime tối thiểu (staticlib, panic=abort)
   lib/core/*.gt              thư viện lõi bằng Grit
   tests/{pass,fail,golden,fuzz,bench}/
-  docs/{spec,errors,DECISIONS.md,PROGRESS.md,KNOWN_LIMITATIONS.md,OPEN_QUESTIONS.md}
+  docs/{spec,errors,DECISIONS.md,HISTORY.md,KNOWN_LIMITATIONS.md,OPEN_QUESTIONS.md}
 ```
 
 ### 6.2 Các milestone
@@ -403,7 +403,7 @@ Chỉ chuyển khi đạt **tất cả**:
 3. 3 chương trình thật (M12) chạy đúng; benchmark nền được ghi nhận.
 4. Mọi mã lỗi có tài liệu + test đủ (mục 0.5).
 5. Output tái lập 100% (build hai lần so băm).
-6. `KNOWN_LIMITATIONS.md` và `PROGRESS.md` được xem xét bởi Giang.
+6. `KNOWN_LIMITATIONS.md` và `HISTORY.md` được xem xét bởi Giang.
 7. Có ADR chốt giao diện **Obligation IR** ở dạng ổn định (đây là "khớp nối" quan trọng nhất sang Phase 2).
 8. M13 (LSP) hoàn thành và schema JSON chẩn đoán đóng băng (đây là "khớp nối" thứ hai sang 8.E).
 9. **Điều kiện cứng về mutability bên trong (Giang, 2026-10-07):** đột biến 238/361/591/554 của `gt-borrowck/src/regions.rs` (xem `KNOWN_LIMITATIONS.md`) chỉ an toàn chừng nào ngôn ngữ chưa có mutability bên trong, nhưng M8 đưa `Mutex`/atomics vào trước M12. **Trước khi bất kỳ kiểu nào có mutability bên trong được đưa vào fixture hoặc lib**, bốn đột biến này phải được mở lại: mỗi cái hoặc bị giết bằng chương trình tấn công có dùng mutability bên trong (kèm kịch bản `interior_mut` trong bộ sinh, tắt bản sửa để kiểm), hoặc có lập luận tương đương mới tính cả mutability bên trong. Chưa xong thì M8 không được bắt đầu phần `Mutex`/atomics.
@@ -542,5 +542,5 @@ Hôm nay chỉ làm M0:
 2) Viết grammar.ebnf, bảng ký hiệu + bí danh ASCII, đặc tả ngữ nghĩa lõi, danh sách mã lỗi.
 3) Đo token canonical vs ASCII, ghi ADR.
 4) Viết ≥30 chương trình mẫu .gt (đúng/sai) kèm kết quả kỳ vọng.
-5) Cập nhật PROGRESS.md và OPEN_QUESTIONS.md, rồi DỪNG chờ duyệt trước khi sang M1.
+5) Cập nhật HISTORY.md và OPEN_QUESTIONS.md, rồi DỪNG chờ duyệt trước khi sang M1.
 ```

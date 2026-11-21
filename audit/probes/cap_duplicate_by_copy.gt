@@ -1,3 +1,0 @@
-// probe: reject E0401
-// why: E0401: Cap là affine, không sao chép
-ƒ main() → i32 ! {io} { o ≔ root_out(); a ≔ o; b ≔ o; a.write_u64(1); b.write_u64(2); 0 }

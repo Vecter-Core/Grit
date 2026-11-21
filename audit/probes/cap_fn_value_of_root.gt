@@ -1,4 +1,0 @@
-// probe: reject E0310
-// why: E0310: lấy root_out làm giá trị hàm
-ƒ helper() ! ∅ { f ≔ root_out; }
-ƒ main() → i32 ! ∅ { helper(); 0 }

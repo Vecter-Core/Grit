@@ -70,6 +70,8 @@ const LEXICAL_E0101: &[&str] = &[
     "E0101_block_comment.gt",
     "E0101_char_multi.gt",
     "E0101_compound_assign.gt",
+    "E0101_invalid_char_escape.gt",
+    "E0101_invalid_string_escape.gt",
 ];
 
 fn code_of(header: &str) -> Option<ErrorCode> {

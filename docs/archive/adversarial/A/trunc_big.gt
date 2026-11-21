@@ -1,9 +1,0 @@
-ƒ main() → u64 ! {mem} {
-  μa ≔ Arena::new();
-  μv ≔ Vec::new(&a);
-  v.push(1u8);
-  v.truncate(18446744073709551615usize);
-  v.truncate(0usize);
-  v.truncate(5usize);
-  v.len() as u64
-}

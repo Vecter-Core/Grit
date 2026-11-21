@@ -1,0 +1,4 @@
+// expect: fail E0702
+// note: `x / 1` không giảm: biến thể `↓ x` không giảm nghiêm ngặt
+ƒ f(n: u32) → u32 ! ∅ { μx ≔ n; ⟳ x > 0u32 ↓ x { x ← x / 1u32; } x }
+ƒ main() ! ∅ { f(3u32); }

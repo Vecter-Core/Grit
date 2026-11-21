@@ -1,5 +1,0 @@
-// probe: reject E0203
-// why: đọc trường private của struct ở mô-đun khác
-▦ m { ◈ ▢ S { x: i32 } ◈ ƒ mk() → S ! ∅ { S { x: 1 } } }
-ƒ f() → i32 ! ∅ { s ≔ m::mk(); s.x }
-ƒ main() → i32 ! ∅ { 0 }

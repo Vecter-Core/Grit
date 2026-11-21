@@ -1,3 +1,0 @@
-// probe: reject E0402
-// why: E0402: hai &! cùng lúc
-ƒ main() → i32 ! ∅ { μx ≔ 1; a ≔ &!x; b ≔ &!x; *a ← 1; *b ← 2; x }

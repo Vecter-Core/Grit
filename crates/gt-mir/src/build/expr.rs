@@ -726,6 +726,12 @@ impl Builder<'_> {
         if later.iter().all(|l| Self::is_read_only(l)) {
             return op;
         }
+        self.snapshot(op, ty)
+    }
+
+    /// Chụp giá trị của toán hạng CHỖ vào biến tạm NGAY (trừ tạm và biến bất biến không qua tham chiếu: không ai ghi được).
+    /// Dùng khi một sự kiện SAU (biểu thức sau, hay autoref `&self`/`&!self` của người nhận) có thể ghi/mượn chỗ đó.
+    fn snapshot(&mut self, op: Operand, ty: &Ty) -> Operand {
         let p = match &op {
             Operand::Copy(p) | Operand::Move(p) => p.clone(),
             Operand::Const(_) => return op,
@@ -743,23 +749,54 @@ impl Builder<'_> {
     }
 
     /// Các toán hạng theo thứ tự trái sang phải, mỗi cái được chụp lại nếu biểu thức sau nó có thể làm đổi nó.
+    ///
+    /// MƯỢN HAI PHA (như rustc, GÓI 12): ở điểm ép kiểu, reborrow ngầm `&!*r` của một BIẾN CỤC BỘ TRẦN `r: &!T` được tạo SAU các
+    /// đối số đứng sau nó nếu chúng đều CHỈ ĐỌC (`step(st, st.pos + 1)`). Đúng §3a về giá trị: đối số sau không ghi được `r` nên
+    /// con trỏ thu được y hệt; mọi khoản mượn vẫn cùng sống ở lời gọi nên xung đột thật (`f(st, st)`, `f(st, g(st))`) vẫn bị M6 bắt.
     pub(crate) fn seq_operands(&mut self, es: &[&Expr], coerced: bool) -> R<Vec<Operand>> {
-        let mut out = Vec::with_capacity(es.len());
+        let mut out: Vec<Option<Operand>> = Vec::with_capacity(es.len());
+        let mut deferred = Vec::new();
         for (i, e) in es.iter().enumerate() {
+            let later = &es[i + 1..];
+            if coerced
+                && !later.is_empty()
+                && later.iter().all(|l| Self::is_read_only(l))
+                && self.is_bare_local_unique_ref(e)?
+            {
+                deferred.push(i);
+                out.push(None);
+                continue;
+            }
             let o = if coerced {
                 self.as_coerced_operand(e)?
             } else {
                 self.as_operand(e)?
             };
             let ty = self.ty_of(e)?;
-            out.push(self.stabilize(o, &ty, &es[i + 1..]));
+            out.push(Some(self.stabilize(o, &ty, later)));
         }
-        Ok(out)
+        for i in deferred {
+            out[i] = Some(self.as_coerced_operand(es[i])?);
+        }
+        out.into_iter()
+            .map(|o| o.map_or_else(|| ice("toán hạng hoãn (mượn hai pha) chưa được tạo"), Ok))
+            .collect()
+    }
+
+    /// `e` là đường dẫn tới MỘT biến cục bộ (không phép chiếu) có kiểu `&!T`.
+    fn is_bare_local_unique_ref(&self, e: &Expr) -> R<bool> {
+        Ok(
+            matches!(&e.kind, ExprKind::Path(p) if matches!(self.res_of(p.id), Some(Res::Local(_) | Res::SelfValue)))
+                && self.is_unique_ref_place(e)?,
+        )
     }
 
     /// Toán hạng tại điểm ÉP KIỂU (đối số, `≔` có chú thích, `⏎`): một chỗ kiểu `&!T` được reborrow ngầm
     /// (`&!*r`) thay vì move, như Rust — nếu không, `f(r); f(r)` là dùng-sau-move (ADR-023 §0.1, Q30).
     pub(crate) fn as_coerced_operand(&mut self, e: &Expr) -> R<Operand> {
+        if let Some(unique) = self.unsize_target(e) {
+            return self.unsize_of(e, unique);
+        }
         if self.is_unique_ref_place(e)? {
             return self.with_at(e, |b| {
                 let ty = b.ty_of(e)?;
@@ -773,7 +810,56 @@ impl Builder<'_> {
         self.as_operand(e)
     }
 
+    /// Đích của phép ép unsize ghi ở M4 cho nút này (`Some(đích &!?)`), trừ khi chính nút đó đang được ép.
+    fn unsize_target(&self, e: &Expr) -> Option<bool> {
+        if self.unsize_busy.contains(&e.id) {
+            return None;
+        }
+        self.t.unsize.get(&e.id).copied()
+    }
+
+    /// Hạ `e` (kiểu `&[T; N]`/`&![T; N]`) rồi ép sang `&[T]`/`&![T]`: CÙNG dạng MIR với `&(*e)[0..]` (Len, `assert_range`, mượn
+    /// `Subslice`), nên M6/M7 và mọi backend xử lý như lát con người dùng viết (GÓI 12).
+    fn unsize_of(&mut self, e: &Expr, unique: bool) -> R<Operand> {
+        self.unsize_busy.insert(e.id);
+        let inner = if unique && self.is_unique_ref_place(e)? {
+            self.as_coerced_operand(e)
+        } else {
+            self.as_operand(e)
+        };
+        self.unsize_busy.remove(&e.id);
+        let o = inner?;
+        let src = self.ty_of(e)?;
+        let elem = match &src {
+            Ty::Ref(_, a) => match a.as_ref() {
+                Ty::Array(t, _) => (**t).clone(),
+                _ => return ice(format!("ép unsize từ kiểu không phải mảng {src:?}")),
+            },
+            _ => return ice(format!("ép unsize từ kiểu không phải tham chiếu {src:?}")),
+        };
+        let holder = self.temp(src.clone());
+        self.assign(Place::local(holder), Rvalue::Use(o));
+        let base = Place::local(holder).project(PlaceElem::Deref);
+        let from = self.usize_temp(Operand::Const(int_const(0, IntTy::Usize)));
+        let len = self.temp(Ty::Int(IntTy::Usize));
+        self.assign(Place::local(len), Rvalue::Len(base.clone()));
+        self.assert_range(from, Operand::Copy(Place::local(len)), len)?;
+        let k = if unique {
+            BorrowKind::Unique
+        } else {
+            BorrowKind::Shared
+        };
+        let to = Ty::Ref(unique, Box::new(Ty::Slice(Box::new(elem))));
+        let t = self.temp(to.clone());
+        let rv = self.new_borrow(k, base.project(PlaceElem::Subslice { from, to: None }));
+        self.assign(Place::local(t), rv);
+        Ok(self.operand_of(Place::local(t), &to))
+    }
+
     pub(crate) fn as_operand(&mut self, e: &Expr) -> R<Operand> {
+        if let Some(unique) = self.unsize_target(e) {
+            return self.unsize_of(e, unique);
+        }
         self.with_at(e, |b| {
             let ty = b.ty_of(e)?;
             match &e.kind {
@@ -863,6 +949,9 @@ impl Builder<'_> {
     }
 
     pub(crate) fn as_rvalue(&mut self, e: &Expr) -> R<Rvalue> {
+        if self.unsize_target(e).is_some() {
+            return Ok(Rvalue::Use(self.as_operand(e)?));
+        }
         self.with_at(e, |b| {
             let ty = b.ty_of(e)?;
             match &e.kind {
@@ -1230,6 +1319,11 @@ impl Builder<'_> {
     // ---------------- ghi vào đích ----------------
 
     pub(crate) fn expr_into(&mut self, dest: &Place, e: &Expr) -> R<()> {
+        if self.unsize_target(e).is_some() {
+            let o = self.as_operand(e)?;
+            self.assign(dest.clone(), Rvalue::Use(o));
+            return Ok(());
+        }
         self.with_at(e, |b| match &e.kind {
             ExprKind::Block(blk) => b.lower_block(dest, blk),
             ExprKind::If {
@@ -1461,7 +1555,20 @@ impl Builder<'_> {
             // đối số trước, người nhận SAU: khoản mượn (`&self`/`&!self`, autoref muộn, Q28) và cả người nhận theo giá trị
             // (ADR-022 §5: `x.consume(x.len())` hợp lệ — đối số đánh giá trước khi người nhận bị tiêu thụ)
             let es: Vec<&Expr> = args.iter().collect();
-            let ops = self.seq_operands(&es, true)?;
+            let mut ops = self.seq_operands(&es, true)?;
+            // MƯỢN HAI PHA (GÓI 12): autoref `&self`/`&!self` tạo SAU đối số (§3a) ⇒ đối số dạng CHỖ chép (`x.m(x.pos)`) phải được ĐỌC
+            // trước autoref, không phải ở lệnh gọi (lúc `&!x` đã sống). Chụp vào tạm: giá trị y hệt, và M6 thấy đúng thứ tự.
+            if matches!(
+                site.self_kind,
+                Some(gt_ast::SelfKind::Ref) | Some(gt_ast::SelfKind::RefMut)
+            ) {
+                for (o, a) in ops.iter_mut().zip(&es) {
+                    if matches!(o, Operand::Copy(_)) {
+                        let ty = self.ty_of(a)?;
+                        *o = self.snapshot(o.clone(), &ty);
+                    }
+                }
+            }
             if !es.iter().all(|a| Self::is_read_only(a)) {
                 // đối số có thể đã đổi gốc của người nhận (FB-C20): kiểm biên lại ngay trước khi mượn/dùng người nhận
                 self.recheck_place(&recv)?;
@@ -1484,7 +1591,6 @@ impl Builder<'_> {
                 }
                 _ => self.operand_of(recv, &rty),
             };
-            let mut ops = ops;
             ops.insert(0, recv_op);
             let c = Self::callee_of(&site);
             return self.emit_call(dest, c, ops, spans, &ret_ty);

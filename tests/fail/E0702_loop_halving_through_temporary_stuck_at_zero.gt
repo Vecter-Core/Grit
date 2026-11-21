@@ -1,0 +1,4 @@
+// expect: fail E0702
+// note: như E0702_loop_halving_stuck_at_zero nhưng qua biến trung gian: `x ≥ 0` cho phép x = 0 và `0 / 2 = 0` ⇒ không dừng
+ƒ f(n: u32) → u32 ! ∅ { μx ≔ n; ⟳ x >= 0u32 ↓ x { y ≔ x / 2u32; x ← y; } x }
+ƒ main() ! ∅ { f(3u32); }

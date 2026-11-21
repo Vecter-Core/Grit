@@ -1,4 +1,0 @@
-// probe: reject E0205
-// why: D7: che bóng trong khối con
-ƒ use_it(v: i32) ! ∅ { }
-ƒ main() → i32 ! ∅ { x ≔ 1; ⎇ true { x ≔ 2; use_it(x); } x }

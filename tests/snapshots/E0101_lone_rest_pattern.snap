@@ -1,0 +1,10 @@
+# tests/fail/E0101_lone_rest_pattern.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi pattern (`..` đơn lẻ chỉ hợp lệ trong danh sách tuple/variant/struct), gặp `↦`
+ --> tests/fail/E0101_lone_rest_pattern.gt:3:25
+  |
+3 | ƒ main() ! ∅ { ⌥ 1 { .. ↦ 1, _ ↦ 2 }; }
+  |                         ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi pattern (`..` đơn lẻ chỉ hợp lệ trong danh sách tuple/variant/struct), gặp `↦`","file":"tests/fail/E0101_lone_rest_pattern.gt","span":{"start":{"offset":167,"line":3,"col":25},"end":{"offset":170,"line":3,"col":26}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

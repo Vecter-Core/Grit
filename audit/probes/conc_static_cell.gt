@@ -1,4 +1,0 @@
-// probe: reject
-// why: ■ static Cell không Sync
-■ C: Cell<i32> ≔ Cell::new(0);
-ƒ main() → i32 ! ∅ { 0 }

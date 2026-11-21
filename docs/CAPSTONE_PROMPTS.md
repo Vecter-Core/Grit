@@ -35,6 +35,6 @@ Viết `grep-lite [-c] [-n] PATTERN FILE...` theo đúng đề mục K4 trong `d
 
 ## Kiểm tra quy trình trước khi giao capstone
 
-Chương trình mẫu fib đã được dùng để xác minh `gritc check`/`gritc run` độc lập; xem kết quả G2.7 trong `docs/RUN_REPORTS.md`. Người chuẩn bị không viết hoặc chỉnh lời giải K1–K4.
+Chương trình mẫu fib đã được dùng để xác minh `gritc check`/`gritc run` độc lập; xem kết quả G2.7 trong `docs/HISTORY.md`. Người chuẩn bị không viết hoặc chỉnh lời giải K1–K4.
 
 > **Giới hạn nói thẳng (GÓI 4 S1.c):** đây là kiểm tra CÙNG HỌ model — tài liệu (`AI_GUIDE`, `STD_REFERENCE`) do Claude viết nên một model Claude đọc có thể hiểu dễ hơn người dùng/AI khác họ. Không dùng kết quả để nói "AI nào cũng viết được Grit".

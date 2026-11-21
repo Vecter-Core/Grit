@@ -1,6 +1,0 @@
-// probe: reject E0311|E0801|E0802
-// why: impl khai hiệu ứng rộng hơn trait
-⊏ T { ƒ f(&self) → i32 ! ∅; }
-▢ S { n: i32 }
-⊐ T for S { ƒ f(&self) → i32 ! {io} { 1 } }
-ƒ main() → i32 ! ∅ { 0 }

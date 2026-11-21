@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: sau `*` trong kiểu phải là `□` hoặc `μ` (con trỏ thô)
+ƒ main(p: *i32) ! ∅ { }

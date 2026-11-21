@@ -189,6 +189,8 @@ pub(crate) struct Env<'a> {
     pub out_methods: BTreeMap<NodeId, crate::traits::MethodRes>,
     /// Chế độ tham chiếu (ADR-040) tại mỗi pattern phá cấu trúc nơi chế độ BẬT: `NodeId` → `duy nhất?`.
     pub out_pat_modes: BTreeMap<NodeId, bool>,
+    /// Ép unsize `&[T; N]` → `&[T]` tại nút (GÓI 12): `NodeId` → đích `&!`?
+    pub out_unsize: BTreeMap<NodeId, bool>,
     /// Bảng region của từng chữ ký (M4.5).
     pub region_sigs: BTreeMap<NodeId, RegionSig>,
     pub out_calls: Vec<crate::check::CallRec>,
@@ -226,6 +228,7 @@ impl<'a> Env<'a> {
             out_locals: BTreeMap::new(),
             out_methods: BTreeMap::new(),
             out_pat_modes: BTreeMap::new(),
+            out_unsize: BTreeMap::new(),
             region_sigs: BTreeMap::new(),
             out_calls: Vec::new(),
             out_sites: BTreeMap::new(),

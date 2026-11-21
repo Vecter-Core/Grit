@@ -26,7 +26,7 @@ Bạn (Claude Code) hiện đang làm **Phase 1**. Không nhảy sang ý tưởn
 ## 2. Việc đầu tiên phải làm
 
 1. Đọc toàn bộ `GRIT_PLAN.md` — nguồn sự thật duy nhất về kiến trúc, milestone, luật ngôn ngữ (D1–D29), hệ mã lỗi, tiêu chí hoàn thành.
-2. Xác định milestone hiện tại bằng cách đọc `docs/PROGRESS.md` (nếu chưa có file này, nghĩa là đang ở M0).
+2. Xác định milestone hiện tại bằng cách đọc `docs/HISTORY.md` (nếu chưa có file này, nghĩa là đang ở M0).
 3. **Không được làm milestone sau khi milestone trước chưa đạt "Tiêu chí hoàn thành"** như ghi trong `GRIT_PLAN.md` mục 6.2.
 4. Nếu thấy mâu thuẫn, lỗ hổng, hoặc chỗ thiếu trong `GRIT_PLAN.md` — **dừng lại, ghi vào `docs/OPEN_QUESTIONS.md`, không tự đoán rồi code tiếp.**
 
@@ -49,8 +49,8 @@ Mỗi pass kiểm tra mới (borrow checker, hiệu ứng, biên, đa luồng...
 - Một **corpus chương trình đúng** — không được chặn nhầm.
 - Nếu sau này phát hiện một case lọt qua (false negative) — đây là **bug mức nghiêm trọng nhất có thể có** trong dự án này. Phải thêm ngay vào corpus vĩnh viễn, không chỉ sửa rồi thôi.
 
-**Luật bộ sinh (Giang, 2026-10-07, từ bài học M6):** mỗi lỗ hổng soundness (false negative) tìm ra bằng cách KHÁC với bộ sinh chương trình ngẫu nhiên (viết tay, đột biến, hunting) thì PHẢI mở rộng bộ sinh để TỰ tìm được nó, rồi kiểm bằng cách TẮT bản sửa: bộ sinh phải tự phát hiện (ghi kết quả vào PROGRESS.md), và loại cấu trúc mới phải vào bảng độ phủ có ngưỡng. Một oracle/bộ sinh chỉ phủ những cấu trúc nó sinh ra — "oracle sạch" không phải chứng minh.
-- **Điểm mù của oracle (Giang, 2026-10-08, từ lỗ hổng #4 của M7):** khi một lỗ hổng soundness CHỈ được tìm bằng cách mà oracle không quan sát được (ví dụ chương trình bị một kiểm tra khác từ chối nên oracle không bao giờ so được hành vi, như `⊲` nhắc tham số bị gán lại ⇒ E0902), thì phải (1) ghi LÝ DO oracle mù vào `KNOWN_LIMITATIONS.md` mục "những gì oracle không quan sát được", và (2) thêm một test golden (chương trình nhỏ + kết quả CHÍNH XÁC) giết được lỗ hổng đó — vì "tắt bản sửa" không thể dùng oracle để kiểm. Chỉ số "tỉ lệ lần chạy tới cuối hàm" của oracle phải được đo và báo trong PROGRESS.md; loại nghĩa vụ dưới ngưỡng (mặc định ≥ 100 check bị xoá mà đoạn sau chạy tới cuối hàm) chưa được tính là đã kiểm.
+**Luật bộ sinh (Giang, 2026-10-07, từ bài học M6):** mỗi lỗ hổng soundness (false negative) tìm ra bằng cách KHÁC với bộ sinh chương trình ngẫu nhiên (viết tay, đột biến, hunting) thì PHẢI mở rộng bộ sinh để TỰ tìm được nó, rồi kiểm bằng cách TẮT bản sửa: bộ sinh phải tự phát hiện (ghi kết quả vào HISTORY.md), và loại cấu trúc mới phải vào bảng độ phủ có ngưỡng. Một oracle/bộ sinh chỉ phủ những cấu trúc nó sinh ra — "oracle sạch" không phải chứng minh.
+- **Điểm mù của oracle (Giang, 2026-10-08, từ lỗ hổng #4 của M7):** khi một lỗ hổng soundness CHỈ được tìm bằng cách mà oracle không quan sát được (ví dụ chương trình bị một kiểm tra khác từ chối nên oracle không bao giờ so được hành vi, như `⊲` nhắc tham số bị gán lại ⇒ E0902), thì phải (1) ghi LÝ DO oracle mù vào `KNOWN_LIMITATIONS.md` mục "những gì oracle không quan sát được", và (2) thêm một test golden (chương trình nhỏ + kết quả CHÍNH XÁC) giết được lỗ hổng đó — vì "tắt bản sửa" không thể dùng oracle để kiểm. Chỉ số "tỉ lệ lần chạy tới cuối hàm" của oracle phải được đo và báo trong HISTORY.md; loại nghĩa vụ dưới ngưỡng (mặc định ≥ 100 check bị xoá mà đoạn sau chạy tới cuối hàm) chưa được tính là đã kiểm.
 - **Luật "chỉ THÊM, không GỠ" (Giang, 2026-10-17, R4):** biến môi trường, cờ dòng lệnh hay cấu hình KHÔNG được gỡ bỏ một kiểm tra an toàn (kể cả ở hồ sơ dev); chúng chỉ được THÊM kiểm tra (vd `GRITRT_ARENA_CHECK=1` ở release). Công tắc tắt phục vụ đo hiệu năng, nếu cần, phải là cargo feature CHỈ-CHO-TEST không có trong `gritc` phát hành (có test khẳng định như `release_has_no_allow_intrinsic_values`).
 - **Luật "kiểm tra gắn với điểm gọi trực tiếp phải được thử qua giá trị hàm" (Giang, 2026-10-17, R4; từ FB-15/E0313):** MỌI lớp kiểm tra mà cơ chế dựa vào việc nhìn thấy lời gọi TRỰC TIẾP (tiền điều kiện `⊳` của intrinsic, lớp nghĩa vụ IR Guard, E0310 capability, E0405 Arena, thứ tự atomic E0503, hiệu ứng, khoá…) PHẢI có test chạy cùng hành vi khi hàm được lấy làm GIÁ TRỊ rồi gọi gián tiếp (biến cục bộ, tham số kiểu hàm, qua `⌥`); thiếu test này thì lớp kiểm tra chưa được coi là đã kiểm thử.
 - Bộ đếm phòng thủ (nhánh `return false`/kiểm độ dài chỉ-để-phòng-thủ) phải FAIL-CLOSED (ICE E99xx), không âm thầm chấp nhận hay bỏ qua (P3), và bằng 0 trên corpus + bộ sinh ngẫu nhiên là bằng chứng KIỂM THỬ, không phải chứng minh.
@@ -73,7 +73,7 @@ Mỗi pass kiểm tra mới (borrow checker, hiệu ứng, biên, đa luồng...
 ### 3.4 Minh bạch, không tự ý quyết định lớn
 - Mọi quyết định thiết kế quan trọng ghi thành ADR ngắn trong `docs/DECISIONS.md` (bối cảnh – quyết định – hệ quả).
 - Không tự ý đổi luật ngôn ngữ (mục 4 trong `GRIT_PLAN.md`) hoặc hệ mã lỗi mà không có ADR và chưa được chủ dự án duyệt.
-- Kết thúc mỗi milestone: chạy hết test + clippy + fmt, cập nhật `docs/PROGRESS.md` — **trung thực**, kể cả khi chưa đạt. Báo cáo "làm được gì / còn thiếu gì / rủi ro mới phát hiện".
+- Kết thúc mỗi milestone: chạy hết test + clippy + fmt, cập nhật `docs/HISTORY.md` — **trung thực**, kể cả khi chưa đạt. Báo cáo "làm được gì / còn thiếu gì / rủi ro mới phát hiện".
 
 ### 3.5 Rust code (crate Rust của chính gritc)
 - `#![forbid(unsafe_code)]` ở mọi crate, trừ ranh giới FFI gọi LLVM (phải có ADR giải thích).
@@ -86,7 +86,7 @@ Mỗi pass kiểm tra mới (borrow checker, hiệu ứng, biên, đa luồng...
 2. Nếu milestone liên quan tới luật ngôn ngữ (D1–D29) — đọc đúng luật đó trước, đừng đoán.
 3. Viết test trước khi viết logic chính khi có thể (đặc biệt với các pass kiểm tra an toàn — xem mục 3.3).
 4. Code từng phần nhỏ, chạy test thường xuyên, không viết một khối lớn rồi mới test.
-5. Khi milestone "xong" theo tiêu chí: chạy toàn bộ test suite + lint, cập nhật `docs/PROGRESS.md`, rồi **dừng lại báo cáo** — không tự ý nhảy sang milestone kế tiếp nếu đây là lần đầu hoàn thành (chờ xác nhận), trừ khi được dặn "cứ làm liên tục tới hết Phase 1".
+5. Khi milestone "xong" theo tiêu chí: chạy toàn bộ test suite + lint, cập nhật `docs/HISTORY.md`, rồi **dừng lại báo cáo** — không tự ý nhảy sang milestone kế tiếp nếu đây là lần đầu hoàn thành (chờ xác nhận), trừ khi được dặn "cứ làm liên tục tới hết Phase 1".
 
 ## 5. Việc không được làm ở Phase 1 (xem mục 6.3 của GRIT_PLAN.md)
 
