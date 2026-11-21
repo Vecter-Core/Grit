@@ -203,3 +203,23 @@ Tệp này biến mất khỏi cây làm việc (không qua commit) ngày 2026-1
 | {} | (commit dọn dẹp 2026-11-17) | tệp RỖNG tên `{}` ở thư mục gốc, tạo nhầm bởi một lệnh shell (2026-10-18); không chứa gì, không được tham chiếu |
 | tiến trình dự án.md | (chưa commit) | báo cáo chưa theo dõi, đổi tên không dấu thành docs/PROJECT_STATUS.md (lệnh P0b); không có commit xoá |
 | tests/fail/E0203_struct_pat_private_field_cov.gt | 9ffcc28 | thêm nhầm ở GÓI 7 S2.c: tiền tố E0203 khiến `gt-resolve` (chủ mã E0203) đòi resolver báo lỗi này, nhưng lỗi trường riêng tư trong pattern do `gt-types` phát; thay bằng test `crates/gt-types/tests/struct_pat_privacy.rs` |
+| docs/HANDOFF.md | (GÓI 12, 2026-11-21) | GÓI 12: gộp vào docs/STATUS.md (trạng thái, luật, môi trường); bản gốc: git show e8a8ae5:docs/HANDOFF.md |
+| docs/PROJECT_STATUS.md | (GÓI 12, 2026-11-21) | GÓI 12: gộp vào docs/STATUS.md (toàn cảnh, bản đồ tài liệu); bản gốc ở e8a8ae5 |
+| docs/READINESS.md | (GÓI 12, 2026-11-21) | GÓI 12: gộp vào docs/STATUS.md mục 4-6 (12 điều kiện §7, A1-A6, TCB); neo phiên bản đổi sang STATUS.md (tools/version_docs.py); bản gốc ở e8a8ae5 |
+| docs/PENDING_GIANG.md | (GÓI 12, 2026-11-21) | GÓI 12: gộp vào docs/STATUS.md mục 7 (việc chờ Giang); không chép email cá nhân sang tệp mới; bản gốc ở e8a8ae5; tools/fixture_secret_check.py bỏ --pending |
+| docs/SEED_FINISH_LINE.md | (GÓI 12, 2026-11-21) | GÓI 12: gộp vào docs/STATUS.md mục 5-7; bản gốc ở e8a8ae5 |
+| docs/KNOWN_LIMITATIONS_DIGEST.md | (GÓI 12, 2026-11-21) | GÓI 12: mục lục tự sinh của KNOWN_LIMITATIONS.md, dư thừa; bản gốc ở e8a8ae5 |
+| docs/PROGRESS.md | (GÓI 12, 2026-11-21) | GÓI 12: nhật ký chỉ-nối-thêm 849 dòng, nén vào docs/HISTORY.md (mục 1-4); bản gốc ở e8a8ae5 |
+| docs/HANDOFF_ARCHIVE.md | (GÓI 12, 2026-11-21) | GÓI 12: lịch sử bàn giao, nén vào docs/HISTORY.md; bản gốc ở e8a8ae5 |
+| docs/RUN_REPORTS.md | (GÓI 12, 2026-11-21) | GÓI 12: báo cáo chạy theo mục, nén vào docs/HISTORY.md (mục 2-4); bản gốc ở e8a8ae5 |
+| docs/RUN_REPORTS_INDEX.md | (GÓI 12, 2026-11-21) | GÓI 12: chỉ mục tự sinh của RUN_REPORTS.md; công cụ sinh tools/reports_index.py và test_reports_index.py bị xoá cùng; gate.sh bỏ hai kiểm tra của thứ không còn tồn tại |
+| docs/RUNLIST.md | (GÓI 12, 2026-11-21) | GÓI 12: danh sách lệnh R1-R12 đã xong/lỗi thời (có hai bảng mâu thuẫn); nén vào docs/HISTORY.md; bản gốc ở e8a8ae5 |
+| docs/CI_REPORT.md | (GÓI 12, 2026-11-21) | GÓI 12: nhật ký các lần chạy CI của kho đã đình chỉ; tóm tắt trong docs/HISTORY.md mục 4-5; bản gốc ở e8a8ae5 |
+| docs/CLOUD_GATE_RESULT.md | (GÓI 12, 2026-11-21) | GÓI 12: kết quả cổng Linux rc6 (GREEN, 16c37f0), tóm tắt trong docs/HISTORY.md; bản gốc ở e8a8ae5 |
+| docs/GITHUB_SUSPENSION.md | (GÓI 12, 2026-11-21) | GÓI 12: ghi nhận đình chỉ GitHub, tóm tắt trong docs/HISTORY.md mục 5 và docs/STATUS.md mục 7; bản gốc ở e8a8ae5 |
+| docs/PR_integration_to_main.md | (GÓI 12, 2026-11-21) | GÓI 12: mô tả PR hợp nhất integration vào main đã xong; bản gốc ở e8a8ae5 |
+| docs/PHASE2_PROPOSAL_OPUS.md | (GÓI 12, 2026-11-21) | GÓI 12: đề xuất đã được docs/PHASE2_PLAN.md hợp nhất và thay thế; bản gốc ở e8a8ae5 |
+| docs/E_PROMPT_CLAUDE.md | (GÓI 12, 2026-11-21) | GÓI 12: kịch bản phiên R11b đã xong; bản gốc ở e8a8ae5 |
+| docs/E_PROMPT_GPT.md | (GÓI 12, 2026-11-21) | GÓI 12: Giang không còn dùng GPT (AGENTS.md, 2026-11-19); bản gốc ở e8a8ae5 |
+| tools/reports_index.py | (GÓI 12, 2026-11-21) | GÓI 12: chỉ sinh/kiểm docs/RUN_REPORTS_INDEX.md từ RUN_REPORTS.md, cả hai đã bị xoá; gate.sh bỏ kiểm `reports_index --check` (kiểm tra của thứ không còn tồn tại, không phải nới cổng) |
+| tools/test_reports_index.py | (GÓI 12, 2026-11-21) | GÓI 12: unittest của tools/reports_index.py đã xoá; bỏ khỏi danh sách unittest công cụ của gate.sh |

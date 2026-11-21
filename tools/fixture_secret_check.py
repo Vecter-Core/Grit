@@ -9,9 +9,9 @@ Loại:
   (iii) GIẢ HIỂN NHIÊN — ký tự lặp, hoặc chứa example/test/fake/dummy/xxxx/123456/placeholder.
   (iv)  KHÔNG PHÂN LOẠI ĐƯỢC — còn lại (và mọi trường hợp không chắc cách tính: ghi KHÔNG KIỂM ĐƯỢC thay vì đoán).
 
-KHÔNG in giá trị: chỉ 4 ký tự đầu. KHÔNG gọi mạng. Ghi vào docs/SECRET_FIXTURES.md; mục (i) và (iv) được đưa vào đầu docs/PENDING_GIANG.md
-(tệp, dòng, loại, việc Giang cần làm) bằng `--pending`.
-Dùng: python tools/fixture_secret_check.py [--out docs/SECRET_FIXTURES.md] [--pending]
+KHÔNG in giá trị: chỉ 4 ký tự đầu. KHÔNG gọi mạng. Ghi vào docs/SECRET_FIXTURES.md; mục (i) và (iv) nằm trong chính tệp đó (docs/STATUS.md chỉ trỏ tới)
+(tệp, dòng, loại, việc Giang cần làm).
+Dùng: python tools/fixture_secret_check.py [--out docs/SECRET_FIXTURES.md]
 """
 import os
 import re
@@ -140,29 +140,7 @@ def main(argv):
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write(render(rows))
     print("ghi", out, "—", len(rows), "mục")
-    if "--pending" in argv:
-        put_pending(os.path.join(ROOT, "docs", "PENDING_GIANG.md"), pending_block(rows))
     return 0
-
-
-def put_pending(path, block):
-    """Đặt khối KIỂM FIXTURE lên ĐẦU tệp (sau dòng tiêu đề `# …`). Nếu đã có khối cũ (bắt đầu bằng marker) thì thay nó (đến `## ` kế tiếp)."""
-    marker = "## KIỂM FIXTURE BÍ MẬT"
-    with open(path, encoding="utf-8") as f:
-        s = f.read()
-    nl = "\r\n" if "\r\n" in s else "\n"
-    body = block.replace("\n", nl)
-    lines = s.split(nl)
-    if any(x.startswith(marker) for x in lines):
-        start = next(i for i, x in enumerate(lines) if x.startswith(marker))
-        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
-        new = lines[:start] + body.split(nl) + lines[end:]
-    else:
-        # ĐẦU tệp: ngay sau dòng tiêu đề `# …` (dòng 1)
-        first = 1 if lines and lines[0].startswith("# ") else 0
-        new = lines[:first] + [""] + body.split(nl) + lines[first:]
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        f.write(nl.join(new))
 
 
 if __name__ == "__main__":

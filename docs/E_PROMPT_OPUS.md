@@ -5,7 +5,7 @@
 ## Bối cảnh (đọc 5 phút)
 Grit là ngôn ngữ cho AI viết; trình biên dịch `gritc` (Rust, repo `D:\Grit`, nhánh `windows-work`) **từ chối** (ĐỎ `E…`/ICE `E9901`) mọi chương trình mà nó không chứng minh được an toàn và khi đó **không sinh binary** (fail-closed). Lỗi nghiêm trọng nhất là **false negative**: chấp nhận chương trình sai, sinh mã sai hoặc UB. Chỉ ≈ 3,8 % dòng TCB từng được đọc chéo khác họ (`docs/CROSS_REVIEW_COVERAGE.md`): `runtime/gt-rt` + `crates/gt-guard` tại hash G1.5 `c5aa45b` (GPT-6). Phần còn lại ≈ 63 000 dòng chỉ có corpus, oracle, đột biến, bộ sinh. Việc của bạn là tìm chương trình `.gt` (hoặc test Rust) mà `gritc` chấp nhận hoặc chạy sai.
 
-Đọc trước (≤ 30 phút): `AGENTS.md`, `docs/TCB_REVIEW_GUIDE.md`, `docs/CROSS_REVIEW_COVERAGE.md`, `docs/TCB_CODE_AUDIT.md`, `docs/TCB_CODE_AUDIT_CLAUDE.md`, `docs/KNOWN_LIMITATIONS_DIGEST.md`, `docs/AI_GUIDE.md`.
+Đọc trước (≤ 30 phút): `AGENTS.md`, `docs/TCB_REVIEW_GUIDE.md`, `docs/CROSS_REVIEW_COVERAGE.md`, `docs/TCB_CODE_AUDIT.md`, `docs/TCB_CODE_AUDIT_CLAUDE.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/AI_GUIDE.md`.
 
 ## Vai trò
 Kẻ tấn công, CHỈ ĐỌC (và thêm test/FB khi tìm được lỗi, xem quy tắc). Mọi "an toàn" phải có thí nghiệm kèm kết quả thật.
@@ -30,7 +30,7 @@ ARENA-01 (kích thước/căn lề tổng quát; release không bật kiểm ch�
 
 ## Quy tắc BẮT BUỘC
 1. Mỗi nghi vấn: một chương trình `.gt` hoặc test Rust tấn công + kết quả thật (lệnh, mã thoát, đầu ra rút gọn); kết luận `xác nhận` / `bác bỏ trong phạm vi thí nghiệm` / `chưa kiểm được` (+ lý do). **Cấm "an toàn" không bằng chứng.**
-2. **Cấm** đổi trạng thái TCB (`TCB_INTRINSICS.md`, `READINESS.md`) và **cấm sửa mã** (chỉ thêm test + FB): lỗi thật ⇒ test ĐỎ trước (commit riêng) → báo kiến trúc sư (hoặc sửa nếu hỏng bộ nhớ đạt tới từ Grit) → FB-C trong `docs/FIELD_BUGS.md`. Mọi commit có `Author-Model: <tên model thật>`.
+2. **Cấm** đổi trạng thái TCB (`TCB_INTRINSICS.md`, `STATUS.md`) và **cấm sửa mã** (chỉ thêm test + FB): lỗi thật ⇒ test ĐỎ trước (commit riêng) → báo kiến trúc sư (hoặc sửa nếu hỏng bộ nhớ đạt tới từ Grit) → FB-C trong `docs/FIELD_BUGS.md`. Mọi commit có `Author-Model: <tên model thật>`.
 3. Quy trình repo: không chạy hai `cargo` cùng lúc; `CARGO_BUILD_JOBS=2`, `--test-threads=2`; lô nặng ≤ 15 phút; `bash tools/preflight.sh D:/Grit` trước lô nặng. Không `git reset --hard`/`clean`/force-push, không push `main`. Không chạy `gate.sh` đầy đủ.
 4. Mẫu tấn công: `tests/fail/*`, `crates/*/tests/support/progen.rs`, `docs/AI_GUIDE.md`. Chương trình bị chấp nhận mà theo `docs/spec/` phải bị từ chối là false negative.
 

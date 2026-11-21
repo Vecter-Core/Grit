@@ -88,7 +88,7 @@
 - **Cú pháp:** `∈` cần miền là range có ngoặc (`x ∈ (0..10)`); không có pattern `..=b` (chỉ `a..=b`, `a..`, `..b`); `⌥` trên `&T` là lỗi kiểu ở Phase 1 (không auto-deref scrutinee).
 - **Mã chết sau nhánh bắt-tất-cả** không phải lỗi M4 (ghi chú N của M5).
 - **Instance:** bảng instance lazy chỉ từ các gốc không generic; hàm generic không được gọi từ gốc nào không có instance (vẫn được kiểm một lần, ở dạng đa hình). Ngưỡng 64 → E0312.
-- **Đột biến:** KHÔNG đột biến toàn bộ gt-types (chính sách 2026-10-06); chỉ ~48 đột biến có mục tiêu cho D1/D4/D5/`!` (kết quả ở PROGRESS.md).
+- **Đột biến:** KHÔNG đột biến toàn bộ gt-types (chính sách 2026-10-06); chỉ ~48 đột biến có mục tiêu cho D1/D4/D5/`!` (kết quả ở HISTORY.md).
 
 ## ĐIỀU KIỆN CỨNG: lỗ hổng tạm thời của M4/M5 (Giang, 2026-10-06; cũng ở GRIT_PLAN.md mục 7, điểm 9)
 - Trước M7, literal ngoài phạm vi (`x: u8 ≔ 300`) lọt qua M4; E0307 (thiếu đường trả về) phụ thuộc M5.

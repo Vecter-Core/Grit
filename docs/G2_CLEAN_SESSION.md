@@ -1,6 +1,6 @@
 # Gói 2 — handoff cho phiên sạch tiếp theo
 
-Ngày 2026-11-12; nhánh làm việc `integration`; `main` chưa đụng. Push dự phòng là `origin/windows-work`. Đọc `docs/HANDOFF.md`, `docs/RUNLIST.md`, rồi file này. Worktree hiện không được coi là sạch cho tới khi kiểm tra `git status --short`.
+Ngày 2026-11-12; nhánh làm việc `integration`; `main` chưa đụng. Push dự phòng là `origin/windows-work`. Đọc `docs/STATUS.md`, `docs/HISTORY.md`, rồi file này. Worktree hiện không được coi là sạch cho tới khi kiểm tra `git status --short`.
 
 ## Không làm trong phiên chuẩn bị
 
@@ -12,7 +12,7 @@ Ngày 2026-11-12; nhánh làm việc `integration`; `main` chưa đụng. Push d
 ## Việc còn mở, theo thứ tự
 
 1. G2.1: giải thích/đóng survivor mutation `crates/gt-term/src/lib.rs:361` (mutation ở dòng 685 đã bị test bắt); chạy `python tools/fail_open_scan.py list --limit 0` theo lô, phân loại các 95 hit chưa rà, chỉ đánh dấu sau khi đọc từng hit; chưa gọi mục này xong.
-2. G2.2 R11b: chuyển `docs/E_PROMPT_CLAUDE.md` cho phiên Claude/model khác họ và lưu nguyên phản hồi; các Codex-authored TCB lines vẫn CHỜ review. Không giả lập phản hồi.
+2. G2.2 R11b: chuyển `docs/HISTORY.md` cho phiên Claude/model khác họ và lưu nguyên phản hồi; các Codex-authored TCB lines vẫn CHỜ review. Không giả lập phản hồi.
 3. G2.5: ADR-C06 đã kết luận K3 có 1 caller Arena/234 dòng; giữ HashMap hiện hành. Điều kiện test riêng ≥1.500 seed vẫn mở; không tự đổi thiết kế.
 4. G2.7: chỉ chuẩn bị/kiểm chứng môi trường sạch cho lần review tiếp; không author capstone.
 5. Cuối Gói 2: khi các mục yêu cầu đã giải quyết, chạy gate đầy đủ đúng HEAD hiện hành một lần, cập nhật READINESS/HANDOFF/RUNLIST, bundle, push `HEAD:refs/heads/windows-work`. Không tuyên bố xong nếu điều kiện cứng chưa được xác nhận.

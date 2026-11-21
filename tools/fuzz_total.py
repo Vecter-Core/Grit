@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Tổng fuzz TÍCH LUỸ từ docs/FUZZ_LOG.jsonl (ADR-037). Dùng: python tools/fuzz_total.py [--json]
-Chỉ tính các dòng status=ok (phiên chạy hết giờ, không lỗi) và status=historical (số liệu cũ ghi tay từ PROGRESS.md, gắn nhãn riêng).
+Chỉ tính các dòng status=ok (phiên chạy hết giờ, không lỗi) và status=historical (số liệu cũ ghi tay từ HISTORY.md, gắn nhãn riêng).
 Phiên `fail` KHÔNG được tính vào giờ nhưng được báo (và phải được điều tra); `skipped_busy` chỉ đếm số lần bỏ qua."""
 import hashlib, json, os, subprocess, sys
 

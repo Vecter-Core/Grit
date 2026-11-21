@@ -9,7 +9,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import version_docs as vd  # noqa: E402
 
-FILES = ["CHANGELOG.md", "docs/spec/FREEZE.md", "docs/READINESS.md", "docs/PROJECT_STATUS.md", "README.md", "BUILDING.md", "crates/gt-driver/Cargo.toml"]
+FILES = ["CHANGELOG.md", "docs/spec/FREEZE.md", "docs/STATUS.md", "README.md", "BUILDING.md", "crates/gt-driver/Cargo.toml"]
 
 
 class VersionDocs(unittest.TestCase):
@@ -38,12 +38,12 @@ class VersionDocs(unittest.TestCase):
 
     def test_stale_label_in_each_document_is_red(self):
         v = vd.cargo_version(ROOT)
-        for rel in ("CHANGELOG.md", "docs/spec/FREEZE.md", "docs/READINESS.md", "docs/PROJECT_STATUS.md"):
+        for rel in ("CHANGELOG.md", "docs/spec/FREEZE.md", "docs/STATUS.md"):
             d = self.copy()
             p = os.path.join(d, rel)
             s = open(p, encoding="utf-8", newline="").read()
             self.assertIn(v, s, rel)
-            anchor = {"CHANGELOG.md": "## ", "docs/spec/FREEZE.md": "`gritc --version` ⇒ `", "docs/READINESS.md": "Nhãn hiện hành: **`", "docs/PROJECT_STATUS.md": "Bản hiện tại là **`"}[rel]
+            anchor = {"CHANGELOG.md": "## ", "docs/spec/FREEZE.md": "`gritc --version` ⇒ `", "docs/STATUS.md": "Nhãn hiện hành: **`"}[rel]
             self.assertIn(anchor + v, s, rel)
             open(p, "w", encoding="utf-8", newline="").write(s.replace(anchor + v, anchor + "1.0.0-rc2", 1))
             e = vd.check(d, run_binary=False)

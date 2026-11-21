@@ -2,7 +2,7 @@
 //! dùng hàm làm giá trị theo 8 loại — hàm thường, gọi qua chuỗi biến, hàm kết hợp `&self`, hàm kết hợp `self`, hàm generic, truyền qua tham số kiểu hàm, intrinsic (E0313),
 //! phương thức Atomic (E0503) — với hiệu ứng ngẫu nhiên của callee/caller. Oracle ĐỘC LẬP (mô hình Rust, không đọc kết quả của gritc): quy tắc "hiệu ứng callee ⊆ hiệu ứng caller" và
 //! "intrinsic không là giá trị" ⇒ mã chẩn đoán kỳ vọng CHÍNH XÁC; chương trình xanh ⇒ giá trị mô hình == thông dịch == exe LLVM.
-//! Tắt bản sửa FB-13 / FB-15 / S-E / E0313 thì bộ sinh phải ĐỎ (kiểm bằng hoàn nguyên, ghi ở PROGRESS.md).
+//! Tắt bản sửa FB-13 / FB-15 / S-E / E0313 thì bộ sinh phải ĐỎ (kiểm bằng hoàn nguyên, ghi ở HISTORY.md).
 //! `GT_FNGEN_N` = số chương trình mỗi loại (mặc định 32). Bảng độ phủ in ra bằng `--nocapture`.
 #![cfg(feature = "llvm")]
 use gt_driver::native::{build_exe_profile, run_exe_timeout};

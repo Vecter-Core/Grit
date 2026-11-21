@@ -7,7 +7,7 @@ thời điểm, seed, kết quả (xanh/đỏ), thời gian, bộ nhớ vật l�
   python tools/flake_llvm_sort.py --runs 12 --seed-start 1 --max-seconds 500
 
 Mỗi lần chạy dùng một seed khác nhau (`seed-start` trở đi), TUẦN TỰ; cấm tiến trình song song. Dừng nhận lần mới khi quá `--max-seconds`.
-Không phải bằng chứng "đã sửa": kết luận thống kê ở docs/RUN_REPORTS.md (0/N ⇒ giới hạn trên ≈ 3/N ở tin cậy 95%).
+Không phải bằng chứng "đã sửa": kết luận thống kê ở docs/HISTORY.md (0/N ⇒ giới hạn trên ≈ 3/N ở tin cậy 95%).
 """
 import argparse
 import ctypes

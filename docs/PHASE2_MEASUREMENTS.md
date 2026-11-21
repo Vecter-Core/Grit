@@ -17,7 +17,7 @@ Trạng thái (cập nhật sau khi Giang đóng WSL `OpenClawGateway`, prefligh
 | 7 | Oracle "ghi thẳng vào đích" | KHÔNG ĐO được ngoài cây | — |
 | 9 | Commit charge Arena đặt trước | CHƯA ĐO | — |
 
-Phép đo 6 (từ lần đọc đầu, không đổi): 0 ca đảo đối số xác nhận trong `docs/USER_BUGS.md` (0 mục), `APPS_LOG.md`, `CAPSTONE_LOG.md`, `RUN_REPORTS.md`; 15 mẫu từ khoá đều 0 khớp. Cảnh báo: lỗi đảo hai đối số cùng kiểu KHÔNG phải lỗi biên dịch, chỉ lộ thành đầu ra sai; nhật ký rất ngắn nên 0 không chứng minh lỗi không xảy ra. N9 giữ HOÃN.
+Phép đo 6 (từ lần đọc đầu, không đổi): 0 ca đảo đối số xác nhận trong `docs/USER_BUGS.md` (0 mục), `APPS_LOG.md`, `CAPSTONE_LOG.md`, `HISTORY.md`; 15 mẫu từ khoá đều 0 khớp. Cảnh báo: lỗi đảo hai đối số cùng kiểu KHÔNG phải lỗi biên dịch, chỉ lộ thành đầu ra sai; nhật ký rất ngắn nên 0 không chứng minh lỗi không xảy ra. N9 giữ HOÃN.
 
 ## GÓI 11 — bổ sung (2026-11-20; Windows trừ khi ghi khác)
 - **Cỡ enum thực (S2.c, ĐO tĩnh, Windows, `GRITC_DUMP_IR`, gritc release dựng từ rc6, hồ sơ dev):** số lần KIỂU `{ i64, [k x i64] }` xuất hiện trong IR (không phải số giá trị lúc chạy): json {k=0: 10, k=1: 18, k=2: 70, k=4: 111}; sha256 {0: 10, 1: 18}; sortlines {0: 64, 1: 18}; stats {0: 10, 1: 28}; wc {0: 10, 1: 18}; wordfreq {0: 52, 1: 18, 4: 10}. Cỡ = 8 + 8k byte. Tag `u8` chỉ co được enum không payload (k=0: 8 → 1 byte, tối đa 7 byte mỗi giá trị); enum có payload căn lề 8 vẫn đệm lại nên KHÔNG lợi. 4 capstone CHƯA đo.
