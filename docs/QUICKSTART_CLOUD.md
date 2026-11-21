@@ -9,7 +9,7 @@ Nền đã kiểm: container Linux x86_64. Windows: chưa kiểm. **origin (GitH
 4. Dặn AI (mẫu câu bên dưới). AI đọc docs/AI_GUIDE.md rồi tạo gói bằng `rig new`.
 5. AI lặp: `rig lock && rig check` → sửa lỗi E… → `rig run`. KHÔNG được nới kiểm tra.
 6. Kiểm kết quả với dữ liệu thật của bạn; yêu cầu AI `git commit` + `git push` khi ổn.
-7. Muốn tiếp phiên sau: nói AI đọc docs/STATUS.md, git show e8a8ae5:docs/archive/SEED_PLAN.md, docs/HISTORY.md, docs/HISTORY.md.
+7. Muốn tiếp phiên sau: nói AI đọc docs/STATUS.md và docs/ROADMAP.md (lịch sử từng gói: docs/HISTORY.md).
 8. Gặp `LỖI` ở `gritc doctor`: làm theo dòng "→" nó in ra (hoặc BUILDING.md).
 9. Chương trình lớn: chia thành nhiều tệp `src/*.gt` (tên tệp = tên module).
 10. Không dùng được Windows: chưa kiểm — dùng Linux/đám mây.

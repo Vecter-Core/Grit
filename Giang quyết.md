@@ -1,7 +1,7 @@
 # Giang quyết — các điểm cần chủ dự án quyết, kèm lựa chọn của kiến trúc sư
 
 > Viết ngày 2026-11-18 bởi Claude Opus 5.5 (vai kiến trúc sư), cho **Giang**. Nhánh `integration`, HEAD `869e819`.
-> Phạm vi: chỉ đọc **tài liệu chữ**, không đọc mã, không sửa mã, không commit. Nguồn: `docs/STATUS.md`, `docs/STATUS.md` §5, `docs/OPEN_QUESTIONS.md`, `docs/STATUS.md`, `docs/DECISIONS.md` (ADR-018/022/025/036/037/038/C09), `docs/TCB_REVIEW_GUIDE.md`, `docs/TCB_CODE_AUDIT.md`, `docs/TCB_CODE_AUDIT_CLAUDE.md`, `docs/AUTHORSHIP.md`, `docs/KNOWN_LIMITATIONS.md`, `GRIT_PLAN.md` §7.
+> Phạm vi: chỉ đọc **tài liệu chữ**, không đọc mã, không sửa mã, không commit. Nguồn: `docs/STATUS.md`, `docs/OPEN_QUESTIONS.md`, `docs/DECISIONS.md` (ADR-018/022/025/036/037/038/C09), `docs/TCB_REVIEW_GUIDE.md`, `docs/TCB_CODE_AUDIT.md`, `docs/TCB_CODE_AUDIT_CLAUDE.md`, `docs/AUTHORSHIP.md`, `docs/KNOWN_LIMITATIONS.md`, `GRIT_PLAN.md` §7.
 > Mỗi mục có: **bối cảnh**, **các lựa chọn**, **lựa chọn của tôi** và lý do, rồi một dòng để bạn ký. Chỗ nào tôi chưa kiểm bằng lệnh thật thì ghi **CHƯA KIỂM**.
 
 ---

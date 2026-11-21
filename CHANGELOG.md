@@ -51,4 +51,4 @@ Nhãn là **RC**, không phải `1.0.0-seed`: danh sách điều kiện còn thi
 - Cổng xanh 53286a7, build tái lập (hai lần cùng SHA-256), capstone 8/8, `rig` + `setup_cloud.sh` + `gritc doctor`.
 
 ## trước đó
-- Lịch sử chi tiết: `docs/HISTORY.md`, `docs/HISTORY.md`, `git log`.
+- Lịch sử chi tiết: `docs/HISTORY.md`, `git log`.
