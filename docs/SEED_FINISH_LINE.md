@@ -51,4 +51,4 @@ Việc ngắn nhất Giang làm được ngay: #4 (đọc), #8 (bấm dispatch),
 * Việc cho Giang: (1) chép `D:\Grit_export` ra ngoài máy; (2) quyết định giao GÓI 12 làm S3 (fuzz WSL + TSan), S4 (nhóm D + coverage), S2.a/b/e và chạy lại cổng Linux trên rc7.
 
 ## Cập nhật GÓI 13 (2026-11-22)
-* Điều kiện cổng Windows (#8) và cổng Linux cục bộ: **rc8 GREEN cả hai nền, cùng `GATE_TREE=c7bdef26…`** (WSL2 cục bộ, KHÔNG phải CI). Fuzz 24 giờ (#1) vẫn CHƯA; TSan CHƯA (thiếu clang). Cây `main` chưa có cổng đầy đủ.
+* Điều kiện cổng Windows (#8) và cổng Linux cục bộ: **rc8 GREEN cả hai nền, cùng `GATE_TREE=c7bdef26…`** (WSL2 cục bộ, KHÔNG phải CI). Fuzz 24 giờ (#1) vẫn CHƯA; TSan WSL CHƯA (thiếu clang) — chỉ tái lập cục bộ: CI đã chạy TSan (`docs/TSAN_RESULTS.md`, run 44283688809), KHÔNG chặn Seed (GÓI 14 A3). Chặn Seed thật: fuzz 24 giờ, R11c, capstone sạch, điều kiện #6, VS Code, giấy phép. Cây `main` chưa có cổng đầy đủ.
