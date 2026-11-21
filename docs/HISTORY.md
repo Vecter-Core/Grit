@@ -76,3 +76,19 @@ Thời gian KHÔNG nằm ở số lượng test: `gt-fmt/comments.rs` 1.337 s (5
 - Kiểm cổng (nhẹ, ĐO 2026-11-21): `clippy --workspace --all-targets -D warnings` rc=0, `fmt --check` OK, `check_expectations` (550 fail/439 pass/13 warn/9 lexer) OK, `nul`, `platform_tests`, unittest công cụ đã sửa OK.
 
 **Chưa làm / chờ quyết định:** (1) cổng đầy đủ trong clone sạch + test LLVM (cần máy có LLVM 20); (2) lấy mẫu `comments.rs`; (3) còn ứng viên white-box CHƯA có số đo đủ: `gt-dataflow/properties.rs` (0 dòng riêng nhưng chưa thử đột biến), `gt-resolve/names.rs` và `gt-types/{adt,functions,literals,traits_generics,...}.rs` (compile-fail viết trong Rust, nên chuyển dần sang mẫu `.gt`), `gt-diag/*`; (4) hai mẫu trong `KNOWN_EXTRA` (E0401_move_in_while, E1001_raw_ptr_return) nên viết lại tối thiểu; (5) luật "mỗi tệp xoá một dòng DELETIONS" làm `docs/DELETIONS.md` phình (205 ⇒ 602 dòng): đề xuất cho phép dòng theo thư mục (Giang quyết, vì đụng cổng).
+
+### GÓI 12 phần 2 (2026-11-21, Claude Opus 5.5) — hoàn thiện Giai đoạn 1: đo trước, sửa sau
+Lệnh Giang: kế hoạch tối ưu từng M, gộp chỗ thừa, viết chỗ thiếu của Giai đoạn 1 ("gt-borrowck thua Rust là sao"), đọc ngôn ngữ khác.
+- **Đo**: 15 idiom Rust NLL ⇒ gt-borrowck chấp nhận 14 TRƯỚC khi sửa; lỗ duy nhất: mượn hai pha. Idiom M4/M7/M8 ⇒ ép mảng→lát thiếu; vòng
+  `x / k`, Euclid ĐỎ; `==` trên tuple/`Option` thiếu. Mã lặp trong `crates/*/src`: 2,6% dòng (không thừa nhiều).
+- **Đã làm** (mỗi việc: test ĐỎ trước, mẫu tấn công giữ ĐỎ, ADR): mượn hai pha (ADR-C14), ép unsize (ADR-C15), quan hệ chia/dư cho M7/M8
+  (ADR-C16), gộp `empty_output` ở gt-types; kế hoạch từng M ở `docs/ROADMAP.md` mục 0b.
+- **Bằng chứng**: oracle borrowck 6/6 (20 000 chương trình); term_oracle 1 500 chương trình, 0 âm tính giả (37 có chia được chấp nhận); oracle
+  `zone::shift_upper` > 10 000 nghiệm; gt-oblig 21 bộ (golden không đổi). Đột biến: 29 (27 TỰ ĐỘNG `tools/mut.py`, 2 tay): lượt đầu 17 giết /
+  9 sống / 1 không biên dịch ⇒ thêm 3 mẫu ⇒ còn 1 sống là đột biến TƯƠNG ĐƯƠNG (`zone.rs` `if self.empty` → false: khi rỗng mọi truy vấn bị cờ
+  chặn trước). Một đột biến sống ở lượt đầu là UNSOUND thật (cho `%` khẳng định `a % b < a`) — chính bộ đột biến tìm ra lỗ hổng của bộ TEST.
+- **Sự cố tự gây**: lô đột biến đầu bị lưới `track` dừng vì tôi sửa tệp trong lúc chạy (đúng thiết kế); chạy lại với cây sạch. Giai đoạn
+  `failopen`: 3 mục mới (2 nhánh ICE `_ => return ice`, 1 `_ => None` bảo thủ) được PHÂN LOẠI trong sổ cái rồi mới ghi baseline.
+- **Kiểm cuối**: 264 test của các crate đổi đạt; clippy -D warnings rc=0; fmt; check_expectations; nul; failopen 0 mới; platform_tests;
+  mọi unittest công cụ của cổng đạt. **CHƯA**: cổng đầy đủ trong clone sạch, test nhị phân LLVM (máy không có LLVM 20).
+

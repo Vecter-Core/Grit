@@ -24,6 +24,9 @@ Nhãn hiện hành: **`1.0.0-rc7`** (ứng viên, **CHƯA** phải `1.0.0-seed`)
 | Máy này (đo 2026-11-21) | Linux, `cargo 1.98.1` (đúng bản ghim): dựng `gritc` **không-LLVM** được; thiếu LLVM 20 (có 17/18) ⇒ backend `llvm` và test chạy nhị phân thật **CHƯA dựng được ở đây** |
 | Test không-LLVM (ĐO 2026-11-21) | trước dọn: 181 bộ/863 test đạt/0 lỗi (≈ 2.263 s; 5 bộ chiếm 89,7% thời gian); sau dọn: 931 ⇒ 821 test; 781 đạt, 37 lỗi (tất cả ở 7 bộ `rig`, cần LLVM), `comments.rs` 1.337 s ⇒ 695 s. Chi tiết, cách đo và việc còn dở: `docs/HISTORY.md` mục 7. Cổng đầy đủ và test LLVM **CHƯA chạy** |
 
+**GÓI 12 phần 2 (2026-11-21):** mượn hai pha (ADR-C14), ép `&[T; N]` → `&[T]` (ADR-C15), vòng/đệ quy qua `/` và `%` chứng minh được dừng
+(ADR-C16). Nhãn GIỮ `1.0.0-rc7` (chưa có cổng đầy đủ trên mã mới — không đổi nhãn khi chưa có bằng chứng). Kế hoạch từng M: `docs/ROADMAP.md` mục 0b.
+
 ## 3. Luật làm việc (bản đầy đủ: `AGENTS.md`, `.claude/skills/grit-contract.md`)
 - Chỉ báo số liệu THẬT từ lệnh đã chạy; ghi `CHƯA KIỂM` cho phần chưa kiểm. Không báo xong khi chưa có cổng liền mạch xanh trên đúng mã đó.
 - Lỗi soundness/false negative = lỗi nghiêm trọng nhất: test ĐỎ trước, sửa sau trong commit riêng, ghi `docs/FIELD_BUGS.md`, mở rộng bộ sinh/oracle, kiểm bằng cách tắt bản sửa.
