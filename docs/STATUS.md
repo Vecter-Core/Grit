@@ -1,6 +1,6 @@
 # STATUS — trạng thái hiện tại của Grit (ĐỌC TỆP NÀY ĐẦU TIÊN)
 
-> Lập 2026-11-21 (GÓI 12) bằng cách GỘP và nén: `HANDOFF`, `PROJECT_STATUS`, `READINESS`, `PENDING_GIANG`, `SEED_FINISH_LINE`, `KNOWN_LIMITATIONS_DIGEST`. Cập nhật tại commit e8a8ae5.
+> Lập 2026-11-21 (GÓI 12) bằng cách GỘP và nén: `HANDOFF`, `PROJECT_STATUS`, `READINESS`, `PENDING_GIANG`, `SEED_FINISH_LINE`, `KNOWN_LIMITATIONS_DIGEST`. Cập nhật tại commit 44b7fd3.
 > Số liệu bên dưới được CHÉP từ các tài liệu đó (ngày ghi kèm), **không đo lại** trừ chỗ ghi "ĐO 2026-11-21". Bản gốc còn nguyên trong git: `git show e8a8ae5:docs/<TÊN>.md`.
 > Lịch sử từng gói: `docs/HISTORY.md`. Kế hoạch tiếp: `docs/ROADMAP.md` (gần) và `docs/PHASE2_PLAN.md` (Giai đoạn 2). Giới hạn kỹ thuật chi tiết: `docs/KNOWN_LIMITATIONS.md`.
 
@@ -22,7 +22,7 @@ Nhãn hiện hành: **`1.0.0-rc7`** (ứng viên, **CHƯA** phải `1.0.0-seed`)
 | CI GitHub | **KHOÁ**: tài khoản `gn3305970-lang` bị đình chỉ (HTTP 403), Actions HTTP 422 (2026-11-20). Run xanh cuối: Linux rc4 trên `1793b7f` (1028/0/207, 2026-11-19) |
 | Nhánh (ĐO 2026-11-21 trong clone này) | `origin` = `Vecter-Core/Grit`; `main` = `origin/main` = `e8a8ae5` = điểm xuất phát của nhánh phiên `claude/cool-cray-hqha6n`. Tài liệu cũ ghi `main` = `e450c69`/`17beed4` cho kho `gn3305970-lang` (đã đình chỉ): **hai kho, hai số, chưa đối chiếu được** — `CHƯA KIỂM`. Quy tắc `main` (chỉ fast-forward sau CI xanh; chỉ Giang đẩy): AGENTS.md |
 | Máy này (đo 2026-11-21) | Linux, `cargo 1.98.1` (đúng bản ghim): dựng `gritc` **không-LLVM** được; thiếu LLVM 20 (có 17/18) ⇒ backend `llvm` và test chạy nhị phân thật **CHƯA dựng được ở đây** |
-| Baseline test không-LLVM (ĐO 2026-11-21) | 160 bộ đầu: 0 lỗi; xem `docs/HISTORY.md` mục "GÓI 12" cho thời gian từng bộ |
+| Test không-LLVM (ĐO 2026-11-21) | trước dọn: 194 bộ/903 test đạt/0 lỗi (≈ 2.329 s; 5 bộ chiếm 82% thời gian); sau dọn: 821 test (−111). Chi tiết, cách đo và việc còn dở: `docs/HISTORY.md` mục 7. Cổng đầy đủ và test LLVM **CHƯA chạy** |
 
 ## 3. Luật làm việc (bản đầy đủ: `AGENTS.md`, `.claude/skills/grit-contract.md`)
 - Chỉ báo số liệu THẬT từ lệnh đã chạy; ghi `CHƯA KIỂM` cho phần chưa kiểm. Không báo xong khi chưa có cổng liền mạch xanh trên đúng mã đó.
