@@ -46,6 +46,7 @@ rc=0
 START=$(date +%s)
 BUDGET="${GATE_BUDGET_SEC:-0}"
 INCOMPLETE=0
+UNITS_RUN=0
 red() { echo "GATE_RED: $1"; rc=1; }
 has() { case " $STAGES " in *" $1 "*) return 0 ;; esac; return 1; }
 over_budget() { [ "$BUDGET" -gt 0 ] && [ $(( $(date +%s) - START )) -ge "$BUDGET" ]; }
@@ -75,6 +76,12 @@ unit() {
   local name="$1"; shift
   if done_unit "$name"; then echo "== $name: ĐÃ ĐẠT (điểm lưu)"; return 0; fi
   if over_budget; then INCOMPLETE=1; echo "== $name: hoãn (hết ngân sách ${BUDGET}s)"; return 2; fi
+  # GÓI 14 A1: đơn vị DÀI MỘT MÌNH (đo: `gt-fmt comments` 929 s Windows, 1024 s Linux ở GÓI 13 — một bộ không chia nhỏ được, > 15 phút): chỉ chạy ở ĐẦU lô
+  # (chưa chạy đơn vị nào trong lần gọi này) để lô đó chỉ gồm nó; có ngân sách mà không ở đầu lô ⇒ hoãn sang lô sau. Không đặt ngân sách ⇒ chạy bình thường.
+  case " ${GATE_SOLO_UNITS-test:gt-fmt:comments} " in
+    *" $name "*) if [ "$BUDGET" -gt 0 ] && [ "$UNITS_RUN" -gt 0 ]; then INCOMPLETE=1; echo "== $name: hoãn (đơn vị dài chạy MỘT MÌNH ở đầu lô; lô này đã chạy $UNITS_RUN đơn vị)"; return 2; fi ;;
+  esac
+  UNITS_RUN=$((UNITS_RUN+1))
   echo "== $name"
   "$@"; local c=$?
   if [ $c = 0 ] && [ "$(tree_hash)" != "$KEY" ]; then echo "GATE_TREE_CHANGED: cây đổi trong giai đoạn $name (băm lúc bắt đầu $KEY) ⇒ KHÔNG hợp lệ"; c=1; fi
@@ -97,7 +104,8 @@ stage_expect() {
   $PY tools/check_expectations.py | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: check_expectations"; r=1; }
   $PY tools/reports_index.py --check | tail -1; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: reports_index"; r=1; }
   $PY tools/adversarial_check.py | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: adversarial_check"; r=1; }
-  for t in test_check_expectations test_mut_guard test_mut_resume test_preflight test_nul_check test_gate test_require_preflight test_unsafe_inventory test_version_docs test_platform_tests test_triage_user_bugs test_deny test_tsan_inject test_secret_scan_history test_fuzz_ingest test_adversarial_check test_reports_index test_fuzz_loop test_nul_scan test_doc_test test_ai_guide test_gen_docs test_gate_clean test_pyfind test_gate_split test_fuzz_import_local; do
+  $PY tools/corpus_owner_check.py | tail -22; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: corpus_owner_check (GÓI 14 A2)"; r=1; }
+  for t in test_check_expectations test_mut_guard test_mut_resume test_preflight test_nul_check test_gate test_require_preflight test_unsafe_inventory test_version_docs test_platform_tests test_triage_user_bugs test_deny test_tsan_inject test_secret_scan_history test_fuzz_ingest test_adversarial_check test_reports_index test_fuzz_loop test_nul_scan test_doc_test test_ai_guide test_gen_docs test_gate_clean test_pyfind test_gate_split test_fuzz_import_local test_corpus_owner_check test_fuzz_total test_fuzz_night; do
     if [ -f "tools/$t.py" ]; then
       $PY -m unittest "tools/$t.py" 2>&1 | tail -3; [ "${PIPESTATUS[0]}" = 0 ] || { echo "GATE_RED: unittest $t"; r=1; }
     fi
@@ -123,7 +131,7 @@ if has clippy;     then unit clippy stage_clippy; fi
 if has audit;      then unit audit stage_audit; fi
 
 # ---- test: mỗi crate một đơn vị (điểm lưu); GATE_TEST_CMD (kiểm thử cổng) chạy một cục -------------------------------------------------------
-# GÓI 12 P4: gói nằm trong GATE_SPLIT_PKGS (mặc định: gt-driver, đơn vị 35 phút ở GÓI 11) được CHIA: mỗi mục tiêu `--lib`, `--bin X`, `--test Y`, `--doc` là một đơn vị
+# GÓI 12 P4: gói nằm trong GATE_SPLIT_PKGS (mặc định: gt-driver và gt-fmt — GÓI 14 A1: gt-fmt 892 s Windows / 1024 s Linux ở GÓI 13) được CHIA: mỗi mục tiêu `--lib`, `--bin X`, `--test Y`, `--doc` là một đơn vị
 # có điểm lưu riêng (`test:<gói>:<mục tiêu>`), in `secs=` từng đơn vị để biết bộ nào vượt 15 phút. Gói khác giữ một đơn vị/gói.
 test_unit() { # $1 = gói; $2 = nhãn (mặc định = gói); còn lại = đối số thêm cho `cargo test` (vd --test tên)
   local pkg="$1" label="${2:-$1}" t0; shift; [ $# -gt 0 ] && shift
@@ -184,7 +192,7 @@ if has test; then
     # thứ tự phụ thuộc: crate nhỏ trước; mỗi gói một đơn vị. Gói thật lấy từ `cargo metadata` để KHÔNG bỏ sót crate mới.
     PKGS=$(cargo metadata --no-deps --format-version 1 2>/dev/null | $PY -c "import sys,json; print(' '.join(p['name'] for p in json.load(sys.stdin)['packages']))")
     [ -n "$PKGS" ] || { echo "TEST_STAGE_INVALID: không liệt kê được gói"; red "giai đoạn test không hợp lệ"; }
-    SPLIT=" ${GATE_SPLIT_PKGS-gt-driver} "
+    SPLIT=" ${GATE_SPLIT_PKGS-gt-driver gt-fmt} "
     for p in $PKGS; do
       case "$SPLIT" in *" $p "*) split_unit "$p" ;; *) unit "test:$p" test_unit "$p" ;; esac
     done

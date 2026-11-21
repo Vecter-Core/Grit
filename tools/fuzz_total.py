@@ -81,11 +81,73 @@ def hashed_files(target):
     return [x for x in out.splitlines() if x]
 
 
+def last_session(target, path=LOG):
+    """Dòng log CUỐI của `target` (mọi trạng thái trừ `historical`), hoặc None."""
+    last = None
+    if os.path.exists(path):
+        for ln in open(path, encoding="utf-8"):
+            ln = ln.strip()
+            if ln.startswith("{"):
+                d = json.loads(ln)
+                if d.get("target") == target and d.get("status") != "historical":
+                    last = d
+    return last
+
+
+def failures(target, path=LOG):
+    """Các phiên `fail` của `target`."""
+    out = []
+    if os.path.exists(path):
+        for ln in open(path, encoding="utf-8"):
+            ln = ln.strip()
+            if ln.startswith("{"):
+                d = json.loads(ln)
+                if d.get("target") == target and d.get("status") == "fail":
+                    out.append(d)
+    return out
+
+
+def summary_text(hashes, path=LOG, now=None):
+    """GÓI 14 E1: MỘT màn hình cho Giang dán lại. `hashes` = {mục tiêu: băm nguồn hiện tại}. Ước tính đồng hồ treo tường, giả định mỗi mục tiêu chạy với tốc độ thật 1 giờ log/giờ đồng hồ
+    (tuần tự: hai phần xen kẽ nên tổng = thiếu_lex + thiếu_parse; song song: hai đồng hồ riêng nên = max). Đây là SUY RA, không phải đo."""
+    import datetime as _dt
+    now = now or _dt.datetime.now(_dt.timezone.utc)
+    lines = ["FUZZ_SUMMARY (băm nguồn HIỆN TẠI; chỉ phiên status=ok trên băm này mới tính)"]
+    missing = {}
+    for tg in ("lex", "parse"):
+        h = hashes[tg]
+        sec = seconds_on_hash(tg, h, path)
+        by = seconds_on_hash_by_source(tg, h, path)
+        miss = max(0.0, TARGET_HOURS - sec / 3600)
+        missing[tg] = miss
+        src = ", ".join(f"{k} {v / 3600:.2f} h" for k, v in sorted(by.items())) or "chưa có"
+        lines.append(f"  {tg:<5} băm {h}: có {sec / 3600:.2f} h / {TARGET_HOURS:.0f} h — CÒN THIẾU {miss:.2f} h   (theo nguồn: {src})")
+    for tg in ("lex", "parse"):
+        ls = last_session(tg, path)
+        if ls is None:
+            lines.append(f"  phiên cuối {tg}: chưa có")
+        else:
+            lines.append(f"  phiên cuối {tg}: {ls.get('ts')} status={ls.get('status')} {ls.get('seconds')} s exit={ls.get('exit')} nguồn={ls.get('source', 'windows')}")
+        fl = failures(tg, path)
+        if fl:
+            lines.append(f"  !! {tg}: {len(fl)} phiên LỖI (cuối: {fl[-1].get('ts')} exit={fl[-1].get('exit')}) — phải điều tra trước khi tin giờ tích luỹ")
+    seq, par = missing["lex"] + missing["parse"], max(missing.values())
+    fmt = lambda h: (now + _dt.timedelta(hours=h)).strftime("%Y-%m-%d %H:%M UTC")
+    if seq <= 0:
+        lines.append("  ĐỦ 24 giờ cả hai trên băm hiện tại (điều kiện #1 mới chỉ ĐỦ GIỜ; Giang tự đánh dấu)")
+    else:
+        lines.append(f"  ước tính (SUY RA): tuần tự còn {seq:.1f} h ⇒ xong ≈ {fmt(seq)}; song song (`--parallel`, cần RAM trống ≥ 10 GB, WSL: FUZZ_PAR_MIN_GB=6) còn {par:.1f} h ⇒ xong ≈ {fmt(par)}")
+    return chr(10).join(lines)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     if "--kind-done" in sys.argv:
         k = sys.argv[sys.argv.index("--kind-done") + 1]
         sys.exit(0 if seconds_on_hash(k, current_hash(k)) >= TARGET_HOURS * 3600 else 1)
+    if "--summary" in sys.argv:
+        print(summary_text({k: current_hash(k) for k in ("lex", "parse")}))
+        return
     if "--hash" in sys.argv:
         print(current_hash(sys.argv[sys.argv.index("--hash") + 1]))
         return

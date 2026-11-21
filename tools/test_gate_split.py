@@ -12,6 +12,11 @@ META = (
     '{"packages":[{"name":"pkgA","targets":[{"kind":["lib"],"name":"pkga"},{"kind":["test"],"name":"t1"},{"kind":["test"],"name":"t2"}]},'
     '{"name":"pkgB","targets":[{"kind":["lib"],"name":"pkgb"}]}]}'
 )
+META_DEFAULT = (
+    '{"packages":[{"name":"gt-fmt","targets":[{"kind":["lib"],"name":"gt_fmt"},{"kind":["test"],"name":"roundtrip"},{"kind":["test"],"name":"golden"}]},'
+    '{"name":"gt-driver","targets":[{"kind":["lib"],"name":"gt_driver"},{"kind":["test"],"name":"d1"}]},'
+    '{"name":"gt-other","targets":[{"kind":["lib"],"name":"gt_other"},{"kind":["test"],"name":"o1"}]}]}'
+)
 FAKE_CARGO = """#!/bin/sh
 case "$1" in
   metadata) cat <<'EOF'
@@ -56,10 +61,20 @@ class SplitTestUnits(unittest.TestCase):
             f.write(FAKE_CARGO.replace("@@META@@", META))
         os.chmod(os.path.join(self.bin, "cargo"), 0o755)  # Linux: PATH chỉ chạy tệp có bit thực thi (nếu thiếu, gate gọi cargo THẬT)
 
-    def run_gate(self, fail="-"):
+    def run_gate(self, fail="-", split="pkgA", solo=None, budget=None):
         env = {k: v for k, v in os.environ.items() if k not in ("GATE_RESET", "GATE_BUDGET_SEC", "GATE_FORCE_PREFLIGHT", "GATE_TEST_CMD")}
         sep = ";" if os.name == "nt" else ":"
-        env.update(GATE_STAGES="test", GATE_SPLIT_PKGS="pkgA", PYTHONIOENCODING="utf-8", FAKE_LOG=fwd(self.log), FAKE_FAIL=fail,
+        if split is None:  # mặc định của cổng (không đặt GATE_SPLIT_PKGS), meta của gói thật
+            env.pop("GATE_SPLIT_PKGS", None)
+            with open(os.path.join(self.bin, "cargo"), "w", encoding="utf-8", newline="\n") as f:
+                f.write(FAKE_CARGO.replace("@@META@@", META_DEFAULT))
+        else:
+            env["GATE_SPLIT_PKGS"] = split
+        if solo is not None:
+            env["GATE_SOLO_UNITS"] = solo
+        if budget is not None:
+            env["GATE_BUDGET_SEC"] = str(budget)
+        env.update(GATE_STAGES="test", PYTHONIOENCODING="utf-8", FAKE_LOG=fwd(self.log), FAKE_FAIL=fail,
                    PATH=fwd(self.bin) + sep + env.get("PATH", ""))
         script = fwd(os.path.join(ROOT, "tools", "gate.sh"))
         p = subprocess.run([BASH, script, fwd(self.repo)], cwd=self.repo, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -83,6 +98,39 @@ class SplitTestUnits(unittest.TestCase):
             self.assertIn("TEST_UNIT " + u + " ", out)
         self.assertIn("secs=", out)
         self.assertIn("TEST_PASSED=15 FAILED=0 SUITES=5", out)
+
+    def test_default_split_list_includes_gt_fmt_and_gt_driver_but_not_other_packages(self):
+        """GÓI 14 A1: gt-fmt chạy 892 s (Windows)/1024 s (Linux) như MỘT đơn vị ⇒ mặc định phải chia cả gt-fmt (và gt-driver); gói khác giữ một đơn vị."""
+        rc, out = self.run_gate(split=None)
+        self.assertEqual(rc, 0, out)
+        c = self.calls()
+        for u in ("gt-fmt:lib", "gt-fmt:roundtrip", "gt-fmt:golden", "gt-fmt:doc", "gt-driver:lib", "gt-driver:d1", "gt-driver:doc"):
+            self.assertIn("TEST_UNIT " + u + " ", out)
+        self.assertEqual(sum("-p gt-other" in x for x in c), 1, c)  # gói không nằm trong danh sách: MỘT lệnh, không `--test`
+        self.assertFalse(any("-p gt-other" in x and ("--test o1" in x or "--lib" in x) for x in c), c)
+        self.assertIn("TEST_UNIT gt-other ", out)
+
+    def test_solo_unit_runs_only_at_the_head_of_a_batch_and_is_deferred_otherwise(self):
+        """GÓI 14 A1: đơn vị dài chạy MỘT MÌNH (đo gt-fmt comments 929 s). Có ngân sách + không ở đầu lô ⇒ hoãn; lô sau nó chạy đầu lô."""
+        rc, out = self.run_gate(solo="test:pkgA:t2", budget=100000)
+        self.assertEqual(rc, 3, out)  # INCOMPLETE
+        self.assertIn("test:pkgA:t2: hoãn (đơn vị dài chạy MỘT MÌNH", out)
+        self.assertFalse(any("--test t2" in x for x in self.calls()), self.calls())
+        before = len(self.calls())
+        rc, out2 = self.run_gate(solo="test:pkgA:t2", budget=100000)
+        self.assertEqual(rc, 0, out2)  # lib/t1 ĐÃ ĐẠT ⇒ t2 là đơn vị đầu tiên chạy ở lô này
+        self.assertIn("test:pkgA:lib: ĐÃ ĐẠT", out2)
+        later = self.calls()[before:]
+        self.assertTrue(any("--test t2" in x for x in later), later)
+
+    def test_solo_unit_is_not_deferred_without_a_budget(self):
+        rc, out = self.run_gate(solo="test:pkgA:t2")
+        self.assertEqual(rc, 0, out)
+        self.assertTrue(any("--test t2" in x for x in self.calls()), self.calls())
+
+    def test_default_solo_unit_is_gt_fmt_comments(self):
+        with open(os.path.join(ROOT, "tools", "gate.sh"), encoding="utf-8") as f:
+            self.assertIn("test:gt-fmt:comments", f.read())
 
     def test_unchanged_tree_reuses_every_target_and_changed_tree_reruns_all(self):
         self.run_gate()
