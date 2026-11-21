@@ -70,85 +70,9 @@ fn codes(o: &gt_oblig::driver::OblOutput) -> Vec<String> {
         .collect()
 }
 
-#[test]
-fn every_pass_case_has_no_obligation_errors() {
-    let (mut n, mut obs, mut disch, mut kept) = (0, 0, 0, 0);
-    let mut bad = vec![];
-    for p in entries("pass") {
-        if p.extension().is_some_and(|x| x != "gt") {
-            continue;
-        }
-        n += 1;
-        let (o, _t) =
-            run_all(&p).unwrap_or_else(|| panic!("{}: mẫu pass phải qua M4/M5", name(&p)));
-        let errs: Vec<String> = codes(&o)
-            .into_iter()
-            .filter(|c| c.starts_with('E'))
-            .collect();
-        if !errs.is_empty() {
-            bad.push(format!("{}: {:?}", name(&p), errs));
-        }
-        obs += o.stats.obligations;
-        disch += o.stats.discharged;
-        kept += o.stats.lowered;
-    }
-    eprintln!("pass: {n} ca, {obs} nghĩa vụ, {disch} xoá, {kept} giữ");
-    assert!(n >= 70, "chỉ {n} ca pass");
-    assert!(bad.is_empty(), "{}", bad.join("\n"));
-}
-
 const OWNED: &[&str] = &[
     "E0601", "E0602", "E0603", "E0604", "E0901", "E0902", "E1001",
 ];
-
-#[test]
-fn fail_cases_of_m7_give_exactly_their_code() {
-    let mut owned = 0;
-    for p in entries("fail") {
-        let n = name(&p);
-        let Some(code) = OWNED.iter().find(|c| n.starts_with(&format!("{c}_"))) else {
-            continue;
-        };
-        owned += 1;
-        let Some((o, _t)) = run_all(&p) else {
-            panic!("{n}: phải qua M4/M5")
-        };
-        let errs: Vec<String> = codes(&o)
-            .into_iter()
-            .filter(|c| c.starts_with('E'))
-            .collect();
-        assert!(
-            !errs.is_empty() && errs.iter().all(|c| c == code),
-            "{n}: kỳ vọng chỉ {code}, có {errs:?}"
-        );
-    }
-    assert!(owned >= 20, "chỉ {owned} mẫu thuộc M7");
-}
-
-#[test]
-#[ignore = "công cụ gỡ lỗi: in các check được giữ trên corpus, không khẳng định gì"]
-fn dump_kept() {
-    for p in entries("pass") {
-        if p.extension().is_some_and(|x| x != "gt") {
-            continue;
-        }
-        let Some((o, _)) = run_all(&p) else { continue };
-        for r in &o.per_body {
-            for j in &r.judged {
-                if matches!(j.status, gt_oblig::analysis::Status::Lowered { .. }) {
-                    eprintln!(
-                        "{} {} {} goal={} hyps={:?}",
-                        name(&p),
-                        j.ob.id,
-                        j.ob.kind.name(),
-                        j.ob.goal.to_text(),
-                        j.ob.hyps.iter().map(|h| h.to_text()).collect::<Vec<_>>()
-                    );
-                }
-            }
-        }
-    }
-}
 
 const NOTE_CODES: &[&str] = &[
     "N0601", "N0602", "N0603", "N0604", "N0605", "N0901", "N0902", "N0903", "N0904",

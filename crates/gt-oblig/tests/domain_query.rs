@@ -157,33 +157,3 @@ fn unreachable_points_are_none() {
     assert!(reachable >= 1);
     assert!(unreachable + reachable == b.blocks.len());
 }
-
-#[test]
-#[ignore = "công cụ gỡ lỗi: in miền cho nguồn GT_SRC, không khẳng định gì"]
-fn dump_domain() {
-    let src = std::env::var("GT_SRC").expect("GT_SRC");
-    let (t, m) = common::mir(&src);
-    let info = build_prog_info(&t, &m);
-    let b = m.bodies.iter().find(|b| b.key == "main::f").expect("f");
-    let q = DomainQuery::new(b, &info).expect("phân tích");
-    let (i, n) = (local(b, "i").0, local(b, "n").0);
-    let d = Term::Sub(Box::new(Term::Var(i)), Box::new(Term::Var(n)));
-    for (bi, blk) in b.blocks.iter().enumerate() {
-        for s in 0..=blk.statements.len() {
-            let l = Location {
-                block: gt_mir::BasicBlock(bi as u32),
-                statement: s,
-            };
-            if let Some(iv) = q.interval_at(l, &Term::Var(i)) {
-                let dv = q.interval_at(l, &d).expect("cùng điểm");
-                eprintln!("bb{bi}:{s} i={:?} i-n={:?}", bounds(&iv), bounds(&dv));
-                if s == blk.statements.len() {
-                    eprintln!(
-                        "bb{bi}: term {:?}",
-                        blk.terminator.as_ref().map(|t| &t.kind)
-                    );
-                }
-            }
-        }
-    }
-}

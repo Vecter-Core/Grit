@@ -220,29 +220,6 @@ fn a_function_used_as_a_value_never_gets_its_precondition_assumed() {
 }
 
 #[test]
-#[ignore = "công cụ gỡ lỗi: in hợp đồng MIR, không khẳng định gì"]
-fn dump_contract() {
-    let (t, m) = common::mir(&format!("{POS}ƒ f() → i32 ! ∅ {{ pos(5) }}\n"));
-    for b in &m.bodies {
-        eprintln!("{}", common::text(&t, &m, &b.key));
-    }
-    let info = gt_oblig::driver::build_prog_info(&t, &m);
-    eprintln!("{:#?}", info.pre);
-    let o = analyze_program(&t, &m, &mut ZoneProver::new(24));
-    for r in &o.per_body {
-        for j in &r.judged {
-            eprintln!(
-                "{} {:?} goal={} hyps={:?}",
-                j.ob.id,
-                j.status,
-                j.ob.goal.to_text(),
-                j.ob.hyps.iter().map(|h| h.to_text()).collect::<Vec<_>>()
-            );
-        }
-    }
-}
-
-#[test]
 fn unbounded_quantifier_is_red_e0902() {
     let src = "ƒ f(r: Range<i32>) → i32 ! ∅ ⊳ ∀ i ∈ r : i >= 0 { 1 }\n";
     let (_t, _m, o) = pipeline(src);

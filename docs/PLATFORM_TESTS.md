@@ -25,12 +25,6 @@
 | `crates/gt-driver/tests/llvm_diff_bits.rs::batch` | theo lô bằng `GT_BITS_START/COUNT/OUT` |
 | `crates/gt-driver/tests/llvm_diff_gtv.rs::batch` | theo lô bằng `GT_GTV_START/COUNT/OUT` |
 | `crates/gt-driver/tests/llvm_diff_refpat.rs::batch` | theo lô bằng `GT_DIFF_START/COUNT/OUT` |
-| `crates/gt-oblig/tests/contracts.rs::dump_contract` | công cụ gỡ lỗi: in hợp đồng MIR; không khẳng định gì |
-| `crates/gt-oblig/tests/corpus.rs::dump_kept` | công cụ gỡ lỗi: in các check được giữ trên corpus |
-| `crates/gt-oblig/tests/decisions.rs::dump_one` | công cụ gỡ lỗi: in quyết định cho nguồn `GT_SRC` |
-| `crates/gt-oblig/tests/domain_query.rs::dump_domain` | công cụ gỡ lỗi: in miền cho nguồn `GT_SRC` |
-| `crates/gt-oblig/tests/oracle.rs::probe_alias_scenario` | thăm dò thủ công kịch bản alias (không khẳng định) |
-| `crates/gt-term/tests/termination.rs::dump_term` | công cụ gỡ lỗi: in kết quả chứng minh dừng cho `GT_SRC` |
 | `crates/rig/tests/dogfood_sortlines.rs::perf_report_against_rust_sort_by` | đo hiệu năng: `--ignored --nocapture` |
 | `crates/rig/tests/dogfood_stats.rs::perf_report_against_rust` | đo hiệu năng: `--ignored --nocapture` |
 | `crates/rig/tests/dogfood_wordfreq.rs::perf_report_against_rust` | đo hiệu năng: `--ignored --nocapture` |

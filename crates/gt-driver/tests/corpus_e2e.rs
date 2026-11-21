@@ -5,15 +5,17 @@
 //! * `pass`     ⇒ phán quyết XANH (không lỗi, không cảnh báo);
 //! * `fail Exxx` ⇒ phán quyết ĐỎ và tập mã mức "error" là ĐÚNG `{Exxx}` (không thiếu, không thừa mã khác);
 //! * `warn Sxxx` ⇒ phán quyết VÀNG (cổng vẫn mở, mã thoát 0) và có cảnh báo `Sxxx`, không có lỗi.
+//!
 //! Tệp đơn được chép thành `main.gt` (tên tệp = tên module, mẫu dùng `main::…`); ca nhiều tệp được chạy nguyên thư mục.
 //!
-//! Thay cho chín bộ `corpus.rs` theo crate (mỗi bộ chỉ chạy một phần pipeline qua API riêng). Mẫu mới chỉ cần thêm tệp `.gt`, không viết Rust.
+//! Thay cho sáu bộ corpus theo crate (gt-types, gt-mir, gt-resolve, gt-term, và phần trùng của gt-oblig, gt-parser, gate.rs; mỗi bộ chỉ chạy một phần pipeline
+//! qua API riêng). GIỮ `gt-borrowck/tests/corpus.rs` và `gt-dataflow/tests/corpus.rs` vì chúng khẳng định điều nội bộ mà CLI không thấy. Mẫu mới chỉ cần thêm tệp `.gt`, không viết Rust.
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Mẫu mà chương trình thật sự kích hoạt THÊM một lỗi đúng của pass khác (không phải lỗi của gritc). Bảng phải NGẮN: thêm mục = phải nêu lý do.
 /// Cách sửa gốc là viết lại mẫu cho tối thiểu; chưa làm vì golden `tests/golden/borrowck/diagnostics.txt` đang ghim vị trí của chúng.
@@ -63,7 +65,11 @@ fn cases() -> Vec<Case> {
             .collect();
         ents.sort();
         for path in ents {
-            let name = path.file_name().expect("tên").to_string_lossy().into_owned();
+            let name = path
+                .file_name()
+                .expect("tên")
+                .to_string_lossy()
+                .into_owned();
             let expect =
                 expect_of(&path).unwrap_or_else(|| panic!("{kind}/{name}: thiếu dòng expect"));
             v.push(Case {
@@ -144,7 +150,10 @@ fn judge(c: &Case, o: &Outcome) -> Result<(), String> {
             }
         }
         ("warn", Some(code)) => {
-            if o.verdict != "yellow" || o.exit != 0 || !o.errors.is_empty() || !o.warns.contains(code)
+            if o.verdict != "yellow"
+                || o.exit != 0
+                || !o.errors.is_empty()
+                || !o.warns.contains(code)
             {
                 return Err(format!(
                     "kỳ vọng VÀNG có {code}, nhận phán quyết {} (mã thoát {}), lỗi {:?}, cảnh báo {:?}",
@@ -188,7 +197,9 @@ fn every_corpus_sample_gets_exactly_its_expected_verdict_from_the_real_gritc() {
                     };
                     let r = run_gritc(&target).and_then(|o| judge(c, &o));
                     if let Err(e) = r {
-                        bad.lock().expect("khoá").push(format!("{}/{}: {e}", c.kind, c.name));
+                        bad.lock()
+                            .expect("khoá")
+                            .push(format!("{}/{}: {e}", c.kind, c.name));
                     }
                 }
             });

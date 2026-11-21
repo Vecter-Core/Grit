@@ -423,36 +423,3 @@ fn pruned_programs_behave_exactly_like_fully_checked_ones() {
         cov.compared
     );
 }
-
-#[test]
-#[ignore = "thăm dò thủ công kịch bản alias, không khẳng định gì"]
-fn probe_alias_scenario() {
-    let mut shown = 0;
-    let mut with = 0;
-    for seed in 1..=300u64 {
-        let mut g = obgen::OGen::new(seed);
-        let p = g.program();
-        if !p.src.contains("al0 ≔ xs") {
-            continue;
-        }
-        with += 1;
-        if shown < 2 {
-            shown += 1;
-            eprintln!("--- seed {seed}\n{}", p.src);
-            let t = common::run(&[("main.gt", p.src.as_str())]);
-            let m = gt_mir::lower_program(&t);
-            let o = analyze_program(&t, &m, &mut ZoneProver::new(24));
-            for r in &o.per_body {
-                for j in &r.judged {
-                    eprintln!(
-                        "  {} {} {}",
-                        j.ob.id,
-                        j.ob.kind.name(),
-                        status_name(&j.status)
-                    );
-                }
-            }
-        }
-    }
-    eprintln!("chương trình có kịch bản: {with}/300");
-}

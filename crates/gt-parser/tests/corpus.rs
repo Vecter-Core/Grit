@@ -1,110 +1,11 @@
-//! Chạy parser THẬT trên corpus `tests/`: 30 file pass phải parse không lỗi; file fail thuộc phạm vi parser phải ra ĐÚNG mã;
-//! file fail thuộc milestone sau (kiểu, borrow, …) phải PARSE ĐƯỢC (parser không báo thay phần của milestone sau).
+//! Hai bề mặt (canonical Unicode và alias ASCII) cho CÙNG AST, và trivia đi kèm AST. Việc "mọi mẫu corpus pass/fail đúng mã" đã chuyển sang
+//! `crates/gt-driver/tests/corpus_e2e.rs` (GÓI 12): E2E qua `gritc`, không phụ thuộc API parser.
 mod common;
 use common::*;
-use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
-
-fn files(sub: &str) -> Vec<PathBuf> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests")
-        .join(sub);
-    let mut v: Vec<PathBuf> = std::fs::read_dir(&root)
-        .unwrap_or_else(|e| panic!("{}: {e}", root.display()))
-        .map(|e| e.expect("entry").path())
-        .filter(|p| p.extension().is_some_and(|x| x == "gt"))
-        .collect();
-    v.sort();
-    assert!(!v.is_empty());
-    v
-}
+use std::path::Path;
 
 fn read(p: &Path) -> String {
     std::fs::read_to_string(p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))
-}
-
-fn name(p: &Path) -> String {
-    p.file_name().expect("tên").to_string_lossy().into_owned()
-}
-
-#[test]
-fn all_pass_files_parse_without_any_diagnostic() {
-    let list = files("pass");
-    assert!(list.len() >= 30, "corpus pass có {} file", list.len());
-    let mut failures = vec![];
-    for p in &list {
-        let out = parse_src(&read(p));
-        if !out.report.diagnostics.is_empty() {
-            let d = &out.report.diagnostics[0];
-            failures.push(format!(
-                "{}: {} {} @{}..{}",
-                name(p),
-                d.code,
-                d.message,
-                d.span.start,
-                d.span.end
-            ));
-        }
-    }
-    assert!(
-        failures.is_empty(),
-        "file pass bị parser chặn:\n{}",
-        failures.join("\n")
-    );
-}
-
-#[test]
-fn warn_files_parse_without_diagnostic() {
-    for p in files("warn") {
-        let out = parse_src(&read(&p));
-        assert!(
-            out.report.diagnostics.is_empty(),
-            "{}: {:?}",
-            name(&p),
-            out.report.diagnostics
-        );
-    }
-}
-
-/// Mã mà tầng lexer+parser sở hữu. Mọi mã khác thuộc milestone sau.
-const OWNED: &[&str] = &["E0101", "E0102", "E1201", "E1202", "E1203", "E1204"];
-
-#[test]
-fn fail_files_get_exactly_the_expected_code_from_the_parser_or_parse_cleanly() {
-    let mut failures = vec![];
-    let mut owned_checked = 0;
-    let mut later_checked = 0;
-    for p in files("fail") {
-        let src = read(&p);
-        let header = src.lines().next().unwrap_or_default().to_string();
-        let expected = header
-            .split_whitespace()
-            .nth(3)
-            .unwrap_or_default()
-            .to_string();
-        let out = parse_src(&src);
-        let got: BTreeSet<String> = codes(&out).into_iter().collect();
-        if OWNED.contains(&expected.as_str()) {
-            owned_checked += 1;
-            if got != BTreeSet::from([expected.clone()]) {
-                failures.push(format!("{}: mong đợi {{{expected}}}, có {got:?}", name(&p)));
-            }
-        } else {
-            later_checked += 1;
-            if !got.is_empty() {
-                failures.push(format!(
-                    "{}: thuộc milestone sau ({expected}) nhưng parser báo {got:?}: {:?}",
-                    name(&p),
-                    out.report.diagnostics[0].message
-                ));
-            }
-        }
-    }
-    assert!(failures.is_empty(), "\n{}", failures.join("\n"));
-    assert!(
-        owned_checked >= 15 && later_checked >= 20,
-        "owned {owned_checked}, later {later_checked}"
-    );
 }
 
 /// Hai bề mặt cho cùng AST (không tính vị trí): ASCII alias và canonical.
