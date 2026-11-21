@@ -35,6 +35,10 @@ const KINDS_F64: [&str; 3] = ["f64_arith", "f64_cmp", "f64_conv"];
 /// loại kiểm PHÁN QUYẾT M8 (GT_GTV_SET=term): đồ thị dừng qua impl generic/hai trait, kỳ vọng từ bảng impl của bộ sinh
 const KINDS_TERM: [&str; 1] = ["term_graph"];
 
+/// GÓI 14 B1: loại ĐỌC `□`/`■` (`GT_GTV_SET=const`): literal, biểu thức giữa các hằng, initializer gọi hàm, chuỗi static đọc qua hàm. Ba nguồn: mô hình số học u64 bao quanh của bộ sinh,
+/// thông dịch (nay đọc được hằng — trước đây ICE mã 2) và exe LLVM.
+const KINDS_CONST: [&str; 4] = ["const_lit", "const_expr", "const_fn", "static_chain"];
+
 const KINDS: [&str; 7] = [
     "generic_unbounded",
     "bound_call",
@@ -1274,6 +1278,72 @@ fn gen_f64_arith(rng: &mut Rng) -> (String, Want) {
     )
 }
 
+/// GÓI 14 B1: chương trình đọc hằng/static; mô hình = số học u64 bao quanh tính thẳng trong bộ sinh (không qua gt-types/gt-mir)
+fn gen_const(kind: &str, rng: &mut Rng) -> (String, Want) {
+    let is_static = kind == "static_chain";
+    let (kw, nm) = if is_static { ("■", "S") } else { ("□", "C") };
+    let n = 2 + rng.below(4) as usize;
+    let nf = 1 + rng.below(3) as usize;
+    let fns: Vec<(u64, u64)> = (0..nf).map(|_| (rng.below(9) + 1, rng.below(50))).collect();
+    let mut src = String::new();
+    for (k, (m, a)) in fns.iter().enumerate() {
+        src.push_str(&format!("ƒ f{k}(x: u64) → u64 ! ∅ {{ x *% {m}u64 +% {a}u64 }}
+"));
+    }
+    let mut vals: Vec<u64> = Vec::new();
+    for i in 0..n {
+        let lit = rng.below(1_000_000_007);
+        let (expr, v) = if i == 0 || kind == "const_lit" {
+            (format!("{lit}u64"), lit)
+        } else {
+            let a = rng.below(i as u64) as usize;
+            let b = rng.below(i as u64) as usize;
+            match (kind, rng.below(3)) {
+                ("const_fn", _) | ("static_chain", 2) => {
+                    let k = rng.below(nf as u64) as usize;
+                    let (m, ad) = fns[k];
+                    if rng.chance(50) {
+                        (format!("f{k}({nm}{a})"), vals[a].wrapping_mul(m).wrapping_add(ad))
+                    } else {
+                        (format!("f{k}({lit}u64)"), lit.wrapping_mul(m).wrapping_add(ad))
+                    }
+                }
+                (_, 0) => (format!("{nm}{a} +% {nm}{b}"), vals[a].wrapping_add(vals[b])),
+                (_, 1) => (format!("{nm}{a} *% {nm}{b}"), vals[a].wrapping_mul(vals[b])),
+                _ => (format!("{nm}{a} +% {lit}u64"), vals[a].wrapping_add(lit)),
+            }
+        };
+        src.push_str(&format!("{kw} {nm}{i}: u64 ≔ {expr};
+"));
+        vals.push(v);
+    }
+    let reads = 2 + rng.below(5) as usize;
+    let mut body = String::from("  μh ≔ 0u64;
+");
+    let mut h = 0u64;
+    for _ in 0..reads {
+        let i = rng.below(n as u64) as usize;
+        if is_static && rng.chance(50) {
+            // đọc static qua một hàm (đọc trong thân hàm, không phải trong main)
+            src.push_str(&format!("ƒ rd{i}() → u64 ! ∅ {{ {nm}{i} +% 0u64 }}
+"));
+            body.push_str(&format!("  h ← h *% 1000003u64 +% rd{i}();
+"));
+        } else {
+            body.push_str(&format!("  h ← h *% 1000003u64 +% {nm}{i};
+"));
+        }
+        h = h.wrapping_mul(1_000_003).wrapping_add(vals[i]);
+    }
+    (
+        format!("{src}ƒ main() → u64 ! ∅ {{
+{body}  h
+}}
+"),
+        Ok(h.to_string()),
+    )
+}
+
 fn gen_f64_cmp(rng: &mut Rng) -> (String, Want) {
     let n = 2 + rng.below(6) as usize;
     let mut body = String::from("  μh ≔ 0u64;\n");
@@ -1536,6 +1606,7 @@ fn run_one(kind: &'static str, seed: u64, t: &mut Tally, dir: &std::path::Path) 
         "text_build" => gen_text_build(&mut rng),
         "text_utf8" => gen_text_utf8(&mut rng),
         "text_slice" => gen_text_slice(&mut rng),
+        "const_lit" | "const_expr" | "const_fn" | "static_chain" => gen_const(kind, &mut rng),
         k => gen_generic(k, &mut rng),
     };
     let mut inputs = vec![SourceInput {
@@ -1647,6 +1718,8 @@ fn run_batch(start: u64, count: u64) -> Tally {
             &KINDS_TEXT
         } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "f64") {
             &KINDS_F64
+        } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "const") {
+            &KINDS_CONST
         } else {
             &KINDS
         };
@@ -1682,6 +1755,8 @@ fn batch() {
         } else {
             "generic-trait-vec-term"
         }
+    } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "const") {
+        "generic-trait-vec-const"
     } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "f64") {
         "generic-trait-vec-f64"
     } else if std::env::var("GT_GTV_SET").is_ok_and(|v| v == "text") {
@@ -1750,6 +1825,23 @@ fn tiny_f64_batch() {
     assert_eq!(t.mismatch, 0, "bất đồng: {:#?}", t.detail);
     let compared: u64 = t.compared.values().sum();
     assert!(compared >= 12, "quá ít chương trình f64: {}", summary(&t));
+}
+
+/// GÓI 14 B1: lô nhỏ cố định cho đọc `□`/`■`: 4 loại × 6 chương trình khớp mô hình độc lập của bộ sinh ở CẢ thông dịch và LLVM
+#[test]
+fn tiny_const_batch() {
+    let dir = std::env::temp_dir().join(format!("gt-gtv-const-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("tạo");
+    let mut t = Tally::default();
+    for s in 1..=6u64 {
+        for k in KINDS_CONST {
+            run_one(k, s, &mut t, &dir);
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(t.mismatch, 0, "bất đồng: {:#?}", t.detail);
+    let compared: u64 = t.compared.values().sum();
+    assert!(compared >= 20, "quá ít chương trình đọc hằng: {}", summary(&t));
 }
 
 /// lô nhỏ cố định cho PHÁN QUYẾT M8 theo đồ thị instance (cổng đầy đủ + đột biến gt-term): 30 chương trình `term_graph`, cả có và không có

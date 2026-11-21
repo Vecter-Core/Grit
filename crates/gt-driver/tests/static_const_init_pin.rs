@@ -1,8 +1,8 @@
 //! GÓI 12 P3.c — GHIM hành vi hiện tại của khởi tạo `■` (static) và `□` (hằng) có initializer không phải literal, ở cả hai backend (mã thoát + thông báo).
-//! Đây là bản ghi hành vi ĐO ĐƯỢC (2026-11-20, gritc 1.0.0-rc8 dev), KHÔNG phải tuyên bố hành vi đúng:
+//! Đây là bản ghi hành vi ĐO ĐƯỢC (gritc 1.0.0-rc8 dev; cập nhật GÓI 14 B1), KHÔNG phải tuyên bố hành vi đúng:
 //!  - vòng khởi tạo `■` (qua hàm): `check` XANH (mục 8/12 NEXT_PRODUCT_BATCH, chờ ADR mã lỗi mới); LLVM từ chối (`build`/`run` mã 3, KHÔNG sinh exe);
-//!    thông dịch báo "lỗi nội bộ" (ICE, mã 2) — với chương trình người dùng đây là ICE chứ không phải chẩn đoán;
-//!  - `■`/`□` KHÔNG vòng, initializer gọi hàm: LLVM chạy đúng; thông dịch cũng ICE ("hằng ngoài phạm vi thông dịch") — hạn chế của backend interpreter;
+//!    thông dịch (từ GÓI 14 B1) cũng từ chối: "chưa hỗ trợ ... vòng khởi tạo", mã 3 — KHÔNG còn lỗi nội bộ (mã 2) như GÓI 12/13;
+//!  - `■`/`□` KHÔNG vòng, initializer gọi hàm: LLVM chạy đúng; thông dịch (từ GÓI 14 B1) cũng chạy đúng (trước đó ICE "hằng ngoài phạm vi thông dịch", mã 2);
 //!  - vòng `□` (FB-C36): `check` ĐỎ E0703 (mã thoát 1), không có exe.
 //!
 //! Khi sửa theo NEXT_PRODUCT_BATCH #12 (check đỏ cho vòng `■`), test `static_cycles_*` PHẢI đổi — đó là chủ ý của việc ghim.
@@ -43,27 +43,34 @@ fn check_green(src: &str, tag: &str) {
     assert_eq!(c, 0, "check phải XANH (hành vi ghim): {t}");
 }
 
-fn interp_ice(src: &str, tag: &str) {
+fn interp_refuses_cycle(src: &str, tag: &str) {
     let (c, t) = gritc(&["run", "--backend=interpreter"], src, tag);
-    assert_eq!(c, 2, "thông dịch phải ICE (mã 2): {t}");
-    assert!(t.contains("lỗi nội bộ khi chạy"), "{t}");
-    assert!(t.contains("hằng ngoài phạm vi thông dịch"), "{t}");
+    assert_eq!(c, 3, "thông dịch phải từ chối vòng static (mã 3), không ICE: {t}");
+    assert!(t.contains("chưa hỗ trợ"), "{t}");
+    assert!(t.contains("vòng khởi tạo"), "{t}");
+    assert!(!t.contains("lỗi nội bộ"), "{t}");
+}
+
+fn interp_runs(src: &str, tag: &str) {
+    let (c, t) = gritc(&["run", "--backend=interpreter"], src, tag);
+    assert_eq!(c, 0, "thông dịch phải chạy được: {t}");
+    assert!(t.contains("main trả về 0"), "{t}");
 }
 
 #[test]
-fn static_cycles_check_green_interpreter_ice() {
+fn static_cycles_check_green_interpreter_refuses_with_exit_3() {
     for (s, tag) in [
         (S_CYCLE_F, "sc1"),
         (S_CYCLE_DEEP, "sc2"),
         (S_CYCLE_MUTUAL, "sc3"),
     ] {
         check_green(s, tag);
-        interp_ice(s, tag);
+        interp_refuses_cycle(s, tag);
     }
 }
 
 #[test]
-fn acyclic_static_and_const_initialisers_check_green_interpreter_ice() {
+fn acyclic_static_and_const_initialisers_check_green_and_run_on_the_interpreter() {
     for (s, tag) in [
         (S_OK, "ok1"),
         (S_OK2, "ok2"),
@@ -73,7 +80,7 @@ fn acyclic_static_and_const_initialisers_check_green_interpreter_ice() {
         (C_OK3, "ok6"),
     ] {
         check_green(s, tag);
-        interp_ice(s, tag);
+        interp_runs(s, tag);
     }
 }
 
