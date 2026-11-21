@@ -51,3 +51,4 @@ tests/pass/E0203_ok_rest_skips_private_field.gt	gt-resolve
 tests/pass/E0316_ok_in_invariant.gt	gt-types
 tests/pass/E0316_ok_in_post.gt	gt-types
 tests/pass/E0316_ok_in_pre.gt	gt-types
+tests/fail/E0301_expected_type_mismatch_generic_return.gt	gt-types

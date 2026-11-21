@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: GÓI 14 D2 (nhóm D, call.rs:512 hướng false): kiểu mong đợi `u32` KHÔNG hợp nhất được với kiểu kết quả `Option<_>` của hàm generic ⇒ không gợi ý ngược, rồi E0301 (không suy ra được kiểu + sai kiểu)
+ƒ mk<T>() → Option<T> ! ∅ { None }
+ƒ main() → i32 ! ∅ { a: u32 ≔ mk(); 0 }

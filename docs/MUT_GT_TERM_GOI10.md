@@ -87,3 +87,18 @@ dòng  suite đúng/sai   corpus đúng/sai   phân loại (hướng)
 | 515 | `if ra != rb` → luôn đúng | tương đương | `parent[rb]=ra` khi `ra==rb` là gán lại gốc cho chính nó (toán) |
 | 562, 630 (`&&→\|\|`) | thêm cạnh gián tiếp | **chặt thêm** | mutant từ chối nhiều hơn; không làm mất an toàn; chưa có test (cần chương trình `spawn` có hiệu ứng) |
 - **Mục tiêu "0 con theo hướng chấp-nhận-thêm mà không có test hay lập luận CÓ ĐO": ĐẠT ở mức ĐO** (mọi con chấp-nhận-thêm còn lại có 0 lần chạy trên 996 chương trình + suite, kèm bất biến được kiểm). Hạn chế: "0 lần" không chứng minh không tới được; dòng 319/324/368/392 chỉ dựa vào so sánh số nút. Dòng 559/576/671 của bảng cũ nay là 567/584/699 (+687): đã có lập luận trên.
+
+
+## GÓI 14 D1 (2026-11-21, Windows; nguồn 100% tự động; `docs/MUT_GT_TERM_G14.jsonl`, số dòng của `lib.rs` sau GÓI 14 B2)
+Chạy lại các con còn sống bằng `mut_range --only-survivors docs/MUT_GT_TERM_G13.jsonl` với `GRIT_MUT_LINES` (1 worker; bộ test = bộ GÓI 13 + `survivors_g14`, `survivors_g14_fallback`). Test mới: `survivors_g14.rs` (7 test: hàm đệ quy KHÔNG được gọi vẫn bị E0703; đệ quy generic qua giá trị hàm gán biến/đối số; generic chỉ có mặt như giá trị), `survivors_g14_fallback.rs` (`spawn(w, 5u64)` không lùi về đồ thị bảo thủ). Mọi test XANH trên mã gốc.
+| dòng (lib.rs) | đột biến | kết quả GÓI 14 | ghi chú |
+|---|---|---|---|
+| 319 | `if fn_params(b.node).is_empty()` → `false` | SỐNG | **TƯƠNG ĐƯƠNG (ĐO)**: vòng gieo gốc dư thừa — `t.instances` đã chứa mọi hàm không generic; hàm đệ quy KHÔNG được gọi vẫn bị bắt khi tắt dòng này |
+| 319 | → `true` | bị bắt | |
+| 324 | `if by_node.contains_key(&i.node)` → `true`/`false`/phủ định (3 con) | SỐNG | chưa giết sau 2 lần (GÓI 13: chỉ so số nút đồ thị; GÓI 14: không dựng được chương trình mà phán quyết phụ thuộc — instance không thân chỉ chiếm chỗ trong giới hạn đồ thị) |
+| 368 | xoá `ops.push(o)` (phát hiện instance của hằng hàm trong `Use`/`Cast`/`Repeat`) | SỐNG | 4 chương trình (đệ quy generic qua `h ≔ g`, qua `ap(g, …)`, generic chỉ xuất hiện như giá trị) đều vẫn bị bắt nhờ đường khác (tập `escaped`/giá trị hàm) ⇒ chưa có chương trình phụ thuộc đúng dòng này |
+| 400 (cũ 392) | xoá `ops.extend(cargs.iter())` | SỐNG | như 368 |
+| 570 (cũ 562) | `Operand::Const(_) => false` → `true` | **bị bắt** | `survivors_g14_fallback` |
+| 638 (cũ 630) | `if dyn_arg && takes_fn_param(..)` → `true` / `false` | bị bắt (cả hai) | bộ test hiện hành (chưa tách test nào) |
+| 638 | `&&` → `||` | SỐNG | cần `dyn_arg` đúng mà `takes_fn_param` sai (intrinsic không có tham số hàm nhận giá trị hàm) — chưa dựng được |
+Kết quả: 11 đột biến chạy (1 `invalid` do Defender chặn exe, chạy lại ⇒ SỐNG): **4 bị bắt, 7 sống**. Trong số 21 con còn sống sau GÓI 13, **2 con được giết** (570; 638 `condition → true`) ⇒ **≈ 19 còn sống** (chưa chạy lại toàn bộ 110; số 19 là SUY RA từ danh sách con mục tiêu). Con không giết được sau 2 lần (324×3, 368, 400, 638 `&&→||`, và 319 `→false` tương đương) ghi ở `KNOWN_LIMITATIONS.md` mục "false negative tiềm ẩn". Dòng 562 ở D1(ii): ĐÃ có test.
