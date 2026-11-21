@@ -1,0 +1,4 @@
+// expect: fail E0702
+// note: giết đột biến "bỏ điều kiện a ≥ 0" của luật chia (ADR-C16): với x âm, `x / 2 > x` (chia cắt về 0), nên `x ← x / 2; x ← x - 1` KHÔNG giảm (−3 → −2 → −2 → …) dù biến thể bị chặn dưới
+ƒ f(n: i32) → i32 ! ∅ { μx ≔ n; ⟳ x > -100i32 ↓ x + 100i32 { x ← x / 2i32; x ← x - 1i32; } x }
+ƒ main() ! ∅ { f(-3i32); }

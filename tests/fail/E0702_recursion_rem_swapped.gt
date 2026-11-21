@@ -1,0 +1,4 @@
+// expect: fail E0702
+// note: đệ quy truyền `a` (không phải `a % b`) vào vị trí của biến thể: không giảm
+ƒ g(a: u32, b: u32) → u32 ! ∅ ↓ b { ⎇ b == 0u32 { a } ⇝ { g(b, a) } }
+ƒ main() ! ∅ { g(4u32, 6u32); }

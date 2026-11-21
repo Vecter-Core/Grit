@@ -100,7 +100,8 @@ impl LGen {
             if cond.contains('<') {
                 0
             } else if cond.contains('>') {
-                40
+                // GÓI 12: đi xuống bằng TRỪ hoặc bằng CHIA (`/`, `%` hằng) — phủ luật quan hệ chia/dư của bộ chứng minh (ADR-C16)
+                if self.rng.chance(75) { 40 } else { 93 }
             } else {
                 step_kind
             }
@@ -123,6 +124,9 @@ impl LGen {
                 "{i} ← {};",
                 vars[self.rng.below(vars.len() as u64) as usize]
             ),
+            // GÓI 12: chia cho 1..=3 (chia 1 không giảm; kẹt ở 0 nếu điều kiện cho phép 0; số âm TĂNG khi chia cắt về 0)
+            93..=96 => format!("{i} ← {i} / {};", self.lit(c)),
+            97..=98 => format!("{i} ← {i} % {};", self.lit(1 + c)),
             _ => format!("{i} ← {i} + {};", self.lit(0)),
         };
         let variant = match self.rng.below(10) {

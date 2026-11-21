@@ -380,9 +380,9 @@ Quên `↓` là E0703:
 
 ### Khi bộ kiểm chưa chứng minh được
 
-Compiler **sound nhưng không complete**: nó có thể từ chối chương trình đúng. Thuật toán Euclid dừng vì `a % b < b`, nhưng bộ giải của Grit hiện không biết điều đó, nên `↓ b` bị từ chối:
+Bộ giải biết các bất đẳng thức của phép chia và phép dư (GÓI 12, ADR-C16): với `a ≥ 0`, `b ≥ 1` thì `a % b < b` và `a / b ≤ a`, thêm `a ≥ 1`, `b ≥ 2` thì `a / b < a`. Nên thuật toán Euclid được chấp nhận:
 
-```grit fail=E0702
+```grit value=6
 ƒ gcd(a: u64, b: u64) → u64 ! ∅ ↓ b {
   ⎇ b == 0 { a } ⇝ { gcd(b, a % b) }
 }
@@ -390,8 +390,20 @@ Compiler **sound nhưng không complete**: nó có thể từ chối chương tr
 ƒ main() → u64 ! ∅ { gcd(48, 18) }
 ```
 
+Nhưng compiler vẫn **sound nhưng không complete**: nó có thể từ chối chương trình đúng. Vòng nhân đôi dừng (`x` tăng gấp đôi nên `n - x` giảm), nhưng quan hệ `x * 2 > x` là phi tuyến, bộ giải khoảng + zone không thấy, nên `↓ n - x` bị từ chối:
+
+```grit fail=E0702
+ƒ pow2_at_least(n: u64) → u64 ! ∅ {
+  μx ≔ 1u64;
+  ⟳ x < n ↓ n - x { x ← x * 2; }
+  x
+}
+
+ƒ main() → u64 ! ∅ { pow2_at_least(100) }
+```
+
 ```text
-error[E0702]: lời gọi đệ quy không làm biến thể `↓` giảm nghiêm ngặt (hoặc không bị chặn dưới ≥ 0)
+error[E0702]: biến thể `↓` không giảm nghiêm ngặt qua mỗi vòng hoặc không bị chặn dưới (≥ 0)
 ```
 
 Chương trình hợp lệ nhưng chưa chứng minh được: dùng mẫu **nhiên liệu** (fuel). Bạn cấp một ngân sách số vòng, đưa nó vào điều kiện và vào `↓`; nó giảm đúng 1 mỗi vòng nên *luôn* chứng minh được. Sau vòng lặp gọi `core::fuel_left(fuel)`: nếu nhiên liệu cạn (bằng 0) thì chương trình abort với `fuel_exhausted` thay vì chạy mãi hay trả kết quả cụt.
@@ -433,7 +445,7 @@ Với nhiên liệu:
 
 Đọc kỹ cái giá: kiểm tra `fuel_left` là kiểm tra lúc chạy (ghi chú `N0905`). Bạn phải chọn nhiên liệu *đủ lớn* và có lý lẽ cho nó (ví dụ "số chữ số của `u64` ≤ 20, nên 24 là đủ"). Nhiên liệu bằng đúng số vòng cần thiết sẽ abort sai vào vòng cuối; hãy cho dư.
 
-**Bài tập 4.** Đếm số chữ số thập phân của `n: u64` (với `0` cho kết quả `0`). Vòng `x ← x / 10` không tự chứng minh được; hãy dùng nhiên liệu.
+**Bài tập 4.** Đếm số chữ số thập phân của `n: u64` (với `0` cho kết quả `0`) bằng mẫu nhiên liệu. (Từ GÓI 12, vòng `⟳ x > 0 ↓ x { x ← x / 10; … }` tự chứng minh được nên KHÔNG cần nhiên liệu; bài này chỉ để luyện mẫu nhiên liệu cho những vòng như nhân đôi ở trên.)
 
 Đáp án (`digits(12345) = 5`; `u64` có tối đa 20 chữ số):
 

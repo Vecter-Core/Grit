@@ -746,6 +746,26 @@ impl Env {
         self.reduce();
     }
 
+    /// `v := khoảng` với thêm sự thật `v_mới ≤ v_cũ + c` (GÓI 12: `x ← x / k`, `x ← a % x`): giữ quan hệ cận trên của `v` dịch `c`.
+    pub fn assign_interval_upper_shift(&mut self, v: VarId, iv: Interval, c: i128) {
+        let Some(ty) = self.ty(v) else { return };
+        if let Some(i) = self.zv.get(&v).copied() {
+            self.zone.shift_upper(i, c);
+        }
+        match iv.meet(ty.range()) {
+            Some(x) => {
+                if let Some(e) = self.iv.get_mut(&v) {
+                    e.1 = x;
+                }
+            }
+            None => {
+                self.dead = true;
+                return;
+            }
+        }
+        self.reduce();
+    }
+
     /// `v := khoảng` (không quan hệ): kết quả của phép quấn/bão hoà/gọi hàm.
     pub fn assign_interval(&mut self, v: VarId, iv: Interval) {
         let Some(ty) = self.ty(v) else { return };

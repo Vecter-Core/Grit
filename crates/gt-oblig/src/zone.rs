@@ -119,6 +119,23 @@ impl Zone {
         }
     }
 
+    /// `x_mới ≤ x_cũ + c` (GÓI 12; dùng cho `x ← x / k`, `x ← a % x`): MỌI cận trên của `x` so với biến khác dịch `+c`, mọi cận dưới bị
+    /// bỏ (giá trị mới có thể nhỏ hơn bất kỳ). Giữ bao đóng: `m'[x][j] = m[x][j] + c ≤ m[x][k] + c + m[k][j] = m'[x][k] + m'[k][j]`;
+    /// đường qua cột `x` đều vô cực. Tràn khi cộng ⇒ bỏ ràng buộc (yếu hơn, vẫn sound).
+    pub fn shift_upper(&mut self, x: usize, c: i128) {
+        if self.empty {
+            return;
+        }
+        let n = self.n;
+        for k in 0..n {
+            if k == x {
+                continue;
+            }
+            self.m[x * n + k] = add(self.m[x * n + k], Some(c));
+            self.m[k * n + x] = None;
+        }
+    }
+
     /// `x := y + c` (x ≠ y): quên `x` rồi thêm hai ràng buộc, đóng bao.
     pub fn assign_copy(&mut self, x: usize, y: usize, c: i128) {
         self.forget(x);
@@ -223,6 +240,74 @@ mod tests {
         assert_eq!(z.get(0, 2), Some(-3));
         z.add_le(2, 0, 2); // x2 − x0 ≤ 2 ⇒ chu trình −3 + 2 < 0
         assert!(z.is_empty_set());
+    }
+
+    /// ORACLE (GÓI 12): `shift_upper` sound — với mọi nghiệm nguyên nhỏ thoả zone ngẫu nhiên (đã đóng bao) và mọi giá trị mới
+    /// `x' ≤ x + c`, nghiệm mới thoả zone sau biến đổi; và zone sau biến đổi vẫn đóng bao (bằng zone đóng bao lại từ đầu).
+    #[test]
+    fn shift_upper_is_sound_on_all_small_valuations() {
+        let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
+        let mut rnd = |m: u64| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed % m
+        };
+        let mut checked = 0u32;
+        for _ in 0..400 {
+            let n = 3;
+            let mut z = Zone::new(n);
+            for _ in 0..4 {
+                let (i, j) = (rnd(3) as usize, rnd(3) as usize);
+                if i != j {
+                    z.add_le(i, j, rnd(7) as i128 - 3);
+                }
+            }
+            if z.is_empty_set() {
+                continue;
+            }
+            let x = rnd(3) as usize;
+            let c = -(rnd(3) as i128);
+            let mut z2 = z.clone();
+            z2.shift_upper(x, c);
+            let sat = |z: &Zone, v: &[i128]| {
+                (0..n).all(|i| (0..n).all(|j| z.get(i, j).is_none_or(|b| v[i] - v[j] <= b)))
+            };
+            for a in -3i128..=3 {
+                for b in -3i128..=3 {
+                    for d in -3i128..=3 {
+                        let v = [a, b, d];
+                        if !sat(&z, &v) {
+                            continue;
+                        }
+                        for nx in -8i128..=v[x] + c {
+                            let mut w = v;
+                            w[x] = nx;
+                            assert!(
+                                sat(&z2, &w),
+                                "shift_upper unsound: {z:?} x={x} c={c} {v:?} -> {w:?}"
+                            );
+                            checked += 1;
+                        }
+                    }
+                }
+            }
+            // bao đóng giữ nguyên: đóng lại từ đầu không làm chặt hơn
+            let mut re = Zone::new(n);
+            for i in 0..n {
+                for j in 0..n {
+                    if let Some(b) = z2.get(i, j) {
+                        re.add_le(i, j, b);
+                    }
+                }
+            }
+            for i in 0..n {
+                for j in 0..n {
+                    assert_eq!(re.get(i, j), z2.get(i, j), "shift_upper làm mất bao đóng");
+                }
+            }
+        }
+        assert!(checked > 10_000, "quá ít nghiệm được kiểm: {checked}");
     }
 
     #[test]

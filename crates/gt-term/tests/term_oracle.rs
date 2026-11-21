@@ -111,6 +111,15 @@ fn accepted_programs_never_run_out_of_fuel() {
             (true, true, _) => unreachable!(),
         };
         *tally.entry(key).or_default() += 1;
+        // GÓI 12: chương trình có phép chia/dư (luật quan hệ chia/dư của bộ chứng minh, ADR-C16) phải thật sự được sinh và chấp nhận
+        if p.src.contains(" / ") || p.src.contains(" % ") {
+            let k = if accepted {
+                "có chia: chấp nhận"
+            } else {
+                "có chia: bác"
+            };
+            *tally.entry(k).or_default() += 1;
+        }
     }
     eprintln!("{tally:?}\nmã: {codes:?}");
     if n < 1500 || drop_variants {
@@ -126,6 +135,11 @@ fn accepted_programs_never_run_out_of_fuel() {
         get("bác, phân kỳ thật") >= 200,
         "chỉ {} chương trình phân kỳ bị bác đúng",
         get("bác, phân kỳ thật")
+    );
+    assert!(
+        get("có chia: chấp nhận") >= 20,
+        "chỉ {} chương trình có chia/dư được chấp nhận: bộ sinh không còn phủ luật chia/dư",
+        get("có chia: chấp nhận")
     );
     for c in ["E0701", "E0702", "E0703"] {
         assert!(
