@@ -1,0 +1,1 @@
+{"suite":"generic-trait-vec-const","start":1,"count":128,"result":{"programs":{"const_expr": 32, "const_fn": 32, "const_lit": 32, "static_chain": 32},"compared":{"const_expr": 32, "const_fn": 32, "const_lit": 32, "static_chain": 32},"dropped":{},"mismatch":0,"term_fallbacks":0}}

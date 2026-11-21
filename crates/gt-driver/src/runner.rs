@@ -68,7 +68,12 @@ pub fn run_main_with(art: Artifacts, fuel: u64) -> RunReport {
     };
     apply_types_fault_from_env();
     let mut it = Interp::new(&mir, fuel).with_types(&types);
-    match it.call_key(&key, Vec::new()) {
+    // GÓI 14 B1: static khởi tạo lúc khởi động (như LLVM) — abort/vòng khởi tạo hiện ra TRƯỚC `main`, kể cả static không bao giờ được đọc
+    let out = match it.init_statics() {
+        Some(o) => o,
+        None => it.call_key(&key, Vec::new()),
+    };
+    match out {
         Outcome::Value(v) => RunReport {
             end: RunEnd::Normal,
             value: Some(format!("{v:?}")),
@@ -83,6 +88,13 @@ pub fn run_main_with(art: Artifacts, fuel: u64) -> RunReport {
         },
         Outcome::Bug(m) if m.contains("đệ quy quá sâu") => RunReport {
             end: RunEnd::Limit,
+            value: None,
+        },
+        Outcome::Bug(m) if m.starts_with(gt_mir::interp::UNSUPPORTED) => RunReport {
+            end: RunEnd::Unsupported(
+                m.trim_start_matches(gt_mir::interp::UNSUPPORTED)
+                    .to_string(),
+            ),
             value: None,
         },
         Outcome::Bug(m) => RunReport {

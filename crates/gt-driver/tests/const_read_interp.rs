@@ -25,7 +25,7 @@ fn interp_returns(src: &str, tag: &str, want: &str) {
     let (c, t) = gritc(&["run", "--backend=interpreter"], src, tag);
     assert_eq!(c, 0, "thông dịch phải chạy được: {t}\n{src}");
     assert!(
-        t.contains(&format!("main trả về {want}")),
+        t.contains(&format!("main trả về Int({want},")),
         "kỳ vọng main trả về {want}: {t}\n{src}"
     );
 }

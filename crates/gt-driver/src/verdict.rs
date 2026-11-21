@@ -97,6 +97,8 @@ pub enum RunEnd {
     ProgramExit(u8),
     /// bộ chạy phát hiện MIR không hợp lệ: lỗi nội bộ của gritc
     Internal(String),
+    /// GÓI 14 B1: chương trình HỢP LỆ nhưng bộ chạy tham chiếu CHƯA hỗ trợ (vd. vòng khởi tạo giữa các static): mã thoát 3, cùng loại với LLVM `build`
+    Unsupported(String),
 }
 
 /// Mã thoát của giai đoạn `run`. `ProgramExit(0)` = bình thường; s ∈ 1..=100 ↦ 100+s; ngoài khoảng ⇒ kẹp về 200 (vẫn trong vùng chương trình).
@@ -108,5 +110,6 @@ pub fn run_exit_code(e: &RunEnd) -> i32 {
         RunEnd::Limit => 71,
         RunEnd::ProgramExit(s) => 100 + i32::from((*s).min(100)),
         RunEnd::Internal(_) => 2,
+        RunEnd::Unsupported(_) => 3,
     }
 }

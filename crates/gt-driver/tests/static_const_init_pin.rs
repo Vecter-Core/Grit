@@ -45,7 +45,10 @@ fn check_green(src: &str, tag: &str) {
 
 fn interp_refuses_cycle(src: &str, tag: &str) {
     let (c, t) = gritc(&["run", "--backend=interpreter"], src, tag);
-    assert_eq!(c, 3, "thông dịch phải từ chối vòng static (mã 3), không ICE: {t}");
+    assert_eq!(
+        c, 3,
+        "thông dịch phải từ chối vòng static (mã 3), không ICE: {t}"
+    );
     assert!(t.contains("chưa hỗ trợ"), "{t}");
     assert!(t.contains("vòng khởi tạo"), "{t}");
     assert!(!t.contains("lỗi nội bộ"), "{t}");
@@ -54,7 +57,7 @@ fn interp_refuses_cycle(src: &str, tag: &str) {
 fn interp_runs(src: &str, tag: &str) {
     let (c, t) = gritc(&["run", "--backend=interpreter"], src, tag);
     assert_eq!(c, 0, "thông dịch phải chạy được: {t}");
-    assert!(t.contains("main trả về 0"), "{t}");
+    assert!(t.contains("main trả về Int(0,"), "{t}");
 }
 
 #[test]

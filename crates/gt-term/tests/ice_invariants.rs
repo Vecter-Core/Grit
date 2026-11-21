@@ -13,8 +13,7 @@ use gt_oblig::prover::ZoneProver;
 use gt_term::check_termination;
 use gt_types::TypesOutput;
 
-const PROG: &str =
-    "ƒ g(x: i32) → i32 ! ∅ { x + 1i32 }\nƒ main() → i32 ! ∅ { g(2i32) }\n";
+const PROG: &str = "ƒ g(x: i32) → i32 ! ∅ { x + 1i32 }\nƒ main() → i32 ! ∅ { g(2i32) }\n";
 
 fn codes(t: &TypesOutput, m: &MirOutput) -> (Vec<String>, String) {
     let info = build_prog_info(t, m);
@@ -52,8 +51,17 @@ fn intact_mir_has_no_ice() {
 #[test]
 fn function_as_arithmetic_operand_is_an_explicit_ice() {
     let (t, mut m) = setup();
-    let fnode = m.bodies.iter().find(|b| b.key.ends_with("::g")).expect("g").node;
-    let b = m.bodies.iter_mut().find(|b| b.key.ends_with("::main")).expect("main");
+    let fnode = m
+        .bodies
+        .iter()
+        .find(|b| b.key.ends_with("::g"))
+        .expect("g")
+        .node;
+    let b = m
+        .bodies
+        .iter_mut()
+        .find(|b| b.key.ends_with("::main"))
+        .expect("main");
     let ty = b.locals[0].ty.clone();
     let source = b.blocks[0].terminator.as_ref().expect("terminator").source;
     b.blocks[0].statements.push(Statement {
@@ -61,7 +69,11 @@ fn function_as_arithmetic_operand_is_an_explicit_ice() {
             Place::local(Local(0)),
             Rvalue::BinaryOp(
                 BinOp::Add,
-                Operand::Const(Const::FnItem { node: fnode, generics: vec![], ty }),
+                Operand::Const(Const::FnItem {
+                    node: fnode,
+                    generics: vec![],
+                    ty,
+                }),
                 Operand::Const(Const::Unit),
             ),
         ),
@@ -75,7 +87,11 @@ fn function_as_arithmetic_operand_is_an_explicit_ice() {
 #[test]
 fn call_argument_pointing_past_the_locals_is_an_explicit_ice() {
     let (t, mut m) = setup();
-    let b = m.bodies.iter_mut().find(|b| b.key.ends_with("::main")).expect("main");
+    let b = m
+        .bodies
+        .iter_mut()
+        .find(|b| b.key.ends_with("::main"))
+        .expect("main");
     let mut hit = false;
     for bb in &mut b.blocks {
         if let Some(term) = bb.terminator.as_mut()
@@ -99,11 +115,18 @@ fn call_to_a_node_with_neither_body_nor_signature_is_an_explicit_ice() {
         let any = m.bodies[0].node;
         NodeId::new(any.file(), 4_000_000)
     };
-    let b = m.bodies.iter_mut().find(|b| b.key.ends_with("::main")).expect("main");
+    let b = m
+        .bodies
+        .iter_mut()
+        .find(|b| b.key.ends_with("::main"))
+        .expect("main");
     let mut hit = false;
     for bb in &mut b.blocks {
         if let Some(term) = bb.terminator.as_mut()
-            && let TerminatorKind::Call { callee: Callee::Fn { node, .. }, .. } = &mut term.kind
+            && let TerminatorKind::Call {
+                callee: Callee::Fn { node, .. },
+                ..
+            } = &mut term.kind
         {
             *node = bogus;
             hit = true;
@@ -118,7 +141,11 @@ fn call_to_a_node_with_neither_body_nor_signature_is_an_explicit_ice() {
 #[test]
 fn block_without_terminator_is_an_explicit_ice() {
     let (t, mut m) = setup();
-    let b = m.bodies.iter_mut().find(|b| b.key.ends_with("::g")).expect("g");
+    let b = m
+        .bodies
+        .iter_mut()
+        .find(|b| b.key.ends_with("::g"))
+        .expect("g");
     let last = b.blocks.len() - 1;
     b.blocks[last].terminator = None;
     let (c, msgs) = codes(&t, &m);

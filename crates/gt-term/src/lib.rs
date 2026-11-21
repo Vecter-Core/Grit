@@ -368,7 +368,15 @@ fn instance_graph(
                                 ops.push(o);
                             }
                             gt_mir::Rvalue::Aggregate(_, v) => ops.extend(v.iter()),
-                            _ => {}
+                            // GÓI 14 B2 (NEXT_PRODUCT_BATCH #11): liệt kê ĐỦ biến thể (không `_`), để biến thể `Rvalue` mới buộc người sửa xem lại. Toán hạng của phép tính
+                            // KHÔNG được là hàm (M4 chặn; `invariant_violations` phát E9901 nếu vi phạm); `Const::Item` ở đây do `const_cycles` xử lý.
+                            gt_mir::Rvalue::CastFits(..)
+                            | gt_mir::Rvalue::BinaryOp(..)
+                            | gt_mir::Rvalue::CheckedBinaryOp(..)
+                            | gt_mir::Rvalue::UnaryOp(..)
+                            | gt_mir::Rvalue::Ref(..)
+                            | gt_mir::Rvalue::Len(_)
+                            | gt_mir::Rvalue::Discriminant(_) => {}
                         }
                     }
                 }
@@ -832,6 +840,65 @@ fn const_cycles<'a>(
         .collect()
 }
 
+/// GÓI 14 B2 (NEXT_PRODUCT_BATCH #11/#4): các NHÁNH PHÒNG THỦ của phần dựng cạnh/kiểm vòng lặp chỉ tới được khi MIR vi phạm một bất biến mà giai đoạn trước bảo đảm.
+/// Trước đây chúng lặng lẽ "bảo thủ" hoặc bỏ qua (đo: 0 lần trên 996 chương trình). Nay mỗi vi phạm là ICE E9901 tường minh, nêu dữ liệu nào hỏng:
+///  1. toán hạng của phép tính (`BinaryOp`/`CheckedBinaryOp`/`UnaryOp`/`CastFits`) là hằng hàm — M4 không cho hàm làm toán hạng phép tính;
+///  2. đối số lời gọi trỏ tới local KHÔNG có trong `locals` của thân (nhánh `None => true` của `dyn_fn_arg`) — validator M5 bảo đảm mọi local tồn tại;
+///  3. lời gọi `Callee::Fn` tới nút không có chữ ký trong bảng kiểu và không có thân (nhánh `None => true` của `takes_fn_param`);
+///  4. khối cơ bản không có terminator (nhánh `return true` của `has_back_edge`) — validator M5 bảo đảm.
+fn invariant_violations(t: &TypesOutput, m: &MirOutput) -> Vec<(NodeId, Span, String)> {
+    let body_nodes: BTreeSet<NodeId> = m.bodies.iter().map(|b| b.node).collect();
+    let has_sig = |n: NodeId| {
+        t.db.fns.values().any(|(sig, _)| sig.node == n)
+            || t.db
+                .impls
+                .iter()
+                .any(|i| i.members.iter().any(|sg| sg.node == n))
+    };
+    let mut out = Vec::new();
+    for b in &m.bodies {
+        for (bi, bb) in b.blocks.iter().enumerate() {
+            for st in &bb.statements {
+                if let gt_mir::StatementKind::Assign(_, rv) = &st.kind {
+                    let arith: Vec<&gt_mir::Operand> = match rv {
+                        gt_mir::Rvalue::CastFits(o, _) | gt_mir::Rvalue::UnaryOp(_, o) => vec![o],
+                        gt_mir::Rvalue::BinaryOp(_, a, c)
+                        | gt_mir::Rvalue::CheckedBinaryOp(_, a, c) => vec![a, c],
+                        _ => Vec::new(),
+                    };
+                    if arith
+                        .iter()
+                        .any(|o| matches!(o, gt_mir::Operand::Const(gt_mir::Const::FnItem { .. })))
+                    {
+                        out.push((b.node, st.source.span, format!("thân `{}` bb{bi}: toán hạng của phép tính là hàm (M4 phải chặn); đồ thị dừng không bao phủ được", b.key)));
+                    }
+                }
+            }
+            match bb.terminator.as_ref() {
+                None => out.push((b.node, b.span, format!("thân `{}` bb{bi}: khối không có terminator (validator M5 phải chặn); không xét được cạnh lùi của vòng lặp", b.key))),
+                Some(term) => {
+                    if let TerminatorKind::Call { callee, args, .. } = &term.kind {
+                        for o in args {
+                            if let gt_mir::Operand::Copy(p) | gt_mir::Operand::Move(p) = o
+                                && p.local.index() >= b.locals.len()
+                            {
+                                out.push((b.node, term.source.span, format!("thân `{}` bb{bi}: đối số lời gọi trỏ tới local {} ngoài {} local của thân (validator M5 phải chặn)", b.key, p.local.index(), b.locals.len())));
+                            }
+                        }
+                        if let Callee::Fn { node, .. } = callee
+                            && !body_nodes.contains(node)
+                            && !has_sig(*node)
+                        {
+                            out.push((b.node, term.source.span, format!("thân `{}` bb{bi}: lời gọi tới nút không có thân lẫn chữ ký trong bảng kiểu (không biết có nhận hàm làm tham số hay không)", b.key)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Kiểm điều kiện dừng toàn chương trình. `base` từ `driver::build_prog_info` (hợp đồng, vị từ…).
 pub fn check_termination(
     t: &TypesOutput,
@@ -840,6 +907,15 @@ pub fn check_termination(
     prover: &mut (dyn Prover + Send),
 ) -> TermOutput {
     let mut bag = Diagnostics::new(LIMIT);
+    for (node, span, msg) in invariant_violations(t, m) {
+        bag.push(mk(
+            t,
+            "E9901",
+            node,
+            span,
+            format!("bất biến MIR bị vi phạm: {msg}"),
+        ));
+    }
     let mut fns: BTreeMap<NodeId, &FnItem> = BTreeMap::new();
     for p in &t.resolve.programs {
         index_fns(&p.items, &mut fns);
@@ -906,7 +982,14 @@ pub fn check_termination(
                                 ops.push(o);
                             }
                             gt_mir::Rvalue::Aggregate(_, v) => ops.extend(v.iter()),
-                            _ => {}
+                            // GÓI 14 B2 (#11): vét cạn như trên; vi phạm "toán hạng phép tính là hàm" ⇒ E9901 ở `invariant_violations`
+                            gt_mir::Rvalue::CastFits(..)
+                            | gt_mir::Rvalue::BinaryOp(..)
+                            | gt_mir::Rvalue::CheckedBinaryOp(..)
+                            | gt_mir::Rvalue::UnaryOp(..)
+                            | gt_mir::Rvalue::Ref(..)
+                            | gt_mir::Rvalue::Len(_)
+                            | gt_mir::Rvalue::Discriminant(_) => {}
                         }
                         for o in ops {
                             if let gt_mir::Operand::Const(gt_mir::Const::FnItem { node, .. }) = o {

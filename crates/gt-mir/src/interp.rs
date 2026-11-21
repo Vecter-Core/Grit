@@ -82,6 +82,22 @@ pub struct Interp<'a> {
     types: Option<&'a TypesOutput>,
     /// vết các `Assert` đã chạy: (khoá thân, khối, đạt?) — để oracle M7 kiểm "tới được ⇒ sai"
     pub asserts: Vec<(String, u32, bool)>,
+    /// GÓI 14 B1: giá trị đã tính của `□`/`■` (mỗi hằng/static tính MỘT lần; LLVM cũng tính một lần cho static, và hằng thuần ⇒ cùng giá trị)
+    items: std::collections::BTreeMap<NodeId, V>,
+    /// hằng/static đang được tính (phát hiện vòng khởi tạo)
+    items_busy: Vec<NodeId>,
+}
+
+/// Tiền tố thông điệp của [`Outcome::Bug`] khi chương trình HỢP LỆ nhưng bộ chạy tham chiếu CHƯA hỗ trợ (vd. vòng khởi tạo giữa các static, hằng chứa tham chiếu):
+/// `gritc run` báo "chưa hỗ trợ" với mã thoát 3 (như LLVM `build`), KHÔNG phải lỗi nội bộ (mã 2).
+pub const UNSUPPORTED: &str = "[chưa hỗ trợ] ";
+
+fn holds_ref(v: &V) -> bool {
+    match v {
+        V::Ref(..) => true,
+        V::Tuple(x) | V::Array(x) | V::Adt(_, x) => x.iter().any(holds_ref),
+        _ => false,
+    }
 }
 
 enum Flow {
@@ -103,6 +119,66 @@ impl<'a> Interp<'a> {
             fuel,
             types: None,
             asserts: Vec::new(),
+            items: std::collections::BTreeMap::new(),
+            items_busy: Vec::new(),
+        }
+    }
+
+    /// GÓI 14 B1: khởi tạo MỌI `■` trước `main` (như LLVM: static khởi tạo lúc khởi động, theo thứ tự phụ thuộc; ở đây đệ quy theo phụ thuộc). `None` = xong;
+    /// `Some(kết cục)` = khởi tạo abort / hết nhiên liệu / chưa hỗ trợ (vòng khởi tạo).
+    pub fn init_statics(&mut self) -> Option<Outcome> {
+        let mir = self.mir;
+        for b in &mir.bodies {
+            if b.kind == BodyKind::Static
+                && let Err(e) = self.read_item(b.node)
+            {
+                return Some(match e {
+                    Flow::Abort(k) => Outcome::Abort(k),
+                    Flow::Bug(m) => Outcome::Bug(m),
+                    Flow::Fuel => Outcome::OutOfFuel,
+                    Flow::Ret => {
+                        Outcome::Bug("khởi tạo static kết thúc bằng `Ret` lạc".to_string())
+                    }
+                });
+            }
+        }
+        None
+    }
+
+    /// Giá trị của `□`/`■` `node`: tính bằng thân MIR riêng của nó rồi GHI NHỚ. Vòng ⇒ "chưa hỗ trợ" (với `□`, `check` đã chặn bằng E0703 — FB-C36).
+    fn read_item(&mut self, node: NodeId) -> Result<V, Flow> {
+        if let Some(v) = self.items.get(&node) {
+            return Ok(v.clone());
+        }
+        let mir = self.mir;
+        let Some(b) = mir
+            .bodies
+            .iter()
+            .find(|b| b.node == node && matches!(b.kind, BodyKind::Const | BodyKind::Static))
+        else {
+            return Err(Flow::Bug("hằng/static không có thân MIR".to_string()));
+        };
+        if self.items_busy.contains(&node) {
+            return Err(Flow::Bug(format!(
+                "{UNSUPPORTED}vòng khởi tạo giữa các hằng/static (qua `{}`): bộ chạy tham chiếu không tính được",
+                b.key
+            )));
+        }
+        self.items_busy.push(node);
+        let r = self.run(b, Vec::new());
+        self.items_busy.pop();
+        match r {
+            Outcome::Value(v) if holds_ref(&v) => Err(Flow::Bug(format!(
+                "{UNSUPPORTED}giá trị của `{}` chứa tham chiếu (khung của initializer đã đóng)",
+                b.key
+            ))),
+            Outcome::Value(v) => {
+                self.items.insert(node, v.clone());
+                Ok(v)
+            }
+            Outcome::Abort(k) => Err(Flow::Abort(k)),
+            Outcome::Bug(m) => Err(Flow::Bug(m)),
+            Outcome::OutOfFuel => Err(Flow::Fuel),
         }
     }
 
@@ -930,7 +1006,7 @@ impl<'a> Interp<'a> {
         }
     }
 
-    fn operand(&self, o: &Operand) -> Result<V, Flow> {
+    fn operand(&mut self, o: &Operand) -> Result<V, Flow> {
         match o {
             Operand::Copy(p) | Operand::Move(p) => {
                 let (fr, l, path) = self.resolve(p)?;
@@ -951,9 +1027,7 @@ impl<'a> Interp<'a> {
                         Err(_) => return Err(Flow::Bug(format!("literal số thực lạ `{text}`"))),
                     }
                 }
-                Const::Item { .. } => {
-                    return Err(Flow::Bug("hằng ngoài phạm vi thông dịch".to_string()));
-                }
+                Const::Item { node, .. } => return self.read_item(*node),
             }),
         }
     }

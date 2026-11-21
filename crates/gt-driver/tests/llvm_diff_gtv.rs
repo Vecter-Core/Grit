@@ -1281,14 +1281,20 @@ fn gen_f64_arith(rng: &mut Rng) -> (String, Want) {
 /// GÓI 14 B1: chương trình đọc hằng/static; mô hình = số học u64 bao quanh tính thẳng trong bộ sinh (không qua gt-types/gt-mir)
 fn gen_const(kind: &str, rng: &mut Rng) -> (String, Want) {
     let is_static = kind == "static_chain";
-    let (kw, nm) = if is_static { ("■", "S") } else { ("□", "C") };
+    let (kw, nm) = if is_static {
+        ("■", "S")
+    } else {
+        ("□", "C")
+    };
     let n = 2 + rng.below(4) as usize;
     let nf = 1 + rng.below(3) as usize;
     let fns: Vec<(u64, u64)> = (0..nf).map(|_| (rng.below(9) + 1, rng.below(50))).collect();
     let mut src = String::new();
     for (k, (m, a)) in fns.iter().enumerate() {
-        src.push_str(&format!("ƒ f{k}(x: u64) → u64 ! ∅ {{ x *% {m}u64 +% {a}u64 }}
-"));
+        src.push_str(&format!(
+            "ƒ f{k}(x: u64) → u64 ! ∅ {{ x *% {m}u64 +% {a}u64 }}
+"
+        ));
     }
     let mut vals: Vec<u64> = Vec::new();
     for i in 0..n {
@@ -1303,9 +1309,15 @@ fn gen_const(kind: &str, rng: &mut Rng) -> (String, Want) {
                     let k = rng.below(nf as u64) as usize;
                     let (m, ad) = fns[k];
                     if rng.chance(50) {
-                        (format!("f{k}({nm}{a})"), vals[a].wrapping_mul(m).wrapping_add(ad))
+                        (
+                            format!("f{k}({nm}{a})"),
+                            vals[a].wrapping_mul(m).wrapping_add(ad),
+                        )
                     } else {
-                        (format!("f{k}({lit}u64)"), lit.wrapping_mul(m).wrapping_add(ad))
+                        (
+                            format!("f{k}({lit}u64)"),
+                            lit.wrapping_mul(m).wrapping_add(ad),
+                        )
                     }
                 }
                 (_, 0) => (format!("{nm}{a} +% {nm}{b}"), vals[a].wrapping_add(vals[b])),
@@ -1313,33 +1325,47 @@ fn gen_const(kind: &str, rng: &mut Rng) -> (String, Want) {
                 _ => (format!("{nm}{a} +% {lit}u64"), vals[a].wrapping_add(lit)),
             }
         };
-        src.push_str(&format!("{kw} {nm}{i}: u64 ≔ {expr};
-"));
+        src.push_str(&format!(
+            "{kw} {nm}{i}: u64 ≔ {expr};
+"
+        ));
         vals.push(v);
     }
     let reads = 2 + rng.below(5) as usize;
-    let mut body = String::from("  μh ≔ 0u64;
-");
+    let mut body = String::from(
+        "  μh ≔ 0u64;
+",
+    );
     let mut h = 0u64;
     for _ in 0..reads {
         let i = rng.below(n as u64) as usize;
         if is_static && rng.chance(50) {
             // đọc static qua một hàm (đọc trong thân hàm, không phải trong main)
-            src.push_str(&format!("ƒ rd{i}() → u64 ! ∅ {{ {nm}{i} +% 0u64 }}
-"));
-            body.push_str(&format!("  h ← h *% 1000003u64 +% rd{i}();
-"));
+            if !src.contains(&format!("ƒ rd{i}()")) {
+                src.push_str(&format!(
+                    "ƒ rd{i}() → u64 ! ∅ {{ {nm}{i} +% 0u64 }}
+"
+                ));
+            }
+            body.push_str(&format!(
+                "  h ← h *% 1000003u64 +% rd{i}();
+"
+            ));
         } else {
-            body.push_str(&format!("  h ← h *% 1000003u64 +% {nm}{i};
-"));
+            body.push_str(&format!(
+                "  h ← h *% 1000003u64 +% {nm}{i};
+"
+            ));
         }
         h = h.wrapping_mul(1_000_003).wrapping_add(vals[i]);
     }
     (
-        format!("{src}ƒ main() → u64 ! ∅ {{
+        format!(
+            "{src}ƒ main() → u64 ! ∅ {{
 {body}  h
 }}
-"),
+"
+        ),
         Ok(h.to_string()),
     )
 }
@@ -1841,7 +1867,11 @@ fn tiny_const_batch() {
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(t.mismatch, 0, "bất đồng: {:#?}", t.detail);
     let compared: u64 = t.compared.values().sum();
-    assert!(compared >= 20, "quá ít chương trình đọc hằng: {}", summary(&t));
+    assert!(
+        compared >= 20,
+        "quá ít chương trình đọc hằng: {}",
+        summary(&t)
+    );
 }
 
 /// lô nhỏ cố định cho PHÁN QUYẾT M8 theo đồ thị instance (cổng đầy đủ + đột biến gt-term): 30 chương trình `term_graph`, cả có và không có

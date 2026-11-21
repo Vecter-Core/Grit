@@ -400,6 +400,9 @@ fn cmd_run(cli: &Cli) -> i32 {
                 eprintln!("chương trình thoát với trạng thái {s} (mã thoát {exit})")
             }
             RunEnd::Internal(m) => eprintln!("gritc: lỗi nội bộ khi chạy: {m}"),
+            RunEnd::Unsupported(m) => eprintln!(
+                "gritc: bộ chạy tham chiếu chưa hỗ trợ chương trình này: {m} (mã thoát {exit}; backend LLVM: `--backend=llvm`)"
+            ),
         }
     }
     exit
