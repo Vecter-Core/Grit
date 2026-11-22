@@ -310,6 +310,9 @@ Mặc định cho hàm không có ghi chú riêng: TOÀN PHẦN theo thiết k�
 - `◈ ⊏ Hash { ƒ hash(&self) → u64 ! ∅; }`
 - `◈ ▢ Bytes<'a> { ◈ b: &'a [u8] }` — khoá/giá trị là lát byte (vd. nội dung `File::bytes()` hoặc một `&[u8]` nào đó): dùng được làm khoá của HashMap, so theo thứ tự từ điển byte
 - `◈ ▢ HashMap<'a, K, V> { slots: Vec<'a, usize>, ents: Vec<'a, Ent<K, V>>, live: usize }`
+- `◈ ▢ SlabKey { idx: usize, gen: u64 }` — Kho đối tượng SỐNG LÂU có tay cầm thế hệ — như `MemoryPool` của Zig và `slotmap` của Rust: thêm / xoá TỪNG phần tử O(1), ô bị xoá được TÁI DÙNG trước khi cấp ô mới (nên số ô từng cấp == số phần tử sống tối đa: thêm/xoá liên tục suốt đời chương trình không làm bộ nhớ tăng quá đỉnh, dù Arena không trả lại từng khối). Khoá cũ của một ô đã xoá KHÔNG BAO GIỜ đọc được phần tử mới đặt vào ô đó (thế hệ `u64` tăng mỗi lần xoá). Dùng cho bảng kết nối, nút cây/đồ thị (trỏ nhau bằng `SlabKey` thay vì tham chiếu), thực thể. Phần tử `Copy` như `Vec`. Viết bằng Grit thường, đi qua cùng cổng như mã người dùng: KHÔNG thuộc TCB.
+- `▢ SlabSlot<T> { v: T, gen: u64, live: bool, next_free: usize }`
+- `◈ ▢ Slab<'a, T> { slots: Vec<'a, SlabSlot<T>>, free: usize, live: usize }` — `free` = 1 + chỉ số ô trống đầu danh sách (0 = không còn ô trống); danh sách nối qua `next_free` (cùng quy ước 1 + chỉ số)
 
 ### Hàm tự do
 
@@ -506,6 +509,25 @@ Mặc định cho hàm không có ghi chú riêng: TOÀN PHẦN theo thiết k�
   - hiệu ứng: `∅`; abort: không
 - `ƒ entry_at(&self, i: usize) → Option<(K, V)> ! ∅`
   - hiệu ứng: `∅`; abort: không (trả `None` nếu ngoài biên hoặc entry đã xoá)
+
+### `⊐ <'a, T: Copy> Slab<'a, T>`
+
+- `ƒ new(a: &'a Arena) → Slab<'a, T> ! {mem}`
+  - hiệu ứng: `{mem}`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+- `ƒ len(&self) → usize ! ∅` — số phần tử đang sống
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+- `ƒ capacity(&self) → usize ! ∅` — số ô từng cấp (không bao giờ giảm) == số phần tử sống tối đa từng có
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+- `ƒ insert(&!self, v: T) → SlabKey ! {mem}` — thêm `v`, trả khoá; tái dùng ô trống gần nhất nếu có
+  - hiệu ứng: `{mem}`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+- `ƒ get(&self, k: SlabKey) → Option<T> ! ∅` — phần tử của khoá `k`, hoặc None nếu đã xoá (kể cả khi ô đã được tái dùng cho phần tử khác)
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+- `ƒ contains(&self, k: SlabKey) → bool ! ∅`
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+- `ƒ set(&!self, k: SlabKey, v: T) → bool ! ∅` — ghi đè phần tử của khoá `k`; false nếu khoá không còn sống
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
+- `ƒ remove(&!self, k: SlabKey) → Option<T> ! ∅` — xoá phần tử của khoá `k` (trả nó); ô vào danh sách trống, thế hệ tăng nên mọi bản sao của `k` hết hiệu lực
+  - hiệu ứng: `∅`; abort: toàn phần theo thiết kế (xem mặc định ở trên)
 
 ### Nội bộ (công khai vì các impl dùng chung; KHÔNG dựa vào, có thể đổi)
 

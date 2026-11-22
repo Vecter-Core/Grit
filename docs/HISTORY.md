@@ -92,3 +92,14 @@ Lệnh Giang: kế hoạch tối ưu từng M, gộp chỗ thừa, viết chỗ 
 - **Kiểm cuối**: 264 test của các crate đổi đạt; clippy -D warnings rc=0; fmt; check_expectations; nul; failopen 0 mới; platform_tests;
   mọi unittest công cụ của cổng đạt. **CHƯA**: cổng đầy đủ trong clone sạch, test nhị phân LLVM (máy không có LLVM 20).
 
+
+### GÓI 12 phần 3 (2026-11-22, Claude Opus 5.5) — thẩm định đánh giá quản lý bộ nhớ của Gemini
+Lệnh Giang: "đánh giá của Gemini có thật không? chỗ dùng được thì làm, chỗ sai thì đề xuất".
+- **Đúng (đã là thiết kế Grit):** không GC (GRIT_PLAN); allocator tường minh kiểu Zig (D26, `Vec::new(&ar)`); Arena giải phóng theo lô và borrowck
+  cấm dùng sau Arena; Perceus chỉ để tham khảo.
+- **Sai/lệch:** `Cap<Mem>` không tồn tại (thật là `Cap<Alloc>` + hiệu ứng `mem`); `Drop` một mình không trả bộ nhớ nào trong Arena (cần
+  `GlobalAlloc`); `std::HashMap` đã có `remove` tái dùng dung lượng; thời gian thực là Phase 2 (8.I); ví dụ web server chưa áp dụng được (Grit chưa có mạng).
+- **Đã làm:** `std::Slab` (ADR-C17) + oracle `std_slab.rs` (40×120 thao tác, so mô hình Rust, `capacity == đỉnh sống`); 2 đột biến tay bị giết;
+  `STD_REFERENCE.md` sinh lại; băm `std` trong 8 `rig.lock`.
+- **Đề xuất (chưa làm):** `GlobalAlloc` + hạ `Drop` (ADR-C18) — lỗ hổng Phase 1 thật so với GRIT_PLAN §4.0(a).
+- **CHƯA KIỂM:** exe LLVM, cổng đầy đủ trong clone sạch.

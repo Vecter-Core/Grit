@@ -27,6 +27,8 @@ Nhãn hiện hành: **`1.0.0-rc7`** (ứng viên, **CHƯA** phải `1.0.0-seed`)
 **GÓI 12 phần 2 (2026-11-21):** mượn hai pha (ADR-C14), ép `&[T; N]` → `&[T]` (ADR-C15), vòng/đệ quy qua `/` và `%` chứng minh được dừng
 (ADR-C16). Nhãn GIỮ `1.0.0-rc7` (chưa có cổng đầy đủ trên mã mới — không đổi nhãn khi chưa có bằng chứng). Kế hoạch từng M: `docs/ROADMAP.md` mục 0b.
 
+**GÓI 12 phần 3 (2026-11-22):** thẩm định đánh giá quản lý bộ nhớ của Gemini; làm phần dùng được: `std::Slab` (ADR-C17, oracle 40×120 thao tác, 2 đột biến bị giết); đề xuất `GlobalAlloc` + hạ `Drop` (ADR-C18, CHƯA LÀM — cần hợp đồng TCB + LLVM). Nhãn GIỮ `1.0.0-rc7`.
+
 ## 3. Luật làm việc (bản đầy đủ: `AGENTS.md`, `.claude/skills/grit-contract.md`)
 - Chỉ báo số liệu THẬT từ lệnh đã chạy; ghi `CHƯA KIỂM` cho phần chưa kiểm. Không báo xong khi chưa có cổng liền mạch xanh trên đúng mã đó.
 - Lỗi soundness/false negative = lỗi nghiêm trọng nhất: test ĐỎ trước, sửa sau trong commit riêng, ghi `docs/FIELD_BUGS.md`, mở rộng bộ sinh/oracle, kiểm bằng cách tắt bản sửa.

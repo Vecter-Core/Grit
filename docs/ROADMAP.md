@@ -40,7 +40,7 @@ mã nguồn KHÔNG thừa nhiều; phần thừa thật nằm ở test/tài li�
 | M9 gritc/secret | đạt | — | — | — |
 | M10 LLVM | đạt có điều kiện | — | **khai báo mà không hạ được** (`check` XANH, `build` mã 3): `Env::var`, `Clock::now`, `Fs::sub` (hạ), `Net::connect` (gỡ tới Giai đoạn 2), `Option::is_some/unwrap`; nhân/chia 128 bit; vòng khởi tạo `■` (NEXT_PRODUCT_BATCH #8) | — |
 | M11 rig | đạt | — | — (kho gói là Giai đoạn 2) | — |
-| M12 std | dở | — | `Drop` người dùng được hạ ⇒ `Vec`/`HashMap` phần tử không-Copy; `split/trim/find/parse`, in/đọc `f64`, `read_line`, bộ ghi đệm opt-in (Q75 giữ mặc định) | — |
+| M12 std | dở | `std::Slab` (ADR-C17) | `GlobalAlloc` (GRIT_PLAN §4.0a, thiếu) + `Drop` người dùng được hạ (ADR-C18 đề xuất) ⇒ `Vec`/`HashMap` phần tử không-Copy; `split/trim/find/parse`, in/đọc `f64`, `read_line`, bộ ghi đệm opt-in (Q75 giữ mặc định) | — |
 | M13 LSP | tối thiểu | — | hover kiểu, đi tới biến cục bộ (điều kiện #8) | — |
 
 Những gì KHÔNG làm trong Giai đoạn 1 (đúng lệnh "Giai đoạn 2 cứ từ từ"): FFI, closure bắt biến, `async`/`dyn`, kho gói, SMT/kernel, backend x64, tối ưu ±5%.
