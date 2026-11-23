@@ -150,13 +150,11 @@ fn a_linear_fact_dies_when_a_variable_it_mentions_is_reassigned() {
 }",
             "ghi qua &!",
         ),
-        // sự kiện chứa NGUYÊN TỬ (bool `c`) không được sống qua phép gán lại `c` (nguyên tử không nằm trong tập local của sự kiện)
+        // sự kiện chứa NGUYÊN TỬ (bool `c`, từ `⊳ c ∧ x + y ≤ 60`) không được sống qua phép gán lại `c`: nguyên tử không nằm trong tập local của sự kiện;
+        // mục tiêu `a ∧ x + y ≤ 60` nhắc cùng x, y nên sự kiện cũ sẽ được dùng để "chứng minh" `a`
         (
-            "ƒ need(a: bool) → u32 ! ∅ ⊳ a { 0 }
-ƒ f(p: u8, q: u8, c: bool) → u32 ! ∅ {
-  μcc ≔ c; x ≔ p as u32; y ≔ q as u32;
-  ⎇ cc ∧ x + y ≤ 60 { cc ← false; need(cc) } ⇝ { 0 }
-}",
+            "ƒ need(a: bool, p: u32, q: u32) → u32 ! ∅ ⊳ a ∧ p + q <= 60 { 0 }
+ƒ f(μc: bool, d: bool, x: u32, y: u32) → u32 ! ∅ ⊳ c ∧ x + y <= 60 { c ← d; need(c, x, y) }",
             "nguyên tử bị gán lại",
         ),
         // `⊳` của hàm KHÔNG được bị đảo dấu: ở thân x + y ≤ 100 đúng, nên x + y > 100 KHÔNG được coi là đã biết
