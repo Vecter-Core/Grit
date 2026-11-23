@@ -539,3 +539,15 @@ fn random_programs_drop_exactly_like_an_independent_scope_model_on_both_backends
         assert!(tally[k] >= 8, "bộ sinh quá ít ca `{n}`: {tally:?}");
     }
 }
+
+#[test]
+fn a_contract_never_drops_its_copy_of_a_drop_argument() {
+    // thân hợp đồng nhận BẢN SAO bit của đối số (M7 truyền Copy): drop nó sẽ chạy `drop` hai lần. Tham số Drop ở đầu và ở cuối danh sách
+    // (biên của "là tham số" trong elaboration); mỗi giá trị phải drop ĐÚNG một lần, ở hàm nhận.
+    let src = "ƒ first<'a>(d: D<'a>, n: u64) ! ∅ ⊳ n > 0u64 ⊲ n > 0u64 { }\n\
+               ƒ last<'a>(n: u64, d: D<'a>) ! ∅ ⊳ n > 0u64 ⊲ n > 0u64 { }\n\
+               ƒ main() → u64 ! ∅ {\n  log ≔ Cell::new(0u64);\n  {\n    first(mk(&log, 3u64), 1u64);\n    last(1u64, mk(&log, 4u64));\n  };\n  log.get()\n}\n";
+    for (backend, got) in run(src, "contract") {
+        assert_eq!(got, Some(seq(&[3, 4])), "({backend})\n{src}");
+    }
+}

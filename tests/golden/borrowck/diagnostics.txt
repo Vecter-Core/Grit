@@ -229,6 +229,7 @@ E0406_write_through_origin_while_reborrowed | E0406 | `*p ← 1;` | [khoản mư
 E0407_array_element | E0407 | `eat(a[0])` | [] | không thể move ra khỏi `a`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
 E0407_array_element_in_let | E0407 | `a[1]` | [] | không thể move ra khỏi `a`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
 E0407_contract_moves_drop_arg | E0407 | `ok(d)` | [] | hợp đồng không được move giá trị có thể có `Drop` ra khỏi tham số (hợp đồng chỉ nhìn bản sao của giá trị thật; ADR-C18)
+E0407_contract_moves_drop_arg_into_tuple | E0407 | `(d, n)` | [] | hợp đồng không được move giá trị có thể có `Drop` ra khỏi tham số (hợp đồng chỉ nhìn bản sao của giá trị thật; ADR-C18)
 E0407_deref_in_let | E0407 | `*r` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
 E0407_deref_in_struct_literal | E0407 | `W { b: *r, n: 0 }` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
 E0407_deref_shared_ref | E0407 | `*r` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)

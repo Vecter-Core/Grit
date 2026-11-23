@@ -1,0 +1,6 @@
+// expect: fail E0407
+// note: hợp đồng move BẢN SAO của đối số có Drop vào một tuple (lệnh gán, không phải lời gọi) ⇒ bản sao bị drop ⇒ từ chối (ADR-C18)
+▢ E { v: u32 }
+⊐ Drop for E { ƒ drop(&!self) ! ∅ { } }
+ƒ h(d: E, n: u64) ! ∅ ⊳ (d, n).1 > 0u64 { }
+ƒ main() ! ∅ { h(E { v: 1u32 }, 1u64); }
