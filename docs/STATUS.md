@@ -29,6 +29,8 @@ Nhãn hiện hành: **`1.0.0-rc7`** (ứng viên, **CHƯA** phải `1.0.0-seed`)
 
 **GÓI 12 phần 3 (2026-11-22):** thẩm định đánh giá quản lý bộ nhớ của Gemini; làm phần dùng được: `std::Slab` (ADR-C17, oracle 40×120 thao tác, 2 đột biến bị giết); đề xuất `GlobalAlloc` + hạ `Drop` (ADR-C18, CHƯA LÀM — cần hợp đồng TCB + LLVM). Nhãn GIỮ `1.0.0-rc7`.
 
+**GÓI 12 phần 4 (2026-11-23):** ADR-C18 bước 1 — `Drop` người dùng CHẠY THẬT (thông dịch + exe LLVM): luật M4 (E0313), cờ drop/drop mở (elaboration giữa M5 và M6), dropck ở M6, đệ quy qua drop ⇒ E0703 ở M8. Oracle 60 chương trình × 2 backend; đột biến tự động 107 (70 giết / 25 tương đương / 12 không biên dịch). Container đám mây giờ có LLVM 20 (`tools/setup_cloud.sh --install-system`). Nhãn GIỮ `1.0.0-rc7` (chưa có cổng đầy đủ trong clone sạch).
+
 ## 3. Luật làm việc (bản đầy đủ: `AGENTS.md`, `.claude/skills/grit-contract.md`)
 - Chỉ báo số liệu THẬT từ lệnh đã chạy; ghi `CHƯA KIỂM` cho phần chưa kiểm. Không báo xong khi chưa có cổng liền mạch xanh trên đúng mã đó.
 - Lỗi soundness/false negative = lỗi nghiêm trọng nhất: test ĐỎ trước, sửa sau trong commit riêng, ghi `docs/FIELD_BUGS.md`, mở rộng bộ sinh/oracle, kiểm bằng cách tắt bản sửa.

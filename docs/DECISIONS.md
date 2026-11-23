@@ -1399,5 +1399,8 @@ Trả lời từng câu của điều kiện R6, KÈM bằng chứng chạy đư
   người dùng) ⇒ đệ quy qua drop ⇒ E0703 (trước khi sửa: XANH — chương trình không dừng được chấp nhận; hai mẫu `E0703_recursion_through_drop*`).
 - **Backend:** thông dịch (`Interp::drop_place`) và LLVM (`drop_glue_at`: gọi `drop` với con trỏ chỗ, GEP trường, `switch` theo thẻ, vòng IR cho mảng).
 - **Bằng chứng:** `crates/gt-driver/tests/user_drop.rs` (ĐỎ trước: E0313; XANH sau) — 15 ca, mỗi ca chạy bằng thông dịch VÀ exe LLVM, so dãy
-  drop mã hoá thứ tự; 13 mẫu corpus mới (E0313 ×5, E0318, E0403, E0407, E0703 ×2, pass ×3). Oracle ngẫu nhiên và đột biến: xem HISTORY.
+  drop mã hoá thứ tự; 15 mẫu corpus mới (E0313 ×5, E0318, E0403, E0407 ×2, E0703 ×2, pass ×4). Oracle ngẫu nhiên (`user_drop.rs`): 60
+  chương trình sinh ngẫu nhiên × 2 backend so với mô hình phạm vi độc lập. Đột biến TỰ ĐỘNG `elaborate.rs`: 107 chạy được, cuối 70 giết /
+  25 sống đều tương đương có lập luận / 12 không biên dịch (`docs/MUT_DROP_ELAB_GOI12.md`). Hồi quy bắt trước commit: tuple lồng 100 tầng
+  bị E0318 giả (giới hạn độ sâu glue) ⇒ glue rỗng khi không có `drop` người dùng nào + giới hạn 1024.
 - **Còn lại (bước 2–3):** `GlobalAlloc` (intrinsic + hợp đồng TCB) và `Owned<T>`; container chứa phần tử có Drop; Drop cho kiểu generic theo kiểu.

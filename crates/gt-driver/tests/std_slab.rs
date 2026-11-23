@@ -3,7 +3,7 @@
 //! dùng (`check` M4–M9) rồi bằng thông dịch MIR; kết quả so với MÔ HÌNH Rust độc lập viết dưới đây (không dùng mã Grit nào).
 //! Tính chất bộ nhớ khẳng định tường minh: `capacity()` (số ô từng cấp, không bao giờ giảm) == số phần tử SỐNG TỐI ĐA từng có — ô bị xoá
 //! luôn được tái dùng trước khi cấp ô mới, nên thêm/xoá liên tục suốt đời chương trình không làm bộ nhớ tăng quá đỉnh.
-//! Không cần LLVM (backend thông dịch); exe LLVM của cùng mã do `std_lib`/`std2_lib` (cần LLVM) phủ khi có máy.
+//! Luôn chạy bằng thông dịch; bản dựng có backend LLVM thì 10 chương trình đầu còn được dựng thành exe THẬT và phải ra cùng số.
 use gt_driver::runner::run_main;
 use gt_driver::{Options, RunEnd, check};
 use gt_resolve::SourceInput;
@@ -140,6 +140,31 @@ fn slab_matches_an_independent_model_and_never_grows_past_peak_live() {
             .map(|d| format!("{}: {}", d.code.as_str(), d.message))
             .collect();
         assert!(codes.is_empty(), "#{seed}: gritc từ chối: {codes:?}\n{src}");
+        #[cfg(feature = "llvm")]
+        if seed <= 10 {
+            use gt_driver::pipeline::{attestation, mir_dump};
+            let att = {
+                let art = res.open_gate().expect("cổng mở");
+                attestation(&res, &mir_dump(art))
+            };
+            let dir = std::env::temp_dir().join(format!("gt-std-slab-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).expect("tạo thư mục");
+            let exe = dir.join(format!("slab{seed}.exe"));
+            gt_driver::native::build_exe_profile(
+                res.open_gate().expect("cổng"),
+                &exe,
+                true,
+                &att,
+                gt_codegen_llvm::Opt::Dev,
+            )
+            .unwrap_or_else(|e| panic!("#{seed}: backend lỗi: {e}"));
+            let r =
+                gt_driver::native::run_exe_timeout(&exe, Some(std::time::Duration::from_secs(30)));
+            let _ = std::fs::remove_file(&exe);
+            assert_eq!(r.end, RunEnd::Normal, "#{seed}: exe {:?}", r.end);
+            let got: Option<u64> = r.value.as_deref().and_then(|v| v.trim().parse().ok());
+            assert_eq!(got, Some(want), "#{seed}: exe LLVM ≠ mô hình\n{src}");
+        }
         let art = res.take_gated().expect("cổng mở (XANH/VÀNG)");
         let run = run_main(art);
         assert_eq!(run.end, RunEnd::Normal, "#{seed}: {:?}\n{src}", run.end);
