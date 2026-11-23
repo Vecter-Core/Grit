@@ -153,3 +153,14 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
   phải sửa kỳ vọng sau khi ĐỌC MIR: biến tạm của gán đè cũng bị xoá — đúng đặc tả); đột biến tay 3/3 bị bắt; unit gt-rt xoá đúng `len` byte; 3 mẫu corpus.
   Chạy: 66 bộ/372 test của các crate bị đụng + 7 bộ driver/58 test đạt; clippy (có/không LLVM, runtime) sạch.
 - **CHƯA:** luật Guard "mọi alloca Secret được xoá"; đột biến tự động; cổng liền mạch trên mã này; `declassify` cần `Cap<Secret>` (ADR-C13, vẫn hoãn).
+
+### P2-A2/A3 bước 1 (2026-11-23, Claude Opus 5.5) — kernel chứng chỉ Farkas (ADR-P2-04)
+- **Đã làm:** crate `gt-kernel` — phần TCB (`linear.rs`: dịch nghĩa vụ sang DNF ràng buộc tuyến tính, cái không hiểu ⇒ làm yếu; `check.rs`: kiểm chứng chỉ
+  Farkas từng ca + luật `a ∧ ¬a`) tách khỏi phần tìm (`search.rs`, Fourier–Motzkin, NGOÀI TCB). `CertifiedProver{require_kernel}` bật ở M7 và M8:
+  mọi "đã chứng minh" phải có chứng chỉ kernel chấp nhận.
+- **Bằng chứng:** corpus 105/105 chứng minh zone có chứng chỉ (`kernel_coverage.rs`, `rejected == 0`); oracle vét cạn 3000 nghĩa vụ; chế độ chỉ-tin-kernel:
+  63 bộ/240 test (corpus, gt-driver, rig) đạt. Đột biến tự động `docs/MUT_KERNEL_P2.md`: 76 → 72 giết, 4 sống có lập luận; lượt 1 lộ 3 đột biến
+  KHÔNG SOUND sống (test độc hại cũ vi phạm nhiều luật cùng lúc) — đã thêm test cô lập từng luật. `mut.py` sửa giết nhóm tiến trình trên POSIX.
+- **Phát hiện:** Farkas thêm 0 chứng minh mới trên corpus vì M7 chỉ xuất giả thiết khoảng + zone ⇒ bước 2: M7 giữ sự kiện tuyến tính tổng quát.
+- **Phụ:** danh sách test nền Windows thiếu 10 test có sẵn (bước diff CI sẽ đỏ) — đã bổ sung, kiểm bằng đúng lệnh CI (`PLATFORM_DIFF_OK`).
+- **CHƯA:** cổng liền mạch trên mã này; TCB của kernel CHỜ DUYỆT.
