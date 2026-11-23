@@ -1498,6 +1498,10 @@ phản ví dụ, không bao giờ cấp phép hay đổi phán quyết `gritc`; 
   xanh ⇒ chạy trên thông dịch tham chiếu. Dùng `gritc` làm bộ lọc nên KHÔNG cần bộ tính hợp đồng riêng (không có hai bản ngữ nghĩa của biểu thức hợp đồng).
 - **Phản ví dụ:** mọi abort (`postcondition`, `overflow`, `precondition` của hàm được gọi, `index`…). Hết nhiên liệu ghi là "chậm", KHÔNG phải lỗi (mọi vòng `⟳` có biến
   thể `↓` được M8 chứng minh dừng nên chạy lâu ≠ không dừng) — phát hiện sau khi thử `std::pow_u64` với số mũ 2³².
+- **Bước 2 (cùng ngày): `f64` và `char`.** Literal biên: f64 `0.0, 1.0, -1.0, 0.5, ±1e300, 1e-300`; char `'a','Z','0',' ','\0','é'`. `f32` vẫn bỏ qua (Phase 1 chưa có: E0319). **Điểm yếu lộ ra khi
+  thử:** M7 không suy luận số thực nên `⊳ x >= 0.0` KHÔNG bị loại bằng E0901 — ứng viên âm sẽ abort `precondition` ngay ở cửa vào và bị đổ lỗi oan cho hàm. Cách xử lý (đánh đổi có ý thức):
+  với hàm có `⊳` mà `gritc` không quyết định được (tham số float/char, hoặc `⊳` có lời gọi), abort `precondition` được ghi là "mơ hồ" (không phải phản ví dụ). Cái mất: một vi phạm `⊳` của hàm
+  được gọi sẽ bị bỏ lọt ở đúng loại hàm này. Hàm KHÔNG có `⊳` riêng thì abort `precondition` chắc chắn đến từ hàm được gọi nên vẫn được báo.
 - **Giới hạn công khai:** đối số chỉ là hằng biên (không phải fuzz); kiểu chưa hỗ trợ bị bỏ qua; mỗi ứng viên chạy lại `gritc check` nên chậm với dự án lớn (CHƯA đo); hợp đồng
   chỉ được thử ở các điểm biên, không chứng minh gì — chứng minh vẫn là việc của M7/kernel.
 **Kết quả:** `crates/rig/tests/auto.rs` (6 test E2E qua tiến trình `rig`): hàm đúng qua và ứng viên vi phạm `⊳` bị loại chứ không bị đổ lỗi; `⊲` sai báo `postcondition` kèm lời gọi phản
