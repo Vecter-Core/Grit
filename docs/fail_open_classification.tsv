@@ -86,7 +86,7 @@ crates/gt-driver/src/native.rs	365	unwrap_or_default	AN TOÀN		stdout đọc kh�
 crates/gt-driver/src/native.rs	367	let _ =	AN TOÀN		Dọn tệp phụ; không ảnh hưởng kết quả.	let _ = std::fs::remove_file(f);
 crates/gt-driver/src/native.rs	379	unwrap_or	AN TOÀN		Thiếu dòng `abort: ` ⇒ lý do "unknown" nhưng vẫn RunEnd::Aborted (mã 70) — không bị đọc thành Normal.	.unwrap_or("unknown")
 crates/gt-driver/src/native.rs	382	unwrap_or	AN TOÀN		clamp(1,255) rồi u8: luôn vừa, 255 chỉ là dự phòng vô hại; mã 0 đã xử lý riêng (Normal) trước đó.	Some(c) => RunEnd::ProgramExit(u8::try_from(c.clamp(1, 255)).unwrap_or(255)),
-crates/gt-driver/src/pipeline.rs	223	_ =>	AN TOÀN		alias chỉ gọi SAU khi pass cha đã chạy xong (Done) và chỉ ghi Done khi không có Fault chèn; để kiểm cổng.	_ => self.record(name, PassStatus::Done),
+crates/gt-driver/src/pipeline.rs	232	_ =>	AN TOÀN		alias chỉ gọi SAU khi pass cha đã chạy xong (Done) và chỉ ghi Done khi không có Fault chèn; để kiểm cổng.	_ => self.record(name, PassStatus::Done),
 crates/gt-driver/src/render.rs	129	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
 crates/gt-driver/src/render.rs	181	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
 crates/gt-driver/src/render.rs	192	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
@@ -123,6 +123,18 @@ crates/gt-guard/src/lib.rs	446	is_some_and	AN TOÀN		không thấy hàm hoặc k
 crates/gt-guard/src/lib.rs	475	is_some_and	AN TOÀN		unreachable không có lệnh liền trước ⇒ ok=false ⇒ vi phạm	&& prev.as_ref().is_some_and(|p| {
 crates/gt-guard/src/lib.rs	477	is_some_and	AN TOÀN		không có gritrt_abort hoặc thiếu noreturn ⇒ ok=false ⇒ vi phạm	&& m.get_function("gritrt_abort").is_some_and(|a| {
 crates/gt-guard/src/lib.rs	493	unwrap_or	AN TOÀN		split().next() không bao giờ None; cờ UB đứng ngay sau opcode nên đứng trước mọi ', !'; tên local có ', !' không sinh từ định danh Grit	let body = text.split(", !").next().unwrap_or(&text);
+crates/gt-kernel/src/lib.rs	88	_ =>	AN TOÀN		require_kernel: không có chứng chỉ được kernel chấp nhận ⇒ Unknown (fail-closed: giữ kiểm/từ chối)	_ => {
+crates/gt-kernel/src/lib.rs	96	is_some_and	AN TOÀN		chỉ đếm độ phủ (measure), không ảnh hưởng phán quyết	if find_cert(ob, &mut steps).is_some_and(|c| check(ob, &c).is_ok()) {
+crates/gt-kernel/src/lib.rs	106	let _ =	AN TOÀN		trừ ngân sách bước đã dùng; bộ tìm đã bị giới hạn bởi min(search_steps, budget.steps)	let _ = budget.spend(before - steps);
+crates/gt-kernel/src/linear.rs	70	_ =>	AN TOÀN		số hạng lạ ⇒ biến mờ: chỉ bỏ quên quan hệ ⇒ công thức yếu hơn ⇒ khó bác bỏ hơn (sound cho chứng minh vô nghiệm)	_ => Some(Lin::key(Key::Opaque(format!("{t:?}")))),
+crates/gt-kernel/src/linear.rs	137	_ =>	AN TOÀN		không tuyến tính hoá được ⇒ True: làm YẾU công thức cần bác bỏ (sound)	_ => one(Vec::new()),
+crates/gt-kernel/src/linear.rs	154	_ =>	AN TOÀN		không tuyến tính hoá được ⇒ True: làm YẾU (sound)	_ => one(Vec::new()),
+crates/gt-kernel/src/linear.rs	159	_ =>	AN TOÀN		không tuyến tính hoá được ⇒ True: làm YẾU (sound)	_ => one(Vec::new()),
+crates/gt-kernel/src/linear.rs	180	_ =>	AN TOÀN		vị từ/lượng từ không diễn giải ⇒ True: làm YẾU công thức cần bác bỏ (sound)	_ => one(Vec::new()),
+crates/gt-kernel/src/search.rs	66	is_some_and	AN TOÀN		bộ TÌM (ngoài TCB): chọn biến khử; sai chỉ làm mất chứng minh, kernel kiểm lại	.filter(|r| r.lin.coef.get(*k).is_some_and(|v| *v > 0))
+crates/gt-kernel/src/search.rs	70	is_some_and	AN TOÀN		bộ TÌM ngoài TCB	.filter(|r| r.lin.coef.get(*k).is_some_and(|v| *v < 0))
+crates/gt-kernel/src/search.rs	77	is_some_and	AN TOÀN		bộ TÌM ngoài TCB	.partition(|r| r.lin.coef.get(&k).is_some_and(|v| *v > 0));
+crates/gt-kernel/src/search.rs	80	is_some_and	AN TOÀN		bộ TÌM ngoài TCB	.partition(|r| r.lin.coef.get(&k).is_some_and(|v| *v < 0));
 crates/gt-mir/src/build/expr.rs	18	unwrap_or	AN TOÀN		không bóc được cặp nháy thì giữ nguyên chuỗi (AST không chứa nháy); chỉ là cách giải escape, không ảnh hưởng phán quyết an toàn	.unwrap_or(s);
 crates/gt-mir/src/build/expr.rs	46	ok()?	AN TOÀN		hex/codepoint hỏng ⇒ None ⇒ người gọi lit_const trả ICE 'literal chuỗi hỏng' (từ chối)	out.push(char::from_u32(u32::from_str_radix(&hex, 16).ok()?)?);
 crates/gt-mir/src/build/expr.rs	48	_ =>	AN TOÀN		escape lạ ⇒ None ⇒ lit_const ICE (từ chối)	_ => return None,

@@ -25,6 +25,7 @@ gt-mir = { path = "../gt-mir" }
 gt-dataflow = { path = "../gt-dataflow" }
 gt-borrowck = { path = "../gt-borrowck" }
 gt-oblig = { path = "../gt-oblig" }
+gt-kernel = { path = "../gt-kernel" }
 gt-term = { path = "../gt-term" }
 gt-effects = { path = "../gt-effects" }
 gt-conc = { path = "../gt-conc" }

@@ -23,7 +23,7 @@ ROOT = os.environ.get("GRIT_ROOT") or os.environ.get("FOS_ROOT") or os.path.dirn
 LEDGER = os.path.join(ROOT, "docs", "FAIL_OPEN_LEDGER.jsonl")
 AUDIT = os.path.join(ROOT, "docs", "FAIL_OPEN_AUDIT.md")
 SRC_ROOTS = ["crates", os.path.join("runtime", "gt-rt", "src")]
-SEED_CRATES = ["gt-types", "gt-mir", "gt-borrowck", "gt-oblig", "gt-term", "gt-effects", "gt-conc", "gt-secrets", "gt-guard", "gt-driver", "gt-codegen-llvm"]
+SEED_CRATES = ["gt-types", "gt-mir", "gt-borrowck", "gt-oblig", "gt-kernel", "gt-term", "gt-effects", "gt-conc", "gt-secrets", "gt-guard", "gt-driver", "gt-codegen-llvm"]
 SEED_PATTERNS = [
     ("unwrap_or", re.compile(r"\.unwrap_or\(")),
     ("unwrap_or_default", re.compile(r"\.unwrap_or_default\(")),
