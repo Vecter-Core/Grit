@@ -183,3 +183,11 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
 - **Quyết định của Giang (2026-11-23):** KHÔNG gán nhãn seed (hay nhãn phiên bản khác) cho tới khi viết Grit hoàn chỉnh như viết Rust.
 - **Cổng:** clone sạch trên d558cda XANH liền mạch 4 lượt: 976 test đạt, 0 lỗi, 209 bộ, `GATE_TREE=9d9b5813…`.
 - **CHƯA:** đo thời gian `--auto` trên dự án lớn; hỗ trợ f32/f64/char/slice; cổng Windows.
+
+### P2-DUYỆT + P2-C3 bước 1 (2026-11-23, Claude Opus 5.5 / Sonnet 5.5) — duyệt theo ủy quyền + khoá `edition`
+- **Duyệt (ADR-P2-07, `docs/DUYET_2026-11-23.md`):** Giang ủy quyền "duyệt những chính sách cần duyệt, chỉ cần không phản triết lý Grit". TCB B5 (`Owned`, lang item `owned`), B6 (xoá Secret), K (kernel) DUYỆT hợp đồng; ADR-P2-00/01/03 DUYỆT; ADR-P2-02 DUYỆT
+  hướng đi có điều kiện; ADR-C13 HOÃN ⇒ DUYỆT cho edition 2; ROADMAP DUYỆT. Giới hạn nói thẳng: người duyệt = tác giả, cùng họ model (độc lập yếu). Khi duyệt kernel: đột biến tắt `require_kernel` SỐNG ⇒ thêm 2 test (bộ nói dối; mọi chứng minh được kernel kiểm lại: 446 chương trình/110 chứng minh) TRƯỚC khi ký.
+  Cổng clone sạch XANH `5c89e6b` (981/0, 209 bộ).
+- **C3 bước 1 (ADR-P2-08):** khoá `edition` ở `[package]` của `rig.toml` (vắng ⇒ 1; số nguyên `1`; mọi thứ khác mã 11); bộ đọc TOML thêm `Value::Int`; `FREEZE.md` sửa cùng commit; 4 test E2E đỏ trước + đột biến tay 2/2. Cổng clone sạch XANH `ac542b5` (986/0, 210 bộ, `GATE_TREE=ef27a0a5…`).
+  Sơ suất: commit WIP 7b2fd49 (chưa biên dịch, do hook buộc commit lúc cổng chiếm Cargo) — đã ghi rõ và thay bằng commit hoàn chỉnh trước khi chạy cổng.
+- **CHƯA:** `gritc` biết `edition`; `gritc fix` + golden (điều kiện TRƯỚC cú pháp mới đầu tiên); hợp đồng TCB cho GLIR/`gt-layout`; đọc chéo khác họ model cho phần Giai đoạn 2; cổng Windows.

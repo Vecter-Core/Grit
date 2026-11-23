@@ -1,0 +1,4 @@
+// expect: fail E0320
+// note: `?` không chuyển đổi lỗi: u8 khác i32
+ƒ g() → Result<u32, u8> ! ∅ { Ok(1u32) }
+ƒ f() → Result<u32, i32> ! ∅ { v ≔ g()?; Ok(v) }

@@ -77,6 +77,7 @@ không phải chữ/số/`_`. Bí danh toán tử (`<-`, `->`, `:=`, `<=`...) d�
 | Giải tham chiếu (prefix) **và** nhân (infix) | `*` | `*` — cùng một token `STAR`, parser phân biệt (semantics §14); **đã duyệt: giữ ASCII** |
 | Số học kiểm tràn (mặc định) | `+ - * / %` | giống |
 | Quấn vòng / bão hoà / trả Option | `+% -% *%` / `+^ -^ *^` / `+? -? *?` | giống (đã ASCII) |
+| Lan truyền lỗi `e?` (**edition 2**, ADR-P2-09) | `?` hậu tố (token `QUESTION`, đứng riêng; `+?` `-?` `*?` vẫn là một token theo khớp-dài-nhất) | giống (đã ASCII) |
 
 ## Lifetime / region có tên
 

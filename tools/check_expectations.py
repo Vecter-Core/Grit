@@ -13,7 +13,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TESTS = os.path.join(ROOT, "tests")
 CODES_MD = os.path.join(ROOT, "docs", "spec", "error_codes.md")
 EXPECT_RE = re.compile(r"^// expect: (pass|lexer|fail E\d{4}|warn S\d{3})\s*$")
-DIR_KIND = {"pass": "pass", "fail": "fail", "warn": "warn", "lexer": "lexer"}
+# `ed2/*`: mẫu EDITION 2 (ADR-P2-09) — để riêng vì các bộ test khác đọc tests/pass ở edition 1; cùng luật tiêu đề/tên/bảng mã lỗi
+DIR_KIND = {"pass": "pass", "fail": "fail", "warn": "warn", "lexer": "lexer", "ed2/pass": "pass", "ed2/fail": "fail"}
 # bidi, zero-width/vô hình (D15). Chỉ các mẫu E1201/E1202 được phép chứa.
 BIDI = set(range(0x202A, 0x202F)) | set(range(0x2066, 0x206A))
 INVISIBLE = {0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF}
@@ -32,7 +33,7 @@ CASE_EXPECT_RE = re.compile(r"^expect: (pass|fail E\d{4}|warn S\d{3})\s*$")
 DOC_REQUIRED = [
     "E0101", "E0102", "E0201", "E0202", "E0203", "E0204", "E0205",
     "E0301", "E0302", "E0303", "E0304", "E0305", "E0307", "E0308", "E0309",
-    "E0310", "E0311", "E0312", "E0313", "E0314", "E0315", "E0316", "E0317", "E0318", "E0319", "E1002",
+    "E0310", "E0311", "E0312", "E0313", "E0314", "E0315", "E0316", "E0317", "E0318", "E0319", "E0320", "E0321", "E1002",
     "E0401", "E0402", "E0403", "E0404", "E0405", "E0406", "E0407", "E0501", "E0502", "E0503",
     "E0601", "E0602", "E0603", "E0604", "E0901", "E0902", "E1001", "E1401",
     "E0701", "E0702", "E0703", "E0801", "E0802",
@@ -234,7 +235,7 @@ def main():
     codes, refs = load_code_table()
     if not codes:
         err("không đọc được bảng mã lỗi trong error_codes.md")
-    seen_files = {"fail": set(), "warn": set(), "pass": set(), "lexer": set()}
+    seen_files = {"fail": set(), "warn": set(), "pass": set(), "lexer": set(), "ed2/pass": set(), "ed2/fail": set()}
     total = 0
     for kind, name, path in gt_files():
         total += 1
@@ -293,6 +294,10 @@ def main():
     for code, ref in refs:
         if ref.startswith("pass/"):
             sub, base = "pass", ref[5:]
+        elif ref.startswith("ed2/pass/"):
+            sub, base = "ed2/pass", ref[9:]
+        elif ref.startswith("ed2/fail/"):
+            sub, base = "ed2/fail", ref[9:]
         else:
             sub, base = ("warn" if code.startswith("S") else "fail"), ref
         cited.add((sub, base))
@@ -311,7 +316,9 @@ def main():
                     m = DOC_LINE_RE.match(ln)
                     if m and m.group(1) == "fail" and m.group(2).startswith("fail/"):
                         documented.add(("fail", m.group(2)[5:]))
-    for sub in ("fail", "warn"):
+                    if m and m.group(1) == "fail" and m.group(2).startswith("ed2/fail/"):
+                        documented.add(("ed2/fail", m.group(2)[9:]))
+    for sub in ("fail", "warn", "ed2/fail"):
         for base in sorted(seen_files[sub]):
             if (sub, base) not in cited and (sub, base) not in documented:
                 err(f"tests/{sub}/{base}.gt không được liệt kê trong error_codes.md (hay docs/errors/<mã>.md)")

@@ -1,0 +1,4 @@
+// expect: pass
+// note: ADR-P2-09 — `?` trên Result cùng kiểu lỗi: nhánh thành công đi tiếp, nhánh lỗi thoát sớm như `⏎ Err(e)`
+ƒ digit(c: u8) → Result<u32, u8> ! ∅ { ⎇ c >= 48u8 ∧ c <= 57u8 { Ok((c - 48u8) as u32) } ⇝ { Err(c) } }
+ƒ two(a: u8, b: u8) → Result<u32, u8> ! ∅ { x ≔ digit(a)?; y ≔ digit(b)?; Ok(x * 10u32 + y) }

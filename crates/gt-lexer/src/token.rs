@@ -64,6 +64,8 @@ pub enum TokenKind {
     MinusSat,
     StarSat,
     PlusChk,
+    /// `?` đứng riêng — toán tử lan truyền lỗi (CHỈ edition ≥ 2, ADR-P2-09)
+    Question,
     MinusChk,
     StarChk,
     // so sánh, mượn
@@ -172,6 +174,7 @@ impl TokenKind {
             MinusSat => "MINUS_SAT",
             StarSat => "STAR_SAT",
             PlusChk => "PLUS_CHK",
+            Question => "QUESTION",
             MinusChk => "MINUS_CHK",
             StarChk => "STAR_CHK",
             EqEq => "EQ_EQ",

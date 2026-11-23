@@ -1,0 +1,3 @@
+// expect: fail E0320
+// note: `?` trên Option trong hàm trả Result: KHÁC HỌ — không chuyển đổi ngầm; dùng ok_or tường minh
+ƒ f(x: Option<u32>) → Result<u32, u8> ! ∅ { v ≔ x?; Ok(v) }

@@ -99,6 +99,8 @@ pub struct Options {
     pub checks: Checks,
     pub deny_yellow: bool,
     pub fault: Option<Fault>,
+    /// edition của ngôn ngữ (ADR-P2-01/09); mặc định 1 = hành vi đóng băng của Seed
+    pub edition: u32,
 }
 
 impl Default for Options {
@@ -107,6 +109,7 @@ impl Default for Options {
             checks: DEFAULT_CHECKS,
             deny_yellow: false,
             fault: None,
+            edition: 1,
         }
     }
 }
@@ -329,7 +332,9 @@ fn run_passes(
         }
     };
     // ---- M4
-    let t = match run.stage("m4.types", || gt_types::check_program(inputs, &prelude)) {
+    let t = match run.stage("m4.types", || {
+        gt_types::check_program_with_edition(inputs, &prelude, opts.edition)
+    }) {
         Some(Ok(t)) => t,
         Some(Err(e)) => return Err(format!("đầu vào không hợp lệ: {e:?}")),
         None => {

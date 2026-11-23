@@ -1332,6 +1332,7 @@ impl Builder<'_> {
                 else_branch,
             } => b.if_into(dest, cond, then_block, else_branch.as_deref()),
             ExprKind::Match { scrutinee, arms } => b.match_into(dest, scrutinee, arms),
+            ExprKind::Try(inner) => b.try_into(dest, inner),
             ExprKind::Loop(l) => {
                 b.loop_into(l)?;
                 b.assign_unit_if_unit(dest)

@@ -34,10 +34,18 @@ pub fn render_tokens(out: &LexOutput) -> Vec<String> {
         .collect()
 }
 
-/// Lex một tệp nguồn.
+/// Lex một tệp nguồn theo edition 1 (hành vi đóng băng của Seed).
 #[must_use]
 pub fn lex(source: &str) -> LexOutput {
+    lex_with_edition(source, 1)
+}
+
+/// Lex theo `edition` (ADR-P2-01/09). Edition ≥ 2 thêm token `?` đứng riêng (`Question`); edition 1 giữ nguyên: `?` đứng riêng là `E0101`.
+/// `+?` `-?` `*?` luôn là một token (khớp dài nhất) ở mọi edition.
+#[must_use]
+pub fn lex_with_edition(source: &str, edition: u32) -> LexOutput {
     let mut lx = Lexer {
+        edition,
         src: source,
         pos: 0,
         tokens: Vec::new(),
@@ -202,6 +210,8 @@ fn keyword_kind(text: &str) -> TokenKind {
 // ---------- lexer ----------
 
 struct Lexer<'a> {
+    /// edition của ngôn ngữ (ADR-P2-01): quyết định tập token (hiện chỉ `?` đứng riêng ở edition ≥ 2)
+    edition: u32,
     src: &'a str,
     pos: usize,
     tokens: Vec<Token>,
@@ -358,6 +368,8 @@ impl Lexer<'_> {
                             | '%'
                     ) {
                         self.op(c, start);
+                    } else if c == '?' && self.edition >= 2 {
+                        self.single(TokenKind::Question, start);
                     } else {
                         self.bump();
                         self.bad(ErrorCode::E0101, "ký tự không thuộc ngôn ngữ Grit", start);

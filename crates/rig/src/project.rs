@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 pub struct Package {
     pub name: String,
     pub version: String,
+    /// edition của ngôn ngữ (ADR-P2-01): vắng trong `rig.toml` ⇒ 1; chỉ `1` được hỗ trợ
+    pub edition: u32,
     pub dir: PathBuf,
     /// (tên phụ thuộc, đường dẫn đã khai báo)
     pub deps: Vec<(String, String)>,
@@ -78,6 +80,7 @@ fn read_manifest(dir: &Path) -> Result<(String, toml::Doc), String> {
 pub struct Manifest {
     pub name: String,
     pub version: String,
+    pub edition: u32,
     /// (tên phụ thuộc, đường dẫn đã khai báo)
     pub deps: Vec<(String, String)>,
     /// nội dung đã chuẩn hoá LF
@@ -97,7 +100,7 @@ pub fn parse_manifest(dir: &Path) -> Result<Manifest, String> {
         return Err(at("thiếu mục [package]"));
     };
     for (k, (_, line)) in pkg {
-        if k != "name" && k != "version" {
+        if k != "name" && k != "version" && k != "edition" {
             return Err(at(&format!("dòng {line}: khoá package.`{k}` không hỗ trợ")));
         }
     }
@@ -118,6 +121,30 @@ pub fn parse_manifest(dir: &Path) -> Result<Manifest, String> {
             "phiên bản `{version}` phải dạng MAJOR.MINOR.PATCH"
         )));
     }
+    // ADR-P2-01: vắng ⇒ edition 1; chỉ số nguyên đã hỗ trợ — edition lạ bị TỪ CHỐI (fail-closed, không đoán nghĩa)
+    let edition = match pkg.get("edition") {
+        None => 1,
+        Some((Value::Int(n), _))
+            if u32::try_from(*n).is_ok_and(|n| gt_driver::SUPPORTED_EDITIONS.contains(&n)) =>
+        {
+            u32::try_from(*n).map_err(|_| at("edition quá lớn"))?
+        }
+        Some((Value::Int(n), line)) => {
+            return Err(at(&format!(
+                "dòng {line}: edition {n} chưa được hỗ trợ (hỗ trợ: {})",
+                gt_driver::SUPPORTED_EDITIONS
+                    .iter()
+                    .map(u32::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )));
+        }
+        Some((_, line)) => {
+            return Err(at(&format!(
+                "dòng {line}: `edition` phải là số nguyên dương trần (vd `edition = 1`), không phải chuỗi/bảng"
+            )));
+        }
+    };
     let mut deps = Vec::new();
     if let Some(ds) = doc.get("dependencies") {
         for (k, (v, line)) in ds {
@@ -147,6 +174,7 @@ pub fn parse_manifest(dir: &Path) -> Result<Manifest, String> {
     Ok(Manifest {
         name,
         version,
+        edition,
         deps,
         text,
     })
@@ -214,6 +242,7 @@ impl Loader {
         let Manifest {
             name,
             version,
+            edition,
             deps,
             text: manifest_text,
         } = parse_manifest(&canon)?;
@@ -242,6 +271,7 @@ impl Loader {
         self.pkgs.push(Package {
             name,
             version,
+            edition,
             dir: canon.clone(),
             deps,
             files,
@@ -263,7 +293,25 @@ pub fn load(root_dir: &Path) -> Result<Project, String> {
     l.load(root_dir, None, true)?;
     let p = Project { pkgs: l.pkgs };
     check_modules(&p)?;
+    check_editions(&p)?;
     Ok(p)
+}
+
+/// Quy tắc edition (ADR-P2-09): cú pháp edition 2 là TẬP CHA của edition 1, nên cả đồ thị được biên dịch theo edition của gói GỐC; một gói phụ thuộc có edition
+/// LỚN HƠN gốc có thể dùng cú pháp mà gốc không hiểu ⇒ TỪ CHỐI (gói phụ thuộc edition ≤ gốc thì hợp lệ).
+fn check_editions(p: &Project) -> Result<(), String> {
+    let root = p.root().edition;
+    for pkg in &p.pkgs {
+        if pkg.edition > root {
+            return Err(format!(
+                "gói `{}` có edition {} lớn hơn edition {root} của gói gốc `{}`: nâng edition của gói gốc hoặc dùng bản edition thấp hơn của phụ thuộc",
+                pkg.name,
+                pkg.edition,
+                p.root().name
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Quy tắc module: (1) tên tệp không va chạm giữa các gói; (2) tệp của gói PHỤ THUỘC phải tên `<gói>.gt` hoặc `<gói>_….gt`

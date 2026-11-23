@@ -134,11 +134,11 @@ fn line_indent(out: &str) -> String {
 }
 
 /// Đặt comment của `src` vào văn bản cơ sở `base`.
-pub(crate) fn place(src: &str, base: &str) -> Result<String, PlaceError> {
-    let lexed = gt_lexer::lex(src);
+pub(crate) fn place(src: &str, base: &str, edition: u32) -> Result<String, PlaceError> {
+    let lexed = gt_lexer::lex_with_edition(src, edition);
     let src_tokens = without_eof(lexed.tokens);
     let trivia = lexed.trivia;
-    let base_tokens = without_eof(gt_lexer::lex(base).tokens);
+    let base_tokens = without_eof(gt_lexer::lex_with_edition(base, edition).tokens);
     let map = align(&src_tokens, &base_tokens)?;
     let a = anchor(&src_tokens, &base_tokens, &map, &trivia);
 
@@ -199,13 +199,13 @@ pub(crate) fn place(src: &str, base: &str) -> Result<String, PlaceError> {
             out.push('\n');
         }
     }
-    verify(src, &base_tokens, &out)?;
+    verify(src, &base_tokens, &out, edition)?;
     Ok(out)
 }
 
 /// Xác minh: đầu ra lex ra đúng luồng token cơ sở và đúng dãy comment của nguồn.
-fn verify(src: &str, base_tokens: &[Token], out: &str) -> Result<(), PlaceError> {
-    let lexed = gt_lexer::lex(out);
+fn verify(src: &str, base_tokens: &[Token], out: &str, edition: u32) -> Result<(), PlaceError> {
+    let lexed = gt_lexer::lex_with_edition(out, edition);
     let out_tokens = without_eof(lexed.tokens);
     let same_tokens = out_tokens.len() == base_tokens.len()
         && out_tokens
@@ -213,7 +213,9 @@ fn verify(src: &str, base_tokens: &[Token], out: &str) -> Result<(), PlaceError>
             .zip(base_tokens)
             .all(|(a, b)| a.kind == b.kind);
     let texts = |t: &[gt_lexer::Trivia]| t.iter().map(|c| c.text.clone()).collect::<Vec<_>>();
-    if same_tokens && texts(&lexed.trivia) == texts(&gt_lexer::lex(src).trivia) {
+    if same_tokens
+        && texts(&lexed.trivia) == texts(&gt_lexer::lex_with_edition(src, edition).trivia)
+    {
         Ok(())
     } else {
         Err(PlaceError::Verify)
@@ -250,13 +252,13 @@ mod tests {
     fn verify_rejects_changed_tokens_or_changed_comment_sequence() {
         let src = "a // x\n";
         let base = toks("a\n");
-        assert_eq!(verify(src, &base, "a // x\n"), Ok(()));
-        assert_eq!(verify(src, &base, "a\n"), Err(PlaceError::Verify)); // mất comment
-        assert_eq!(verify(src, &base, "a // y\n"), Err(PlaceError::Verify)); // đổi nội dung
-        assert_eq!(verify(src, &base, "b // x\n"), Err(PlaceError::Verify)); // đổi token
-        assert_eq!(verify(src, &base, "a a // x\n"), Err(PlaceError::Verify)); // thêm token
+        assert_eq!(verify(src, &base, "a // x\n", 1), Ok(()));
+        assert_eq!(verify(src, &base, "a\n", 1), Err(PlaceError::Verify)); // mất comment
+        assert_eq!(verify(src, &base, "a // y\n", 1), Err(PlaceError::Verify)); // đổi nội dung
+        assert_eq!(verify(src, &base, "b // x\n", 1), Err(PlaceError::Verify)); // đổi token
+        assert_eq!(verify(src, &base, "a a // x\n", 1), Err(PlaceError::Verify)); // thêm token
         assert_eq!(
-            verify(src, &base, "a // x\n// x\n"),
+            verify(src, &base, "a // x\n// x\n", 1),
             Err(PlaceError::Verify)
         ); // thêm comment
     }
@@ -269,7 +271,8 @@ mod tests {
                 "(a // c
 )",
                 "a
-"
+",
+                1
             )
             .unwrap(),
             "a  // c
@@ -281,7 +284,8 @@ mod tests {
                 "( // c
 a)",
                 "a
-"
+",
+                1
             )
             .unwrap(),
             "// c
@@ -295,7 +299,8 @@ a
 // c
 ) + b",
                 "a + b
-"
+",
+                1
             )
             .unwrap(),
             "a
@@ -309,7 +314,7 @@ a
     fn trailing_comment_skips_separators_added_by_the_printer() {
         // nguồn không có `,` cuối; cơ sở thêm `,` → comment đứng sau dấu phẩy
         assert_eq!(
-            place("▢ P{x:i32 // c\n}", "▢ P {\n  x: i32,\n}\n").unwrap(),
+            place("▢ P{x:i32 // c\n}", "▢ P {\n  x: i32,\n}\n", 1).unwrap(),
             "▢ P {\n  x: i32,  // c\n}\n"
         );
     }
@@ -323,7 +328,8 @@ a
 // c
 b",
                 "a * (b)
-"
+",
+                1
             )
             .unwrap(),
             "a *

@@ -1516,3 +1516,30 @@ K (kernel) DUYỆT hợp đồng; ADR-P2-00/01/03 DUYỆT; ADR-P2-02 DUYỆT hư
 Không thuộc ủy quyền: đẩy `main`, giấy phép, nhãn phiên bản (Giang: không gán tới khi viết Grit hoàn chỉnh như Rust), việc chỉ người làm được.
 Khi duyệt kernel phát hiện ranh giới TCB thật rộng hơn hai tệp đã gọi tên (gồm nhánh quyết định của `CertifiedProver` + cấu hình driver) và đột biến tắt
 `require_kernel` sống ⇒ thêm 2 test bảo vệ TRƯỚC khi ký.
+
+## ADR-P2-08 — C3 bước 1: khoá `edition` trong `rig.toml` (2026-11-23; cài đặt ADR-P2-01 đã duyệt)
+**Làm:** `[package]` nhận khoá `edition`. Vắng ⇒ edition 1. Giá trị là SỐ NGUYÊN DƯƠNG TRẦN (`edition = 1`): bộ đọc TOML của `rig` thêm `Value::Int` (chỉ chữ số thập phân, không dấu, không số 0
+đầu trừ `0`, vừa u64); mọi dạng khác (`"1"`, `1.0`, `-1`, `01`, `1x`, rỗng) bị từ chối ngay ở bộ đọc. Số nguyên chưa hỗ trợ (hiện chỉ `1`) ⇒ mã 11 "edition N chưa được hỗ trợ (hỗ trợ: 1)".
+Áp cho MỌI gói trong đồ thị (gốc và phụ thuộc). Khoá lạ khác của `[package]` vẫn bị từ chối. **KHÔNG đổi:** cú pháp, ngữ nghĩa, phán quyết `gritc` của edition 1; `rig new` vẫn không ghi `edition`.
+`FREEZE.md` đã sửa cùng commit (hàng Rig).
+**Lý do chọn số nguyên trần:** đúng TOML chuẩn mà người và AI sẽ viết theo phản xạ; từ chối chuỗi để một giá trị có hai cách viết không thành hai nghĩa (P7).
+**Chưa làm (ghi để khỏi tưởng đã xong):** `gritc` chưa BIẾT edition (chưa có cú pháp edition 2 nên chưa cần); gói phụ thuộc khác edition chưa có luật trộn (hiện chỉ một giá trị hợp lệ); `gritc fix` (golden) — điều kiện của ADR-P2-01 TRƯỚC cú pháp mới đầu tiên; giờ fuzz lexer/parser chưa bị đặt lại vì chưa đụng lexer/parser.
+**Bằng chứng:** `crates/rig/tests/edition.rs` (4 test E2E, đỏ trước vì `edition = 1` từng bị từ chối là khoá lạ): vắng ≡ `edition = 1`; 9 dạng sai bị mã 11 và KHÔNG ghi `rig.lock`; gói phụ thuộc `edition = 2` bị từ chối; khoá lạ vẫn bị từ chối;
+test đơn vị TOML (+4 dạng sai, +1 ca số nguyên); đột biến tay 2/2 bị bắt (hỗ trợ cả edition 2; nuốt chuỗi/bảng như vắng).
+
+## ADR-P2-09 — Edition 2, lô 1: toán tử lan truyền lỗi `e?` (2026-11-23; duyệt theo ủy quyền của Giang; cài đặt ADR-038 mục c, Q85)
+**Quyết định (kiến trúc sư, theo ủy quyền "bạn quyết"):** DUYỆT `e?` — Q85 từng HOÃN chỉ vì chưa duyệt ký hiệu/token mới; nay đã có `edition` (ADR-P2-01/08) làm cơ chế để thêm cú pháp mà không đổi nghĩa chương trình cũ.
+**Căn cứ triết lý:** P1 (máy là độc giả: một ký tự thay cho `⌥ e { Ok(x) ↦ x, Err(e) ↦ ⏎ Err(e) }` — AI viết dài dòng dễ sai ở chính chỗ này); P2/P3 (không chuyển đổi lỗi ngầm, không `From`: khác họ hoặc khác kiểu lỗi ⇒ lỗi KIỂU ĐỎ, không đoán);
+P5 (sound, không complete: từ chối `e?` trong hàm không trả `Option`/`Result` cùng họ); P6 (KHÔNG thêm TCB: hạ thành `match` + `return` đã có); P7 (hạ tất định); P8 (không nhân nhượng).
+**Cú pháp:** `postfix ::= … | postfix "?"` — hậu tố, ưu tiên cao nhất, ngang `.` / `()` / `[]`. Token `?` MỚI đứng riêng; `+?` `-?` `*?` (cộng/trừ/nhân trả Option) GIỮ NGUYÊN theo khớp-dài-nhất của lexer; `x +? y` vẫn là phép cộng kiểm tra.
+**Gắn edition:** ở edition 1, `?` đứng riêng giữ nguyên chẩn đoán cũ `E0101`; chỉ edition 2 mới là toán tử. `gt_parser::parse_*` nhận edition; `gritc --edition N`; `rig` truyền `edition` của gói gốc. **Quy tắc hỗn hợp:** cú pháp edition 2 là TẬP CHA của edition 1 (chỉ thêm, không đổi nghĩa) nên gói phụ thuộc edition ≤ gốc được biên dịch cùng edition của gốc; gói phụ thuộc edition > gốc bị TỪ CHỐI (mã 11).
+**Ngữ nghĩa (không chuyển đổi lỗi):** trong thân hàm có kiểu trả về `R`:
+- `e: Option<T>` và `R = Option<U>` ⇒ `⌥ e { Some(x) ↦ x, None ↦ ⏎ None }`, kiểu của `e?` là `T`.
+- `e: Result<T, E>` và `R = Result<U, E>` (CÙNG `E`, so khớp kiểu đúng) ⇒ `⌥ e { Ok(x) ↦ x, Err(er) ↦ ⏎ Err(er) }`, kiểu là `T`.
+- `e` không phải `Option`/`Result` ⇒ **E0321** (toán hạng của `?` không phải Option/Result). `e` và `R` khác họ (Option vs Result), `R` không phải Option/Result, hoặc khác `E` ⇒ **E0320** (`?` không khớp kiểu trả về của hàm).
+- Hiệu ứng: `?` không thêm hiệu ứng; `⏎` sớm đi qua đường thoát đã có (drop elaboration, `⊲` được kiểm ở mọi điểm thoát như `⏎` viết tay, vòng lặp `⟳` giữ biến thể, `⟦ ⟧` không đổi).
+- `?` chỉ trong thân `ƒ` (Phase 1 chưa có closure). `?` ở `■`/`□` hằng/static ⇒ E0320 (không có hàm bao).
+**Hạ thành (M5):** `match` + `return` MIR dựng bằng chính hàm hạ `⌥`/`⏎` có sẵn — KHÔNG thêm loại câu lệnh/terminator MIR, KHÔNG đổi M6/M7/M8/Guard/runtime/LLVM.
+**Điều kiện (ADR-038 mục 7, giữ nguyên):** (1) mã lỗi mới E0320, E0321 vào `docs/spec/error_codes.md` + `docs/errors/` với ≥ 3 mẫu fail + ≥ 3 mẫu pass trong `tests/` (corpus chạy ở edition tương ứng); (2) spec (`grammar.ebnf`, `symbols.md`, `semantics.md`) cập nhật CÙNG commit đổi parser; (3) bộ sinh ngẫu nhiên có `?` với oracle độc lập (mô hình tính giá trị/đường thoát; thông dịch ≡ exe LLVM dev/release/release-o2); (4) `gt-fmt` round-trip (`fmt(fmt(x)) == fmt(x)`, giữ comment); (5) M6 oracle động có chương trình dùng `?` với `Owned`/`Drop` (thoát sớm không rò, không double-drop); (6) đột biến tự động cho phần kiểm kiểu và hạ `?` (≥ nửa tự động); (7) giờ fuzz lexer/parser bị ĐẶT LẠI (đổi token/parser) — ghi vào `FREEZE.md` và KHÔNG gọi lexer/parser là "đóng băng đủ giờ" cho tới khi tích luỹ lại.
+**KHÔNG làm trong lô này:** chuyển đổi lỗi/`From`; `?` trên `Option` trong hàm trả `Result` (cần `ok_or` tường minh); closure; `try` block; thay `⏎` sớm bằng nhãn.
+**CHƯA KIỂM lúc viết:** chỗ đặt kiểm kiểu trong `gt-types` (suy luận kiểu của `e` khi `e` là biểu thức cần ngữ cảnh, vd `None?`); tương tác với suy luận của `⏎` (kiểu `!`); chạy được trong thân `⟳`/`⟦` hay không.

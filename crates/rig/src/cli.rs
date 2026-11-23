@@ -97,7 +97,7 @@ fn load_locked(dir: &Path, locked: bool) -> Result<Project, i32> {
 }
 
 /// Cổng phán quyết của gritc trên một tập nguồn. `Err(mã)` = đã in lý do.
-fn gate(sources: &[(String, String)], deny_yellow: bool) -> Result<CheckResult, i32> {
+fn gate(sources: &[(String, String)], deny_yellow: bool, edition: u32) -> Result<CheckResult, i32> {
     let inputs: Vec<SourceInput> = sources
         .iter()
         .map(|(n, t)| SourceInput {
@@ -111,6 +111,7 @@ fn gate(sources: &[(String, String)], deny_yellow: bool) -> Result<CheckResult, 
             checks: DEFAULT_CHECKS,
             deny_yellow,
             fault: None,
+            edition,
         },
     )
     .map_err(|e| {
@@ -178,7 +179,7 @@ fn cmd_check(a: &Args) -> i32 {
         Ok(p) => p,
         Err(c) => return c,
     };
-    match gate(&p.sources(false), a.deny_yellow) {
+    match gate(&p.sources(false), a.deny_yellow, p.root().edition) {
         Ok(_) => 0,
         Err(c) => c,
     }
@@ -186,7 +187,7 @@ fn cmd_check(a: &Args) -> i32 {
 
 fn build_root(a: &Args, dir: &Path) -> Result<(Project, PathBuf), i32> {
     let p = load_locked(dir, a.locked)?;
-    let mut res = gate(&p.sources(false), a.deny_yellow)?;
+    let mut res = gate(&p.sources(false), a.deny_yellow, p.root().edition)?;
     let out = exe_path(dir, &p.root().name);
     compile(&mut res, &out)?;
     Ok((p, out))
@@ -292,6 +293,7 @@ fn cmd_test(a: &Args) -> i32 {
                     checks: DEFAULT_CHECKS,
                     deny_yellow: a.deny_yellow,
                     fault: None,
+                    edition: p.root().edition,
                 },
             )
         };
@@ -366,6 +368,7 @@ fn cmd_test_auto(a: &Args) -> i32 {
         checks: DEFAULT_CHECKS,
         deny_yellow: false,
         fault: None,
+        edition: p.root().edition,
     };
     let ts = autotest::targets(&root_files);
     if ts.is_empty() {
@@ -604,9 +607,10 @@ fn cmd_fmt(a: &Args) -> i32 {
         Ok(d) => d,
         Err(c) => return c,
     };
-    if let Err(e) = project::load(&dir) {
-        return fail_with(E_PROJECT, &e);
-    }
+    let edition = match project::load(&dir) {
+        Ok(p) => p.root().edition,
+        Err(e) => return fail_with(E_PROJECT, &e),
+    };
     let mut code = 0;
     for sub in ["src", "tests"] {
         let rd = match std::fs::read_dir(dir.join(sub)) {
@@ -634,7 +638,7 @@ fn cmd_fmt(a: &Args) -> i32 {
                 Ok(t) => t.replace("\r\n", "\n"),
                 Err(e) => return fail(&format!("không đọc được {}: {e}", f.display())),
             };
-            match gt_fmt::format(&name, &text) {
+            match gt_fmt::format_with_edition(&name, &text, edition) {
                 Ok(out) if out == text => {}
                 Ok(out) => {
                     if a.check {

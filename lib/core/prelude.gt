@@ -3,6 +3,7 @@
 // (gt-driver có test khoá hai bản bằng nhau).
 #lang(option)
 ⊔ Option<T> { None, Some(T) }
+#lang(result)
 ⊔ Result<T, E> { Ok(T), Err(E) }
 #lang(range)
 ▢ Range<T> { start: T, end: T }

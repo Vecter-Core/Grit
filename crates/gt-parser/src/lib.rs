@@ -45,7 +45,18 @@ pub fn parse(file: &str, source: &str) -> ParseOutput {
 /// Như `parse`, nhưng mọi `NodeId` mang `file_id` (chương trình nhiều tệp — ADR-017a). `FileId` do `gt_span::SourceMap` cấp.
 #[must_use]
 pub fn parse_file(file_id: gt_span::FileId, file: &str, source: &str) -> ParseOutput {
-    match gt_stack::run_with_big_stack(|| parse_inner(file_id, file, source)) {
+    parse_file_with_edition(file_id, file, source, 1)
+}
+
+/// Như `parse_file`, theo `edition` (ADR-P2-01/09): edition ≥ 2 nhận toán tử hậu tố `?`; edition 1 giữ hành vi đóng băng.
+#[must_use]
+pub fn parse_file_with_edition(
+    file_id: gt_span::FileId,
+    file: &str,
+    source: &str,
+    edition: u32,
+) -> ParseOutput {
+    match gt_stack::run_with_big_stack(|| parse_inner(file_id, file, source, edition)) {
         Ok(out) => out,
         Err(e) => ice(file_id, file, source, &e.to_string()),
     }
@@ -82,8 +93,8 @@ fn ice(file_id: gt_span::FileId, file: &str, source: &str, msg: &str) -> ParseOu
     }
 }
 
-fn parse_inner(file_id: gt_span::FileId, file: &str, source: &str) -> ParseOutput {
-    let lexed = gt_lexer::lex(source);
+fn parse_inner(file_id: gt_span::FileId, file: &str, source: &str, edition: u32) -> ParseOutput {
+    let lexed = gt_lexer::lex_with_edition(source, edition);
     let mut p = parser::Parser::new(file_id, file, source.len(), lexed.tokens);
     for e in &lexed.errors {
         if let Some(d) = convert::lex_error(file, e) {

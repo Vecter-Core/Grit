@@ -40,6 +40,8 @@ struct Cli {
     fmt_check: bool,
     backend: Backend,
     profile: gt_codegen_llvm::Opt,
+    /// edition của ngôn ngữ (`--edition=N`, mặc định 1; ADR-P2-01/09)
+    edition: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,6 +77,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
         fmt_check: false,
         backend: default_backend(),
         profile: gt_codegen_llvm::Opt::Dev,
+        edition: 1,
     };
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -94,6 +97,22 @@ fn parse(args: &[String]) -> Result<Cli, String> {
                         .ok_or_else(|| "`-o` cần đường dẫn".to_string())?
                         .clone(),
                 );
+            }
+            s if s.starts_with("--edition=") => {
+                let v = &s["--edition=".len()..];
+                match v.parse::<u32>() {
+                    Ok(n) if crate::SUPPORTED_EDITIONS.contains(&n) => cli.edition = n,
+                    _ => {
+                        return Err(format!(
+                            "`{s}`: edition phải là số nguyên đã hỗ trợ ({})",
+                            crate::SUPPORTED_EDITIONS
+                                .iter()
+                                .map(u32::to_string)
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ));
+                    }
+                }
             }
             s if s.starts_with("--backend=") => {
                 return Err(format!(
@@ -182,6 +201,7 @@ fn options(cli: &Cli) -> Options {
         checks: cli.checks,
         deny_yellow: cli.deny_yellow,
         fault,
+        edition: cli.edition,
     }
 }
 
@@ -441,7 +461,7 @@ fn cmd_fmt(cli: &Cli) -> i32 {
     let name = Path::new(path)
         .file_name()
         .map_or_else(|| path.clone(), |n| n.to_string_lossy().into_owned());
-    match gt_fmt::format(&name, &text) {
+    match gt_fmt::format_with_edition(&name, &text, cli.edition) {
         Ok(out) => {
             if cli.fmt_check {
                 if out == text {

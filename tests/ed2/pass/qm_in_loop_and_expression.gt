@@ -1,0 +1,12 @@
+// expect: pass
+// note: ADR-P2-09 — `?` trong vòng lặp có biến thể ↓ và làm toán hạng của biểu thức; thoát sớm giữ nguyên luật dừng
+ƒ digit(c: u8) → Result<u32, u8> ! ∅ { ⎇ c >= 48u8 ∧ c <= 57u8 { Ok((c - 48u8) as u32) } ⇝ { Err(c) } }
+ƒ sum(a: &[u8]) → Result<u32, u8> ! ∅ {
+  μs ≔ 0u32;
+  μi ≔ 0usize;
+  ⟳ i < a.len() ↓ a.len() - i {
+    s ← s +% digit(a[i])?;
+    i ← i + 1usize;
+  }
+  Ok(s)
+}

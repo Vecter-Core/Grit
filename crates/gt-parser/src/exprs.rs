@@ -331,6 +331,13 @@ impl Parser {
                         },
                     );
                 }
+                TokenKind::Question => {
+                    // chỉ có token này ở edition ≥ 2 (lexer); ngang hàng `.`/`()`/`[]`
+                    chain += 1;
+                    self.chain_check(chain)?;
+                    self.bump();
+                    e = self.mk_expr(start, ExprKind::Try(Box::new(e)));
+                }
                 TokenKind::Dot => {
                     chain += 1;
                     self.chain_check(chain)?;

@@ -45,12 +45,13 @@ crates/gt-conc/src/lib.rs	121	_ =>	AN TOÀN		các terminator còn lại (Goto/Re
 crates/gt-conc/src/lib.rs	198	unwrap_or	AN TOÀN		chỉ là tên hiển thị trong thông báo	let name = |v: u32| NAMES.get(v as usize).copied().unwrap_or("?");
 crates/gt-conc/src/lib.rs	199	unwrap_or	GHI NHẬN		thiếu tham số ordering mặc định thành SeqCst (hợp lệ cho mọi thao tác) nên sẽ không kiểm nếu chữ ký prelude trôi khỏi dạng (load 1, store 1, compare_exchange 2 ordering); đã kiểm prelude đúng và người dùng không thể thêm impl Atomic (E0311) nên chưa với tới	let o = |k: usize| ords.get(k).and_then(|x| x.1).unwrap_or(4);
 crates/gt-conc/src/lib.rs	227	_ =>	AN TOÀN		các phương thức Atomic khác (fetch_*, exchange...) chấp nhận mọi ordering	_ => None,
-crates/gt-driver/src/cli.rs	155	is_some_and	AN TOÀN		Chỉ lọc phần mở rộng .gt; mỗi DirEntry trước đó đã map_err thành lỗi trả về, không âm thầm bỏ lỗi đọc mục.	if q.extension().is_some_and(|x| x == "gt") {
-crates/gt-driver/src/cli.rs	178	_ =>	AN TOÀN		GRITC_FAULT sai dạng ⇒ không bơm lỗi; chỉ dùng để làm gritc từ chối thêm khi kiểm thử.	_ => None,
-crates/gt-driver/src/cli.rs	284	let _ =	AN TOÀN		Dọn thư mục tạm sau khi chạy; không ảnh hưởng phán quyết.	let _ = std::fs::remove_dir_all(&dir);
-crates/gt-driver/src/cli.rs	390	unwrap_or	AN TOÀN		Chỉ in giá trị trả về khi chạy xong; không ảnh hưởng phán quyết/mã thoát.	rr.value.as_deref().unwrap_or("()")
-crates/gt-driver/src/cli.rs	461	let _ =	AN TOÀN		Dọn tệp tạm của fmt; lỗi ghi đã trả usage_err trước đó.	let _ = std::fs::remove_file(&tmp);
-crates/gt-driver/src/cli.rs	558	let _ =	AN TOÀN		Dọn thư mục thăm dò của doctor; kết quả doctor lấy từ smoke test.	let _ = std::fs::remove_dir_all(&probe);
+crates/gt-driver/src/cli.rs	105	_ =>	AN TOÀN		ADR-P2-09 --edition=N: giá trị không phải số nguyên đã hỗ trợ ⇒ Err ⇒ mã 3 (fail-closed)	_ => {
+crates/gt-driver/src/cli.rs	174	is_some_and	AN TOÀN		Chỉ lọc phần mở rộng .gt; mỗi DirEntry trước đó đã map_err thành lỗi trả về, không âm thầm bỏ lỗi đọc mục.	if q.extension().is_some_and(|x| x == "gt") {
+crates/gt-driver/src/cli.rs	197	_ =>	AN TOÀN		GRITC_FAULT sai dạng ⇒ không bơm lỗi; chỉ dùng để làm gritc từ chối thêm khi kiểm thử.	_ => None,
+crates/gt-driver/src/cli.rs	304	let _ =	AN TOÀN		Dọn thư mục tạm sau khi chạy; không ảnh hưởng phán quyết.	let _ = std::fs::remove_dir_all(&dir);
+crates/gt-driver/src/cli.rs	410	unwrap_or	AN TOÀN		Chỉ in giá trị trả về khi chạy xong; không ảnh hưởng phán quyết/mã thoát.	rr.value.as_deref().unwrap_or("()")
+crates/gt-driver/src/cli.rs	481	let _ =	AN TOÀN		Dọn tệp tạm của fmt; lỗi ghi đã trả usage_err trước đó.	let _ = std::fs::remove_file(&tmp);
+crates/gt-driver/src/cli.rs	578	let _ =	AN TOÀN		Dọn thư mục thăm dò của doctor; kết quả doctor lấy từ smoke test.	let _ = std::fs::remove_dir_all(&probe);
 crates/gt-driver/src/lsp.rs	89	ok()?	AN TOÀN		LSP chỉ là chẩn đoán trong editor, không phải phán quyết (gritc check/build là nguồn); không tìm được std ⇒ thiếu prelude ⇒ lỗi/ không có chẩn đoán trong editor, không ảnh hưởng build. Ghi chú: diagnostics_for trả rỗng khi check() Err/ICE (hiển thị như sạch trong editor).	let exe = std::env::current_exe().ok()?;
 crates/gt-driver/src/lsp.rs	116	is_some_and	AN TOÀN		lọc đuôi .gt khi quét thư mục cho LSP; chỉ ảnh hưởng ngữ cảnh chẩn đoán editor.	.filter(|p| p.extension().is_some_and(|x| x == "gt"))
 crates/gt-driver/src/lsp.rs	140	unwrap_or_default	AN TOÀN		docs[uri] luôn có (publish chỉ gọi diagnostics_for khi docs.contains_key); chỉ editor.	let text = docs.get(uri).cloned().unwrap_or_default();
@@ -86,7 +87,7 @@ crates/gt-driver/src/native.rs	365	unwrap_or_default	AN TOÀN		stdout đọc kh�
 crates/gt-driver/src/native.rs	367	let _ =	AN TOÀN		Dọn tệp phụ; không ảnh hưởng kết quả.	let _ = std::fs::remove_file(f);
 crates/gt-driver/src/native.rs	379	unwrap_or	AN TOÀN		Thiếu dòng `abort: ` ⇒ lý do "unknown" nhưng vẫn RunEnd::Aborted (mã 70) — không bị đọc thành Normal.	.unwrap_or("unknown")
 crates/gt-driver/src/native.rs	382	unwrap_or	AN TOÀN		clamp(1,255) rồi u8: luôn vừa, 255 chỉ là dự phòng vô hại; mã 0 đã xử lý riêng (Normal) trước đó.	Some(c) => RunEnd::ProgramExit(u8::try_from(c.clamp(1, 255)).unwrap_or(255)),
-crates/gt-driver/src/pipeline.rs	232	_ =>	AN TOÀN		alias chỉ gọi SAU khi pass cha đã chạy xong (Done) và chỉ ghi Done khi không có Fault chèn; để kiểm cổng.	_ => self.record(name, PassStatus::Done),
+crates/gt-driver/src/pipeline.rs	235	_ =>	AN TOÀN		alias chỉ gọi SAU khi pass cha đã chạy xong (Done) và chỉ ghi Done khi không có Fault chèn; để kiểm cổng.	_ => self.record(name, PassStatus::Done),
 crates/gt-driver/src/render.rs	129	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
 crates/gt-driver/src/render.rs	181	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
 crates/gt-driver/src/render.rs	192	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
@@ -171,29 +172,30 @@ crates/gt-mir/src/build/expr.rs	1208	_ =>	AN TOÀN		nhánh Div/Rem: Assert chia 
 crates/gt-mir/src/build/expr.rs	1263	_ =>	AN TOÀN		ICE: toán tử nhị phân lạ bị từ chối	_ => ice("toán tử nhị phân lạ"),
 crates/gt-mir/src/build/expr.rs	1280	_ =>	AN TOÀN		∈ trên vế phải không phải Range literal: ICE nếu không phải Adt/range hai trường; M4 báo E0301 trước (thử ∈ struct start/end ⇒ E0301)	_ => {
 crates/gt-mir/src/build/expr.rs	1290	unwrap_or	AN TOÀN		Ty::Err làm kiểu trường bị validate.rs ('kiểu chưa giải quyết') bắt thành ICE E9901; thực tế Range luôn có đối số	let el = args.first().cloned().unwrap_or(Ty::Err);
-crates/gt-mir/src/build/expr.rs	1365	_ =>	AN TOÀN		nhánh mặc định expr_into hạ qua as_rvalue; không đọc thiếu thành đúng	_ => {
-crates/gt-mir/src/build/expr.rs	1446	_ =>	AN TOÀN		nhánh Implies của short_circuit (a sai ⇒ true); caller chỉ truyền And/Or/Implies	_ => (vec![(0, short_bb)], rhs_bb, true),
-crates/gt-mir/src/build/expr.rs	1483	unwrap_or	AN TOÀN		Ty::Err đi vào kiểu local/trường ⇒ validate.rs ICE; thực tế Option luôn có đối số	let el = args.first().cloned().unwrap_or(Ty::Err);
-crates/gt-mir/src/build/expr.rs	1487	_ =>	AN TOÀN		nhánh mặc định chỉ nhận MulChecked (caller giới hạn ba toán tử +? -? *?)	_ => BinOp::Mul,
-crates/gt-mir/src/build/expr.rs	1531	_ =>	AN TOÀN		ICE nếu lang item option thiếu None/Some	_ => ice("lang item option cần biến thể `None` và `Some`"),
-crates/gt-mir/src/build/expr.rs	1534	_ =>	AN TOÀN		ICE nếu lang item option không phải enum	_ => ice("lang item option phải là enum"),
-crates/gt-mir/src/build/expr.rs	1592	_ =>	GHI NHẬN		phương thức gọi dạng x.m() mà không có self_kind (hàm không có self) bị hạ như nhận theo giá trị, không có khoản mượn; typeck vẫn chấp nhận nhưng downstream từ chối bằng ICE E9901 ở borrowck (đã chạy, exit 2), nên fail-closed; nên báo lỗi rõ ở M4	_ => self.operand_of(recv, &rty),
-crates/gt-mir/src/build/expr.rs	1634	_ =>	AN TOÀN		callee không phải Path có site ⇒ gọi qua giá trị (Callee::Value) có stabilize; Path thiếu site thì fn_item_const ICE	_ => {
-crates/gt-mir/src/build/expr.rs	1718	_ =>	AN TOÀN		None = vòng lặp không phải while nên không có cond; chỉ là siêu dữ liệu vòng	_ => None,
-crates/gt-mir/src/build/expr.rs	1757	_ =>	AN TOÀN		None = điều kiện không phải literal bool; đi nhánh tổng quát	_ => None,
-crates/gt-mir/src/build/expr.rs	1833	_ =>	AN TOÀN		nhánh không với tới (inner đã khớp Slice|Array ở guard) và biến el không được dùng	_ => Ty::Err,
-crates/gt-mir/src/build/expr.rs	1891	let _ =	AN TOÀN		let _ = el chỉ để tắt cảnh báo biến không dùng	let _ = el;
-crates/gt-mir/src/build/expr.rs	1895	unwrap_or	AN TOÀN		Ty::Err không phải Ty::Int ⇒ ICE 'lặp trên range không phải số nguyên'	let el = args.first().cloned().unwrap_or(Ty::Err);
-crates/gt-mir/src/build/expr.rs	1906	_ =>	AN TOÀN		nhánh mặc định lấy range từ place (kể cả không phải literal); range_field_order ICE nếu không đúng hai trường	_ => {
-crates/gt-mir/src/build/expr.rs	1994	_ =>	AN TOÀN		ICE: ⟳ trên kiểu không hỗ trợ	_ => ice(format!("⟳ in trên kiểu {ity:?}")),
-crates/gt-mir/src/build/expr.rs	2030	_ =>	AN TOÀN		miền không phải a..b ⇒ ghi Body.uncheckable và dùng hằng thay thế, nhưng gt-oblig driver.rs:215 đổi mỗi uncheckable thành E0902 (ĐỎ); đã chạy ∀/∃ trên Range<i32> ở ⊳ và ⋈ đều ĐỎ	_ => {
-crates/gt-mir/src/build/expr.rs	2083	let _ =	AN TOÀN		let _ = to_step chỉ để tắt cảnh báo	let _ = to_step;
-crates/gt-mir/src/build/expr.rs	2097	let _ =	AN TOÀN		let _ = to_decided chỉ để tắt cảnh báo	let _ = to_decided;
-crates/gt-mir/src/build/matching.rs	138	_ =>	AN TOÀN		`destructures` khớp từng chữ với gt-types/check/pat.rs; lệch chế độ tham chiếu ⇒ ICE (hai kiểm chéo trong test_pat).	_ => false,
-crates/gt-mir/src/build/matching.rs	206	_ =>	AN TOÀN		Binding không phải biến thể: bắt buộc có định danh trong resolve.decls, không thì ICE (không tạo binding tuỳ tiện).	_ => {
-crates/gt-mir/src/build/matching.rs	270	_ =>	AN TOÀN		Pattern biến thể không phân giải ⇒ ICE.	_ => ice("pattern biến thể không phân giải được sau M4"),
-crates/gt-mir/src/build/matching.rs	341	_ =>	AN TOÀN		seq_pats: vị trí không sau `..` thì k=i; số thành phần lệch ⇒ M4 báo E0304 (thử), vượt ⇒ ICE.	_ => i,
-crates/gt-mir/src/build/matching.rs	367	_ =>	AN TOÀN		Pattern biến thể trên kiểu khác enum ⇒ ICE.	_ => return ice("pattern biến thể trên kiểu khác enum của nó"),
+crates/gt-mir/src/build/expr.rs	1366	_ =>	AN TOÀN		nhánh mặc định expr_into hạ qua as_rvalue; không đọc thiếu thành đúng	_ => {
+crates/gt-mir/src/build/expr.rs	1447	_ =>	AN TOÀN		nhánh Implies của short_circuit (a sai ⇒ true); caller chỉ truyền And/Or/Implies	_ => (vec![(0, short_bb)], rhs_bb, true),
+crates/gt-mir/src/build/expr.rs	1484	unwrap_or	AN TOÀN		Ty::Err đi vào kiểu local/trường ⇒ validate.rs ICE; thực tế Option luôn có đối số	let el = args.first().cloned().unwrap_or(Ty::Err);
+crates/gt-mir/src/build/expr.rs	1488	_ =>	AN TOÀN		nhánh mặc định chỉ nhận MulChecked (caller giới hạn ba toán tử +? -? *?)	_ => BinOp::Mul,
+crates/gt-mir/src/build/expr.rs	1532	_ =>	AN TOÀN		ICE nếu lang item option thiếu None/Some	_ => ice("lang item option cần biến thể `None` và `Some`"),
+crates/gt-mir/src/build/expr.rs	1535	_ =>	AN TOÀN		ICE nếu lang item option không phải enum	_ => ice("lang item option phải là enum"),
+crates/gt-mir/src/build/expr.rs	1593	_ =>	GHI NHẬN		phương thức gọi dạng x.m() mà không có self_kind (hàm không có self) bị hạ như nhận theo giá trị, không có khoản mượn; typeck vẫn chấp nhận nhưng downstream từ chối bằng ICE E9901 ở borrowck (đã chạy, exit 2), nên fail-closed; nên báo lỗi rõ ở M4	_ => self.operand_of(recv, &rty),
+crates/gt-mir/src/build/expr.rs	1635	_ =>	AN TOÀN		callee không phải Path có site ⇒ gọi qua giá trị (Callee::Value) có stabilize; Path thiếu site thì fn_item_const ICE	_ => {
+crates/gt-mir/src/build/expr.rs	1719	_ =>	AN TOÀN		None = vòng lặp không phải while nên không có cond; chỉ là siêu dữ liệu vòng	_ => None,
+crates/gt-mir/src/build/expr.rs	1758	_ =>	AN TOÀN		None = điều kiện không phải literal bool; đi nhánh tổng quát	_ => None,
+crates/gt-mir/src/build/expr.rs	1834	_ =>	AN TOÀN		nhánh không với tới (inner đã khớp Slice|Array ở guard) và biến el không được dùng	_ => Ty::Err,
+crates/gt-mir/src/build/expr.rs	1892	let _ =	AN TOÀN		let _ = el chỉ để tắt cảnh báo biến không dùng	let _ = el;
+crates/gt-mir/src/build/expr.rs	1896	unwrap_or	AN TOÀN		Ty::Err không phải Ty::Int ⇒ ICE 'lặp trên range không phải số nguyên'	let el = args.first().cloned().unwrap_or(Ty::Err);
+crates/gt-mir/src/build/expr.rs	1907	_ =>	AN TOÀN		nhánh mặc định lấy range từ place (kể cả không phải literal); range_field_order ICE nếu không đúng hai trường	_ => {
+crates/gt-mir/src/build/expr.rs	1995	_ =>	AN TOÀN		ICE: ⟳ trên kiểu không hỗ trợ	_ => ice(format!("⟳ in trên kiểu {ity:?}")),
+crates/gt-mir/src/build/expr.rs	2031	_ =>	AN TOÀN		miền không phải a..b ⇒ ghi Body.uncheckable và dùng hằng thay thế, nhưng gt-oblig driver.rs:215 đổi mỗi uncheckable thành E0902 (ĐỎ); đã chạy ∀/∃ trên Range<i32> ở ⊳ và ⋈ đều ĐỎ	_ => {
+crates/gt-mir/src/build/expr.rs	2084	let _ =	AN TOÀN		let _ = to_step chỉ để tắt cảnh báo	let _ = to_step;
+crates/gt-mir/src/build/expr.rs	2098	let _ =	AN TOÀN		let _ = to_decided chỉ để tắt cảnh báo	let _ = to_decided;
+crates/gt-mir/src/build/matching.rs	151	_ =>	AN TOÀN		ADR-P2-09 try_into: Option/Result không phải enum ⇒ ICE E9901 (đóng-khi-lỗi)	_ => ice("Option/Result không phải enum"),
+crates/gt-mir/src/build/matching.rs	218	_ =>	AN TOÀN		`destructures` khớp từng chữ với gt-types/check/pat.rs; lệch chế độ tham chiếu ⇒ ICE (hai kiểm chéo trong test_pat).	_ => false,
+crates/gt-mir/src/build/matching.rs	286	_ =>	AN TOÀN		Binding không phải biến thể: bắt buộc có định danh trong resolve.decls, không thì ICE (không tạo binding tuỳ tiện).	_ => {
+crates/gt-mir/src/build/matching.rs	350	_ =>	AN TOÀN		Pattern biến thể không phân giải ⇒ ICE.	_ => ice("pattern biến thể không phân giải được sau M4"),
+crates/gt-mir/src/build/matching.rs	421	_ =>	AN TOÀN		seq_pats: vị trí không sau `..` thì k=i; số thành phần lệch ⇒ M4 báo E0304 (thử), vượt ⇒ ICE.	_ => i,
+crates/gt-mir/src/build/matching.rs	447	_ =>	AN TOÀN		Pattern biến thể trên kiểu khác enum ⇒ ICE.	_ => return ice("pattern biến thể trên kiểu khác enum của nó"),
 crates/gt-mir/src/build/mod.rs	134	unwrap_or	AN TOÀN		u32::MAX chỉ khi >4 tỷ khối cơ bản (hết bộ nhớ trước).	BasicBlock(u32::try_from(self.body.blocks.len() - 1).unwrap_or(u32::MAX))
 crates/gt-mir/src/build/mod.rs	187	unwrap_or	AN TOÀN		u32::MAX chỉ khi >4 tỷ local.	Local(u32::try_from(self.body.locals.len() - 1).unwrap_or(u32::MAX))
 crates/gt-mir/src/build/mod.rs	222	unwrap_or	AN TOÀN		Frame Args luôn được push đầu mỗi thân (start_fn/build_const) ⇒ frames không rỗng; không thấy loại frame thì rơi về frame trên cùng (tạm cấp hàm), vẫn được drop ở exit_to.	.unwrap_or(self.frames.len().saturating_sub(1));
@@ -407,26 +409,27 @@ crates/gt-types/src/check/call.rs	608	let _ =	AN TOÀN		đã phát E0301 trướ
 crates/gt-types/src/check/expr.rs	28	_ =>	AN TOÀN		Predicate thiếu/không khớp trả false ⇒ nơi gọi báo lỗi 'cần kiểu số/số nguyên/số thực' (từ chối).	_ => false,
 crates/gt-types/src/check/expr.rs	36	_ =>	AN TOÀN		Predicate thiếu/không khớp trả false ⇒ nơi gọi báo lỗi 'cần kiểu số/số nguyên/số thực' (từ chối).	_ => false,
 crates/gt-types/src/check/expr.rs	44	_ =>	AN TOÀN		Predicate thiếu/không khớp trả false ⇒ nơi gọi báo lỗi 'cần kiểu số/số nguyên/số thực' (từ chối).	_ => false,
-crates/gt-types/src/check/expr.rs	66	_ =>	AN TOÀN		Thiếu gợi ý kiểu tuple chỉ làm hint rỗng; từng phần tử vẫn được kiểm/ép kiểu bình thường.	_ => vec![None; v.len()],
-crates/gt-types/src/check/expr.rs	78	_ =>	AN TOÀN		Không có kỳ vọng mảng ⇒ phần tử là biến suy luận mới, các phần tử sau vẫn phải unify (expr_expect).	_ => self.fresh(),
-crates/gt-types/src/check/expr.rs	88	_ =>	AN TOÀN		Chỉ là gợi ý kiểu cho giá trị lặp; kiểu thật vẫn lấy từ self.expr(value).	_ => None,
-crates/gt-types/src/check/expr.rs	221	_ =>	AN TOÀN		Nhánh còn lại của `-` là số (is_numeric) hoặc Ty::Err đã có chẩn đoán; không có nhánh nào bị chấp nhận nhầm.	_ => {}
-crates/gt-types/src/check/expr.rs	409	_ =>	SỬA	FB-C19	eq_ok trả true cho MỌI Ty::Infer(_) (kể cả biến suy luận tổng quát chưa giải) nên `==` trên biến kiểu chưa biết lọt, về sau biến được unify với f64 hoặc tuple ⇒ bỏ qua cấm `==` số thực (D4, E0303) và 'chưa hỗ trợ' cho tuple; chỉ biến Float được bắt riêng bởi is_float.	_ => false,
-crates/gt-types/src/check/expr.rs	443	_ =>	AN TOÀN		Cặp kiểu không thuộc danh sách ép hợp lệ ⇒ false ⇒ báo E0301; cấm f→int/f32 đã chặn trước đó.	_ => false,
-crates/gt-types/src/check/expr.rs	533	_ =>	AN TOÀN		Truy cập trường trên kiểu không có trường ⇒ E0304 + Ty::Err (có chẩn đoán).	_ => {
-crates/gt-types/src/check/expr.rs	555	let _ =	AN TOÀN		Bỏ kiểu chỉ số khi nền là Ty::Err; lỗi gốc đã được báo.	let _ = self.expr(index, None);
-crates/gt-types/src/check/expr.rs	566	let _ =	AN TOÀN		Bỏ kiểu chỉ số sau khi đã báo E0301 'không thể đánh chỉ số'.	let _ = self.expr(index, None);
-crates/gt-types/src/check/expr.rs	604	_ =>	AN TOÀN		Range mở dùng độc lập ⇒ báo E0301 (từ chối).	_ => {
-crates/gt-types/src/check/expr.rs	619	unwrap_or	AN TOÀN		Range luôn có 1 đối số kiểu (lowering kiểm số đối số, sai ⇒ E0301); unwrap_or(Ty::Err) không đạt tới trên đường hợp lệ.	Ty::Adt(d, args) if self.is_range_def(d) => args.first().cloned().unwrap_or(Ty::Err),
-crates/gt-types/src/check/expr.rs	649	unwrap_or	AN TOÀN		`Self` ngoài impl/trait bị resolver báo E0201 trước khi tới đây (đã thử: `Self { x: 1 }` ngoài impl ⇒ ĐỎ E0201).	Some(Res::SelfType) => self.cx.self_ty.clone().unwrap_or(Ty::Err),
-crates/gt-types/src/check/expr.rs	651	_ =>	AN TOÀN		Đường dẫn không phải struct ⇒ báo E0301 rồi Ty::Err.	_ => {
-crates/gt-types/src/check/expr.rs	732	let _ =	AN TOÀN		Bỏ kiểu giá trị của trường không tồn tại sau khi đã báo E0304.	let _ = self.expr(&f.value, None);
-crates/gt-types/src/check/expr.rs	831	_ =>	AN TOÀN		Không có pattern phá cấu trúc thì giữ nguyên kiểu scrutinee để xét vét cạn; không nới lỏng.	_ => st,
-crates/gt-types/src/check/expr.rs	875	unwrap_or	AN TOÀN		loops.push(false) ngay trước đó nên pop luôn Some; không đạt unwrap_or.	let broke = self.loops.pop().unwrap_or(false);
-crates/gt-types/src/check/expr.rs	880	_ =>	AN TOÀN		Chỉ chọn kiểu kết quả: vòng vô hạn có break hoặc while/for ⇒ (); chỉ `⟳ {}` không break ⇒ `!`, đúng ngữ nghĩa.	_ => unit,
-crates/gt-types/src/check/expr.rs	887	unwrap_or	AN TOÀN		Như dòng 605: Range luôn có đối số; lỗi arity được báo ở lowering.	Ty::Adt(d, args) if self.is_range_def(d) => args.first().cloned().unwrap_or(Ty::Err),
-crates/gt-types/src/check/expr.rs	890	_ =>	AN TOÀN		Tham chiếu tới thứ không phải slice/mảng ⇒ not_iterable báo E0301.	_ => self.not_iterable(t, iter),
-crates/gt-types/src/check/expr.rs	893	_ =>	AN TOÀN		Kiểu không lặp được ⇒ not_iterable báo E0301.	_ => self.not_iterable(t, iter),
+crates/gt-types/src/check/expr.rs	67	_ =>	AN TOÀN		Thiếu gợi ý kiểu tuple chỉ làm hint rỗng; từng phần tử vẫn được kiểm/ép kiểu bình thường.	_ => vec![None; v.len()],
+crates/gt-types/src/check/expr.rs	79	_ =>	AN TOÀN		Không có kỳ vọng mảng ⇒ phần tử là biến suy luận mới, các phần tử sau vẫn phải unify (expr_expect).	_ => self.fresh(),
+crates/gt-types/src/check/expr.rs	89	_ =>	AN TOÀN		Chỉ là gợi ý kiểu cho giá trị lặp; kiểu thật vẫn lấy từ self.expr(value).	_ => None,
+crates/gt-types/src/check/expr.rs	222	_ =>	AN TOÀN		Nhánh còn lại của `-` là số (is_numeric) hoặc Ty::Err đã có chẩn đoán; không có nhánh nào bị chấp nhận nhầm.	_ => {}
+crates/gt-types/src/check/expr.rs	410	_ =>	SỬA	FB-C19	eq_ok trả true cho MỌI Ty::Infer(_) (kể cả biến suy luận tổng quát chưa giải) nên `==` trên biến kiểu chưa biết lọt, về sau biến được unify với f64 hoặc tuple ⇒ bỏ qua cấm `==` số thực (D4, E0303) và 'chưa hỗ trợ' cho tuple; chỉ biến Float được bắt riêng bởi is_float.	_ => false,
+crates/gt-types/src/check/expr.rs	444	_ =>	AN TOÀN		Cặp kiểu không thuộc danh sách ép hợp lệ ⇒ false ⇒ báo E0301; cấm f→int/f32 đã chặn trước đó.	_ => false,
+crates/gt-types/src/check/expr.rs	508	_ =>	AN TOÀN		Truy cập trường trên kiểu không có trường ⇒ E0304 + Ty::Err (có chẩn đoán).	_ => {
+crates/gt-types/src/check/expr.rs	595	_ =>	AN TOÀN		Range mở dùng độc lập ⇒ báo E0301 (từ chối).	_ => {
+crates/gt-types/src/check/expr.rs	617	let _ =	AN TOÀN		Bỏ kiểu chỉ số khi nền là Ty::Err; lỗi gốc đã được báo.	let _ = self.expr(index, None);
+crates/gt-types/src/check/expr.rs	628	let _ =	AN TOÀN		Bỏ kiểu chỉ số sau khi đã báo E0301 'không thể đánh chỉ số'.	let _ = self.expr(index, None);
+crates/gt-types/src/check/expr.rs	666	_ =>	AN TOÀN		Đường dẫn không phải struct ⇒ báo E0301 rồi Ty::Err.	_ => {
+crates/gt-types/src/check/expr.rs	681	unwrap_or	AN TOÀN		Range luôn có 1 đối số kiểu (lowering kiểm số đối số, sai ⇒ E0301); unwrap_or(Ty::Err) không đạt tới trên đường hợp lệ.	Ty::Adt(d, args) if self.is_range_def(d) => args.first().cloned().unwrap_or(Ty::Err),
+crates/gt-types/src/check/expr.rs	711	unwrap_or	AN TOÀN		`Self` ngoài impl/trait bị resolver báo E0201 trước khi tới đây (đã thử: `Self { x: 1 }` ngoài impl ⇒ ĐỎ E0201).	Some(Res::SelfType) => self.cx.self_ty.clone().unwrap_or(Ty::Err),
+crates/gt-types/src/check/expr.rs	713	_ =>	AN TOÀN		ADR-P2-09 try_expr: kiểu trả về của hàm bao khác họ/không phải Option-Result ⇒ báo E0320 (từ chối), không bao giờ chấp nhận	_ => {
+crates/gt-types/src/check/expr.rs	794	let _ =	AN TOÀN		Bỏ kiểu giá trị của trường không tồn tại sau khi đã báo E0304.	let _ = self.expr(&f.value, None);
+crates/gt-types/src/check/expr.rs	893	_ =>	AN TOÀN		Không có pattern phá cấu trúc thì giữ nguyên kiểu scrutinee để xét vét cạn; không nới lỏng.	_ => st,
+crates/gt-types/src/check/expr.rs	937	unwrap_or	AN TOÀN		loops.push(false) ngay trước đó nên pop luôn Some; không đạt unwrap_or.	let broke = self.loops.pop().unwrap_or(false);
+crates/gt-types/src/check/expr.rs	942	_ =>	AN TOÀN		Chỉ chọn kiểu kết quả: vòng vô hạn có break hoặc while/for ⇒ (); chỉ `⟳ {}` không break ⇒ `!`, đúng ngữ nghĩa.	_ => unit,
+crates/gt-types/src/check/expr.rs	949	unwrap_or	AN TOÀN		Như dòng 605: Range luôn có đối số; lỗi arity được báo ở lowering.	Ty::Adt(d, args) if self.is_range_def(d) => args.first().cloned().unwrap_or(Ty::Err),
+crates/gt-types/src/check/expr.rs	952	_ =>	AN TOÀN		Tham chiếu tới thứ không phải slice/mảng ⇒ not_iterable báo E0301.	_ => self.not_iterable(t, iter),
+crates/gt-types/src/check/expr.rs	955	_ =>	AN TOÀN		Kiểu không lặp được ⇒ not_iterable báo E0301.	_ => self.not_iterable(t, iter),
 crates/gt-types/src/check/mod.rs	301	_ =>	AN TOÀN		mut_fix_for chỉ dựng gợi ý sửa (Suggestion), None ⇒ vẫn báo lỗi E0308 không kèm gợi ý.	_ => return None,
 crates/gt-types/src/check/mod.rs	358	_ =>	AN TOÀN		closure numeric trong mismatch: chỉ chọn thông điệp/gợi ý ép kiểu; E0301/E0302 vẫn được báo.	_ => false,
 crates/gt-types/src/check/mod.rs	418	is_none_or	AN TOÀN		is_none_or: thân không tail / tail là `⎇` không else ⇒ checker bỏ E0307 vì giao cho M5; đã kiểm: thân rỗng và `⎇ c { ⏎ 1; }` đều ĐỎ E0307, `⎇ c {1}` ĐỎ E0301.	let open_end = body.tail.as_ref().is_none_or(|t| {
@@ -457,24 +460,24 @@ crates/gt-types/src/check/pat.rs	457	let _ =	AN TOÀN		sau E0304 (trường khô
 crates/gt-types/src/check/pat.rs	515	let _ =	GHI NHẬN		bind_fields chỉ gọi sau lỗi E0301/ unify, trừ nhánh `Res::Err|None` ở struct_pat trả Wild không lỗi: chỉ tới được khi resolver lỗi (đã chặn M4 ở check_program), tức nhánh chết; nên ICE.	let _ = self.pat(sub, &Ty::Err);
 crates/gt-types/src/check/pat.rs	541	unwrap_or	AN TOÀN		unwrap_or(s) chỉ ở decode_char: bỏ dấu nháy nếu có; sai dạng ⇒ các bước sau trả None.	.unwrap_or(s);
 crates/gt-types/src/check/pat.rs	563	_ =>	AN TOÀN		escape lạ ⇒ None ⇒ pattern thành Opaque (bảo thủ), biểu thức ⇒ ICE "literal ký tự hỏng" ở MIR; thực tế lexer đã báo E0101 trước (ch1.gt/ch2.gt ĐỎ).	_ => None,
-crates/gt-types/src/collect.rs	77	_ =>	GHI NHẬN		Tên #lang không nhận ra trong prelude bị bỏ qua im lặng (lang=None) thay vì ICE: gõ sai `secret`/`send`/`sync` ở lib/core làm mất kiểm tra tương ứng; chỉ prelude đặt được (người dùng bị E1002) và không có kiểm 'đủ mọi lang item'.	_ => return None,
-crates/gt-types/src/collect.rs	322	_ =>	AN TOÀN		`#level` sai/thiếu ⇒ level None ⇒ gt-effects fail-closed E0502 'thiếu #level' (đã thử #level("abc") ⇒ ĐỎ E0502).	_ => None,
-crates/gt-types/src/collect.rs	368	_ =>	AN TOÀN		Ràng buộc generic không phải trait ⇒ E0309; Res::Err/None đã có lỗi ở bước phân giải.	_ => {
-crates/gt-types/src/collect.rs	572	_ =>	AN TOÀN		Chỉ đếm tham số lifetime cho kiểm số lượng; 0 với thứ không phải kiểu thì nơi gọi đã báo lỗi 'không phải kiểu'.	_ => return 0,
-crates/gt-types/src/collect.rs	662	_ =>	AN TOÀN		Item không phải kiểu dùng ở vị trí kiểu ⇒ E0301 + Ty::Err.	_ => {
-crates/gt-types/src/collect.rs	716	_ =>	AN TOÀN		Nhánh không thể đạt: node đã là TypeAlias (cùng item vừa match ở trên).	_ => &a.ty,
-crates/gt-types/src/collect.rs	720	_ =>	AN TOÀN		Nhánh không thể đạt: node đã là TypeAlias; generics None chỉ nếu không có generics.	_ => None,
-crates/gt-types/src/collect.rs	731	_ =>	AN TOÀN		Không đạt được: DefKind::TypeAlias luôn ứng với ItemKind::TypeAlias; (Ty::Err không chẩn đoán sẽ nguy hiểm nếu đạt tới, ghi chú).	_ => Ty::Err,
-crates/gt-types/src/collect.rs	741	unwrap_or_default	AN TOÀN		aliases luôn được điền cho mọi alias ở pha 1; số đối số đã kiểm == generics.len() trước khi subst.	.unwrap_or_default();
-crates/gt-types/src/collect.rs	744	_ =>	AN TOÀN		Alias tham chiếu vòng ⇒ E0301 báo rõ.	_ => {
-crates/gt-types/src/collect.rs	775	_ =>	AN TOÀN		eval_usize trả None ⇒ cả hai nơi gọi (kiểu mảng, ArrayRepeat) báo E0301 'độ dài phải là hằng xác định'; tràn/chia/đệ quy sâu cũng ⇒ None ⇒ từ chối.	_ => None,
-crates/gt-types/src/collect.rs	785	_ =>	AN TOÀN		eval_usize trả None ⇒ cả hai nơi gọi (kiểu mảng, ArrayRepeat) báo E0301 'độ dài phải là hằng xác định'; tràn/chia/đệ quy sâu cũng ⇒ None ⇒ từ chối.	_ => None,
-crates/gt-types/src/collect.rs	794	_ =>	AN TOÀN		eval_usize trả None ⇒ cả hai nơi gọi (kiểu mảng, ArrayRepeat) báo E0301 'độ dài phải là hằng xác định'; tràn/chia/đệ quy sâu cũng ⇒ None ⇒ từ chối.	_ => None,
+crates/gt-types/src/collect.rs	80	_ =>	GHI NHẬN		Tên #lang không nhận ra trong prelude bị bỏ qua im lặng (lang=None) thay vì ICE: gõ sai `secret`/`send`/`sync` ở lib/core làm mất kiểm tra tương ứng; chỉ prelude đặt được (người dùng bị E1002) và không có kiểm 'đủ mọi lang item'.	_ => return None,
+crates/gt-types/src/collect.rs	325	_ =>	AN TOÀN		`#level` sai/thiếu ⇒ level None ⇒ gt-effects fail-closed E0502 'thiếu #level' (đã thử #level("abc") ⇒ ĐỎ E0502).	_ => None,
+crates/gt-types/src/collect.rs	371	_ =>	AN TOÀN		Ràng buộc generic không phải trait ⇒ E0309; Res::Err/None đã có lỗi ở bước phân giải.	_ => {
+crates/gt-types/src/collect.rs	575	_ =>	AN TOÀN		Chỉ đếm tham số lifetime cho kiểm số lượng; 0 với thứ không phải kiểu thì nơi gọi đã báo lỗi 'không phải kiểu'.	_ => return 0,
+crates/gt-types/src/collect.rs	665	_ =>	AN TOÀN		Item không phải kiểu dùng ở vị trí kiểu ⇒ E0301 + Ty::Err.	_ => {
+crates/gt-types/src/collect.rs	719	_ =>	AN TOÀN		Nhánh không thể đạt: node đã là TypeAlias (cùng item vừa match ở trên).	_ => &a.ty,
+crates/gt-types/src/collect.rs	723	_ =>	AN TOÀN		Nhánh không thể đạt: node đã là TypeAlias; generics None chỉ nếu không có generics.	_ => None,
+crates/gt-types/src/collect.rs	734	_ =>	AN TOÀN		Không đạt được: DefKind::TypeAlias luôn ứng với ItemKind::TypeAlias; (Ty::Err không chẩn đoán sẽ nguy hiểm nếu đạt tới, ghi chú).	_ => Ty::Err,
+crates/gt-types/src/collect.rs	744	unwrap_or_default	AN TOÀN		aliases luôn được điền cho mọi alias ở pha 1; số đối số đã kiểm == generics.len() trước khi subst.	.unwrap_or_default();
+crates/gt-types/src/collect.rs	747	_ =>	AN TOÀN		Alias tham chiếu vòng ⇒ E0301 báo rõ.	_ => {
+crates/gt-types/src/collect.rs	778	_ =>	AN TOÀN		eval_usize trả None ⇒ cả hai nơi gọi (kiểu mảng, ArrayRepeat) báo E0301 'độ dài phải là hằng xác định'; tràn/chia/đệ quy sâu cũng ⇒ None ⇒ từ chối.	_ => None,
+crates/gt-types/src/collect.rs	788	_ =>	AN TOÀN		eval_usize trả None ⇒ cả hai nơi gọi (kiểu mảng, ArrayRepeat) báo E0301 'độ dài phải là hằng xác định'; tràn/chia/đệ quy sâu cũng ⇒ None ⇒ từ chối.	_ => None,
 crates/gt-types/src/collect.rs	797	_ =>	AN TOÀN		eval_usize trả None ⇒ cả hai nơi gọi (kiểu mảng, ArrayRepeat) báo E0301 'độ dài phải là hằng xác định'; tràn/chia/đệ quy sâu cũng ⇒ None ⇒ từ chối.	_ => None,
-crates/gt-types/src/collect.rs	876	_ =>	AN TOÀN		Pha 1 chỉ cần struct/enum/trait/alias; các item khác được xử lý ở pha 2.	_ => {}
-crates/gt-types/src/collect.rs	968	_ =>	AN TOÀN		Chỉ cắt vòng ở tham chiếu/con trỏ/Param/Fn (đúng ý); gặp chính root hoặc quá DEPTH ⇒ coi là vòng (từ chối).	_ => false,
-crates/gt-types/src/collect.rs	1256	_ =>	AN TOÀN		Trait path không phải trait ⇒ E0311 (Res::Err/None đã có lỗi phân giải).	_ => {
-crates/gt-types/src/collect.rs	1350	ok()?	AN TOÀN		Literal sai/quá lớn ⇒ None ⇒ expr.rs báo E0301; trong pattern ⇒ XPat::Opaque (không phủ gì, bảo thủ).	let v = u128::from_str_radix(digits, radix).ok()?;
+crates/gt-types/src/collect.rs	800	_ =>	AN TOÀN		eval_usize trả None ⇒ cả hai nơi gọi (kiểu mảng, ArrayRepeat) báo E0301 'độ dài phải là hằng xác định'; tràn/chia/đệ quy sâu cũng ⇒ None ⇒ từ chối.	_ => None,
+crates/gt-types/src/collect.rs	879	_ =>	AN TOÀN		Pha 1 chỉ cần struct/enum/trait/alias; các item khác được xử lý ở pha 2.	_ => {}
+crates/gt-types/src/collect.rs	971	_ =>	AN TOÀN		Chỉ cắt vòng ở tham chiếu/con trỏ/Param/Fn (đúng ý); gặp chính root hoặc quá DEPTH ⇒ coi là vòng (từ chối).	_ => false,
+crates/gt-types/src/collect.rs	1259	_ =>	AN TOÀN		Trait path không phải trait ⇒ E0311 (Res::Err/None đã có lỗi phân giải).	_ => {
+crates/gt-types/src/collect.rs	1353	ok()?	AN TOÀN		Literal sai/quá lớn ⇒ None ⇒ expr.rs báo E0301; trong pattern ⇒ XPat::Opaque (không phủ gì, bảo thủ).	let v = u128::from_str_radix(digits, radix).ok()?;
 crates/gt-types/src/db.rs	98	is_some_and	AN TOÀN		params=None chỉ khi duyệt trường ADT mà tham số ADT đã được xét qua đối số; ở gốc luôn Some	Ty::Param(p) => params.is_some_and(|gs| {
 crates/gt-types/src/db.rs	101	is_none_or	AN TOÀN		tham số không tìm thấy trong generics ⇒ is_none_or ⇒ true (có thể có biến đổi bên trong, bảo thủ)	.is_none_or(|g| !g.bounds.is_empty())
 crates/gt-types/src/db.rs	112	is_some_and	AN TOÀN		lang mutability bên trong gồm Cell/Mutex/Atomic; ADT khác thì duyệt trường; (ghi chú: ở dòng 51-53 ADT thiếu trong db trả false, lệch với needs_drop bảo thủ nhưng db luôn đủ)	if adt.lang.is_some_and(Lang::interior_mutable) {

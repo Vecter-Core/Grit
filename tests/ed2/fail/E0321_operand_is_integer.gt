@@ -1,0 +1,3 @@
+// expect: fail E0321
+// note: toán hạng của `?` là số nguyên
+ƒ f(x: u32) → Option<u32> ! ∅ { v ≔ x?; Some(v) }

@@ -34,6 +34,8 @@ const KNOWN_EXTRA: &[(&str, &[&str], &str)] = &[
 
 struct Case {
     kind: &'static str,
+    /// edition của ngôn ngữ khi chạy `gritc` (ADR-P2-01/09): 1 cho `tests/{pass,fail,warn}`, 2 cho `tests/ed2/{pass,fail}`
+    edition: u32,
     name: String,
     path: PathBuf,
     expect: String,
@@ -57,8 +59,15 @@ fn expect_of(path: &Path) -> Option<String> {
 
 fn cases() -> Vec<Case> {
     let mut v = Vec::new();
-    for kind in ["pass", "fail", "warn"] {
-        let mut ents: Vec<PathBuf> = std::fs::read_dir(tests_dir().join(kind))
+    // (thư mục, loại kỳ vọng, edition): mẫu edition 2 nằm riêng ở `tests/ed2/` để các bộ test khác đọc `tests/pass` ở edition 1 không bị ảnh hưởng
+    for (dir, kind, edition) in [
+        ("pass", "pass", 1),
+        ("fail", "fail", 1),
+        ("warn", "warn", 1),
+        ("ed2/pass", "pass", 2),
+        ("ed2/fail", "fail", 2),
+    ] {
+        let mut ents: Vec<PathBuf> = std::fs::read_dir(tests_dir().join(dir))
             .expect("đọc thư mục corpus")
             .map(|e| e.expect("entry").path())
             .filter(|p| p.is_dir() || p.extension().is_some_and(|x| x == "gt"))
@@ -71,9 +80,10 @@ fn cases() -> Vec<Case> {
                 .to_string_lossy()
                 .into_owned();
             let expect =
-                expect_of(&path).unwrap_or_else(|| panic!("{kind}/{name}: thiếu dòng expect"));
+                expect_of(&path).unwrap_or_else(|| panic!("{dir}/{name}: thiếu dòng expect"));
             v.push(Case {
                 kind,
+                edition,
                 name,
                 path,
                 expect,
@@ -90,11 +100,13 @@ struct Outcome {
     warns: BTreeSet<String>,
 }
 
-fn run_gritc(target: &Path) -> Result<Outcome, String> {
-    let out = Command::new(env!("CARGO_BIN_EXE_gritc"))
-        .arg("check")
-        .arg(target)
-        .arg("--json")
+fn run_gritc(target: &Path, edition: u32) -> Result<Outcome, String> {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_gritc"));
+    cmd.arg("check").arg(target).arg("--json");
+    if edition != 1 {
+        cmd.arg(format!("--edition={edition}"));
+    }
+    let out = cmd
         .output()
         .map_err(|e| format!("không chạy được gritc: {e}"))?;
     let j: Value = serde_json::from_slice(&out.stdout).map_err(|e| {
@@ -169,11 +181,26 @@ fn judge(c: &Case, o: &Outcome) -> Result<(), String> {
 #[test]
 fn every_corpus_sample_gets_exactly_its_expected_verdict_from_the_real_gritc() {
     let cases = cases();
-    let count = |k: &str| cases.iter().filter(|c| c.kind == k).count();
+    let count = |k: &str| {
+        cases
+            .iter()
+            .filter(|c| c.kind == k && c.edition == 1)
+            .count()
+    };
     // chống "glob rỗng": corpus co lại một cách im lặng ⇒ ĐỎ (số liệu đo 2026-11-21; giảm có chủ ý thì sửa số ở đây cùng commit)
     assert!(count("pass") >= 430, "chỉ {} mẫu pass", count("pass"));
     assert!(count("fail") >= 530, "chỉ {} mẫu fail", count("fail"));
     assert!(count("warn") >= 12, "chỉ {} mẫu warn", count("warn"));
+
+    // mẫu edition 2 (toán tử `?`, ADR-P2-09): tối thiểu ≥ 3 pass + ≥ 3 fail cho MỖI mã lỗi mới (E0320, E0321) theo điều kiện ADR-038 mục 7
+    let ed2 = |k: &str| {
+        cases
+            .iter()
+            .filter(|c| c.kind == k && c.edition == 2)
+            .count()
+    };
+    assert!(ed2("pass") >= 3, "chỉ {} mẫu pass edition 2", ed2("pass"));
+    assert!(ed2("fail") >= 6, "chỉ {} mẫu fail edition 2", ed2("fail"));
 
     let scratch_root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("corpus_e2e");
     let next = AtomicUsize::new(0);
@@ -195,11 +222,11 @@ fn every_corpus_sample_gets_exactly_its_expected_verdict_from_the_real_gritc() {
                             .expect("ghi main.gt");
                         scratch.clone()
                     };
-                    let r = run_gritc(&target).and_then(|o| judge(c, &o));
+                    let r = run_gritc(&target, c.edition).and_then(|o| judge(c, &o));
                     if let Err(e) = r {
                         bad.lock()
                             .expect("khoá")
-                            .push(format!("{}/{}: {e}", c.kind, c.name));
+                            .push(format!("ed{}/{}/{}: {e}", c.edition, c.kind, c.name));
                     }
                 }
             });

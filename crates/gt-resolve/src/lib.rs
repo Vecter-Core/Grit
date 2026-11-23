@@ -81,10 +81,19 @@ pub fn module_file_name_for(file: &str) -> String {
     cand
 }
 
-/// Giải tên cho cả chương trình. Thứ tự `inputs` không ảnh hưởng kết quả.
+/// Giải tên cho cả chương trình (edition 1). Thứ tự `inputs` không ảnh hưởng kết quả.
 pub fn resolve_program(
     inputs: &[SourceInput],
     prelude: &Prelude,
+) -> Result<ResolveOutput, InputError> {
+    resolve_program_with_edition(inputs, prelude, 1)
+}
+
+/// Như `resolve_program`, parse mọi tệp theo `edition` (ADR-P2-01/09).
+pub fn resolve_program_with_edition(
+    inputs: &[SourceInput],
+    prelude: &Prelude,
+    edition: u32,
 ) -> Result<ResolveOutput, InputError> {
     let mut files = Vec::new();
     for i in inputs {
@@ -101,7 +110,7 @@ pub fn resolve_program(
         mods.push(module_name(f.name())?);
     }
     Ok(
-        match gt_stack::run_with_big_stack(|| resolve_inner(&map, &mods, prelude)) {
+        match gt_stack::run_with_big_stack(|| resolve_inner(&map, &mods, prelude, edition)) {
             Ok(o) => o,
             Err(e) => ice(&e.to_string()),
         },
@@ -145,13 +154,18 @@ fn syntax_failure(report: Report) -> ResolveOutput {
     }
 }
 
-fn resolve_inner(map: &SourceMap, mods: &[String], prelude: &Prelude) -> ResolveOutput {
+fn resolve_inner(
+    map: &SourceMap,
+    mods: &[String],
+    prelude: &Prelude,
+    edition: u32,
+) -> ResolveOutput {
     // 1. parse từng tệp; có lỗi cú pháp thì dừng (không phân giải trên AST không hoàn chỉnh)
     let mut parsed = Vec::new();
     let mut syntax = Diagnostics::new(LIMIT);
     let mut any_syntax = false;
     for (id, f) in map.iter() {
-        let out = gt_parser::parse_file(id, f.name(), f.text());
+        let out = gt_parser::parse_file_with_edition(id, f.name(), f.text(), edition);
         for d in out.report.diagnostics {
             any_syntax = true;
             syntax.push(d);

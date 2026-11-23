@@ -5,6 +5,8 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Value {
     Str(String),
+    /// số nguyên dương trần (`edition = 1`): chỉ các chữ số thập phân, không dấu, không số 0 đầu (trừ `0`), vừa u64
+    Int(u64),
     /// bảng nội tuyến `{ k = "v", … }` (chỉ giá trị chuỗi)
     Table(BTreeMap<String, String>),
 }
@@ -139,9 +141,17 @@ pub fn parse(text: &str) -> Result<Doc, String> {
                 }
             }
             Value::Table(t)
+        } else if !v.is_empty()
+            && v.bytes().all(|b| b.is_ascii_digit())
+            && (v == "0" || !v.starts_with('0'))
+        {
+            match v.parse::<u64>() {
+                Ok(n) => Value::Int(n),
+                Err(_) => return Err(format!("dòng {line}: số nguyên `{v}` quá lớn")),
+            }
         } else {
             return Err(format!(
-                "dòng {line}: giá trị phải là chuỗi \"…\" hoặc bảng {{ … }} (số/mảng/boolean chưa hỗ trợ)"
+                "dòng {line}: giá trị phải là chuỗi \"…\", bảng {{ … }} hoặc số nguyên dương trần như `1` (số thập phân/âm/số 0 đầu/mảng/boolean chưa hỗ trợ)"
             ));
         };
         let sect = doc.entry(sec).or_default();
@@ -170,7 +180,10 @@ mod tests {
     fn rejects_everything_outside_the_subset_with_line_numbers() {
         for (src, needle) in [
             ("a = \"x\"\n", "ngoài mọi mục"),
-            ("[p]\na = 1\n", "chuỗi"),
+            ("[p]\na = 1.5\n", "số nguyên"),
+            ("[p]\na = -1\n", "số nguyên"),
+            ("[p]\na = 01\n", "số nguyên"),
+            ("[p]\na = 99999999999999999999\n", "quá lớn"),
             ("[p]\na = [\"x\"]\n", "chuỗi"),
             ("[p]\na = \"x\"\na = \"y\"\n", "trùng"),
             ("[p]\n[p]\n", "hai lần"),
@@ -186,6 +199,14 @@ mod tests {
             assert!(e.contains(needle), "{src:?} ⇒ {e}");
             assert!(e.starts_with("dòng "), "{e}");
         }
+    }
+
+    #[test]
+    fn bare_positive_integers_parse_as_ints() {
+        let d = parse("[p]\na = 1\nb = 0\nc = 42\n").unwrap();
+        assert_eq!(d["p"]["a"].0, Value::Int(1));
+        assert_eq!(d["p"]["b"].0, Value::Int(0));
+        assert_eq!(d["p"]["c"].0, Value::Int(42));
     }
 
     #[test]

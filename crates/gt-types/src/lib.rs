@@ -33,9 +33,7 @@ pub use ty::{FloatTy, IntTy, ParamId, SELF_INDEX, Ty};
 use collect::{Env, ItemInfo};
 use gt_ast::{ItemKind, NodeId};
 use gt_diag::{Code, Diagnostic, Diagnostics, Report};
-use gt_resolve::{
-    Def, DefId, InputError, LocalId, Prelude, ResolveOutput, SourceInput, resolve_program,
-};
+use gt_resolve::{Def, DefId, InputError, LocalId, Prelude, ResolveOutput, SourceInput};
 use gt_span::Span;
 use std::collections::BTreeMap;
 
@@ -224,7 +222,16 @@ fn empty_output(report: Report, resolve: ResolveOutput) -> TypesOutput {
 
 /// Giải tên rồi kiểm kiểu cho cả chương trình. Thứ tự `inputs` không ảnh hưởng kết quả.
 pub fn check_program(inputs: &[SourceInput], prelude: &Prelude) -> Result<TypesOutput, InputError> {
-    let mut resolve = resolve_program(inputs, prelude)?;
+    check_program_with_edition(inputs, prelude, 1)
+}
+
+/// Như `check_program`, parse theo `edition` (ADR-P2-01/09).
+pub fn check_program_with_edition(
+    inputs: &[SourceInput],
+    prelude: &Prelude,
+    edition: u32,
+) -> Result<TypesOutput, InputError> {
+    let mut resolve = gt_resolve::resolve_program_with_edition(inputs, prelude, edition)?;
     if !resolve.report.diagnostics.is_empty() {
         let report = std::mem::replace(&mut resolve.report, Diagnostics::new(LIMIT).finish());
         return Ok(empty_output(report, resolve));
