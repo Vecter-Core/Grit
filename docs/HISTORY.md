@@ -196,4 +196,5 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
 - **Đã làm:** token `?` + `ExprKind::Try` + hậu tố ở parser; `edition` xuyên lexer/parser/fmt/resolve/types/`Options`/`gritc --edition=N`/`rig`; M4 `try_expr` (E0320, E0321) + lang item `result`; M5 `try_into` (Discriminant + SwitchInt + exit_to(0) + Return — không thêm TCB);
   corpus `tests/ed2/` (4 pass, 7 fail) + `corpus_e2e` chạy `--edition=2`; oracle `qm_oracle.rs` (40 chương trình × thông dịch + LLVM dev/release/release-o2, mô hình độc lập gồm thứ tự drop khi thoát sớm); fmt round-trip `question_mark.rs`; đột biến tay 3/3 bị bắt.
 - **Cổng ĐỎ lần 1 (6b69845):** 3 bài golden IR (`checked_add`, `slice_sum`, `static_atomic`) — nguyên nhân: băm chứng thực bao gồm văn bản prelude, mà tôi thêm `#lang(result)`. Kiểm bằng `git diff` thật: CHỈ đổi dòng băm (+ hai dòng đích Linux/Windows bị bỏ qua khi so). Đã cập nhật chỉ dòng băm, giữ dòng đích Windows. Lẽ ra phải chạy `llvm` trước khi commit: đổi prelude luôn đổi golden.
-- **CHƯA:** cổng sạch trên mã sửa; đột biến tự động M4/M5; M6 oracle động với `?` + `Owned`; LSP biết edition; `std` dùng `?`.
+- **Cổng:** clone sạch trên 5edc297 XANH liền mạch 4 lượt: 990 test đạt, 0 lỗi, 212 bộ, `GATE_TREE=f807009e…`.
+- **CHƯA:** đột biến tự động M4/M5; M6 oracle động với `?` + `Owned`; LSP biết edition; `std` dùng `?`.
