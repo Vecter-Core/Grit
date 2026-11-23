@@ -78,6 +78,30 @@ fn preconditions_that_need_a_linear_branch_fact_are_proved() {
 }",
             "qua điểm hợp",
         ),
+        // `⊳` của CHÍNH hàm là sự kiện cho thân: x + y ≤ 100 ⇒ gọi được hàm cần x + y ≤ 100
+        (
+            "ƒ need(a: u32, b: u32) → u32 ! ∅ ⊳ a + b ≤ 100 { a }
+ƒ f(x: u32, y: u32) → u32 ! ∅ ⊳ x + y ≤ 100 { need(x, y) }",
+            "⊳ của chính hàm",
+        ),
+        // `≠` một biến: khoảng không biểu diễn được, chỉ có sự kiện mới giữ
+        (
+            "ƒ need(a: u32) → u32 ! ∅ ⊳ a != 5 { a }
+ƒ f(p: u8) → u32 ! ∅ {
+  x ≔ p as u32;
+  ⎇ x != 5 { need(x) } ⇝ { 0 }
+}",
+            "≠ một biến",
+        ),
+        // độ dài slice là một biến trong sự kiện
+        (
+            "ƒ need(a: usize, b: usize) → usize ! ∅ ⊳ a + b ≤ 100 { a }
+ƒ f(xs: &[u8], q: u8) → usize ! ∅ {
+  y ≔ q as usize;
+  ⎇ xs.len() + y ≤ 100 { need(xs.len(), y) } ⇝ { 0 }
+}",
+            "độ dài slice",
+        ),
     ];
     for (src, name) in cases {
         let (errs, all) = notes(src);
@@ -125,6 +149,28 @@ fn a_linear_fact_dies_when_a_variable_it_mentions_is_reassigned() {
   ⎇ x + y ≤ 60 { bump(&!y); need(x, y) } ⇝ { 0 }
 }",
             "ghi qua &!",
+        ),
+        // sự kiện chứa NGUYÊN TỬ (bool `c`, từ `⊳ c ∧ x + y ≤ 60`) không được sống qua phép gán lại `c`: nguyên tử không nằm trong tập local của sự kiện;
+        // mục tiêu `a ∧ x + y ≤ 60` nhắc cùng x, y nên sự kiện cũ sẽ được dùng để "chứng minh" `a`
+        (
+            "ƒ need(a: bool, p: u32, q: u32) → u32 ! ∅ ⊳ a ∧ p + q <= 60 { 0 }
+ƒ f(μc: bool, d: bool, x: u32, y: u32) → u32 ! ∅ ⊳ c ∧ x + y <= 60 { c ← d; need(c, x, y) }",
+            "nguyên tử bị gán lại",
+        ),
+        // `⊳` của hàm KHÔNG được bị đảo dấu: ở thân x + y ≤ 100 đúng, nên x + y > 100 KHÔNG được coi là đã biết
+        (
+            "ƒ need(a: u32, b: u32) → u32 ! ∅ ⊳ a + b > 100 { a }
+ƒ f(x: u32, y: u32) → u32 ! ∅ ⊳ x + y ≤ 100 { need(x, y) }",
+            "⊳ không bị đảo",
+        ),
+        // độ dài slice: gán lại slice làm sự kiện về độ dài mất hiệu lực
+        (
+            "ƒ need(a: usize, b: usize) → usize ! ∅ ⊳ a + b ≤ 100 { a }
+ƒ f(xs0: &[u8], xs1: &[u8], q: u8) → usize ! ∅ {
+  μxs ≔ xs0; y ≔ q as usize;
+  ⎇ xs.len() + y ≤ 100 { xs ← xs1; need(xs.len(), y) } ⇝ { 0 }
+}",
+            "slice bị gán lại",
         ),
     ];
     for (src, name) in cases {
@@ -429,4 +475,31 @@ fn every_precondition_m7_claims_proved_holds_on_every_input() {
         needs_fact_proved * 4 >= from_path * 3,
         "sự kiện tuyến tính chứng minh quá ít: {needs_fact_proved}/{from_path}"
     );
+}
+
+fn count(src: &str, code: &str) -> usize {
+    let (errs, all) = notes(src);
+    assert!(errs.is_empty(), "gritc từ chối {errs:?}\n{src}");
+    all.iter().filter(|c| *c == code).count()
+}
+
+/// Đột biến M7 (dòng pres_common/assume_posts): sau lời gọi, `⊳` của callee (đã kiểm hoặc đã chứng minh) và `⊲` là sự kiện ĐÚNG cho phần còn lại — KHÔNG phải phủ định của chúng.
+/// Mỗi cặp tách riêng (một dương, một âm) để hai lỗi không triệt tiêu nhau trong phép đếm.
+#[test]
+fn facts_assumed_after_a_call_are_the_callee_contract_not_its_negation() {
+    let defs = "ƒ n1(a: u32, b: u32) → u32 ! ∅ ⊳ a + b <= 60 { a }
+ƒ n2(a: u32, b: u32) → u32 ! ∅ ⊳ a + b <= 60 { a }
+ƒ n3(a: u32, b: u32) → u32 ! ∅ ⊳ a + b > 60 { a }
+ƒ g(a: u32, b: u32) → u32 ! ∅ ⊲ a + b <= 60 { 0 }\n";
+    let body = |calls: &str| {
+        format!("{defs}ƒ f(p: u8, q: u8) → u32 ! ∅ {{ x ≔ p as u32; y ≔ q as u32; {calls} 0 }}")
+    };
+    // sau n1(x, y) (kiểm lúc chạy), x + y ≤ 60 đúng ⇒ n2 chứng minh được; n1 là N0901 duy nhất
+    assert_eq!(count(&body("u ≔ n1(x, y); v ≔ n2(x, y);"), "N0901"), 1);
+    // …và n3 (cần x + y > 60) KHÔNG được chứng minh: hai N0901
+    assert_eq!(count(&body("u ≔ n1(x, y); v ≔ n3(x, y);"), "N0901"), 2);
+    // `⊲` của g (trên đối số) đúng sau lời gọi ⇒ n2 chứng minh được; không còn N0901
+    assert_eq!(count(&body("u ≔ g(x, y); v ≔ n2(x, y);"), "N0901"), 0);
+    // …và n3 KHÔNG được chứng minh
+    assert_eq!(count(&body("u ≔ g(x, y); v ≔ n3(x, y);"), "N0901"), 1);
 }

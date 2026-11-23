@@ -130,7 +130,7 @@ fn a_function_that_breaks_a_callee_precondition_on_valid_input_is_found() {
 fn functions_the_generator_cannot_drive_are_listed_as_skipped_never_silently_dropped() {
     let d = project(
         "skip",
-        "◈ ƒ fl(x: f64) → f64 ! ∅ { x }\n\
+        "◈ ƒ fl(x: f32) → f32 ! ∅ { x }\n\
          ◈ ƒ gen<T>(x: T) → T ! ∅ { x }\n\
          ƒ private(x: i32) → i32 ! ∅ { x }\n\
          ◈ ƒ fine(x: i32) → i32 ! ∅ { x }\n",
@@ -141,7 +141,7 @@ fn functions_the_generator_cannot_drive_are_listed_as_skipped_never_silently_dro
     assert!(so.contains("auto lib1::fine ... ok"), "{so}");
     assert!(
         so.contains("auto lib1::fl ... BỎ QUA"),
-        "f64 chưa hỗ trợ phải được nêu: {so}"
+        "f32 chưa hỗ trợ phải được nêu: {so}"
     );
     assert!(
         so.contains("auto lib1::gen ... BỎ QUA"),
@@ -165,4 +165,56 @@ fn a_long_running_function_is_noted_as_slow_not_reported_as_a_counterexample() {
         .find(|l| l.contains("lib1::spin"))
         .expect("dòng spin");
     assert!(line.contains("ok") && line.contains("chậm"), "{line}");
+}
+
+#[test]
+fn float_and_char_parameters_are_driven_and_an_entry_precondition_gritc_cannot_decide_is_not_blamed()
+ {
+    // M7 không suy luận số thực nên `⊳ x >= 0.0` KHÔNG bị loại bằng E0901: ứng viên âm sẽ abort `precondition` ngay ở cửa vào — đó không phải lỗi của hàm
+    let d = project(
+        "flt",
+        "◈ ƒ halve(x: f64) → f64 ! ∅ ⊳ x >= 0.0 ⊲ result <= x { x * 0.5 }\n\
+         ◈ ƒ wrong(x: f64) → f64 ! ∅ ⊳ x >= 0.0 ⊲ result > x { x * 0.5 }\n\
+         ◈ ƒ boom(c: char) → u32 ! ∅ { 100u32 / (c as u32) }\n\
+         ◈ ƒ calm(c: char) → u32 ! ∅ { c as u32 }\n",
+    );
+    let o = rig(&d, &["test", "--auto"]);
+    let so = text(&o.stdout);
+    assert_eq!(o.status.code(), Some(1), "{so}\n{}", text(&o.stderr));
+    let halve = so
+        .lines()
+        .find(|l| l.contains("lib1::halve"))
+        .expect("halve");
+    assert!(
+        halve.contains("... ok") && halve.contains("mơ hồ"),
+        "{halve}"
+    );
+    assert!(
+        so.contains("auto lib1::wrong ... FAILED") && so.contains("lib1::wrong("),
+        "{so}"
+    );
+    assert!(so.contains("postcondition"), "{so}");
+    assert!(
+        so.contains("auto lib1::boom ... FAILED") && so.contains("lib1::boom('"),
+        "{so}"
+    );
+    assert!(so.contains("auto lib1::calm ... ok"), "{so}");
+}
+
+#[test]
+fn a_callee_precondition_violated_by_a_function_without_its_own_precondition_is_reported_even_for_floats()
+ {
+    // `outer` không có `⊳` riêng ⇒ mọi abort `precondition` chắc chắn đến từ `inner`
+    let d = project(
+        "fcallee",
+        "ƒ inner(x: f64) → f64 ! ∅ ⊳ x > 0.0 { x }\n\
+         ◈ ƒ outer(x: f64) → f64 ! ∅ { inner(x) }\n",
+    );
+    let o = rig(&d, &["test", "--auto"]);
+    let so = text(&o.stdout);
+    assert_eq!(o.status.code(), Some(1), "{so}\n{}", text(&o.stderr));
+    assert!(
+        so.contains("auto lib1::outer ... FAILED") && so.contains("precondition"),
+        "{so}"
+    );
 }

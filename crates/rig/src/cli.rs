@@ -384,19 +384,33 @@ fn cmd_test_auto(a: &Args) -> i32 {
                 ran: 0,
                 dropped,
                 slow: 0,
+                ambiguous,
             } => {
                 println!(
-                    "{label} ... BỎ QUA (cả {dropped} ứng viên đều ngoài miền ⊳: không có đầu vào hợp lệ để thử)"
+                    "{label} ... BỎ QUA (cả {} ứng viên đều ngoài miền ⊳ hoặc không phân biệt được: không có đầu vào hợp lệ để thử)",
+                    dropped + ambiguous
                 );
                 skipped += 1;
             }
-            Outcome::Ok { ran, dropped, slow } => {
+            Outcome::Ok {
+                ran,
+                dropped,
+                slow,
+                ambiguous,
+            } => {
                 let slow_note = if slow > 0 {
                     format!(", {slow} chậm (hết nhiên liệu — không phải lỗi)")
                 } else {
                     String::new()
                 };
-                println!("{label} ... ok (chạy {ran}, bỏ {dropped} vì ⊳ sai{slow_note})");
+                let amb_note = if ambiguous > 0 {
+                    format!(
+                        ", {ambiguous} mơ hồ (abort precondition mà gritc không quyết định được ⊳ của hàm — không đổ lỗi)"
+                    )
+                } else {
+                    String::new()
+                };
+                println!("{label} ... ok (chạy {ran}, bỏ {dropped} vì ⊳ sai{slow_note}{amb_note})");
                 ok += 1;
             }
             Outcome::Failed { found, ran } => {

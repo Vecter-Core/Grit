@@ -399,3 +399,38 @@ fn multi_case_certificates_with_an_atom_case_in_the_middle_round_trip() {
     assert_eq!(back, c);
     assert_eq!(check(&o, &back), Ok(()));
 }
+
+/// Bộ trong NÓI DỐI: luôn trả "đã chứng minh". Dùng để bảo vệ thuộc tính "gritc chỉ tin kernel" (ADR-P2-04): đột biến tắt `require_kernel`
+/// sống với bộ test cũ vì trên corpus mọi chứng minh của zone đều có chứng chỉ thật.
+struct Liar;
+impl Prover for Liar {
+    fn name(&self) -> &'static str {
+        "liar"
+    }
+    fn prove(&mut self, _ob: &Obligation, _b: &mut Budget) -> Verdict {
+        Verdict::Proved(gt_oblig::ir::Cert("lời nói dối".into()))
+    }
+}
+
+#[test]
+fn a_lying_inner_prover_is_never_trusted_when_the_kernel_is_required() {
+    // x ≤ 5 ⊢ x ≤ 3 (x: u8) là SAI
+    let false_ob = ob(
+        &[(0, 8, false)],
+        vec![Prop::Le(v(0), Term::int(5))],
+        Prop::Le(v(0), Term::int(3)),
+    );
+    let mut p = gt_kernel::CertifiedProver::new(Liar);
+    p.require_kernel = true;
+    let r = p.prove(&false_ob, &mut Budget::new(100_000));
+    assert!(!matches!(r, Verdict::Proved(_)), "tin bộ nói dối: {r:?}");
+    // nghĩa vụ ĐÚNG: vẫn chứng minh được, nhưng bằng chứng chỉ kernel tự dựng và tự kiểm, không phải "lời nói dối"
+    let true_ob = simple();
+    match p.prove(&true_ob, &mut Budget::new(100_000)) {
+        Verdict::Proved(c) => {
+            let cert = FarkasCert::decode(&c.0).expect("chứng chỉ farkas:v1");
+            assert_eq!(check(&true_ob, &cert), Ok(()));
+        }
+        other => panic!("nghĩa vụ đúng phải chứng minh được: {other:?}"),
+    }
+}

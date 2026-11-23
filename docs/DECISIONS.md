@@ -1346,7 +1346,7 @@ Trả lời từng câu của điều kiện R6, KÈM bằng chứng chạy đư
 
 **QUYẾT ĐỊNH (kiến trúc sư, GÓI 10, 2026-11-20; Giang đã nhắn "tiếp tục" = ủy quyền, THU HỒI ĐƯỢC): phương án (b) CHO TÀI LIỆU.** Đồng bộ TÀI LIỆU theo hành vi hiện tại; KHÔNG sửa prelude (mã sản phẩm, đóng băng). Hiệu ứng hiệu dụng của `spawn` = hiệu ứng của worker (trừ `lock(*)`); chú thích `{detach}` trong chữ ký prelude hiện KHÔNG được thi hành; hàm khai `! ∅` vẫn có thể tạo luồng (`! ∅` KHÔNG có nghĩa "không có luồng"). Đã sửa: `TCB_INTRINSICS.md` (dòng `spawn`), `docs/spec/semantics.md` §18, `SAFETY_CLAIMS.md` §3, `AI_GUIDE.md` (mục 10.11), `AI_PITFALLS.md`, `KNOWN_LIMITATIONS.md`. Test KHOÁ hành vi: `tests/fail/E0801_spawn_worker_mem_in_empty.gt`, `tests/pass/E0801_ok_spawn_effect_is_worker_effect.gt` (đã chạy tay bằng `gritc 1.0.0-rc6 check`: đúng phán quyết; chạy qua bộ corpus của cargo **CHƯA KIỂM**, preflight đỏ). Chú thích prelude không khớp hành vi ⇒ `docs/NEXT_PRODUCT_BATCH.md`; đường siết (cho phép khai `{detach}` ở mã người dùng, E1002 hiện chặn) cần ADR riêng, làm TRƯỚC kênh có kiểu.
 
-## ADR-C13 — `declassify` không có `Cap<Secret>`: ĐỀ XUẤT, KHÔNG XONG (2026-11-19; GÓI 8 S3)
+## ADR-C13 — `declassify` không có `Cap<Secret>`: DUYỆT CHO EDITION 2 (2026-11-23; trước đó HOÃN; GÓI 8 S3)
 **Vấn đề (audit 01 F3):** `declassify` trên `Secret` trong hàm `! ∅` không có `Cap<Secret>` trong chữ ký chỉ cho cảnh báo S201, trong khi D28 nói dùng năng lực cần `Cap` trong chữ ký.
 **Đề xuất:** TÁCH hai việc: (1) rò rỉ bí mật (S1xx/S2xx) GIỮ VÀNG theo luật gốc của Giang, KHÔNG đổi mức của bất kỳ S1xx/S2xx nào; (2) dùng năng lực mà không có `Cap` là lỗi KIỂU ⇒ ĐỎ (E0310 hoặc mã phù hợp).
 **Bán kính (đo thô bằng `git grep`, chưa chạy từng chương trình):** từ `declassify` xuất hiện ở 27 tệp (13 tài liệu, 6 `tests/`, 3 `crates/`, 3 `audit/`, 1 `lib/`, 1 `GRIT_PLAN.md`). Số chương trình thật bị đổi phán quyết CHƯA đo. **Trạng thái: KHÔNG XONG** (không viết test-trước, không sửa mã); ghi `docs/KNOWN_LIMITATIONS.md`/`PENDING_GIANG` ở phiên sau.
@@ -1498,9 +1498,21 @@ phản ví dụ, không bao giờ cấp phép hay đổi phán quyết `gritc`; 
   xanh ⇒ chạy trên thông dịch tham chiếu. Dùng `gritc` làm bộ lọc nên KHÔNG cần bộ tính hợp đồng riêng (không có hai bản ngữ nghĩa của biểu thức hợp đồng).
 - **Phản ví dụ:** mọi abort (`postcondition`, `overflow`, `precondition` của hàm được gọi, `index`…). Hết nhiên liệu ghi là "chậm", KHÔNG phải lỗi (mọi vòng `⟳` có biến
   thể `↓` được M8 chứng minh dừng nên chạy lâu ≠ không dừng) — phát hiện sau khi thử `std::pow_u64` với số mũ 2³².
+- **Bước 2 (cùng ngày): `f64` và `char`.** Literal biên: f64 `0.0, 1.0, -1.0, 0.5, ±1e300, 1e-300`; char `'a','Z','0',' ','\0','é'`. `f32` vẫn bỏ qua (Phase 1 chưa có: E0319). **Điểm yếu lộ ra khi
+  thử:** M7 không suy luận số thực nên `⊳ x >= 0.0` KHÔNG bị loại bằng E0901 — ứng viên âm sẽ abort `precondition` ngay ở cửa vào và bị đổ lỗi oan cho hàm. Cách xử lý (đánh đổi có ý thức):
+  với hàm có `⊳` mà `gritc` không quyết định được (tham số float/char, hoặc `⊳` có lời gọi), abort `precondition` được ghi là "mơ hồ" (không phải phản ví dụ). Cái mất: một vi phạm `⊳` của hàm
+  được gọi sẽ bị bỏ lọt ở đúng loại hàm này. Hàm KHÔNG có `⊳` riêng thì abort `precondition` chắc chắn đến từ hàm được gọi nên vẫn được báo.
 - **Giới hạn công khai:** đối số chỉ là hằng biên (không phải fuzz); kiểu chưa hỗ trợ bị bỏ qua; mỗi ứng viên chạy lại `gritc check` nên chậm với dự án lớn (CHƯA đo); hợp đồng
   chỉ được thử ở các điểm biên, không chứng minh gì — chứng minh vẫn là việc của M7/kernel.
 **Kết quả:** `crates/rig/tests/auto.rs` (6 test E2E qua tiến trình `rig`): hàm đúng qua và ứng viên vi phạm `⊳` bị loại chứ không bị đổ lỗi; `⊲` sai báo `postcondition` kèm lời gọi phản
 ví dụ; tràn số không hợp đồng báo `lib1::dec(0u8) → abort overflow`; vi phạm `⊳` của hàm được gọi báo `precondition`; hàm không lái được được liệt kê; hàm chạy lâu không bị báo lỗi. Ba đột biến
 tay (bỏ lọc E0901 / nuốt abort / bỏ ứng viên âm) đều bị test bắt. Chạy thử trên `lib/std`: 2 phát hiện thật — `std::next_cap(usize::MAX)` và `next_cap(usize::MAX−1)` abort `overflow`
 (an toàn: abort có kiểm, không UB; chỉ gọi nội bộ với `(live+1)*4` nên không tới được) — và 11 hàm bị BỎ QUA vì kiểu tham số chưa hỗ trợ.
+
+## ADR-P2-07 — Duyệt theo ủy quyền của Giang (2026-11-23)
+Giang ủy quyền: "đọc và duyệt những chính sách cần duyệt, chỉ cần không phản triết lý của Grit; còn lại bạn quyết". Kết quả đầy đủ, căn cứ từng mục và giới hạn
+(người duyệt cũng là tác giả B5/B6/kernel, cùng họ model ⇒ độc lập yếu): `docs/DUYET_2026-11-23.md`. Tóm tắt: TCB B5 (`Owned`, lang item `owned`), B6 (xoá Secret),
+K (kernel) DUYỆT hợp đồng; ADR-P2-00/01/03 DUYỆT; ADR-P2-02 DUYỆT hướng đi có điều kiện (i)–(iv); ADR-C13 đổi HOÃN ⇒ DUYỆT cho edition 2; ROADMAP DUYỆT.
+Không thuộc ủy quyền: đẩy `main`, giấy phép, nhãn phiên bản (Giang: không gán tới khi viết Grit hoàn chỉnh như Rust), việc chỉ người làm được.
+Khi duyệt kernel phát hiện ranh giới TCB thật rộng hơn hai tệp đã gọi tên (gồm nhánh quyết định của `CertifiedProver` + cấu hình driver) và đột biến tắt
+`require_kernel` sống ⇒ thêm 2 test bảo vệ TRƯỚC khi ký.

@@ -67,3 +67,61 @@ fn kernel_confirms_a_measured_share_of_phase1_proofs_on_the_corpus() {
         "kernel không xác nhận được mọi chứng minh của zone trên corpus"
     );
 }
+
+/// Mọi nghĩa vụ mà `gritc` (qua chính đường ống thật, không dựng prover riêng) ghi là ĐÃ CHỨNG MINH phải mang chứng chỉ `farkas:v1` được
+/// `gt_kernel::check` KIỂM LẠI độc lập trên đúng nghĩa vụ đó. Bảo vệ cấu hình "chỉ tin kernel" của driver: nếu `require_kernel` bị tắt, chứng
+/// chỉ của zone (không phải `farkas:v1`) lọt vào và test ĐỎ.
+#[test]
+fn every_proof_gritc_reports_carries_a_certificate_the_kernel_rechecks() {
+    use gt_oblig::analysis::Status;
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/pass");
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
+        .expect("đọc corpus")
+        .map(|e| e.expect("e").path())
+        .filter(|p| p.extension().is_some_and(|x| x == "gt"))
+        .collect();
+    files.sort();
+    let (mut proofs, mut programs) = (0usize, 0usize);
+    for f in files {
+        let text = std::fs::read_to_string(&f)
+            .expect("đọc")
+            .replace("\r\n", "\n");
+        let inputs = [SourceInput {
+            name: "main.gt".into(),
+            text,
+        }];
+        let Ok(res) = gt_driver::check(&inputs, &gt_driver::Options::default()) else {
+            continue;
+        };
+        let Some(art) = res.open_gate() else {
+            continue;
+        };
+        programs += 1;
+        for b in &art.obl.per_body {
+            for j in &b.judged {
+                if let Status::Discharged { cert, .. } = &j.status {
+                    let c = gt_kernel::FarkasCert::decode(cert).unwrap_or_else(|e| {
+                        panic!(
+                            "{}: {}: chứng chỉ không phải farkas:v1 ({e}): {cert}",
+                            f.display(),
+                            j.ob.id
+                        )
+                    });
+                    assert_eq!(
+                        gt_kernel::check(&j.ob, &c),
+                        Ok(()),
+                        "{}: {}: kernel từ chối chứng chỉ gritc đã dùng",
+                        f.display(),
+                        j.ob.id
+                    );
+                    proofs += 1;
+                }
+            }
+        }
+    }
+    eprintln!("{programs} chương trình, {proofs} chứng minh được kiểm lại");
+    assert!(
+        programs >= 400 && proofs >= 100,
+        "quá ít: {programs} chương trình, {proofs} chứng minh"
+    );
+}

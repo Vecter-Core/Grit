@@ -9,7 +9,7 @@
 //!     hết nhiên liệu ⇒ ghi là "chậm", KHÔNG phải phản ví dụ (mọi vòng `⟳` đều có biến thể `↓` được M8 chứng minh dừng, nên chạy lâu ≠ không dừng).
 //!
 //! Hàm không lái được (tham số khác nhóm trên, generic, có hiệu ứng) được LIỆT KÊ là "BỎ QUA" kèm lý do — không bao giờ lặng lẽ bỏ.
-use gt_ast::{EffectsKind, ItemKind, ParamKind, PrimType, TypeKind, Visibility};
+use gt_ast::{ContractKind, EffectsKind, ItemKind, ParamKind, PrimType, TypeKind, Visibility};
 use gt_driver::pipeline::Options;
 use gt_driver::{RunEnd, check};
 use gt_resolve::SourceInput;
@@ -22,6 +22,8 @@ const FUEL: u64 = 5_000_000;
 enum Kind {
     Int { bits: u32, signed: bool },
     Bool,
+    Float,
+    Char,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,6 +31,8 @@ pub struct Target {
     pub module: String,
     pub name: String,
     params: Vec<Kind>,
+    /// hàm có `⊳` mà `gritc` KHÔNG quyết định được tại điểm gọi bằng hằng (tham số float/char, hoặc `⊳` có lời gọi): abort `precondition` ở cửa vào không phân biệt được với của hàm được gọi
+    amb: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +41,8 @@ pub enum Outcome {
         ran: usize,
         dropped: usize,
         slow: usize,
+        /// abort `precondition` không phân biệt được cửa vào với hàm được gọi (xem `Target::amb`): không tính là phản ví dụ
+        ambiguous: usize,
     },
     Failed {
         found: Vec<String>,
@@ -132,6 +138,8 @@ fn kind_of(p: PrimType) -> Option<(Kind, &'static str)> {
             "usize",
         ),
         PrimType::Bool => (Kind::Bool, "bool"),
+        PrimType::F64 => (Kind::Float, "f64"),
+        PrimType::Char => (Kind::Char, ""),
         _ => return None,
     })
 }
@@ -154,6 +162,16 @@ pub fn targets(files: &[(String, String)]) -> Vec<(Target, Option<String>, Vec<P
                 continue;
             }
             let mut skip: Option<String> = None;
+            let pre_text: Vec<&str> = f
+                .sig
+                .contracts
+                .iter()
+                .filter(|c| c.kind == ContractKind::Pre)
+                .map(|c| {
+                    text.get(c.span.start as usize..c.span.end as usize)
+                        .unwrap_or("(")
+                })
+                .collect();
             let mut kinds = Vec::new();
             let mut prims = Vec::new();
             if f.sig.generics.is_some() {
@@ -186,11 +204,15 @@ pub fn targets(files: &[(String, String)]) -> Vec<(Target, Option<String>, Vec<P
                     }
                 }
             }
+            let amb = !pre_text.is_empty()
+                && (kinds.iter().any(|k| matches!(k, Kind::Float | Kind::Char))
+                    || pre_text.iter().any(|t| t.contains('(')));
             out.push((
                 Target {
                     module: module.clone(),
                     name: f.sig.name.name.clone(),
                     params: kinds,
+                    amb,
                 },
                 skip,
                 prims,
@@ -200,23 +222,26 @@ pub fn targets(files: &[(String, String)]) -> Vec<(Target, Option<String>, Vec<P
     out
 }
 
-fn lit(k: Kind, suf: &str, v: i128) -> String {
-    match k {
-        Kind::Bool => (v != 0).to_string(),
-        Kind::Int { .. } => {
-            if v >= 0 {
-                format!("{v}{suf}")
-            } else {
-                format!("-{}{suf}", -v)
-            }
-        }
+fn int_lit(suf: &str, v: i128) -> String {
+    if v >= 0 {
+        format!("{v}{suf}")
+    } else {
+        format!("-{}{suf}", -v)
     }
 }
 
-/// Giá trị biên cho một kiểu (giới hạn trong i64 cho 128 bit để literal luôn biểu diễn được).
-fn values(k: Kind) -> Vec<i128> {
+/// Literal biên cho một kiểu (số nguyên 128 bit giới hạn trong i64/u64 để literal luôn biểu diễn được).
+fn literals(k: Kind, suf: &str) -> Vec<String> {
     match k {
-        Kind::Bool => vec![0, 1],
+        Kind::Bool => vec!["false".to_string(), "true".to_string()],
+        Kind::Float => ["0.0", "1.0", "-1.0", "0.5", "1e300", "-1e300", "1e-300"]
+            .iter()
+            .map(|v| format!("{v}f64"))
+            .collect(),
+        Kind::Char => ["'a'", "'Z'", "'0'", "' '", "'\\0'", "'é'"]
+            .iter()
+            .map(|v| (*v).to_string())
+            .collect(),
         Kind::Int { bits, signed } => {
             let (lo, hi): (i128, i128) = if signed {
                 if bits >= 128 {
@@ -243,7 +268,7 @@ fn values(k: Kind) -> Vec<i128> {
                     }
                 }
             }
-            v.into_iter().collect()
+            v.into_iter().map(|x| int_lit(suf, x)).collect()
         }
     }
 }
@@ -258,12 +283,12 @@ fn fnv(s: &str) -> u64 {
 }
 
 /// Tối đa `cap` tổ hợp đối số (tất định theo tên hàm): ít tổ hợp thì lấy hết, nhiều thì lấy mẫu không lặp.
-fn combos(vals: &[Vec<i128>], cap: usize, seed: &str) -> Vec<Vec<i128>> {
+fn combos(vals: &[Vec<String>], cap: usize, seed: &str) -> Vec<Vec<String>> {
     let total: usize = vals.iter().map(Vec::len).product();
-    let pick = |mut idx: usize| -> Vec<i128> {
+    let pick = |mut idx: usize| -> Vec<String> {
         vals.iter()
             .map(|v| {
-                let x = v[idx % v.len()];
+                let x = v[idx % v.len()].clone();
                 idx /= v.len();
                 x
             })
@@ -348,22 +373,24 @@ pub fn run_target(
     cap: usize,
     opts: &Options,
 ) -> Outcome {
-    let vals: Vec<Vec<i128>> = t.params.iter().map(|k| values(*k)).collect();
+    let vals: Vec<Vec<String>> = t
+        .params
+        .iter()
+        .zip(prims)
+        .map(|(k, p)| literals(*k, suffix_of(*p)))
+        .collect();
     let cands = combos(&vals, cap.max(1), &format!("{}::{}", t.module, t.name));
-    let (mut ran, mut dropped, mut slow) = (0usize, 0usize, 0usize);
+    let (mut ran, mut dropped, mut slow, mut ambiguous) = (0usize, 0usize, 0usize, 0usize);
     let mut found: Vec<String> = Vec::new();
     for c in cands {
-        let args: Vec<String> = c
-            .iter()
-            .zip(t.params.iter().zip(prims))
-            .map(|(v, (k, p))| lit(*k, suffix_of(*p), *v))
-            .collect();
-        let call = call_text(t, &args);
+        let call = call_text(t, &c);
         match try_candidate(base, &call, opts) {
             Err(why) => return Outcome::Skipped(why),
             Ok(Cand::OutOfDomain) => dropped += 1,
             Ok(Cand::Ran) => ran += 1,
             Ok(Cand::Slow) => slow += 1,
+            // hàm có `⊳` mà gritc không quyết định được: abort `precondition` có thể là của cửa vào (đầu vào ngoài miền) — không đổ lỗi
+            Ok(Cand::Counter(what)) if t.amb && what == "abort precondition" => ambiguous += 1,
             Ok(Cand::Counter(what)) => {
                 ran += 1;
                 found.push(format!("{call} → {what}"));
@@ -371,7 +398,12 @@ pub fn run_target(
         }
     }
     if found.is_empty() {
-        Outcome::Ok { ran, dropped, slow }
+        Outcome::Ok {
+            ran,
+            dropped,
+            slow,
+            ambiguous,
+        }
     } else {
         Outcome::Failed { found, ran }
     }
