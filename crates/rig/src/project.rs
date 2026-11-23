@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 pub struct Package {
     pub name: String,
     pub version: String,
+    /// edition của ngôn ngữ (ADR-P2-01): vắng trong `rig.toml` ⇒ 1; chỉ `1` được hỗ trợ
+    pub edition: u32,
     pub dir: PathBuf,
     /// (tên phụ thuộc, đường dẫn đã khai báo)
     pub deps: Vec<(String, String)>,
@@ -78,6 +80,7 @@ fn read_manifest(dir: &Path) -> Result<(String, toml::Doc), String> {
 pub struct Manifest {
     pub name: String,
     pub version: String,
+    pub edition: u32,
     /// (tên phụ thuộc, đường dẫn đã khai báo)
     pub deps: Vec<(String, String)>,
     /// nội dung đã chuẩn hoá LF
@@ -97,7 +100,7 @@ pub fn parse_manifest(dir: &Path) -> Result<Manifest, String> {
         return Err(at("thiếu mục [package]"));
     };
     for (k, (_, line)) in pkg {
-        if k != "name" && k != "version" {
+        if k != "name" && k != "version" && k != "edition" {
             return Err(at(&format!("dòng {line}: khoá package.`{k}` không hỗ trợ")));
         }
     }
@@ -118,6 +121,29 @@ pub fn parse_manifest(dir: &Path) -> Result<Manifest, String> {
             "phiên bản `{version}` phải dạng MAJOR.MINOR.PATCH"
         )));
     }
+    // ADR-P2-01: vắng ⇒ edition 1; chỉ số nguyên đã hỗ trợ — edition lạ bị TỪ CHỐI (fail-closed, không đoán nghĩa)
+    const SUPPORTED_EDITIONS: [u64; 1] = [1];
+    let edition = match pkg.get("edition") {
+        None => 1,
+        Some((Value::Int(n), _)) if SUPPORTED_EDITIONS.contains(n) => {
+            u32::try_from(*n).map_err(|_| at("edition quá lớn"))?
+        }
+        Some((Value::Int(n), line)) => {
+            return Err(at(&format!(
+                "dòng {line}: edition {n} chưa được hỗ trợ (hỗ trợ: {})",
+                SUPPORTED_EDITIONS
+                    .iter()
+                    .map(u64::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )));
+        }
+        Some((_, line)) => {
+            return Err(at(&format!(
+                "dòng {line}: `edition` phải là số nguyên dương trần (vd `edition = 1`), không phải chuỗi/bảng"
+            )));
+        }
+    };
     let mut deps = Vec::new();
     if let Some(ds) = doc.get("dependencies") {
         for (k, (v, line)) in ds {
@@ -147,6 +173,7 @@ pub fn parse_manifest(dir: &Path) -> Result<Manifest, String> {
     Ok(Manifest {
         name,
         version,
+        edition,
         deps,
         text,
     })
@@ -214,6 +241,7 @@ impl Loader {
         let Manifest {
             name,
             version,
+            edition,
             deps,
             text: manifest_text,
         } = parse_manifest(&canon)?;
@@ -242,6 +270,7 @@ impl Loader {
         self.pkgs.push(Package {
             name,
             version,
+            edition,
             dir: canon.clone(),
             deps,
             files,
