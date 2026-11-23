@@ -206,6 +206,8 @@ enum Var {
     D(String, Option<u64>, bool),
     /// struct `W { x, y }` (không dùng lại sau khi tạo): (id x, id y) nếu còn khởi tạo
     W(Option<u64>, Option<u64>),
+    /// `P` (có drop riêng): (id của P, id của trường inner)
+    P(u64, u64),
 }
 
 struct Gen {
@@ -215,13 +217,21 @@ struct Gen {
     next_id: u64,
     next_var: u32,
     scopes: Vec<Vec<Var>>,
-    stats: [u32; 6],
+    stats: [u32; 8],
 }
 
 impl Gen {
     fn id(&mut self) -> u64 {
         self.next_id += 1;
         self.next_id
+    }
+    /// biểu thức tạo một D: lời gọi (`Call`, đích là chỗ) hoặc literal struct (`Assign`)
+    fn make(&mut self, id: u64) -> String {
+        if self.r.below(2) == 0 {
+            format!("mk(&log, {id}u64)")
+        } else {
+            format!("D {{ log: &log, id: {id}u64 }}")
+        }
     }
     fn ind(&self) -> String {
         "  ".repeat(self.scopes.len() + 1)
@@ -241,6 +251,7 @@ impl Gen {
                     }
                 }
                 Var::D(_, None, _) => {}
+                Var::P(idp, inner) => self.log.extend([*idp, *inner]),
             }
         }
     }
@@ -282,12 +293,12 @@ impl Gen {
     }
     fn stmt(&mut self, depth: u32) {
         let ind = self.ind();
-        match self.r.below(11) {
+        match self.r.below(13) {
             0..=2 => {
                 let (id, n) = (self.id(), self.next_var);
                 self.next_var += 1;
-                self.src
-                    .push_str(&format!("{ind}μv{n} ≔ mk(&log, {id}u64);\n"));
+                let init = self.make(id);
+                self.src.push_str(&format!("{ind}μv{n} ≔ {init};\n"));
                 if let Some(s) = self.scopes.last_mut() {
                     s.push(Var::D(format!("v{n}"), Some(id), true));
                 }
@@ -308,8 +319,13 @@ impl Gen {
                     && let Var::D(name, Some(id), _) = self.scopes[s][i].clone()
                 {
                     let c = self.r.below(2) == 0;
+                    let how = if self.r.below(2) == 0 {
+                        format!("consume({name});")
+                    } else {
+                        format!("z ≔ {name};")
+                    };
                     self.src
-                        .push_str(&format!("{ind}⎇ {c} {{ consume({name}); }} ⇝ {{ }}\n"));
+                        .push_str(&format!("{ind}⎇ {c} {{ {how} }} ⇝ {{ }}\n"));
                     if c {
                         self.log.push(id);
                         self.scopes[s][i] = Var::D(name, None, false);
@@ -325,8 +341,8 @@ impl Gen {
                     && let Var::D(name, old, _) = self.scopes[s][i].clone()
                 {
                     let id = self.id();
-                    self.src
-                        .push_str(&format!("{ind}{name} ← mk(&log, {id}u64);\n"));
+                    let init = self.make(id);
+                    self.src.push_str(&format!("{ind}{name} ← {init};\n"));
                     if let Some(o) = old {
                         self.log.push(o);
                     }
@@ -343,7 +359,7 @@ impl Gen {
                 let (x, y, n) = (self.id(), self.id(), self.next_var);
                 self.next_var += 1;
                 self.src.push_str(&format!(
-                    "{ind}μw{n} ≔ W {{ x: mk(&log, {x}u64), y: mk(&log, {y}u64) }};\n"
+                    "{ind}μw{n} ≔ W {{ n: 0u64, x: mk(&log, {x}u64), y: mk(&log, {y}u64) }};\n"
                 ));
                 let mv = self.r.below(3);
                 let (mut xs, mut ys) = (Some(x), Some(y));
@@ -365,6 +381,36 @@ impl Gen {
                 if let Some(s) = self.scopes.last_mut() {
                     s.push(Var::W(xs, ys));
                 }
+            }
+            10 => {
+                // kiểu có `drop` riêng: gán đè một trường (cây move path có con) vẫn phải drop CẢ giá trị (drop riêng rồi trường)
+                let (a, idp, c, n) = (self.id(), self.id(), self.id(), self.next_var);
+                self.next_var += 1;
+                self.src.push_str(&format!(
+                    "{ind}μp{n} ≔ P {{ log: &log, inner: mk(&log, {a}u64), id: {idp}u64 }};\n{ind}p{n}.inner ← mk(&log, {c}u64);\n"
+                ));
+                self.log.push(a);
+                if let Some(s) = self.scopes.last_mut() {
+                    s.push(Var::P(idp, c));
+                }
+                self.stats[6] += 1;
+            }
+            11 => {
+                // tham số có Drop bị move CÓ ĐIỀU KIỆN trong hàm nhận (cờ của THAM SỐ, đầu hay cuối danh sách)
+                let (id, k) = (self.id(), self.id());
+                let c = self.r.below(2) == 0;
+                let call = if self.r.below(2) == 0 {
+                    format!("maybe_first(mk(&log, {id}u64), &log, {c}, {k}u64);")
+                } else {
+                    format!("maybe_last(&log, {c}, {k}u64, mk(&log, {id}u64));")
+                };
+                self.src.push_str(&format!("{ind}{call}\n"));
+                if c {
+                    self.log.extend([id, k]);
+                } else {
+                    self.log.extend([k, id]);
+                }
+                self.stats[7] += 1;
             }
             8 if depth < 3 => {
                 self.src.push_str(&format!("{ind}{{\n"));
@@ -401,14 +447,28 @@ impl Gen {
                 // Option<D>: Some rồi có thể move ra bằng ⌥ (enum bị move một phần ⇒ drop mở theo thẻ)
                 let (id, n) = (self.id(), self.next_var);
                 self.next_var += 1;
-                let out = self.r.below(2) == 0;
+                let mode = self.r.below(3);
                 self.src
                     .push_str(&format!("{ind}o{n} ≔ Some(mk(&log, {id}u64));\n"));
+                let m = format!("⌥ o{n} {{ Some(d) ↦ consume(d), None ↦ {{ }} }}");
+                let out = match mode {
+                    0 => false,
+                    1 => {
+                        self.src.push_str(&format!("{ind}{m}\n"));
+                        true
+                    }
+                    _ => {
+                        // move CÓ ĐIỀU KIỆN ra khỏi enum: trên đường còn lại phải drop phần tải qua thẻ
+                        let c = self.r.below(2) == 0;
+                        self.src
+                            .push_str(&format!("{ind}⎇ {c} {{ {m} }} ⇝ {{ }}\n"));
+                        c
+                    }
+                };
                 if out {
-                    self.src.push_str(&format!(
-                        "{ind}⌥ o{n} {{ Some(d) ↦ consume(d), None ↦ {{ }} }}\n"
-                    ));
                     self.log.push(id);
+                }
+                if mode != 0 {
                     self.stats[5] += 1;
                 }
                 if let Some(s) = self.scopes.last_mut() {
@@ -420,17 +480,22 @@ impl Gen {
     }
 }
 
-fn random_program(seed: u64) -> (String, Vec<u64>, [u32; 6]) {
+fn random_program(seed: u64) -> (String, Vec<u64>, [u32; 8]) {
     let mut g = Gen {
         r: Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1),
         src: String::from(
-            "▢ W<'a> { x: D<'a>, y: D<'a> }\nƒ main() → u64 ! ∅ {\n  log ≔ Cell::new(0u64);\n  {\n",
+            "▢ W<'a> { n: u64, x: D<'a>, y: D<'a> }\n\
+             ▢ P<'a> { log: &'a Cell<u64>, inner: D<'a>, id: u64 }\n\
+             ⊐ <'a> Drop for P<'a> { ƒ drop(&!self) ! ∅ { self.log.set(self.log.get() *% 31u64 +% self.id); } }\n\
+             ƒ maybe_first<'a>(d: D<'a>, l: &'a Cell<u64>, c: bool, k: u64) ! ∅ { ⎇ c { consume(d); } ⇝ { } e ≔ mk(l, k); }\n\
+             ƒ maybe_last<'a>(l: &'a Cell<u64>, c: bool, k: u64, d: D<'a>) ! ∅ { ⎇ c { consume(d); } ⇝ { } e ≔ mk(l, k); }\n\
+             ƒ main() → u64 ! ∅ {\n  log ≔ Cell::new(0u64);\n  {\n",
         ),
         log: Vec::new(),
         next_id: 0,
         next_var: 0,
         scopes: vec![Vec::new()],
-        stats: [0; 6],
+        stats: [0; 8],
     };
     for _ in 0..4 + g.r.below(8) {
         g.stmt(0);
@@ -442,7 +507,7 @@ fn random_program(seed: u64) -> (String, Vec<u64>, [u32; 6]) {
 
 #[test]
 fn random_programs_drop_exactly_like_an_independent_scope_model_on_both_backends() {
-    let mut tally = [0u32; 6];
+    let mut tally = [0u32; 8];
     for seed in 1..=60u64 {
         let (src, ids, st) = random_program(seed);
         for (k, v) in st.iter().enumerate() {
@@ -464,6 +529,8 @@ fn random_programs_drop_exactly_like_an_independent_scope_model_on_both_backends
         "move một phần W",
         "vòng",
         "move khỏi Option",
+        "gán đè trường của kiểu có drop",
+        "tham số move có điều kiện",
     ];
     for (k, n) in names.iter().enumerate() {
         assert!(tally[k] >= 8, "bộ sinh quá ít ca `{n}`: {tally:?}");
