@@ -1,0 +1,4 @@
+// expect: fail E0320
+// note: hàm trả (), không có chỗ để lan truyền
+ƒ g() → Option<u32> ! ∅ { Some(1u32) }
+ƒ f() ! ∅ { v ≔ g()?; }

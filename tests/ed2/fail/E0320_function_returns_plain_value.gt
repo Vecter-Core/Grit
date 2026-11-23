@@ -1,0 +1,4 @@
+// expect: fail E0320
+// note: hàm bao trả u32, không phải Option/Result
+ƒ g() → Option<u32> ! ∅ { Some(1u32) }
+ƒ f() → u32 ! ∅ { g()? }

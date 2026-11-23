@@ -193,6 +193,8 @@ pub enum ExprKind {
         base: Box<Expr>,
         name: FieldName,
     },
+    /// `e?` — toán tử lan truyền lỗi (CHỈ edition ≥ 2, ADR-P2-09): `Option`/`Result` cùng họ với kiểu trả về của hàm bao
+    Try(Box<Expr>),
     Index {
         base: Box<Expr>,
         index: Box<Expr>,

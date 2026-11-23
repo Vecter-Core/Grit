@@ -118,7 +118,7 @@ binop      = "+"|"-"|"*"|"/"|"%"|"+%"|"-%"|"*%"|"+^"|"-^"|"*^"|"+?"|"-?"|"*?"
 cast       = unary { "as" type } ;
 unary      = ( "¬" | "-" | "*" | "&" | "&!" ) unary | postfix ;
              (* "*" ở đầu toán hạng = deref (prefix); "*" sau một toán hạng đầy đủ = nhân (infix). Lexer chỉ phát STAR (semantics §14) *)
-postfix    = primary { "(" [ expr { "," expr } ] ")" | "." ident | "." dec_int | "[" expr "]" } ;   (* gọi, field, tuple index t.0, index/slice *)
+postfix    = primary { "(" [ expr { "," expr } ] ")" | "." ident | "." dec_int | "[" expr "]" | "?" } ;   (* gọi, field, tuple index t.0, index/slice; "?" CHỈ ở edition >= 2 (ADR-P2-09) *)
 primary    = literal | path | "self" | struct_lit | array_lit | block      (* "self" làm biểu thức (self.w) — Q15b *)
            | "(" ")" | "(" expr ")" | "(" expr "," [ expr { "," expr } [ "," ] ] ")"     (* unit, nhóm, tuple (a, b), 1-tuple (a,) *)
            | ( "∀" | "∃" ) ident "∈" expr ":" expr ;      (* lượng từ chỉ trong hợp đồng; dấu ":" (đổi từ "." vì "0..n." mơ hồ với range/field) *)

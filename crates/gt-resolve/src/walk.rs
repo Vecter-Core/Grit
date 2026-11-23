@@ -613,6 +613,7 @@ impl<'t> Walker<'t> {
                 }
             }
             ExprKind::Field { base, .. } => self.expr(base),
+            ExprKind::Try(inner) => self.expr(inner),
             ExprKind::Index { base, index } => {
                 self.expr(base);
                 self.expr(index);

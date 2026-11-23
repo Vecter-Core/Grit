@@ -1,0 +1,4 @@
+// expect: fail E0321
+// note: toán hạng của `?` là ()
+ƒ u() ! ∅ { }
+ƒ f() → Option<u32> ! ∅ { u()?; Some(1u32) }

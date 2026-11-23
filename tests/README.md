@@ -8,6 +8,7 @@ bắt buộc là dòng kỳ vọng (đúng một dòng `// expect:` trong cả f
 | `tests/pass/` | `// expect: pass` | qua toàn bộ pass (có thể kèm GHI CHÚ N…, ghi trong dòng `// note:`) | `NN_mô_tả.gt` |
 | `tests/fail/` | `// expect: fail Exxxx` | phải bị chặn **đúng mã đó** (không chỉ "có lỗi") | `Exxxx_mô_tả.gt` |
 | `tests/warn/` | `// expect: warn Sxxx` | VÀNG: vẫn chạy (exit 0), phải in cảnh báo đúng mã | `Sxxx_mô_tả.gt` |
+| `tests/ed2/pass/`, `tests/ed2/fail/` | như `pass`/`fail` | mẫu EDITION 2 (ADR-P2-09, hiện: toán tử `?`); `corpus_e2e` chạy `gritc check --edition=2`; để riêng vì các bộ test khác đọc `tests/pass` ở edition 1 | như trên |
 | `tests/lexer/` | `// expect: lexer` | chuỗi token kỳ vọng nằm ở file `<tên>.tokens` cùng thư mục | `mô_tả.gt` + `.tokens` |
 
 Dòng `// note:` (tuỳ chọn) giải thích ý đồ của mẫu. File `.tokens`: mỗi dòng một token (`KIND` hoặc

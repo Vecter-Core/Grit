@@ -592,7 +592,10 @@ impl Fmt {
             | ExprKind::ArrayRepeat { .. }
             | ExprKind::StructLit { .. }
             | ExprKind::Block(_) => 11,
-            ExprKind::Call { .. } | ExprKind::Field { .. } | ExprKind::Index { .. } => 10,
+            ExprKind::Call { .. }
+            | ExprKind::Field { .. }
+            | ExprKind::Index { .. }
+            | ExprKind::Try(_) => 10,
             ExprKind::Unary { .. } => 9,
             ExprKind::Cast { .. } => 8,
             ExprKind::Binary { op, .. } => Self::bin_prec(*op).0,
@@ -721,6 +724,7 @@ impl Fmt {
                     FieldName::Index(i) => format!("{b}.{}", i.value),
                 }
             }
+            ExprKind::Try(inner) => format!("{}?", self.expr(inner, 10, ns, indent)),
             ExprKind::Index { base, index } => {
                 format!(
                     "{}[{}]",

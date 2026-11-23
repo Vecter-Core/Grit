@@ -34,7 +34,12 @@ const LIMIT: usize = 100;
 
 /// Định dạng `source`; `file` chỉ dùng cho chẩn đoán.
 pub fn format(file: &str, source: &str) -> Result<String, FmtError> {
-    match gt_stack::run_with_big_stack(|| format_inner(file, source)) {
+    format_with_edition(file, source, 1)
+}
+
+/// Như `format`, theo `edition` (ADR-P2-01/09): edition ≥ 2 nhận `e?`; mọi bước lex/phân tích/xác minh dùng CÙNG edition.
+pub fn format_with_edition(file: &str, source: &str, edition: u32) -> Result<String, FmtError> {
+    match gt_stack::run_with_big_stack(|| format_inner(file, source, edition)) {
         Ok(r) => r,
         Err(e) => Err(ice(file, &e.to_string())),
     }
@@ -55,8 +60,8 @@ fn ice(file: &str, msg: &str) -> FmtError {
     }
 }
 
-fn format_inner(file: &str, source: &str) -> Result<String, FmtError> {
-    let parsed = gt_parser::parse(file, source);
+fn format_inner(file: &str, source: &str, edition: u32) -> Result<String, FmtError> {
+    let parsed = gt_parser::parse_file_with_edition(gt_span::FileId::new(0), file, source, edition);
     if !parsed.report.diagnostics.is_empty() {
         return Err(FmtError {
             report: parsed.report,
@@ -64,7 +69,7 @@ fn format_inner(file: &str, source: &str) -> Result<String, FmtError> {
     }
     let starts = parsed.trivia.iter().map(|t| t.span.start).collect();
     let base = printer::Fmt::new(starts).program(&parsed.program);
-    match attach::place(source, &base) {
+    match attach::place(source, &base, edition) {
         Ok(out) => Ok(out),
         Err(attach::PlaceError::Align(m)) => {
             Err(ice(file, &format!("gt-fmt: căn token thất bại ({m})")))

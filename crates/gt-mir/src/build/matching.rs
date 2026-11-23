@@ -5,7 +5,7 @@ use crate::mir::*;
 use crate::types::variant_fields;
 use gt_ast::{Arm, Expr, Pattern, PatternKind};
 use gt_resolve::{DefKind, LocalId, Res};
-use gt_types::{AdtKind, IntTy, Ty};
+use gt_types::{AdtKind, IntTy, Lang, Ty};
 
 static PAT_MODE_FAULT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -122,6 +122,86 @@ impl Builder<'_> {
         }
         self.terminate(TerminatorKind::Unreachable)?;
         self.cur = join;
+        Ok(())
+    }
+
+    /// `e?` (ADR-P2-09): tương đương `⌥ e { Some(x) ↦ x, None ↦ ⏎ None }` / `⌥ e { Ok(x) ↦ x, Err(er) ↦ ⏎ Err(er) }`, dựng bằng CHÍNH các nguyên thủy của `⌥`/`⏎`
+    /// (`Discriminant` + `SwitchInt`, `Downcast`/`Field`, `exit_to(0)` + `Return`) — không thêm loại câu lệnh/terminator MIR. M4 đã bảo đảm hàm bao trả cùng họ (và cùng `E`).
+    pub(crate) fn try_into(&mut self, dest: &Place, inner: &Expr) -> R<()> {
+        let ity = self.ty_of(inner)?;
+        let Ty::Adt(d, targs) = &ity else {
+            return ice("`?` trên kiểu không phải ADT sau M4");
+        };
+        let d = *d;
+        let is_opt = self.db.lang.get(&Lang::Option) == Some(&d);
+        if !is_opt && self.db.lang.get(&Lang::Result) != Some(&d) {
+            return ice("`?` trên kiểu không phải Option/Result sau M4");
+        }
+        let (ok_name, bad_name) = if is_opt {
+            ("Some", "None")
+        } else {
+            ("Ok", "Err")
+        };
+        let vi = |name: &str| -> R<u32> {
+            match self.db.adts.get(&d).map(|a| &a.kind) {
+                Some(AdtKind::Enum(vs)) => match vs.iter().position(|v| v.name == name) {
+                    Some(i) => Ok(i as u32),
+                    None => ice(format!("thiếu biến thể `{name}`")),
+                },
+                _ => ice("Option/Result không phải enum"),
+            }
+        };
+        let (ok_vi, bad_vi) = (vi(ok_name)?, vi(bad_name)?);
+        // kiểu trả về của hàm bao: cùng họ (M4)
+        let rty = self.body.locals[RETURN_PLACE.index()].ty.clone();
+        let Ty::Adt(rd, rargs) = &rty else {
+            return ice("`?` trong hàm trả kiểu không phải ADT sau M4");
+        };
+        if *rd != d {
+            return ice("`?`: hàm bao trả khác họ sau M4");
+        }
+        let rargs = rargs.clone();
+        let t = self.temp(ity.clone());
+        let tp = Place::local(t);
+        self.expr_into(&tp, inner)?;
+        let ok_blk = self.new_block();
+        let bad_blk = self.new_block();
+        self.switch_rv(
+            Rvalue::Discriminant(tp.clone()),
+            Ty::Int(IntTy::Usize),
+            vec![(u128::from(ok_vi), ok_blk)],
+            bad_blk,
+        )?;
+        // nhánh lan truyền: dựng giá trị trả về từ `None` / `Err(er)` rồi thoát như `⏎`
+        self.cur = bad_blk;
+        let ret_rv = if is_opt {
+            Rvalue::Aggregate(AggregateKind::Adt(d, bad_vi, rargs.clone()), vec![])
+        } else {
+            let fts = variant_fields(self.db, d, bad_vi, targs);
+            let Some(ety) = fts.first() else {
+                return ice("`Err` không có trường");
+            };
+            let src = tp
+                .project(PlaceElem::Downcast(bad_vi))
+                .project(PlaceElem::Field(0, ety.clone()));
+            let op = self.operand_of(src, ety);
+            Rvalue::Aggregate(AggregateKind::Adt(d, bad_vi, rargs.clone()), vec![op])
+        };
+        self.assign(Place::local(RETURN_PLACE), ret_rv);
+        self.exit_to(0)?;
+        self.terminate(TerminatorKind::Return)?;
+        self.diverge();
+        // nhánh tiếp tục: giá trị bên trong `Some(x)` / `Ok(x)`
+        self.cur = ok_blk;
+        let fts = variant_fields(self.db, d, ok_vi, targs);
+        let Some(vty) = fts.first() else {
+            return ice("`Some`/`Ok` không có trường");
+        };
+        let src = tp
+            .project(PlaceElem::Downcast(ok_vi))
+            .project(PlaceElem::Field(0, vty.clone()));
+        let op = self.operand_of(src, vty);
+        self.assign(dest.clone(), Rvalue::Use(op));
         Ok(())
     }
 

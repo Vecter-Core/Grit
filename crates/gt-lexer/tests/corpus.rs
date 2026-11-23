@@ -72,6 +72,7 @@ const LEXICAL_E0101: &[&str] = &[
     "E0101_compound_assign.gt",
     "E0101_invalid_char_escape.gt",
     "E0101_invalid_string_escape.gt",
+    "E0101_question_mark_needs_edition_2.gt", // edition 1: `?` đứng riêng là ký tự ngoài ngôn ngữ (ADR-P2-09)
 ];
 
 fn code_of(header: &str) -> Option<ErrorCode> {

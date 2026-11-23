@@ -1,0 +1,10 @@
+# tests/fail/E0101_question_mark_needs_edition_2.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: ký tự không thuộc ngôn ngữ Grit
+ --> tests/fail/E0101_question_mark_needs_edition_2.gt:3:46
+  |
+3 | ƒ f(x: Option<u32>) → Option<u32> ! ∅ { v ≔ x?; Some(v) }
+  |                                              ^
+## [1] json
+{"code":"E0101","level":"error","message":"ký tự không thuộc ngôn ngữ Grit","file":"tests/fail/E0101_question_mark_needs_edition_2.gt","span":{"start":{"offset":202,"line":3,"col":46},"end":{"offset":203,"line":3,"col":47}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

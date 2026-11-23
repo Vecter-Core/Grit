@@ -47,8 +47,12 @@ fn project(dir: &Path, edition_line: &str) {
 }
 
 #[test]
-fn edition_one_and_a_missing_key_behave_identically() {
-    for (label, line) in [("vắng", ""), ("edition = 1", "edition = 1\n")] {
+fn editions_one_and_two_and_a_missing_key_are_accepted() {
+    for (label, line) in [
+        ("vắng", ""),
+        ("edition = 1", "edition = 1\n"),
+        ("edition = 2", "edition = 2\n"),
+    ] {
         let d = tmp("ok");
         project(&d, line);
         let l = rig(&d, &["lock"]);
@@ -61,7 +65,7 @@ fn edition_one_and_a_missing_key_behave_identically() {
 #[test]
 fn any_edition_value_other_than_a_supported_integer_is_refused_with_code_11() {
     let bad = [
-        ("edition = 2\n", "edition 2"),
+        ("edition = 3\n", "edition 3"),
         ("edition = 0\n", "edition 0"),
         ("edition = 99\n", "edition 99"),
         ("edition = \"1\"\n", "số nguyên"),
@@ -97,25 +101,41 @@ fn any_edition_value_other_than_a_supported_integer_is_refused_with_code_11() {
 }
 
 #[test]
-fn an_unsupported_edition_in_a_dependency_package_is_refused_too() {
-    let root = tmp("dep");
-    let app = root.join("app");
-    let lib = root.join("lib");
-    write(
-        &app,
-        "rig.toml",
-        "[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[dependencies]\nlib = { path = \"../lib\" }\n",
-    );
-    write(&app, "src/main.gt", "ƒ main() → () ! ∅ { }\n");
-    write(
-        &lib,
-        "rig.toml",
-        "[package]\nname = \"lib\"\nversion = \"0.1.0\"\nedition = 2\n\n[dependencies]\n",
-    );
-    write(&lib, "src/lib.gt", "◈ ƒ one() → i32 ! ∅ { 1 }\n");
-    let o = rig(&app, &["lock"]);
-    assert_eq!(code(&o), 11, "{}", err(&o));
-    assert!(err(&o).contains("edition 2"), "{}", err(&o));
+fn a_dependency_with_an_edition_above_the_roots_is_refused_and_one_at_or_below_is_accepted() {
+    // gói phụ thuộc edition 3 (chưa hỗ trợ) ⇒ từ chối
+    // gói phụ thuộc edition 2 dưới gốc edition 1 ⇒ từ chối (có thể dùng cú pháp mà gốc không hiểu)
+    // gói phụ thuộc edition 1 dưới gốc edition 2 ⇒ chấp nhận (edition 2 là tập cha)
+    for (root_ed, dep_ed, ok, expect) in [
+        ("", "edition = 3\n", false, "edition 3"),
+        ("", "edition = 2\n", false, "lớn hơn"),
+        ("edition = 2\n", "edition = 1\n", true, ""),
+        ("edition = 2\n", "edition = 2\n", true, ""),
+    ] {
+        let root = tmp("dep");
+        let app = root.join("app");
+        let lib = root.join("lib");
+        write(
+            &app,
+            "rig.toml",
+            &format!(
+                "[package]\nname = \"app\"\nversion = \"0.1.0\"\n{root_ed}\n[dependencies]\nlib = {{ path = \"../lib\" }}\n"
+            ),
+        );
+        write(&app, "src/main.gt", "ƒ main() → () ! ∅ { }\n");
+        write(
+            &lib,
+            "rig.toml",
+            &format!("[package]\nname = \"lib\"\nversion = \"0.1.0\"\n{dep_ed}\n[dependencies]\n"),
+        );
+        write(&lib, "src/lib.gt", "◈ ƒ one() → i32 ! ∅ { 1 }\n");
+        let o = rig(&app, &["lock"]);
+        if ok {
+            assert_eq!(code(&o), 0, "{root_ed}/{dep_ed}: {}", err(&o));
+        } else {
+            assert_eq!(code(&o), 11, "{root_ed}/{dep_ed}: {}", err(&o));
+            assert!(err(&o).contains(expect), "{root_ed}/{dep_ed}: {}", err(&o));
+        }
+    }
 }
 
 #[test]

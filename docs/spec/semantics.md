@@ -251,3 +251,10 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 ## 27. Mã thoát của `gritc` và `rig` (D17; ADR-028 §3, ADR-030 §4)
 - **gritc:** 0 qua | 1 ĐỎ (hoặc VÀNG với `--deny-yellow`) | 2 ICE | 3 lỗi dùng/IO/môi trường/chưa hỗ trợ | `run`: 70 abort, 71 hết giới hạn bộ chạy, 100+s trạng thái chương trình.
 - **rig:** chuyển nguyên mã của gritc khi lỗi đến từ gritc; lỗi của rig dùng vùng riêng 10 (`rig.lock` thiếu với `--locked`/lệch), 11 (dự án/manifest sai), 12 (dùng sai), 13 (IO/môi trường). `rig test` có test hỏng ⇒ 1.
+
+## 28. Edition và toán tử `e?` (ADR-P2-01, ADR-P2-08, ADR-P2-09 — Giai đoạn 2)
+**Edition.** Mỗi gói có `edition` (`rig.toml`, `[package]`, số nguyên dương trần; vắng ⇒ 1); `gritc --edition=N` cho dùng trực tiếp. Cú pháp edition 2 là TẬP CHA của edition 1 (chỉ thêm); cả đồ thị gói biên dịch theo edition của gói GỐC,
+gói phụ thuộc có edition lớn hơn gốc bị từ chối. Edition chưa hỗ trợ ⇒ từ chối (fail-closed).
+**`e?` (chỉ edition ≥ 2).** Hậu tố, ưu tiên cao nhất (ngang `.`, `()`, `[]`). Trong hàm trả `Option<U>`: `e: Option<T>` ⇒ `⌥ e { Some(x) ↦ x, None ↦ ⏎ None }`; trong hàm trả `Result<U, E>`: `e: Result<T, E>` (CÙNG `E`) ⇒
+`⌥ e { Ok(x) ↦ x, Err(er) ↦ ⏎ Err(er) }`. Kiểu của `e?` là `T`. KHÔNG chuyển đổi lỗi. Khác họ / khác `E` / hàm bao không trả Option/Result ⇒ E0320; toán hạng không phải Option/Result (hoặc chưa biết kiểu) ⇒ E0321.
+Thoát sớm đi qua đúng đường của `⏎`: hậu điều kiện `⊲` được kiểm, giá trị cần drop trong phạm vi bị drop đúng một lần, `Owned`/`Secret` được trả/xoá như thoát bình thường. `?` không thêm hiệu ứng. Ở edition 1, `?` đứng riêng vẫn là E0101.

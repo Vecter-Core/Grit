@@ -13,6 +13,8 @@ pub(crate) const PRELUDE_FILE: u32 = u32::MAX;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Lang {
     Option,
+    /// `Result<T, E>` (ADR-P2-09): toán tử `e?` (edition 2) lan truyền `Err(E)` — không chuyển đổi lỗi.
+    Result,
     Copy,
     Range,
     /// `a..=b` (gồm đầu mút): khác kiểu với `a..b` để giá trị range không mất thông tin (ADR-022).
@@ -57,6 +59,7 @@ impl Lang {
     fn from_name(s: &str) -> Option<Lang> {
         Some(match s {
             "option" => Lang::Option,
+            "result" => Lang::Result,
             "copy" => Lang::Copy,
             "range" => Lang::Range,
             "range_inclusive" => Lang::RangeInclusive,

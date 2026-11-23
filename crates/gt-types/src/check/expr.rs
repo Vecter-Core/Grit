@@ -54,6 +54,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             ExprKind::Cast { expr, ty } => self.cast(e, expr, ty),
             ExprKind::Call { callee, args } => self.call(e, callee, args, expect),
             ExprKind::Field { base, name } => self.field(e, base, name),
+            ExprKind::Try(inner) => self.try_expr(e, inner),
             ExprKind::Index { base, index } => self.index(e, base, index),
             ExprKind::Range {
                 start,
@@ -455,6 +456,67 @@ impl<'e, 'a> Checker<'e, 'a> {
     }
 
     // ---------------- trường, chỉ số, range ----------------
+
+    /// `e?` (ADR-P2-09, edition 2): `e` là `Option<T>` hoặc `Result<T, E>` và hàm bao trả cùng họ (`Result` thì CÙNG `E` — không chuyển đổi lỗi); kiểu của `e?` là `T`.
+    /// Toán hạng không phải Option/Result (hoặc chưa biết kiểu tại điểm này) ⇒ E0321; hàm bao trả khác họ/khác `E` ⇒ E0320. Hạ thành `match` + `return` ở M5.
+    fn try_expr(&mut self, e: &Expr, inner: &Expr) -> Ty {
+        let it = self.expr(inner, None);
+        let it = self.infer.shallow(&it);
+        if it == Ty::Err {
+            return Ty::Err;
+        }
+        let (opt, res) = (self.lang(Lang::Option), self.lang(Lang::Result));
+        let Ty::Adt(d, args) = &it else {
+            let s = self.show(&it);
+            self.err(
+                "E0321",
+                e.id,
+                e.span,
+                format!("toán hạng của `?` phải là `Option<T>` hoặc `Result<T, E>` đã biết kiểu, không phải `{s}`"),
+            );
+            return Ty::Err;
+        };
+        let is_opt = Some(*d) == opt;
+        if !is_opt && Some(*d) != res {
+            let s = self.show(&it);
+            self.err(
+                "E0321",
+                e.id,
+                e.span,
+                format!(
+                    "toán hạng của `?` phải là `Option<T>` hoặc `Result<T, E>`, không phải `{s}`"
+                ),
+            );
+            return Ty::Err;
+        }
+        let ret = self.infer.shallow(&self.ret.clone());
+        match &ret {
+            Ty::Err => Ty::Err,
+            Ty::Adt(rd, rargs) if rd == d => {
+                if !is_opt && !self.infer.unify(&args[1], &rargs[1]) {
+                    let (a, b) = (self.show(&args[1]), self.show(&rargs[1]));
+                    self.err(
+                        "E0320",
+                        e.id,
+                        e.span,
+                        format!("`?` không chuyển đổi lỗi: toán hạng có kiểu lỗi `{a}`, hàm trả kiểu lỗi `{b}`"),
+                    );
+                    return Ty::Err;
+                }
+                args[0].clone()
+            }
+            _ => {
+                let (a, b) = (self.show(&it), self.show(&ret));
+                self.err(
+                    "E0320",
+                    e.id,
+                    e.span,
+                    format!("`?` trên `{a}` cần hàm bao trả cùng họ (`Option`/`Result`), nhưng hàm trả `{b}`"),
+                );
+                Ty::Err
+            }
+        }
+    }
 
     fn field(&mut self, e: &Expr, base: &Expr, name: &FieldName) -> Ty {
         let bt = self.expr(base, None);

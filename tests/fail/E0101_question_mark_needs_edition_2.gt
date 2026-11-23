@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: edition 1 (mặc định): `?` đứng riêng vẫn là E0101 — toán tử `e?` chỉ có từ edition 2 (ADR-P2-09)
+ƒ f(x: Option<u32>) → Option<u32> ! ∅ { v ≔ x?; Some(v) }
