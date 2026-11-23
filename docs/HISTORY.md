@@ -140,3 +140,16 @@ Lệnh Giang: "tiếp đi".
   `unsafe` gt-rt 72 → 77 (đều có SAFETY); fail-open 16 mục mới phân loại.
 - **Thêm sau cổng:** thông dịch ≡ exe dev ≡ release ≡ release-o2 cho chương trình Owned lồng (0 khối sống); đột biến tay hàm kiểm heap runtime 3/3 bị bắt.
 - **CHƯA:** DUYỆT hợp đồng B5 (bằng chứng đủ, cổng xanh — tác giả không tự duyệt); đột biến tự động hàm runtime; `Owned: Send`; Windows.
+
+## 8. GIAI ĐOẠN 2 (mở 2026-11-23 theo lệnh Giang — ADR-P2-00)
+Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) → D (hiệu năng) sau cùng. Điều kiện vào chưa đủ (nhãn seed, §7) — Giang chủ động bỏ qua.
+
+### P2-A1 (2026-11-23, Claude Opus 5.5) — xoá Secret có bảo đảm (ADR-P2-03)
+- **Đo trước:** không có chỗ nào xoá Secret (FACTCHECK §3) VÀ — phát hiện mới — chương trình người dùng KHÔNG tạo được Secret nào (literal cấm, không hàm tạo).
+- **Đã làm:** `Secret::new`; Secret "cần drop" với glue XOÁ; câu lệnh MIR `Wipe` sau mỗi move ra khỏi chỗ có thể chứa Secret (gán: ngay sau; đối số: trên cạnh
+  trở về); xoá `_0` khi trả về; runtime `gritrt_secret_wipe` (ghi volatile + rào; IR Guard lớp D13; fail-closed khi null/độ dài sai — lỗ fail-open trong
+  bản đầu của chính tôi, sổ fail-open bắt được); `Vec`/`Arena` chứa Secret ⇒ E0318. Đặc tả: `semantics.md` §7; TCB: B6 (CHỜ DUYỆT).
+- **Bằng chứng:** `secret_wipe.rs` — oracle 24 chương trình × (thông dịch, exe dev, release, release-o2): số lần xoá = mô hình độc lập; 5 ca tính tay (2 ca
+  phải sửa kỳ vọng sau khi ĐỌC MIR: biến tạm của gán đè cũng bị xoá — đúng đặc tả); đột biến tay 3/3 bị bắt; unit gt-rt xoá đúng `len` byte; 3 mẫu corpus.
+  Chạy: 66 bộ/372 test của các crate bị đụng + 7 bộ driver/58 test đạt; clippy (có/không LLVM, runtime) sạch.
+- **CHƯA:** luật Guard "mọi alloca Secret được xoá"; đột biến tự động; cổng liền mạch trên mã này; `declassify` cần `Cap<Secret>` (ADR-C13, vẫn hoãn).

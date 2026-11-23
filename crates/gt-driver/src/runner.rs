@@ -61,6 +61,22 @@ pub fn run_main_with(art: Artifacts, fuel: u64) -> RunReport {
 /// mà còn khối sống ⇒ thiếu drop — test đối chiếu với `GRITRT_HEAP_REPORT` của exe).
 #[must_use]
 pub fn run_main_heap(art: Artifacts, fuel: u64) -> (RunReport, usize) {
+    let (r, s) = run_main_stats(art, fuel);
+    (r, s.heap_live)
+}
+
+/// Số liệu của thông dịch tham chiếu khi `main` kết thúc, để đối chiếu với báo cáo của exe (`GRITRT_HEAP_REPORT`, `GRITRT_SECRET_REPORT`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RunStats {
+    /// khối heap của `Owned` còn sống (ADR-C18 bước 2)
+    pub heap_live: usize,
+    /// số lần xoá `Secret` (ADR-P2-03)
+    pub secret_wipes: u64,
+}
+
+/// Như [`run_main_with`], trả thêm [`RunStats`].
+#[must_use]
+pub fn run_main_stats(art: Artifacts, fuel: u64) -> (RunReport, RunStats) {
     let Artifacts { mir, obl, types } = art;
     let mut mir = mir;
     mir.bodies = obl.bodies;
@@ -72,7 +88,7 @@ pub fn run_main_heap(art: Artifacts, fuel: u64) -> (RunReport, usize) {
                     end: RunEnd::Internal(e),
                     value: None,
                 },
-                0,
+                RunStats::default(),
             );
         }
     };
@@ -100,8 +116,11 @@ pub fn run_main_heap(art: Artifacts, fuel: u64) -> (RunReport, usize) {
             value: None,
         },
     };
-    let live = it.heap_live();
-    (r, live)
+    let stats = RunStats {
+        heap_live: it.heap_live(),
+        secret_wipes: it.secret_wipes(),
+    };
+    (r, stats)
 }
 
 /// Văn bản gói: tiêu đề + attestation + MIR sau M7 (Debug tất định).

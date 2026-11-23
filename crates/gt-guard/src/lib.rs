@@ -81,7 +81,7 @@ fn is_atomic(inst: &InstructionValue<'_>) -> bool {
 
 /// Bảng lời gọi runtime hợp lệ: (tên, lớp nghĩa vụ phải mang; `None` = không nhạy cảm). Hợp đồng với `gt-codegen-llvm` và `runtime/gt-rt`
 /// (docs/TCB_INTRINSICS.md). Thêm hàm runtime MỚI = thêm dòng ở đây (nếu quên, Guard từ chối ⇒ fail-closed).
-pub const RUNTIME: [(&str, Option<&str>); 29] = [
+pub const RUNTIME: [(&str, Option<&str>); 30] = [
     ("gritrt_abort", None),
     ("gritrt_exit", None),
     ("gritrt_start", None),
@@ -112,6 +112,8 @@ pub const RUNTIME: [(&str, Option<&str>); 29] = [
     // ADR-C18 bước 2 (TCB B5): heap của `Owned<T>`; lớp E0401 (sở hữu: trả đúng một lần nhờ M6 + cờ drop)
     ("gritrt_heap_alloc", Some("E0401")),
     ("gritrt_heap_free", Some("E0401")),
+    // ADR-P2-03: xoá Secret (D13) — ghi 0 volatile trong runtime
+    ("gritrt_secret_wipe", Some("D13")),
 ];
 
 /// Tên symbol hợp lệ: toàn ASCII `[A-Za-z0-9_.]` (FB-2: tên Unicode làm Guard/bộ liên kết/trình gỡ lỗi rối).

@@ -1416,3 +1416,27 @@ Trả lời từng câu của điều kiện R6, KÈM bằng chứng chạy đư
   Drop/`Owned` ⇒ E0318 (Arena không chạy destructor — lỗ ngữ nghĩa phát hiện khi làm bước này, có từ bước 1); glue `Glue::Free`; thông dịch (khối =
   ô trong kho khung 0, trả = đánh dấu chết ⇒ dùng-sau-trả/trả-hai-lần là `Bug`) và LLVM (`gritrt_heap_alloc/free`, lớp IR Guard E0401); runtime có sổ
   khối sống ở dev + `GRITRT_HEAP_REPORT`. Bằng chứng: `docs/TCB_INTRINSICS.md` cuối mục B5.
+
+## ADR-P2-00 — MỞ Giai đoạn 2 theo lệnh Giang (2026-11-23)
+**Lệnh (văn bản, Giang):** "bây giờ hãy bắt tay vào phát triển giai đoạn 2 đi, ko đợi nữa … hoàn thiện xong giai đoạn 2 rồi mới tối ưu hiệu năng".
+**Điều kiện vào của `PHASE2_PLAN.md` §1 lúc mở:** (1) nhãn `1.0.0-seed` — CHƯA (nhãn `1.0.0-rc7`); (2) các mục §7 GRIT_PLAN — CHƯA kiểm hết (fuzz 24 giờ…);
+(3) cổng đầy đủ xanh — Linux XANH liền mạch trên `3b17f1f` (957/0), Windows chưa chạy lại; (4) lệnh bằng văn bản của Giang — CÓ. Giang chủ động bỏ qua (1)–(2).
+**Thứ tự áp dụng (theo lệnh: hoàn thiện trước, hiệu năng sau):** dòng A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) → D (hiệu năng) cuối cùng;
+trong A: A1 (xoá Secret) trước vì là lỗ hổng thật. `PHASE2_PLAN.md` chuyển từ ĐỀ XUẤT thành KẾ HOẠCH ĐANG THỰC HIỆN; từng mục vẫn cần ADR riêng + test-trước +
+cổng; mục đổi TCB vẫn ghi "CHỜ DUYỆT" tới khi Giang (hoặc kiến trúc sư) duyệt. Giai đoạn 2 là dự án nhiều năm (GRIT_PLAN mục 9): KHÔNG hứa mốc.
+
+## ADR-P2-03 — Xoá Secret có bảo đảm (2026-11-23; thay bản nháp ở `PHASE2_ADR_DRAFTS.md`)
+**Đo trước:** (i) KHÔNG có chỗ nào xoá nội dung `Secret` (FACTCHECK mục 3); (ii) MỚI: chương trình người dùng KHÔNG tạo được giá trị `Secret` nào (literal bị cấm
+ngoài lib/core, prelude không có hàm tạo, không I/O nào trả `Secret`) ⇒ lỗ (i) hiện chỉ là lý thuyết, và kiểu `Secret` gần như không dùng được.
+**Quyết định:**
+1. **Nguồn:** `Secret::new(v: T) → Secret<T> ! ∅` (prelude, intrinsic đồng nhất). Bọc dữ liệu vào Secret không làm lộ gì; chiều mở (`declassify`) giữ S201.
+2. **Xoá khi chết:** `Secret` có drop glue `Wipe` (glue của `T` rồi xoá TOÀN BỘ byte của `Secret<T>`) — dùng elaboration drop của ADR-C18 nên phủ mọi lối ra
+   phạm vi, gán đè, trả về. `Secret` vì vậy "cần drop": `Vec<Secret>`/`Arena::alloc(Secret)` ⇒ E0318 (Arena/Vec không bao giờ xoá).
+3. **Xoá chỗ nguồn sau MOVE:** move để lại bản sao bit ở chỗ nguồn (kể cả `declassify(self)`) ⇒ câu lệnh MIR mới `Wipe(chỗ)` ngay sau mỗi move của chỗ CÓ THỂ chứa
+   Secret (theo kiểu sau khi thế; tham số kiểu ⇒ có thể); move qua đối số lời gọi ⇒ xoá trên cạnh trở về. `_0` chứa Secret được xoá sau khi nạp giá trị trả về.
+4. **Thao tác:** hàm runtime `gritrt_secret_wipe(ptr, len)` ghi 0 bằng `write_volatile` + rào compiler; nằm trong thư viện tĩnh riêng nên tối ưu LLVM (O2) không
+   loại được lời gọi. Bảng RUNTIME của IR Guard, lớp `D13`.
+5. **Bằng chứng:** runtime đếm lời gọi/byte đã xoá (`GRITRT_SECRET_REPORT=1`), thông dịch đếm độc lập theo cùng ngữ nghĩa ⇒ đối chiếu ở dev/release/release-o2;
+   đột biến "bỏ xoá" phải bị bắt.
+**Giới hạn công khai:** KHÔNG bảo vệ thanh ghi/bản sao do LLVM tạo (truyền theo giá trị, tràn thanh ghi), swap, core dump, bản đã `declassify`, đường abort (tiến
+trình dừng ngay, không chạy drop — D3). Luật Guard "mọi alloca Secret có xoá trên mọi đường" CHƯA làm (bước sau).

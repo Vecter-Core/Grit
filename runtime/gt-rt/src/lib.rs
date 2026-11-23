@@ -110,6 +110,16 @@ pub extern "C" fn gritrt_start(main: extern "C" fn()) -> i32 {
         // `panic = "abort"` nên `join` chỉ Err khi luồng chết bất thường; không để lỗi đó thành "thành công"
         Ok(h) => match h.join() {
             Ok(()) => {
+                if std::env::var("GRITRT_SECRET_REPORT").is_ok_and(|v| v == "1") {
+                    let mut err = std::io::stderr().lock();
+                    let _ = writeln!(
+                        err,
+                        "gritrt_secret_wipes={} bytes={}",
+                        SECRET_WIPES.load(std::sync::atomic::Ordering::Relaxed),
+                        SECRET_WIPED_BYTES.load(std::sync::atomic::Ordering::Relaxed)
+                    );
+                    let _ = err.flush();
+                }
                 if std::env::var("GRITRT_HEAP_REPORT").is_ok_and(|v| v == "1") {
                     let mut err = std::io::stderr().lock();
                     let _ = writeln!(err, "gritrt_heap_live={}", heap_live_count());
@@ -727,6 +737,37 @@ pub extern "C" fn gritrt_alloc(size: u64) -> *mut u8 {
     p
 }
 
+// ---------------------------------------------------------------- xoá `Secret` (ADR-P2-03, D13)
+
+static SECRET_WIPES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static SECRET_WIPED_BYTES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Ghi 0 lên `len` byte tại `p` bằng ghi VOLATILE từng byte + rào compiler: tối ưu không được loại bỏ (hàm nằm trong thư viện tĩnh riêng,
+/// mã Grit chỉ thấy một lời gọi ngoài). Đếm số lần/số byte để test đối chiếu với thông dịch (`GRITRT_SECRET_REPORT=1`).
+///
+/// # Safety
+/// `p` trỏ tới `len` byte GHI ĐƯỢC do mã Grit quản lý (một chỗ có kiểu chứa `Secret`; codegen truyền đúng `size_of` của kiểu đó).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_secret_wipe(p: *mut u8, len: u64) {
+    if len == 0 {
+        return;
+    }
+    // fail-closed: không bao giờ "xoá 0 byte" một cách im lặng — con trỏ null hay độ dài không biểu diễn được là lỗi của codegen/TCB
+    if p.is_null() {
+        gritrt_abort(0);
+    }
+    let Ok(n) = usize::try_from(len) else {
+        gritrt_abort(0)
+    };
+    for i in 0..n {
+        // SAFETY: theo điều kiện của hàm, `p..p+len` ghi được; `i < len`.
+        unsafe { std::ptr::write_volatile(p.add(i), 0) };
+    }
+    std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+    SECRET_WIPES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    SECRET_WIPED_BYTES.fetch_add(len, std::sync::atomic::Ordering::Relaxed);
+}
+
 // ---------------------------------------------------------------- heap của `Owned<T>` (ADR-C18 bước 2, hợp đồng TCB B5)
 
 /// Loại abort `heap_exhausted`: hết bộ nhớ hoặc `size/align` không tạo được `Layout`.
@@ -850,6 +891,23 @@ fn force_spawn_failure() -> bool {
 
 #[cfg(test)]
 mod tests {
+    /// ADR-P2-03: `gritrt_secret_wipe` ghi 0 ĐÚNG `len` byte (không thiếu, không tràn sang byte kề) và đếm lần/byte.
+    #[test]
+    fn secret_wipe_zeroes_exactly_the_given_bytes() {
+        let mut buf = [0xAAu8; 32];
+        let (w0, b0) = (
+            super::SECRET_WIPES.load(std::sync::atomic::Ordering::Relaxed),
+            super::SECRET_WIPED_BYTES.load(std::sync::atomic::Ordering::Relaxed),
+        );
+        // SAFETY: buf[8..24] ghi được.
+        unsafe { super::gritrt_secret_wipe(buf.as_mut_ptr().add(8), 16) };
+        assert!(buf[..8].iter().all(|b| *b == 0xAA), "tràn về trước");
+        assert!(buf[8..24].iter().all(|b| *b == 0), "chưa xoá hết");
+        assert!(buf[24..].iter().all(|b| *b == 0xAA), "tràn về sau");
+        assert!(super::SECRET_WIPES.load(std::sync::atomic::Ordering::Relaxed) > w0);
+        assert!(super::SECRET_WIPED_BYTES.load(std::sync::atomic::Ordering::Relaxed) >= b0 + 16);
+    }
+
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
 

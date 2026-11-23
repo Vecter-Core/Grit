@@ -230,6 +230,9 @@ enum Intr {
     VecLen,
     VecAsSlice,
     VecAsMutSlice,
+    /// `Secret<T>` (ADR-P2-03): bọc / mở trường `v`
+    SecretNew,
+    SecretDeclassify,
     /// `Owned<T>` (ADR-C18 bước 2, TCB B5)
     OwnedNew,
     OwnedGet,
@@ -1065,6 +1068,18 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             for s in &bd.statements {
                 match &s.kind {
                     StatementKind::Assign(p, rv) => self.assign(&mut fx, p, rv)?,
+                    StatementKind::Wipe(p) => {
+                        // ADR-P2-03: xoá chỗ nguồn sau move — chỉ khi kiểu SAU KHI THẾ chứa Secret
+                        if let Some(pty) = gt_mir::types::place_ty(fx.body, p) {
+                            let ty = Self::sub(&fx, &pty);
+                            if self.t.db.contains_secret(&ty) {
+                                let pv = self.place(&fx, p)?;
+                                self.secret_wipe(pv.ptr, &ty)?;
+                            }
+                        } else {
+                            return internal(format!("Wipe: kiểu của {p:?}"));
+                        }
+                    }
                     StatementKind::StorageLive(_)
                     | StatementKind::StorageDead(_)
                     | StatementKind::FakeRead(..)
@@ -2036,6 +2051,11 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             TerminatorKind::Return => {
                 let lt = self.lower_ty(&fx.local_tys[0])?;
                 let v = llvm(self.builder.build_load(lt, fx.locals[0], "ret"))?;
+                // ADR-P2-03: `_0` chứa Secret — giá trị đã nạp vào thanh ghi; xoá bản trong ô nhớ trước khi trả về
+                let rty = fx.local_tys[0].clone();
+                if self.t.db.secret_used && self.t.db.contains_secret(&rty) {
+                    self.secret_wipe(fx.locals[0], &rty)?;
+                }
                 llvm(self.builder.build_return(Some(&v)))?;
             }
             TerminatorKind::Unreachable => {
@@ -2158,6 +2178,13 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 "as_slice" => Some(Intr::VecAsSlice),
                 "as_mut_slice" => Some(Intr::VecAsMutSlice),
                 "truncate" => Some(Intr::VecTruncate),
+                _ => None,
+            };
+        }
+        if key.starts_with("$prelude::Secret<") {
+            return match m {
+                "new" => Some(Intr::SecretNew),
+                "declassify" => Some(Intr::SecretDeclassify),
                 _ => None,
             };
         }
@@ -2386,6 +2413,20 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                     .into_pointer_value();
                 self.drop_glue_at(fx, hp, t, inner)?;
                 self.heap_free(hp, t)
+            }
+            Glue::Wipe(inner) => {
+                // `Secret<T> { v }`: glue của `v` rồi xoá cả Secret
+                let BasicTypeEnum::StructType(st) = self.lower_ty(ty)? else {
+                    return internal("drop glue: Secret không phải struct");
+                };
+                if let Ty::Adt(_, args) = ty
+                    && let Some(t) = args.first()
+                    && !inner.is_nothing()
+                {
+                    let vp = llvm(self.builder.build_struct_gep(st, ptr, 0, "sv"))?;
+                    self.drop_glue_at(fx, vp, t, inner)?;
+                }
+                self.secret_wipe(ptr, ty)
             }
             Glue::Fields(fs) => {
                 let BasicTypeEnum::StructType(st) = self.lower_ty(ty)? else {
@@ -2758,6 +2799,16 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 self.fat_value(p, n)
             }
             Intr::StrSlice => self.str_slice(fx, vals),
+            Intr::SecretNew => {
+                let s = self.lower_ty(dest_ty)?.into_struct_type().get_undef();
+                let s = llvm(self.builder.build_insert_value(s, vals[0], 0, "secret"))?;
+                Ok(Some(s.as_basic_value_enum()))
+            }
+            Intr::SecretDeclassify => Ok(Some(llvm(self.builder.build_extract_value(
+                vals[0].into_struct_value(),
+                0,
+                "declassified",
+            ))?)),
             Intr::OwnedNew => {
                 let Some(t) = gargs.first() else {
                     return internal("Owned::new thiếu đối số kiểu");
@@ -3283,6 +3334,24 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             _ => Lang::Cell,
         };
         self.t.db.lang.get(&l).copied()
+    }
+
+    /// `gritrt_secret_wipe(ptr, size_of ty)` (ADR-P2-03; lớp IR Guard D13): ghi 0 volatile trong runtime (thư viện tĩnh riêng ⇒ O2 không loại được).
+    fn secret_wipe(&mut self, ptr: PointerValue<'ctx>, ty: &Ty) -> R<()> {
+        let lt = self.lower_ty(ty)?;
+        let size = self.td.get_abi_size(&lt);
+        let i64t = self.i64t();
+        let ft = self
+            .ctx
+            .void_type()
+            .fn_type(&[self.ptr_type().into(), i64t.into()], false);
+        let f = self.rt_fn("gritrt_secret_wipe", ft);
+        let c = llvm(self.builder.build_call(
+            f,
+            &[ptr.into(), i64t.const_int(size, false).into()],
+            "",
+        ))?;
+        self.tag_obl(c.try_as_basic_value().instruction(), "D13")
     }
 
     /// kiểu LLVM của `Owned<T>` với `gargs = [T]` (bố cục `{ ptr }`)

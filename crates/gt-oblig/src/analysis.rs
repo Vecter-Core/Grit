@@ -1052,7 +1052,8 @@ impl<'a> Ctx<'a> {
             StatementKind::StorageLive(l) | StatementKind::StorageDead(l) => {
                 self.forget_local(st, l.index(), loc)
             }
-            StatementKind::FakeRead(..) | StatementKind::Nop => {}
+            // Wipe: ghi 0 vào chỗ đã chết (ADR-P2-03) — không mang sự kiện nào M7 dùng
+            StatementKind::FakeRead(..) | StatementKind::Wipe(_) | StatementKind::Nop => {}
         }
     }
 

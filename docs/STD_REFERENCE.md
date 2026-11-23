@@ -31,7 +31,7 @@
 - `⊏ Drop { ƒ drop(&!self) ! ∅; }`
 - `▢ Buf { n: i32 }`
 - `▢ Guard { ◈ inner: Buf, ◈ n: i32 }`
-- `▢ Secret<T> { v: T }`
+- `▢ Secret<T> { v: T }` — Secret<T> (D13; ADR-P2-03): `new` bọc dữ liệu (không lộ gì); `declassify` mở (S201). Cần drop: glue XOÁ toàn bộ byte khi chết; chỗ nguồn bị xoá sau mỗi move (gritrt_secret_wipe, TCB). Vec/Arena không bao giờ xoá ⇒ không chứa được Secret (E0318).
 - `▢ Cap<T> { v: T }`
 - `▢ Fs { x: i32 }`
 - `▢ Net { x: i32 }`
@@ -140,7 +140,14 @@
 
 ### `⊐ <T> Secret<T>`
 
+- `ƒ new(v: T) → Secret<T> ! ∅`
+  - hiệu ứng: `∅`; abort: không (bọc dữ liệu; bản này bị xoá khi chết và sau mỗi move — ADR-P2-03)
 - `ƒ declassify(self) → T ! ∅`
+  - hiệu ứng: `∅`; abort: (chưa ghi)
+
+### `⊐ <T> Drop for Secret<T>`
+
+- `ƒ drop(&!self) ! ∅`
   - hiệu ứng: `∅`; abort: (chưa ghi)
 
 ### `⊐ <T> Owned<T>`

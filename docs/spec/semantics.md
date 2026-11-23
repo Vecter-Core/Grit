@@ -83,6 +83,10 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 ## 7. Secret (D13, M9)
 - `Secret<T>`: không `Display`, không vào sink log/mạng/tệp. `declassify` đọc cần `Cap<Secret>` và
   gây **S201** (VÀNG). Literal giống key/token trong nguồn → **S101** (VÀNG). VÀNG vẫn chạy.
+- **Tạo và xoá (Giai đoạn 2, ADR-P2-03):** `Secret::new(v)` bọc dữ liệu. Mọi ô nhớ do Grit quản lý từng chứa một Secret bị GHI 0 khi
+  giá trị chết (drop: hết phạm vi, gán đè), ngay sau khi nó bị move ra (kể cả `declassify(self)` và đối số lời gọi — xoá trên cạnh trở về), và
+  ô trả về `_0` sau khi nạp giá trị. Không bảo vệ: thanh ghi/bản sao do backend tạo, swap, core dump, đường abort (D3). `Vec`/`Arena` không chứa
+  được Secret (E0318).
 
 ## 8. Hợp đồng (Phase 1)
 - `⊳` (pre): người gọi phải chứng minh bằng P1; không chứng minh được → hạ runtime check (kiểm được)

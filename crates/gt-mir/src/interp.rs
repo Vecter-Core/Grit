@@ -84,6 +84,8 @@ pub struct Interp<'a> {
     pub asserts: Vec<(String, u32, bool)>,
     /// các ô của kho khung 0 là khối heap của `Owned` (ADR-C18 bước 2)
     heap: Vec<usize>,
+    /// số lần xoá Secret (ADR-P2-03)
+    secret_wipes: u64,
 }
 
 enum Flow {
@@ -106,6 +108,7 @@ impl<'a> Interp<'a> {
             types: None,
             asserts: Vec::new(),
             heap: Vec::new(),
+            secret_wipes: 0,
         }
     }
 
@@ -195,7 +198,7 @@ impl<'a> Interp<'a> {
             self.fuel -= 1;
             let bd = &b.blocks[cur.index()];
             for s in &bd.statements {
-                if let Err(e) = self.stmt(s) {
+                if let Err(e) = self.stmt(b, s) {
                     return e;
                 }
             }
@@ -204,7 +207,13 @@ impl<'a> Interp<'a> {
             };
             match &t.kind {
                 TerminatorKind::Goto(x) => cur = *x,
-                TerminatorKind::Return => return Flow::Ret,
+                TerminatorKind::Return => {
+                    // ADR-P2-03: `_0` chứa Secret bị xoá sau khi nạp giá trị trả về (cùng quy tắc với codegen)
+                    if self.is_secret_place(b, &Place::local(RETURN_PLACE)) {
+                        self.secret_wipes += 1;
+                    }
+                    return Flow::Ret;
+                }
                 TerminatorKind::Unreachable => {
                     return Flow::Bug(format!("tới `unreachable` ở bb{}", cur.0));
                 }
@@ -457,6 +466,14 @@ impl<'a> Interp<'a> {
                 self.run_glue(0, cell, Vec::new(), inner)?;
                 self.heap_free(cell).map(|_| ())
             }
+            Glue::Wipe(inner) => {
+                // trường `v` (chỉ số 0) trước, rồi xoá cả Secret
+                let mut p = path.clone();
+                p.push(Step::Field(0));
+                self.run_glue(fr, local, p, inner)?;
+                self.secret_wipes += 1;
+                self.set_at(fr, local, &path, V::Uninit)
+            }
             Glue::Fields(fs) => {
                 for (i, _, fg) in fs {
                     let mut p = path.clone();
@@ -490,8 +507,33 @@ impl<'a> Interp<'a> {
         }
     }
 
-    fn stmt(&mut self, s: &Statement) -> Result<(), Flow> {
+    /// Kiểu SAU KHI THẾ của chỗ có chứa `Secret` không (ADR-P2-03).
+    fn is_secret_place(&self, b: &Body, p: &Place) -> bool {
+        let Some(t) = self.types else {
+            return false;
+        };
+        if !t.db.secret_used {
+            return false;
+        }
+        crate::types::place_ty(b, p).is_some_and(|ty| t.db.contains_secret(&self.sub_env(&ty)))
+    }
+
+    /// Số lần xoá Secret đã thực hiện (để đối chiếu với `gritrt_secret_wipe` của exe).
+    #[must_use]
+    pub fn secret_wipes(&self) -> u64 {
+        self.secret_wipes
+    }
+
+    fn stmt(&mut self, b: &'a Body, s: &Statement) -> Result<(), Flow> {
         match &s.kind {
+            StatementKind::Wipe(p) => {
+                if self.is_secret_place(b, p) {
+                    self.secret_wipes += 1;
+                    let (fr, l, path) = self.resolve(p)?;
+                    self.set_at(fr, l, &path, V::Uninit)?;
+                }
+                Ok(())
+            }
             StatementKind::Assign(p, rv) => {
                 let v = self.rvalue(rv)?;
                 self.write(p, v)
@@ -969,6 +1011,18 @@ impl<'a> Interp<'a> {
                 0,
                 vec![V::Adt(0, vec![V::Int(0, IntTy::I32)])],
             )));
+        }
+        if key.starts_with("$prelude::Secret<") {
+            // `Secret<T> { v }`: `new` bọc, `declassify` lấy `v` (ADR-P2-03; S201 do M9 báo)
+            return match (key.rsplit("::").next().unwrap_or(""), vals) {
+                ("new", [v]) => Ok(Some(V::Adt(0, vec![v.clone()]))),
+                ("declassify", [V::Adt(0, f)]) => f
+                    .first()
+                    .cloned()
+                    .map(Some)
+                    .ok_or_else(|| Flow::Bug("Secret::declassify: thiếu trường".to_string())),
+                _ => Err(Flow::Bug(format!("Secret: thao tác lạ {key}"))),
+            };
         }
         if key.starts_with("$prelude::Owned<") {
             return self.owned_op(m, vals).map(Some);

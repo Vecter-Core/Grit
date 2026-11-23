@@ -23,6 +23,8 @@ pub struct TypeDb {
     /// Chương trình có tạo `Owned<_>` không (một biểu thức có kiểu nhắc tới `Owned`; giá trị Owned CHỈ sinh từ `Owned::new` của prelude vì
     /// literal bị cấm). Cùng `user_drops` quyết định có cần drop glue: không có cả hai ⇒ mọi glue rỗng (ADR-C18).
     pub owned_used: bool,
+    /// Chương trình có biểu thức mang kiểu nhắc tới `Secret` (ADR-P2-03): bật glue xoá + xoá-sau-move.
+    pub secret_used: bool,
 }
 
 /// Các trường cần glue của một struct/tuple/biến thể: (chỉ số trường, kiểu trường, glue), theo thứ tự khai báo.
@@ -38,6 +40,8 @@ pub enum Glue {
     Call(NodeId, Box<Glue>),
     /// `Owned<T>` (ADR-C18 bước 2): glue của `T` tại khối heap mà chỗ trỏ tới, RỒI trả khối (`gritrt_heap_free(ptr, size_of T, align_of T)`)
     Free(Ty, Box<Glue>),
+    /// `Secret<T>` (ADR-P2-03): glue của `T` (trường `v`) RỒI xoá toàn bộ byte của `Secret<T>` tại chỗ (`gritrt_secret_wipe`)
+    Wipe(Box<Glue>),
     /// struct/tuple: các trường có glue ≠ `Nothing`, theo thứ tự khai báo: (chỉ số trường, kiểu trường, glue)
     Fields(GlueFields),
     /// enum: chỉ biến thể đang có chạy; (chỉ số biến thể, các trường có glue của biến thể đó)
@@ -62,7 +66,7 @@ impl Glue {
                 }
                 g.calls(out);
             }
-            Glue::Free(_, g) => g.calls(out),
+            Glue::Free(_, g) | Glue::Wipe(g) => g.calls(out),
             Glue::Fields(fs) => fs.iter().for_each(|(_, _, g)| g.calls(out)),
             Glue::Variants(vs) => vs
                 .iter()
@@ -459,6 +463,12 @@ impl TypeDb {
                     let inner = self.glue_inner(t, depth + 1)?;
                     return Ok(Glue::Free(t.clone(), Box::new(inner)));
                 }
+                if adt.lang == Some(Lang::Secret) {
+                    let Some(t) = args.first() else {
+                        return Err("`Secret` thiếu đối số kiểu".to_string());
+                    };
+                    return Ok(Glue::Wipe(Box::new(self.glue_inner(t, depth + 1)?)));
+                }
                 if let Some(l) = adt.lang
                     && matches!(
                         l,
@@ -468,7 +478,6 @@ impl TypeDb {
                             | Lang::Mutex
                             | Lang::Atomic
                             | Lang::Cell
-                            | Lang::Secret
                             | Lang::Cap
                     )
                 {
@@ -522,7 +531,61 @@ impl TypeDb {
     /// Có nguồn drop glue nào trong chương trình không (`drop` người dùng hoặc `Owned`). Không ⇒ mọi glue rỗng.
     #[must_use]
     pub fn glue_possible(&self) -> bool {
-        !self.user_drops.is_empty() || self.owned_used
+        !self.user_drops.is_empty() || self.owned_used || self.secret_used
+    }
+
+    /// Kiểu có THỂ chứa `Secret` (ADR-P2-03: chỗ như vậy bị xoá sau khi move ra). Tham số kiểu ⇒ có thể (nếu chương trình dùng Secret).
+    #[must_use]
+    pub fn may_contain_secret(&self, ty: &Ty) -> bool {
+        if !self.secret_used {
+            return false;
+        }
+        self.contains_lang(ty, Lang::Secret, true, 0)
+    }
+
+    /// `ty` (đã CỤ THỂ) có chứa `Secret` không — để backend quyết định xoá theo kiểu đã thế.
+    #[must_use]
+    pub fn contains_secret(&self, ty: &Ty) -> bool {
+        self.contains_lang(ty, Lang::Secret, false, 0)
+    }
+
+    fn contains_lang(&self, ty: &Ty, l: Lang, params: bool, depth: u32) -> bool {
+        if depth > 64 {
+            return true;
+        }
+        match ty {
+            Ty::Param(_) | Ty::Infer(_) => params,
+            Ty::Tuple(v) => v
+                .iter()
+                .any(|t| self.contains_lang(t, l, params, depth + 1)),
+            Ty::Array(t, n) => *n > 0 && self.contains_lang(t, l, params, depth + 1),
+            Ty::Adt(d, args) => {
+                let Some(adt) = self.adts.get(d) else {
+                    return true;
+                };
+                if adt.lang == Some(l) {
+                    return true;
+                }
+                if adt.lang == Some(Lang::Owned) {
+                    // nội dung nằm ở khối heap, không ở chỗ này: xoá chỗ không xoá được khối (Owned<Secret> tự xoá khi drop qua glue)
+                    return false;
+                }
+                let fields: Vec<Ty> = match &adt.kind {
+                    AdtKind::Struct(fs) => fs
+                        .iter()
+                        .map(|f| subst_with(&f.ty, &adt.generics, args))
+                        .collect(),
+                    AdtKind::Enum(vs) => vs
+                        .iter()
+                        .flat_map(|v| v.fields.iter().map(|f| subst_with(f, &adt.generics, args)))
+                        .collect(),
+                };
+                fields
+                    .iter()
+                    .any(|t| self.contains_lang(t, l, params, depth + 1))
+            }
+            _ => false,
+        }
     }
 
     /// Kiểu (đã cụ thể hoặc còn tham số) có CHỨA theo cấu trúc một nguồn drop glue không: ADT có `drop` người dùng đã đăng ký, hoặc `Owned`.
@@ -543,7 +606,9 @@ impl TypeDb {
                 let Some(adt) = self.adts.get(d) else {
                     return true;
                 };
-                if adt.lang == Some(Lang::Owned) || self.user_drops.contains_key(d) {
+                if matches!(adt.lang, Some(Lang::Owned | Lang::Secret))
+                    || self.user_drops.contains_key(d)
+                {
                     return true;
                 }
                 if args.iter().any(|a| self.holds_glue_inner(a, depth + 1)) {

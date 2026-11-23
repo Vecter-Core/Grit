@@ -400,6 +400,12 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
         .lang
         .get(&Lang::Owned)
         .is_some_and(|d| env.out_types.values().any(|t| t.mentions_adt(*d)));
+    // ADR-P2-03: có biểu thức nào mang kiểu `Secret<_>` không (bật glue xoá + xoá-sau-move)
+    env.db.secret_used = env
+        .db
+        .lang
+        .get(&Lang::Secret)
+        .is_some_and(|d| env.out_types.values().any(|t| t.mentions_adt(*d)));
     let mut bag = Diagnostics::new(LIMIT);
     for d in std::mem::take(&mut env.diags) {
         bag.push(d);

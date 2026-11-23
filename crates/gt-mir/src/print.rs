@@ -96,6 +96,7 @@ fn statement(cx: &PrintCx<'_>, b: &Body, st: &Statement) -> String {
         StatementKind::StorageLive(l) => format!("StorageLive(_{});", l.0),
         StatementKind::StorageDead(l) => format!("StorageDead(_{});", l.0),
         StatementKind::FakeRead(c, p) => format!("FakeRead({c:?}, {});", place(p)),
+        StatementKind::Wipe(p) => format!("Wipe({});", place(p)),
         StatementKind::Nop => "nop;".to_string(),
     }
 }

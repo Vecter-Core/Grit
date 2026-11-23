@@ -941,7 +941,8 @@ impl<'a> Oracle<'a> {
                 let (loc, via) = self.resolve(p)?;
                 self.access(&loc, AK::Read, via)
             }
-            StatementKind::Nop => Ok(()),
+            // Wipe (ADR-P2-03): ghi 0 vào chỗ vừa bị move ra — không phải truy cập dữ liệu sống (khớp gt-borrowck)
+            StatementKind::Wipe(_) | StatementKind::Nop => Ok(()),
         }
     }
 

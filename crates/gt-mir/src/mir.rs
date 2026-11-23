@@ -203,6 +203,9 @@ pub enum StatementKind {
     StorageDead(Local),
     /// "Đọc giả": giữ chỗ được coi là đã dùng ở đây (scrutinee của `⌥`, vế khởi tạo `≔`) cho M6.
     FakeRead(FakeReadCause, Place),
+    /// Xoá (ghi 0, không đọc) toàn bộ byte của chỗ nếu kiểu SAU KHI THẾ chứa `Secret` (ADR-P2-03); không có thì không làm gì. Elaboration chèn
+    /// ngay sau mỗi move ra khỏi chỗ có thể chứa Secret; chỗ đã chưa khởi tạo nên không phải một lần "dùng"/"ghi" đối với M6/M7.
+    Wipe(Place),
     Nop,
 }
 
