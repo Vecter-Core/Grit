@@ -343,6 +343,11 @@ fn every_formula_shape_the_kernel_understands_is_provable() {
             Prop::Le(Term::Mul(Box::new(x()), Box::new(i(2))), i(10)),
         ),
         ("a ⊢ a", vec![Prop::Atom(9)], Prop::Atom(9)),
+        (
+            "x ≤ 3 ⊢ x ≤ 5 ∧ x ≤ 4",
+            vec![Prop::Le(x(), i(3))],
+            Prop::And(vec![Prop::Le(x(), i(5)), Prop::Le(x(), i(4))]),
+        ),
     ];
     for (name, hyps, goal) in cases {
         let o = ob(&[(0, 8, false)], hyps, goal);
@@ -372,4 +377,25 @@ fn every_formula_shape_the_kernel_understands_is_provable() {
     let empty = FarkasCert { cases: vec![] };
     assert_eq!(FarkasCert::decode(&empty.encode()), Ok(empty.clone()));
     assert_ne!(FarkasCert::decode("farkas:v1:"), Ok(empty));
+}
+
+/// Đột biến kernel lượt 2: giải mã chứng chỉ nhiều ca phải giữ ĐÚNG từng ca, kể cả ca nguyên tử nằm GIỮA các ca Farkas.
+#[test]
+fn multi_case_certificates_with_an_atom_case_in_the_middle_round_trip() {
+    let x = || v(0);
+    let i = Term::int;
+    // giả thiết: x ≤ 2 ∨ (a ∧ ¬a) ∨ x ≤ 3 ; mục tiêu x ≤ 5 ⇒ ba ca: Farkas, nguyên tử, Farkas
+    let hyp = Prop::Or(vec![
+        Prop::Le(x(), i(2)),
+        Prop::And(vec![Prop::Atom(4), Prop::Not(Box::new(Prop::Atom(4)))]),
+        Prop::Le(x(), i(3)),
+    ]);
+    let o = ob(&[(0, 8, false)], vec![hyp], Prop::Le(x(), i(5)));
+    let c = find_cert(&o, &mut 50_000).expect("tìm được chứng chỉ");
+    assert_eq!(c.cases.len(), 3, "{c:?}");
+    assert!(matches!(c.cases[1], CaseCert::Atom(4)), "{c:?}");
+    assert_eq!(check(&o, &c), Ok(()));
+    let back = FarkasCert::decode(&c.encode()).expect("giải mã");
+    assert_eq!(back, c);
+    assert_eq!(check(&o, &back), Ok(()));
 }
