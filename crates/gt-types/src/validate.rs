@@ -268,6 +268,7 @@ impl Env<'_> {
                 Lang::Secret
                     | Lang::Cap
                     | Lang::Vec
+                    | Lang::Owned
                     | Lang::Text
                     | Lang::Arena
                     | Lang::Mutex

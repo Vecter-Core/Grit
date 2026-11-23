@@ -43,6 +43,7 @@
 - `▢ ErrOut { x: i32 }` — stderr riêng. Tên `ErrOut` (không phải `Err`) vì `Err` là biến thể của `Result` và sẽ bị che/che khuất (xem DOGFOOD #11).
 - `▢ Host { x: i32 }`
 - `▢ Arena { x: i32 }`
+- `▢ Owned<T> { ptr: *μ T }`
 - `▢ Vec<'a, T> { arena: &'a Arena, ptr: *μ T, len: usize, cap: usize }`
 - `▢ File { x: i32 }`
 - `⊔ IoError { NotFound, Denied, Invalid, Other }`
@@ -140,6 +141,22 @@
 ### `⊐ <T> Secret<T>`
 
 - `ƒ declassify(self) → T ! ∅`
+  - hiệu ứng: `∅`; abort: (chưa ghi)
+
+### `⊐ <T> Owned<T>`
+
+- `ƒ new(a: &Cap<Alloc>, v: T) → Owned<T> ! {mem}`
+  - hiệu ứng: `{mem}`; abort: hết bộ nhớ ⇒ abort `heap_exhausted` (ADR-C18 bước 2; cần `&Cap<Alloc>`, hiệu ứng `mem`)
+- `ƒ get(&self) → &T ! ∅`
+  - hiệu ứng: `∅`; abort: không
+- `ƒ get_mut(&!self) → &!T ! ∅`
+  - hiệu ứng: `∅`; abort: không
+- `ƒ into_inner(self) → T ! ∅`
+  - hiệu ứng: `∅`; abort: không (trả khối heap; Owned bị move)
+
+### `⊐ <T> Drop for Owned<T>`
+
+- `ƒ drop(&!self) ! ∅`
   - hiệu ứng: `∅`; abort: (chưa ghi)
 
 ### `⊐ <T> [T]`

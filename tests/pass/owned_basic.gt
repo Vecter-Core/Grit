@@ -1,0 +1,13 @@
+// expect: pass
+// note: `Owned<T>` (ADR-C18 bước 2): cấp qua `&Cap<Alloc>` (hiệu ứng mem), đọc/ghi qua get/get_mut, lấy ra bằng into_inner; Option<Owned<T>>
+ƒ main() → u64 ! {mem} {
+  al ≔ root_alloc();
+  o ≔ Owned::new(&al, 5u64);
+  x ≔ *o.get();
+  μp ≔ Owned::new(&al, 7u64);
+  w ≔ p.get_mut();
+  *w ← 9u64;
+  y ≔ p.into_inner();
+  q ≔ Some(Owned::new(&al, (1u64, 2u64)));
+  x +% y
+}

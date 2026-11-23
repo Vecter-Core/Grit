@@ -42,6 +42,9 @@ pub enum Lang {
     AtomicOrdering,
     /// `Sync` (M8): trait TỰ ĐỘNG, suy theo cấu trúc (send.rs), cấm viết `⊐ Sync for`.
     Sync,
+    /// `Owned<T>` (ADR-C18 bước 2, TCB B5): sở hữu MỘT khối heap; literal/`⊐ Copy` ngoài lib/core bị cấm (E0313); coi là chứa `T` THEO GIÁ TRỊ
+    /// khi kiểm kích thước vô hạn (đệ quy qua Owned ⇒ E0301) để drop glue luôn hữu hạn.
+    Owned,
 }
 
 impl Lang {
@@ -70,6 +73,7 @@ impl Lang {
             "atomic_int" => Lang::AtomicInt,
             "atomic_ordering" => Lang::AtomicOrdering,
             "sync" => Lang::Sync,
+            "owned" => Lang::Owned,
             _ => return None,
         })
     }
@@ -945,6 +949,10 @@ impl<'a> Env<'a> {
                         // ADT không có trong db: không biết ⇒ coi là chứa chính nó (E0301, bảo thủ), không im lặng cho qua (FAIL_OPEN_AUDIT G2.1.b)
                         return true;
                     };
+                    // `Owned<T>`: trường là con trỏ thô nhưng drop glue đi vào `T` ⇒ coi `T` là THEO GIÁ TRỊ (ADR-C18 bước 2)
+                    if a.lang == Some(Lang::Owned) {
+                        return args.iter().any(|t| walk(db, root, t, seen, depth + 1));
+                    }
                     let sub = |t: &Ty| crate::traits::subst_with(t, &a.generics, args);
                     match &a.kind {
                         AdtKind::Struct(fs) => fs

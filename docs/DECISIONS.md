@@ -1404,3 +1404,15 @@ Trả lời từng câu của điều kiện R6, KÈM bằng chứng chạy đư
   25 sống đều tương đương có lập luận / 12 không biên dịch (`docs/MUT_DROP_ELAB_GOI12.md`). Hồi quy bắt trước commit: tuple lồng 100 tầng
   bị E0318 giả (giới hạn độ sâu glue) ⇒ glue rỗng khi không có `drop` người dùng nào + giới hạn 1024.
 - **Còn lại (bước 2–3):** `GlobalAlloc` (intrinsic + hợp đồng TCB) và `Owned<T>`; container chứa phần tử có Drop; Drop cho kiểu generic theo kiểu.
+
+**BƯỚC 2 — THIẾT KẾ (2026-11-23, GÓI 12 phần 5; lệnh Giang "tiếp đi"): `Owned<T>` + `gritrt_heap_alloc/free`.** Hợp đồng TCB viết TRƯỚC: `docs/TCB_INTRINSICS.md` mục B5.
+- **Kiểu:** `#lang(owned) ▢ Owned<T> { ptr: *μ T }` — giống `Box` của Rust: `new(&Cap<Alloc>, v) ! {mem}` (D26: mọi cấp phát truy được tới capability),
+  `get(&self) → &T`, `get_mut(&!self) → &!T`, `into_inner(self) → T`; drop = glue của `T` rồi trả khối. Literal/`⊐ Copy` ngoài lib/core ⇒ E0313.
+- **Không đệ quy qua `Owned` (E0301):** đệ quy qua `Owned` cần hàm glue NGOÀI DÒNG (đệ quy lúc chạy) — symbol mới mà IR Guard không có trong bảng
+  instance ⇒ phải đổi Guard (TCB). Bước này giữ glue hữu hạn, trải tại chỗ. Cấu trúc liên kết dùng `std::Slab` (tay cầm).
+- **Vì sao không phải `GlobalAlloc` dạng trait/allocator tham số:** Grit chưa có trait object/generic allocator ở intrinsic; `Owned` đi qua `Cap<Alloc>`
+  đã đủ thoả D26 và giữ TCB ở hai hàm runtime. Container dùng heap (bước 3) xây trên cùng hai hàm này.
+- **Đã làm (2026-11-23):** prelude `#lang(owned)`; M4: literal/`Copy` ⇒ E0313, đệ quy qua Owned ⇒ E0301, thêm luật `Arena::alloc` của kiểu cụ thể có
+  Drop/`Owned` ⇒ E0318 (Arena không chạy destructor — lỗ ngữ nghĩa phát hiện khi làm bước này, có từ bước 1); glue `Glue::Free`; thông dịch (khối =
+  ô trong kho khung 0, trả = đánh dấu chết ⇒ dùng-sau-trả/trả-hai-lần là `Bug`) và LLVM (`gritrt_heap_alloc/free`, lớp IR Guard E0401); runtime có sổ
+  khối sống ở dev + `GRITRT_HEAP_REPORT`. Bằng chứng: `docs/TCB_INTRINSICS.md` cuối mục B5.

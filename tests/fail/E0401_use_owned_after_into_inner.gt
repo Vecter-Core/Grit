@@ -1,0 +1,9 @@
+// expect: fail E0401
+// note: `into_inner` lấy `self` theo giá trị ⇒ Owned đã move, khối đã trả; dùng lại là dùng-sau-move (ADR-C18 bước 2)
+ƒ main() → u64 ! {mem} {
+  al ≔ root_alloc();
+  o ≔ Owned::new(&al, 5u64);
+  x ≔ o.into_inner();
+  y ≔ *o.get();
+  x +% y
+}

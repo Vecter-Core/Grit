@@ -1,0 +1,4 @@
+// expect: fail E0301
+// note: Giai đoạn này `Owned<T>` được coi là chứa `T` THEO GIÁ TRỊ: đệ quy qua Owned cần glue ngoài dòng (đổi IR Guard) — chưa hỗ trợ; dùng std::Slab (ADR-C18 bước 2)
+▢ Node { v: u64, next: Option<Owned<Node>> }
+ƒ main() ! ∅ { }

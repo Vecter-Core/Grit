@@ -82,6 +82,8 @@ pub struct Interp<'a> {
     types: Option<&'a TypesOutput>,
     /// vết các `Assert` đã chạy: (khoá thân, khối, đạt?) — để oracle M7 kiểm "tới được ⇒ sai"
     pub asserts: Vec<(String, u32, bool)>,
+    /// các ô của kho khung 0 là khối heap của `Owned` (ADR-C18 bước 2)
+    heap: Vec<usize>,
 }
 
 enum Flow {
@@ -103,6 +105,7 @@ impl<'a> Interp<'a> {
             fuel,
             types: None,
             asserts: Vec::new(),
+            heap: Vec::new(),
         }
     }
 
@@ -394,7 +397,7 @@ impl<'a> Interp<'a> {
         let Some(t) = self.types else {
             return Ok(());
         };
-        if t.db.user_drops.is_empty() {
+        if !t.db.glue_possible() {
             return Ok(());
         }
         let ty = crate::types::place_ty(b, place)
@@ -442,6 +445,17 @@ impl<'a> Interp<'a> {
                     Outcome::OutOfFuel => return Err(Flow::Fuel),
                 }
                 self.run_glue(fr, local, path, inner)
+            }
+            Glue::Free(_, inner) => {
+                let cell = match self.get(fr, local, &path)? {
+                    V::Adt(0, f) => match f.first() {
+                        Some(V::Ref(0, c, _)) => *c,
+                        _ => return Err(Flow::Bug("drop Owned: con trỏ lạ".to_string())),
+                    },
+                    other => return Err(Flow::Bug(format!("drop Owned trên {other:?}"))),
+                };
+                self.run_glue(0, cell, Vec::new(), inner)?;
+                self.heap_free(cell).map(|_| ())
             }
             Glue::Fields(fs) => {
                 for (i, _, fg) in fs {
@@ -780,6 +794,56 @@ impl<'a> Interp<'a> {
 
     /// `Vec<'a, T>` (ADR-032 phụ lục A) trên thông dịch: giá trị `Adt(0, [arena, Array(phần tử), len, cap])`; `Array` luôn có đúng `len`
     /// phần tử. Không mô phỏng hết Arena/tràn kích thước (thông dịch không có bố cục): các abort đó chỉ kiểm trên exe.
+    /// `Owned<T>` (ADR-C18 bước 2): khối heap = một ô trong kho khung 0; `Owned` = `Adt(0, [Ref(0, ô, [])])` (bố cục `{ ptr }`). Trả khối =
+    /// đánh dấu ô `Uninit` ⇒ đọc qua tham chiếu cũ hoặc trả lần hai là `Bug` (thông dịch là bộ chạy THAM CHIẾU cho hợp đồng B5).
+    fn owned_op(&mut self, m: &str, vals: &[V]) -> Result<V, Flow> {
+        let bug = |t: &str| Flow::Bug(format!("Owned::{m}: {t}"));
+        match (m, vals) {
+            ("new", [_cap, v]) => {
+                let l = self.frames[0].locals.len();
+                self.frames[0].locals.push(v.clone());
+                self.heap.push(l);
+                Ok(V::Adt(0, vec![V::Ref(0, l, Vec::new())]))
+            }
+            ("get" | "get_mut", [V::Ref(fr, l, path)]) => match self.get(*fr, *l, path)? {
+                V::Adt(0, f) => match f.first() {
+                    Some(p @ V::Ref(0, cell, _)) if self.frames[0].locals[*cell] != V::Uninit => {
+                        Ok(p.clone())
+                    }
+                    _ => Err(bug("khối đã trả hoặc con trỏ lạ")),
+                },
+                _ => Err(bug("không phải Owned")),
+            },
+            ("into_inner", [V::Adt(0, f)]) => match f.first() {
+                Some(V::Ref(0, cell, _)) => self.heap_free(*cell),
+                _ => Err(bug("con trỏ lạ")),
+            },
+            _ => Err(bug("đối số không đúng dạng")),
+        }
+    }
+
+    /// Trả khối heap `cell`: lấy giá trị ra, đánh dấu chết. Trả lần hai / ô không phải heap ⇒ `Bug`.
+    fn heap_free(&mut self, cell: usize) -> Result<V, Flow> {
+        if !self.heap.contains(&cell) {
+            return Err(Flow::Bug(
+                "heap: trả một ô không phải khối heap".to_string(),
+            ));
+        }
+        match std::mem::replace(&mut self.frames[0].locals[cell], V::Uninit) {
+            V::Uninit => Err(Flow::Bug("heap: trả khối hai lần".to_string())),
+            v => Ok(v),
+        }
+    }
+
+    /// Số khối heap còn sống (để test phát hiện rò rỉ: chương trình kết thúc bình thường phải là 0).
+    #[must_use]
+    pub fn heap_live(&self) -> usize {
+        self.heap
+            .iter()
+            .filter(|c| self.frames[0].locals[**c] != V::Uninit)
+            .count()
+    }
+
     fn vec_op(&mut self, m: &str, vals: &[V]) -> Result<V, Flow> {
         let bug = |t: &str| Flow::Bug(format!("Vec::{m}: {t}"));
         match (m, vals) {
@@ -898,6 +962,16 @@ impl<'a> Interp<'a> {
         let m = key.rsplit("::").next().unwrap_or("");
         if key.starts_with("$prelude::Vec<") {
             return self.vec_op(m, vals).map(Some);
+        }
+        if key == "$prelude::root_alloc" && vals.is_empty() {
+            // `Cap<Alloc>`: giá trị zero (như codegen `RootCap`); quyền nằm ở việc sở hữu giá trị (D29). Các `root_*` khác cần I/O — thông dịch không hỗ trợ.
+            return Ok(Some(V::Adt(
+                0,
+                vec![V::Adt(0, vec![V::Int(0, IntTy::I32)])],
+            )));
+        }
+        if key.starts_with("$prelude::Owned<") {
+            return self.owned_op(m, vals).map(Some);
         }
         if key.ends_with("core::f64_from_bits")
             && let [V::Int(b, _)] = vals

@@ -1,0 +1,4 @@
+// expect: fail E0313
+// note: `Owned` chỉ do lib/core tạo (bất biến: con trỏ trỏ khối heap sống của chính nó) — literal ngoài lib/core bị cấm, kể cả từ con trỏ thô có sẵn (ADR-C18 bước 2)
+ƒ forge(p: *μ u64) ! ∅ { o ≔ Owned { ptr: p }; }
+ƒ main() ! ∅ { }

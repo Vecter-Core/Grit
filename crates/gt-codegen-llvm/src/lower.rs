@@ -230,6 +230,10 @@ enum Intr {
     VecLen,
     VecAsSlice,
     VecAsMutSlice,
+    /// `Owned<T>` (ADR-C18 bước 2, TCB B5)
+    OwnedNew,
+    OwnedGet,
+    OwnedIntoInner,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2004,7 +2008,7 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             }
             TerminatorKind::Drop { place, target } => {
                 // drop glue (ADR-C18): một nguồn sự thật `TypeDb::drop_glue` với thông dịch; không có `drop` người dùng ⇒ chỉ nhảy
-                if !self.t.db.user_drops.is_empty() {
+                if self.t.db.glue_possible() {
                     let Some(pty) = gt_mir::types::place_ty(fx.body, place) else {
                         return internal(format!("drop: kiểu của {place:?}"));
                     };
@@ -2154,6 +2158,14 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 "as_slice" => Some(Intr::VecAsSlice),
                 "as_mut_slice" => Some(Intr::VecAsMutSlice),
                 "truncate" => Some(Intr::VecTruncate),
+                _ => None,
+            };
+        }
+        if key.starts_with("$prelude::Owned<") {
+            return match m {
+                "new" => Some(Intr::OwnedNew),
+                "get" | "get_mut" => Some(Intr::OwnedGet),
+                "into_inner" => Some(Intr::OwnedIntoInner),
                 _ => None,
             };
         }
@@ -2362,6 +2374,18 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 })?;
                 llvm(self.builder.build_call(f, &[ptr.into()], "drop"))?;
                 self.drop_glue_at(fx, ptr, ty, inner)
+            }
+            Glue::Free(t, inner) => {
+                // `ptr` trỏ tới `Owned { ptr }`: glue của `T` tại khối heap rồi trả khối
+                let Ty::Adt(_, args) = ty else {
+                    return internal("drop glue: Free trên kiểu không phải Owned");
+                };
+                let st = self.owned_struct(args)?;
+                let pp = llvm(self.builder.build_struct_gep(st, ptr, 0, "down.p"))?;
+                let hp = llvm(self.builder.build_load(self.ptr_type(), pp, "down"))?
+                    .into_pointer_value();
+                self.drop_glue_at(fx, hp, t, inner)?;
+                self.heap_free(hp, t)
             }
             Glue::Fields(fs) => {
                 let BasicTypeEnum::StructType(st) = self.lower_ty(ty)? else {
@@ -2734,6 +2758,45 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 self.fat_value(p, n)
             }
             Intr::StrSlice => self.str_slice(fx, vals),
+            Intr::OwnedNew => {
+                let Some(t) = gargs.first() else {
+                    return internal("Owned::new thiếu đối số kiểu");
+                };
+                let p = self.heap_alloc(t)?;
+                llvm(self.builder.build_store(p, vals[1]))?;
+                let o = self.lower_ty(dest_ty)?.into_struct_type().get_undef();
+                let o = llvm(self.builder.build_insert_value(o, p, 0, "owned"))?;
+                Ok(Some(o.as_basic_value_enum()))
+            }
+            Intr::OwnedGet => {
+                // `&self`/`&!self` ⇒ con trỏ tới `Owned { ptr }`; tham chiếu trả về = `ptr`
+                let st = self.owned_struct(gargs)?;
+                let pp = llvm(self.builder.build_struct_gep(
+                    st,
+                    vals[0].into_pointer_value(),
+                    0,
+                    "own.p",
+                ))?;
+                Ok(Some(llvm(self.builder.build_load(
+                    self.ptr_type(),
+                    pp,
+                    "own",
+                ))?))
+            }
+            Intr::OwnedIntoInner => {
+                let Some(t) = gargs.first() else {
+                    return internal("Owned::into_inner thiếu đối số kiểu");
+                };
+                let p = llvm(self.builder.build_extract_value(
+                    vals[0].into_struct_value(),
+                    0,
+                    "own",
+                ))?
+                .into_pointer_value();
+                let v = llvm(self.builder.build_load(self.lower_ty(t)?, p, "own.v"))?;
+                self.heap_free(p, t)?;
+                Ok(Some(v))
+            }
             Intr::VecNew => {
                 // Vec { arena: &!Arena, ptr: null, len: 0, cap: 0 } — không cấp phát cho tới `push` đầu tiên
                 let vt = self.lower_ty(dest_ty)?.into_struct_type();
@@ -3220,6 +3283,62 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             _ => Lang::Cell,
         };
         self.t.db.lang.get(&l).copied()
+    }
+
+    /// kiểu LLVM của `Owned<T>` với `gargs = [T]` (bố cục `{ ptr }`)
+    fn owned_struct(&self, gargs: &[Ty]) -> R<StructType<'ctx>> {
+        let Some(def) = self.t.db.lang.get(&Lang::Owned).copied() else {
+            return internal("thiếu lang item `owned`");
+        };
+        Ok(self
+            .lower_ty(&Ty::Adt(def, gargs.to_vec()))?
+            .into_struct_type())
+    }
+
+    /// `gritrt_heap_alloc(size_of T, align_of T)` (TCB B5; lớp E0401). Hết bộ nhớ ⇒ runtime abort `heap_exhausted`.
+    fn heap_alloc(&mut self, t: &Ty) -> R<PointerValue<'ctx>> {
+        let lt = self.lower_ty(t)?;
+        let size = self.td.get_abi_size(&lt);
+        let align = u64::from(self.td.get_abi_alignment(&lt)).max(1);
+        let i64t = self.i64t();
+        let ft = self.ptr_type().fn_type(&[i64t.into(), i64t.into()], false);
+        let f = self.rt_fn("gritrt_heap_alloc", ft);
+        let c = llvm(self.builder.build_call(
+            f,
+            &[
+                i64t.const_int(size, false).into(),
+                i64t.const_int(align, false).into(),
+            ],
+            "heap",
+        ))?;
+        let Some(p) = c.try_as_basic_value().basic() else {
+            return internal("gritrt_heap_alloc không trả giá trị");
+        };
+        self.tag_obl(p.as_instruction_value(), "E0401")?;
+        Ok(p.into_pointer_value())
+    }
+
+    /// `gritrt_heap_free(p, size_of T, align_of T)` (TCB B5; lớp E0401): CHỈ gọi ở `into_inner` và drop glue của `Owned` (đúng một lần nhờ M6 + cờ drop).
+    fn heap_free(&mut self, p: PointerValue<'ctx>, t: &Ty) -> R<()> {
+        let lt = self.lower_ty(t)?;
+        let size = self.td.get_abi_size(&lt);
+        let align = u64::from(self.td.get_abi_alignment(&lt)).max(1);
+        let i64t = self.i64t();
+        let ft = self
+            .ctx
+            .void_type()
+            .fn_type(&[self.ptr_type().into(), i64t.into(), i64t.into()], false);
+        let f = self.rt_fn("gritrt_heap_free", ft);
+        let c = llvm(self.builder.build_call(
+            f,
+            &[
+                p.into(),
+                i64t.const_int(size, false).into(),
+                i64t.const_int(align, false).into(),
+            ],
+            "",
+        ))?;
+        self.tag_obl(c.try_as_basic_value().instruction(), "E0401")
     }
 
     /// kiểu LLVM của `Vec<'a, T>` với `gargs = [T]`

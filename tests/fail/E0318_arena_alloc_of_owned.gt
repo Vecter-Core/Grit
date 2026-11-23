@@ -1,0 +1,7 @@
+// expect: fail E0318
+// note: `Owned` trong Arena sẽ không bao giờ trả khối heap (Arena không chạy destructor) — từ chối (ADR-C18 bước 2)
+ƒ main() ! {mem} {
+  al ≔ root_alloc();
+  ar ≔ Arena::new();
+  r ≔ ar.alloc((1u32, Owned::new(&al, 2u64)));
+}

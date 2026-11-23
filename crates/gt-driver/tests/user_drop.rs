@@ -210,6 +210,8 @@ enum Var {
     W(Option<u64>, Option<u64>),
     /// `P` (có drop riêng): (id của P, id của trường inner)
     P(u64, u64),
+    /// `Owned<D>` (ADR-C18 bước 2): (tên, id của D bên trong nếu còn, dùng lại được theo luật tĩnh?)
+    O(String, Option<u64>, bool),
 }
 
 struct Gen {
@@ -219,7 +221,7 @@ struct Gen {
     next_id: u64,
     next_var: u32,
     scopes: Vec<Vec<Var>>,
-    stats: [u32; 8],
+    stats: [u32; 10],
 }
 
 impl Gen {
@@ -254,6 +256,8 @@ impl Gen {
                 }
                 Var::D(_, None, _) => {}
                 Var::P(idp, inner) => self.log.extend([*idp, *inner]),
+                Var::O(_, Some(id), _) => self.log.push(*id),
+                Var::O(_, None, _) => {}
             }
         }
     }
@@ -295,7 +299,7 @@ impl Gen {
     }
     fn stmt(&mut self, depth: u32) {
         let ind = self.ind();
-        match self.r.below(13) {
+        match self.r.below(15) {
             0..=2 => {
                 let (id, n) = (self.id(), self.next_var);
                 self.next_var += 1;
@@ -414,6 +418,80 @@ impl Gen {
                 }
                 self.stats[7] += 1;
             }
+            13 => {
+                let (id, n) = (self.id(), self.next_var);
+                self.next_var += 1;
+                let init = self.make(id);
+                self.src
+                    .push_str(&format!("{ind}μh{n} ≔ Owned::new(&al, {init});\n"));
+                if let Some(s) = self.scopes.last_mut() {
+                    s.push(Var::O(format!("h{n}"), Some(id), true));
+                }
+                self.stats[8] += 1;
+            }
+            14 => {
+                let all: Vec<(usize, usize)> = self
+                    .scopes
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(s, vs)| {
+                        vs.iter()
+                            .enumerate()
+                            .filter(|(_, v)| matches!(v, Var::O(..)))
+                            .map(move |(i, _)| (s, i))
+                    })
+                    .collect();
+                if all.is_empty() {
+                    return;
+                }
+                let (s, i) = all[self.r.below(all.len() as u64) as usize];
+                let Var::O(name, cur, usable) = self.scopes[s][i].clone() else {
+                    return;
+                };
+                let mut op = self.r.below(4);
+                if op < 3 && !(usable && cur.is_some()) {
+                    op = 3;
+                }
+                match (op, cur) {
+                    (0, Some(id)) => {
+                        self.src.push_str(&format!("{ind}consume_o({name});\n"));
+                        self.log.push(id);
+                        self.scopes[s][i] = Var::O(name, None, false);
+                    }
+                    (1, Some(id)) => {
+                        let c = self.r.below(2) == 0;
+                        self.src.push_str(&format!(
+                            "{ind}⎇ opq({c}) {{ consume_o({name}); }} ⇝ {{ }}\n"
+                        ));
+                        if c {
+                            self.log.push(id);
+                        }
+                        self.scopes[s][i] = Var::O(name, (!c).then_some(id), false);
+                    }
+                    (2, Some(id)) => {
+                        // `into_inner`: D ra khỏi khối heap vào biến của phạm vi HIỆN TẠI (drop ở cuối phạm vi này)
+                        let n = self.next_var;
+                        self.next_var += 1;
+                        self.src
+                            .push_str(&format!("{ind}μz{n} ≔ {name}.into_inner();\n"));
+                        self.scopes[s][i] = Var::O(name, None, false);
+                        if let Some(sc) = self.scopes.last_mut() {
+                            sc.push(Var::D(format!("z{n}"), Some(id), true));
+                        }
+                    }
+                    (_, old) => {
+                        let id = self.id();
+                        let init = self.make(id);
+                        self.src
+                            .push_str(&format!("{ind}{name} ← Owned::new(&al, {init});\n"));
+                        if let Some(o) = old {
+                            self.log.push(o);
+                        }
+                        self.scopes[s][i] = Var::O(name, Some(id), true);
+                    }
+                }
+                self.stats[9] += 1;
+            }
             8 if depth < 3 => {
                 self.src.push_str(&format!("{ind}{{\n"));
                 self.scopes.push(Vec::new());
@@ -482,7 +560,7 @@ impl Gen {
     }
 }
 
-fn random_program(seed: u64) -> (String, Vec<u64>, [u32; 8]) {
+fn random_program(seed: u64) -> (String, Vec<u64>, [u32; 10]) {
     let mut g = Gen {
         r: Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1),
         src: String::from(
@@ -492,13 +570,14 @@ fn random_program(seed: u64) -> (String, Vec<u64>, [u32; 8]) {
              ƒ maybe_first<'a>(d: D<'a>, l: &'a Cell<u64>, c: bool, k: u64) ! ∅ { ⎇ c { consume(d); } ⇝ { } e ≔ mk(l, k); }\n\
              ƒ maybe_last<'a>(l: &'a Cell<u64>, c: bool, k: u64, d: D<'a>) ! ∅ { ⎇ c { consume(d); } ⇝ { } e ≔ mk(l, k); }\n\
              ƒ opq(x: bool) → bool ! ∅ { x }\n\
-             ƒ main() → u64 ! ∅ {\n  log ≔ Cell::new(0u64);\n  {\n",
+             ƒ consume_o<'a>(o: Owned<D<'a>>) ! ∅ { }\n\
+             ƒ main() → u64 ! {mem} {\n  log ≔ Cell::new(0u64);\n  al ≔ root_alloc();\n  {\n",
         ),
         log: Vec::new(),
         next_id: 0,
         next_var: 0,
         scopes: vec![Vec::new()],
-        stats: [0; 8],
+        stats: [0; 10],
     };
     for _ in 0..4 + g.r.below(8) {
         g.stmt(0);
@@ -510,17 +589,21 @@ fn random_program(seed: u64) -> (String, Vec<u64>, [u32; 8]) {
 
 #[test]
 fn random_programs_drop_exactly_like_an_independent_scope_model_on_both_backends() {
-    let mut tally = [0u32; 8];
+    let mut tally = [0u32; 10];
     for seed in 1..=60u64 {
         let (src, ids, st) = random_program(seed);
         for (k, v) in st.iter().enumerate() {
             tally[k] += v;
         }
-        for (backend, got) in run(&src, &format!("rnd{seed}")) {
+        for (backend, got, live) in run_heap(&src, &format!("rnd{seed}")) {
             assert_eq!(
                 got,
                 Some(seq(&ids)),
                 "#{seed} ({backend}): dãy drop lệch mô hình {ids:?}\n{src}"
+            );
+            assert_eq!(
+                live, 0,
+                "#{seed} ({backend}): còn {live} khối heap sống\n{src}"
             );
         }
     }
@@ -534,6 +617,8 @@ fn random_programs_drop_exactly_like_an_independent_scope_model_on_both_backends
         "move khỏi Option",
         "gán đè trường của kiểu có drop",
         "tham số move có điều kiện",
+        "khai báo Owned",
+        "thao tác trên Owned",
     ];
     for (k, n) in names.iter().enumerate() {
         assert!(tally[k] >= 8, "bộ sinh quá ít ca `{n}`: {tally:?}");
@@ -550,4 +635,176 @@ fn a_contract_never_drops_its_copy_of_a_drop_argument() {
     for (backend, got) in run(src, "contract") {
         assert_eq!(got, Some(seq(&[3, 4])), "({backend})\n{src}");
     }
+}
+
+// ======================= Owned<T> (ADR-C18 bước 2, TCB B5) =======================
+
+/// Chạy `main` (trả `u64`) bằng thông dịch VÀ (nếu có) exe LLVM hồ sơ dev; trả (backend, giá trị, số khối heap còn sống lúc kết thúc).
+/// Exe chạy với `GRITRT_HEAP_REPORT=1` (in `gritrt_heap_live=N` ra stderr; kiểm động heap bật ở dev).
+fn run_heap(src: &str, tag: &str) -> Vec<(&'static str, Option<u64>, usize)> {
+    let mut res = check(&inputs(src), &Options::default()).expect("đầu vào hợp lệ");
+    let errs: Vec<String> = res
+        .report
+        .diagnostics
+        .iter()
+        .filter(|d| d.code.as_str().starts_with('E'))
+        .map(|d| format!("{}: {}", d.code.as_str(), d.message))
+        .collect();
+    assert!(errs.is_empty(), "{tag}: gritc từ chối: {errs:?}\n{src}");
+    #[allow(unused_mut)]
+    let mut out = Vec::new();
+    #[cfg(feature = "llvm")]
+    {
+        use gt_driver::pipeline::{attestation, mir_dump};
+        let att = {
+            let art = res.open_gate().expect("cổng mở");
+            attestation(&res, &mir_dump(art))
+        };
+        let dir = std::env::temp_dir().join(format!("gt-owned-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("tạo thư mục");
+        let exe = dir.join(format!("{tag}.exe"));
+        let result = dir.join(format!("{tag}.result"));
+        gt_driver::native::build_exe_profile(
+            res.open_gate().expect("cổng"),
+            &exe,
+            true,
+            &att,
+            gt_codegen_llvm::Opt::Dev,
+        )
+        .unwrap_or_else(|e| panic!("{tag}: backend lỗi: {e}\n{src}"));
+        let o = std::process::Command::new(&exe)
+            .env("GRITRT_HEAP_REPORT", "1")
+            .env("GRITRT_RESULT_FILE", &result)
+            .output()
+            .expect("chạy exe");
+        let err = String::from_utf8_lossy(&o.stderr).into_owned();
+        assert_eq!(
+            o.status.code(),
+            Some(0),
+            "{tag}: exe thoát bất thường: {err}\n{src}"
+        );
+        let live = err
+            .lines()
+            .find_map(|l| l.strip_prefix("gritrt_heap_live="))
+            .and_then(|n| n.trim().parse::<usize>().ok())
+            .unwrap_or_else(|| panic!("{tag}: exe không báo số khối heap: {err}"));
+        let val = std::fs::read_to_string(&result)
+            .ok()
+            .and_then(|v| v.trim().parse().ok());
+        let _ = std::fs::remove_file(&exe);
+        let _ = std::fs::remove_file(&result);
+        out.push(("llvm", val, live));
+    }
+    let art = res.take_gated().expect("cổng mở");
+    let (r, live) = gt_driver::runner::run_main_heap(art, 10_000_000);
+    assert_eq!(
+        r.end,
+        RunEnd::Normal,
+        "{tag}: thông dịch {:?}\n{src}",
+        r.end
+    );
+    out.push(("interp", int(r.value.as_deref()), live));
+    out
+}
+
+const OWNED_LIB: &str = "ƒ consume_o<'a>(o: Owned<D<'a>>) ! ∅ { }\n\
+▢ H<'a> { a: Owned<D<'a>>, b: D<'a> }\n\
+ƒ cond_o<'a>(al: &Cap<Alloc>, l: &'a Cell<u64>, c: bool) ! {mem} { o ≔ Owned::new(al, mk(l, 1u64)); ⎇ c { consume_o(o); } ⇝ { } x ≔ mk(l, 3u64); }\n";
+
+#[test]
+fn owned_frees_every_block_exactly_once_and_drops_its_content_on_both_backends() {
+    let cases: [(&str, &str, &[u64]); 8] = [
+        (
+            "scope",
+            "o ≔ Owned::new(&al, mk(&log, 1u64)); b ≔ mk(&log, 2u64);",
+            &[2, 1],
+        ),
+        (
+            "into_inner",
+            "d ≔ Owned::new(&al, mk(&log, 1u64)).into_inner(); consume(d); e ≔ mk(&log, 2u64);",
+            &[1, 2],
+        ),
+        ("cond_true", "cond_o(&al, &log, true);", &[1, 3]),
+        ("cond_false", "cond_o(&al, &log, false);", &[3, 1]),
+        (
+            "struct",
+            "h ≔ H { a: Owned::new(&al, mk(&log, 1u64)), b: mk(&log, 2u64) };",
+            &[1, 2],
+        ),
+        (
+            "nested",
+            "o ≔ Owned::new(&al, Owned::new(&al, mk(&log, 1u64)));",
+            &[1],
+        ),
+        (
+            "replace_through_get_mut",
+            "μo ≔ Owned::new(&al, mk(&log, 1u64)); w ≔ o.get_mut(); *w ← mk(&log, 2u64);",
+            &[1, 2],
+        ),
+        (
+            "option_and_plain",
+            "o ≔ Some(Owned::new(&al, mk(&log, 1u64))); n ≔ Owned::new(&al, 5u64); m ≔ *n.get();",
+            &[1],
+        ),
+    ];
+    for (tag, body, ids) in cases {
+        let src = format!(
+            "{OWNED_LIB}ƒ main() → u64 ! {{mem}} {{\n  log ≔ Cell::new(0u64);\n  al ≔ root_alloc();\n  {{\n{body}\n  }};\n  log.get()\n}}\n"
+        );
+        for (backend, got, live) in run_heap(&src, &format!("owned_{tag}")) {
+            assert_eq!(
+                got,
+                Some(seq(ids)),
+                "{tag} ({backend}): dãy drop sai\n{src}"
+            );
+            assert_eq!(
+                live, 0,
+                "{tag} ({backend}): còn {live} khối heap sống (thiếu drop)\n{src}"
+            );
+        }
+    }
+}
+
+/// Hợp đồng B5: kiểm động heap (dev) phải BẮT lỗi trả khối hai lần — chèn bằng `GRITRT_FAULT=heap_double_free` ⇒ abort `heap_invalid_free`
+/// (mã 70). Đối chứng: cùng exe không chèn lỗi chạy bình thường; biến môi trường không tắt được kiểm ở dev (R4).
+#[cfg(feature = "llvm")]
+#[test]
+fn heap_dev_check_catches_an_injected_double_free() {
+    use gt_driver::pipeline::{attestation, mir_dump};
+    let src = "ƒ main() → u64 ! {mem} {\n  al ≔ root_alloc();\n  o ≔ Owned::new(&al, 7u64);\n  o.into_inner()\n}\n";
+    let res = check(&inputs(src), &Options::default()).expect("đầu vào hợp lệ");
+    let art = res.open_gate().expect("cổng mở");
+    let att = attestation(&res, &mir_dump(art));
+    let dir = std::env::temp_dir().join(format!("gt-heap-fault-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("tạo thư mục");
+    let exe = dir.join("hf.exe");
+    gt_driver::native::build_exe_profile(art, &exe, true, &att, gt_codegen_llvm::Opt::Dev)
+        .expect("dựng exe");
+    let run = |envs: &[(&str, &str)]| {
+        let mut c = std::process::Command::new(&exe);
+        for (k, v) in envs {
+            c.env(k, v);
+        }
+        c.output().expect("chạy exe")
+    };
+    let ok = run(&[]);
+    assert_eq!(
+        ok.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&ok.stderr)
+    );
+    for envs in [
+        &[("GRITRT_FAULT", "heap_double_free")][..],
+        &[
+            ("GRITRT_FAULT", "heap_double_free"),
+            ("GRITRT_HEAP_CHECK", "0"),
+        ][..],
+    ] {
+        let bad = run(envs);
+        let err = String::from_utf8_lossy(&bad.stderr);
+        assert_eq!(bad.status.code(), Some(70), "{envs:?}: {err}");
+        assert!(err.contains("abort: heap_invalid_free"), "{envs:?}: {err}");
+    }
+    let _ = std::fs::remove_file(&exe);
 }

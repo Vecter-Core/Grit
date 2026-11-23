@@ -394,6 +394,12 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
         }
     }
     out_bodies.sort_by_key(|b| b.node);
+    // ADR-C18 bước 2: có biểu thức nào mang kiểu `Owned<_>` không (quyết định có cần drop glue)
+    env.db.owned_used = env
+        .db
+        .lang
+        .get(&Lang::Owned)
+        .is_some_and(|d| env.out_types.values().any(|t| t.mentions_adt(*d)));
     let mut bag = Diagnostics::new(LIMIT);
     for d in std::mem::take(&mut env.diags) {
         bag.push(d);

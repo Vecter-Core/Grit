@@ -1,0 +1,4 @@
+// expect: fail E0801
+// note: cấp phát heap là hiệu ứng `mem` (như Arena): hàm `! ∅` không được gọi `Owned::new` (ADR-C18 bước 2)
+ƒ mk(al: &Cap<Alloc>) → Owned<u64> ! ∅ { Owned::new(al, 1u64) }
+ƒ main() ! {mem} { al ≔ root_alloc(); o ≔ mk(&al); }

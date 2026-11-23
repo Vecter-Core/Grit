@@ -47,6 +47,7 @@ E0401_same_stmt_unique_ref_duplicated | E0401 | `(a, a)` | [giá trị bị move
 E0401_same_stmt_use_after_move_in_args | E0401 | `g(b, b.v)` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_tuple_field_moved_then_whole | E0401 | `pair(t)` | [giá trị bị move ở đây @ `t.0`] | dùng `t` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_use_after_move | E0401 | `b.v` | [giá trị bị move ở đây @ `b`] | dùng `b` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
+E0401_use_owned_after_into_inner | E0401 | `o.get()` | [giá trị bị move ở đây @ `o`] | dùng `o` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_write_field_through_moved_ref | E0401 | `a.n ← 2;` | [giá trị bị move ở đây @ `a`] | ghi qua `a` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_write_index_of_moved_array | E0401 | `a[0] ← mk();` | [giá trị bị move ở đây @ `a`] | ghi qua `a` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
 E0401_write_through_moved_unique_ref | E0401 | `*a ← 2;` | [giá trị bị move ở đây @ `a`] | ghi qua `a` sau khi giá trị đã bị move (có thể chưa khởi tạo trên một số đường)
@@ -94,6 +95,7 @@ E0403_method_arg_keeps_shared_ref | E0403 | `s.adv2(keep(&s))` | [khoản mượ
 E0403_method_shared_then_unique_self | E0403 | `b.inc()` | [khoản mượn bắt đầu ở đây @ `b.refv()`] | mượn duy nhất `&!` `b` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_mix_call | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_nested_block | E0403 | `&x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_owned_get_mut_while_shared_ref_alive | E0403 | `o.get_mut()` | [khoản mượn bắt đầu ở đây @ `o.get()`] | mượn duy nhất `&!` `o` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_peek_while_bump_live | E0403 | `&b` | [khoản mượn bắt đầu ở đây @ `&!b`] | dùng/mượn chung `b` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_q87_bind_shared_then_unique_root | E0403 | `&!v` | [khoản mượn bắt đầu ở đây @ `&v`] | mượn duy nhất `&!` `v` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_q87_bind_unique_then_read_root | E0403 | `(*p).x` | [khoản mượn bắt đầu ở đây @ `P { x, y } ↦ { r ≔ (*p).x; *x ← 1; r }`] | dùng/mượn chung `p` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
@@ -120,6 +122,7 @@ E0404_outer_option_holds_inner_ref | E0404 | `{ y ≔ 5; o ← Some(&y); }` | [k
 E0404_outer_ref_to_inner_scope | E0404 | `{ y ≔ 5; p ← &y; }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_outer_ref_to_loop_local | E0404 | `{ y ≔ i; p ← &y; }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_outer_struct_holds_inner_ref | E0404 | `{ y ≔ 5; h ← Hs { r: &y }; }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_owned_ref_escapes_its_owner | E0404 | `o ≔ Owned::new(al, 5u64);` | [khoản mượn bắt đầu ở đây @ `o.get()`] | `o` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_param_holds_inner_ref | E0404 | `{ x ≔ 1; *out ← &x; }` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_q87_bind_escapes_local | E0404 | `v ≔ E::A(1);` | [khoản mượn bắt đầu ở đây @ `&v`] | `v` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_q87_bind_escapes_local | E0404 | `E::C ↦ &0` | [khoản mượn bắt đầu ở đây @ `&0`] | một giá trị tạm không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau

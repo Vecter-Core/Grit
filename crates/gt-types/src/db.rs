@@ -20,6 +20,9 @@ pub struct TypeDb {
     /// `Drop` NGƯỜI DÙNG đã qua kiểm của M4 (ADR-C18): ADT → thành viên `drop` của impl (thân có MIR, instance không đối số kiểu).
     /// Chỉ các mục ở đây được drop glue GỌI; `⊐ Drop for` của prelude (`Buf`, `Guard`: thân rỗng, không có MIR) không có mặt.
     pub user_drops: BTreeMap<DefId, NodeId>,
+    /// Chương trình có tạo `Owned<_>` không (một biểu thức có kiểu nhắc tới `Owned`; giá trị Owned CHỈ sinh từ `Owned::new` của prelude vì
+    /// literal bị cấm). Cùng `user_drops` quyết định có cần drop glue: không có cả hai ⇒ mọi glue rỗng (ADR-C18).
+    pub owned_used: bool,
 }
 
 /// Các trường cần glue của một struct/tuple/biến thể: (chỉ số trường, kiểu trường, glue), theo thứ tự khai báo.
@@ -33,6 +36,8 @@ pub enum Glue {
     Nothing,
     /// gọi `drop` người dùng (thành viên impl `NodeId`, instance không đối số) trên chính chỗ, RỒI glue của các trường
     Call(NodeId, Box<Glue>),
+    /// `Owned<T>` (ADR-C18 bước 2): glue của `T` tại khối heap mà chỗ trỏ tới, RỒI trả khối (`gritrt_heap_free(ptr, size_of T, align_of T)`)
+    Free(Ty, Box<Glue>),
     /// struct/tuple: các trường có glue ≠ `Nothing`, theo thứ tự khai báo: (chỉ số trường, kiểu trường, glue)
     Fields(GlueFields),
     /// enum: chỉ biến thể đang có chạy; (chỉ số biến thể, các trường có glue của biến thể đó)
@@ -57,6 +62,7 @@ impl Glue {
                 }
                 g.calls(out);
             }
+            Glue::Free(_, g) => g.calls(out),
             Glue::Fields(fs) => fs.iter().for_each(|(_, _, g)| g.calls(out)),
             Glue::Variants(vs) => vs
                 .iter()
@@ -377,8 +383,8 @@ impl TypeDb {
     /// `Err` (lý do): kiểu còn tham số, ADT không có trong db, kiểu quá sâu, hoặc kiểu lang ĐỤC (Vec/Text/Arena/Mutex/Atomic/Cell/Secret/Cap)
     /// chứa giá trị có Drop người dùng — biểu diễn của chúng không phải trường thường nên glue không đi vào được (fail-closed).
     pub fn drop_glue(&self, ty: &Ty) -> Result<Glue, String> {
-        if self.user_drops.is_empty() {
-            // chỉ `drop` người dùng tạo lời gọi trong glue: không có cái nào ⇒ mọi glue rỗng (chương trình không dùng Drop không đổi gì)
+        if !self.glue_possible() {
+            // glue chỉ làm việc khi có `drop` người dùng hoặc `Owned`: không có cả hai ⇒ mọi glue rỗng (chương trình cũ không đổi gì)
             return Ok(Glue::Nothing);
         }
         self.glue_inner(ty, 0)
@@ -387,7 +393,7 @@ impl TypeDb {
     /// Glue của kiểu có thể CÒN tham số: tham số kiểu coi là "có thể có glue" (`true`). Dùng ở MIR đa hình (M6: drop là một lần dùng).
     #[must_use]
     pub fn may_have_glue(&self, ty: &Ty) -> bool {
-        if self.user_drops.is_empty() {
+        if !self.glue_possible() {
             return false;
         }
         if ty.has_param() || ty.has_infer() {
@@ -445,6 +451,14 @@ impl TypeDb {
                 let Some(adt) = self.adts.get(d) else {
                     return Err(format!("ADT {d:?} không có trong cơ sở kiểu (drop_glue)"));
                 };
+                if adt.lang == Some(Lang::Owned) {
+                    // M4 cấm đệ quy qua `Owned` (E0301) ⇒ đệ quy ở đây dừng
+                    let Some(t) = args.first() else {
+                        return Err("`Owned` thiếu đối số kiểu".to_string());
+                    };
+                    let inner = self.glue_inner(t, depth + 1)?;
+                    return Ok(Glue::Free(t.clone(), Box::new(inner)));
+                }
                 if let Some(l) = adt.lang
                     && matches!(
                         l,
@@ -502,6 +516,52 @@ impl TypeDb {
                     None => inner,
                 })
             }
+        }
+    }
+
+    /// Có nguồn drop glue nào trong chương trình không (`drop` người dùng hoặc `Owned`). Không ⇒ mọi glue rỗng.
+    #[must_use]
+    pub fn glue_possible(&self) -> bool {
+        !self.user_drops.is_empty() || self.owned_used
+    }
+
+    /// Kiểu (đã cụ thể hoặc còn tham số) có CHỨA theo cấu trúc một nguồn drop glue không: ADT có `drop` người dùng đã đăng ký, hoặc `Owned`.
+    /// Không phụ thuộc `owned_used` (dùng được trong lúc M4 kiểm thân). Tham số kiểu ⇒ `false` (chưa biết; xem KNOWN_LIMITATIONS).
+    #[must_use]
+    pub fn holds_glue_source(&self, ty: &Ty) -> bool {
+        self.holds_glue_inner(ty, 0)
+    }
+
+    fn holds_glue_inner(&self, ty: &Ty, depth: u32) -> bool {
+        if depth > 64 {
+            return true;
+        }
+        match ty {
+            Ty::Tuple(v) => v.iter().any(|t| self.holds_glue_inner(t, depth + 1)),
+            Ty::Array(t, n) => *n > 0 && self.holds_glue_inner(t, depth + 1),
+            Ty::Adt(d, args) => {
+                let Some(adt) = self.adts.get(d) else {
+                    return true;
+                };
+                if adt.lang == Some(Lang::Owned) || self.user_drops.contains_key(d) {
+                    return true;
+                }
+                if args.iter().any(|a| self.holds_glue_inner(a, depth + 1)) {
+                    return true;
+                }
+                let fields: Vec<Ty> = match &adt.kind {
+                    AdtKind::Struct(fs) => fs
+                        .iter()
+                        .map(|f| subst_with(&f.ty, &adt.generics, args))
+                        .collect(),
+                    AdtKind::Enum(vs) => vs
+                        .iter()
+                        .flat_map(|v| v.fields.iter().map(|f| subst_with(f, &adt.generics, args)))
+                        .collect(),
+                };
+                fields.iter().any(|t| self.holds_glue_inner(t, depth + 1))
+            }
+            _ => false,
         }
     }
 

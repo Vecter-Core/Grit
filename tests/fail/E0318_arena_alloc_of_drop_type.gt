@@ -1,0 +1,8 @@
+// expect: fail E0318
+// note: Arena không chạy destructor ⇒ đặt giá trị có `drop` người dùng vào Arena là âm thầm bỏ drop — từ chối như Vec (ADR-C18)
+▢ D { v: u32 }
+⊐ Drop for D { ƒ drop(&!self) ! ∅ { } }
+ƒ main() ! {mem} {
+  ar ≔ Arena::new();
+  r ≔ ar.alloc(D { v: 1u32 });
+}
