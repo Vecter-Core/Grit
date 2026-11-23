@@ -16,7 +16,7 @@ Quy tắc chung: một mục ĐÓNG BĂNG chỉ được đổi bằng (1) một
 | Thư viện chuẩn | các chữ ký công khai trong `docs/STD_REFERENCE.md` (sinh tự động; test khoá từng byte): hàm hiện có không đổi chữ ký/nghĩa; chỉ THÊM hàm | `docs_lock.rs`, `std2_lib.rs` (≥ 30 chương trình ba nguồn mỗi nhóm) |
 | Intrinsic TCB | danh sách và hợp đồng ở `docs/TCB_INTRINSICS.md` (27 hàm runtime trong `gt_guard::RUNTIME`; ngân sách intrinsic mới của Seed: 5/6 đã dùng) | IR Guard bảng `RUNTIME`, `io_intrinsics.rs`, `str_eq.rs` |
 | Obligation IR | schema 1 (`gt-oblig/src/ir.rs`, `SCHEMA_VERSION = 1`): chỉ THÊM khoá; JSON cũ là tiền tố của JSON mới (ADR-039, ADR-C04) | `gt-oblig/tests/ir_freeze.rs` |
-| Rig | `rig.toml` (khoá cho phép: package/name/version/dependencies path), `rig.lock` (băm nội dung từng gói), lệnh `new/check/build/run/test/add/lock/fmt/clean` | `crates/rig/tests` |
+| Rig | `rig.toml` (khoá cho phép: package/name/version/edition/dependencies path; `edition` thêm 2026-11-23 theo ADR-P2-01 — vắng ⇒ edition 1, chỉ `1` được hỗ trợ, giá trị khác ⇒ mã 11; KHÔNG đổi cú pháp/ngữ nghĩa edition 1), `rig.lock` (băm nội dung từng gói), lệnh `new/check/build/run/test/add/lock/fmt/clean` | `crates/rig/tests` |
 | Dựng tái lập | cùng mã, cùng đường dẫn ⇒ cùng SHA-256 của `gritc` và của nhị phân do `rig build` | `BUILDING.md`, `rig.rs::builds_are_reproducible…` |
 
 ## KHÔNG đóng băng
