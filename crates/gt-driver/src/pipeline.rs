@@ -346,13 +346,27 @@ fn run_passes(
     gt_mir::set_pat_swap_fault_for_test(
         std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-field-swap"),
     );
-    let Some(m) = run.stage("m5.mir", || gt_mir::lower_program(&t)) else {
+    // hạ MIR rồi elaboration drop (ADR-C18: cờ drop, drop mở) TRƯỚC M6 để M6 thấy đúng drop nào còn là một lần dùng
+    let Some((m, drops)) = run.stage("m5.mir", || {
+        let mut m = gt_mir::lower_program(&t);
+        let drops = if m.report.errors() == 0 {
+            gt_dataflow::elaborate_program(&t, &mut m)
+        } else {
+            Diagnostics::new(1).finish()
+        };
+        (m, drops)
+    }) else {
         run.skip(&AFTER_M4[1..]);
         return Ok(finish(run, sources, None));
     };
     // E0307 do chính `lower_program` báo; canary kiểm nó còn hoạt động
     run.alias("m5.return_paths");
     merge(&mut run.bag, &m.report);
+    merge(&mut run.bag, &drops);
+    if drops.errors() > 0 {
+        run.skip(&AFTER_M4[2..]);
+        return Ok(finish(run, sources, None));
+    }
     if m.report.errors() > 0 {
         run.skip(&AFTER_M4[2..]);
         return Ok(finish(run, sources, None));

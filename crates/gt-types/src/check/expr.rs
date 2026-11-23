@@ -681,7 +681,7 @@ impl<'e, 'a> Checker<'e, 'a> {
         };
         let forged = matches!(
             adt.lang,
-            Some(Lang::Secret | Lang::Cap | Lang::Vec | Lang::Text)
+            Some(Lang::Secret | Lang::Cap | Lang::Vec | Lang::Text | Lang::Owned)
         ) && !self.env.is_prelude(e.id.file());
         if forged {
             let name = self.env.defs()[d.index()].path.clone();

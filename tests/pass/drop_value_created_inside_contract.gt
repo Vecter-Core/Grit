@@ -1,0 +1,7 @@
+// expect: pass
+// note: hợp đồng tạo giá trị có Drop của RIÊNG nó rồi move vào tuple: không phải tham số nên được phép (ADR-C18; đối chứng của E0407_contract_moves_drop_arg_into_tuple)
+▢ E { v: u32 }
+⊐ Drop for E { ƒ drop(&!self) ! ∅ { } }
+ƒ mk0() → E ! ∅ { E { v: 1u32 } }
+ƒ h(n: u64) ! ∅ ⊳ (mk0(), n).1 > 0u64 { }
+ƒ main() ! ∅ { h(1u64); }

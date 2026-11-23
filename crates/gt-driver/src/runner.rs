@@ -54,21 +54,31 @@ pub fn run_main(art: Artifacts) -> RunReport {
 /// Như [`run_main`] nhưng chọn nhiên liệu (cho test giới hạn bộ chạy).
 #[must_use]
 pub fn run_main_with(art: Artifacts, fuel: u64) -> RunReport {
+    run_main_heap(art, fuel).0
+}
+
+/// Như [`run_main_with`], trả thêm số khối heap của `Owned` còn sống khi `main` kết thúc (ADR-C18 bước 2: chương trình kết thúc bình thường
+/// mà còn khối sống ⇒ thiếu drop — test đối chiếu với `GRITRT_HEAP_REPORT` của exe).
+#[must_use]
+pub fn run_main_heap(art: Artifacts, fuel: u64) -> (RunReport, usize) {
     let Artifacts { mir, obl, types } = art;
     let mut mir = mir;
     mir.bodies = obl.bodies;
     let key = match find_main(&mir.bodies) {
         Ok(b) => b.key.clone(),
         Err(e) => {
-            return RunReport {
-                end: RunEnd::Internal(e),
-                value: None,
-            };
+            return (
+                RunReport {
+                    end: RunEnd::Internal(e),
+                    value: None,
+                },
+                0,
+            );
         }
     };
     apply_types_fault_from_env();
     let mut it = Interp::new(&mir, fuel).with_types(&types);
-    match it.call_key(&key, Vec::new()) {
+    let r = match it.call_key(&key, Vec::new()) {
         Outcome::Value(v) => RunReport {
             end: RunEnd::Normal,
             value: Some(format!("{v:?}")),
@@ -89,7 +99,9 @@ pub fn run_main_with(art: Artifacts, fuel: u64) -> RunReport {
             end: RunEnd::Internal(format!("bộ chạy phát hiện MIR không hợp lệ: {m}")),
             value: None,
         },
-    }
+    };
+    let live = it.heap_live();
+    (r, live)
 }
 
 /// Văn bản gói: tiêu đề + attestation + MIR sau M7 (Debug tất định).

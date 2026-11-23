@@ -16,7 +16,7 @@ pub struct Run {
 pub fn pipeline(files: &[(&str, &str)]) -> Run {
     let t = run(files);
     assert!(t.report.diagnostics.is_empty(), "M4 báo: {:?}", show(&t));
-    let m = gt_mir::lower_program(&t);
+    let mut m = gt_mir::lower_program(&t);
     assert!(
         m.report.diagnostics.is_empty(),
         "M5 báo: {:?}",
@@ -26,7 +26,10 @@ pub fn pipeline(files: &[(&str, &str)]) -> Run {
             .map(|d| format!("{} {}", d.code, d.message))
             .collect::<Vec<_>>()
     );
-    let bc = gt_borrowck::check_program(&t, &m);
+    // như pipeline của gritc: elaboration drop (ADR-C18) giữa M5 và M6; chẩn đoán của nó (E0407 ở hợp đồng) tính là của sở hữu
+    let e = gt_dataflow::elaborate_program(&t, &mut m);
+    let mut bc = gt_borrowck::check_program(&t, &m);
+    bc.diagnostics.splice(0..0, e.diagnostics);
     Run { t, m, bc }
 }
 

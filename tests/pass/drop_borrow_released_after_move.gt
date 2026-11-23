@@ -1,0 +1,12 @@
+// expect: pass
+// note: giá trị có Drop đã move đi (drop chạy ở hàm nhận) thì khoản mượn của nó hết ⇒ đọc `n` được (ADR-C18)
+▢ M<'a> { r: &!'a u64 }
+⊐ <'a> Drop for M<'a> { ƒ drop(&!self) ! ∅ { *self.r ← 1u64; } }
+ƒ eat<'a>(m: M<'a>) ! ∅ { }
+ƒ main() → u64 ! ∅ {
+  μn ≔ 0u64;
+  m ≔ M { r: &!n };
+  eat(m);
+  x ≔ n;
+  x
+}

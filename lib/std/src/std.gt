@@ -571,3 +571,80 @@
     }
   }
 }
+
+// ---------------------------------------------------------------- Slab (GÓI 12, ADR-C17)
+// Kho đối tượng SỐNG LÂU có tay cầm thế hệ — như `MemoryPool` của Zig và `slotmap` của Rust: thêm / xoá TỪNG phần tử O(1), ô bị xoá được
+// TÁI DÙNG trước khi cấp ô mới (nên số ô từng cấp == số phần tử sống tối đa: thêm/xoá liên tục suốt đời chương trình không làm bộ nhớ tăng
+// quá đỉnh, dù Arena không trả lại từng khối). Khoá cũ của một ô đã xoá KHÔNG BAO GIỜ đọc được phần tử mới đặt vào ô đó (thế hệ `u64`
+// tăng mỗi lần xoá). Dùng cho bảng kết nối, nút cây/đồ thị (trỏ nhau bằng `SlabKey` thay vì tham chiếu), thực thể. Phần tử `Copy` như `Vec`.
+// Viết bằng Grit thường, đi qua cùng cổng như mã người dùng: KHÔNG thuộc TCB.
+◈ ▢ SlabKey { idx: usize, gen: u64 }
+⊐ Copy for SlabKey { }
+
+▢ SlabSlot<T> { v: T, gen: u64, live: bool, next_free: usize }
+⊐ <T: Copy> Copy for SlabSlot<T> { }
+
+// `free` = 1 + chỉ số ô trống đầu danh sách (0 = không còn ô trống); danh sách nối qua `next_free` (cùng quy ước 1 + chỉ số)
+◈ ▢ Slab<'a, T> { slots: Vec<'a, SlabSlot<T>>, free: usize, live: usize }
+
+⊐ <'a, T: Copy> Slab<'a, T> {
+  ƒ new(a: &'a Arena) → Slab<'a, T> ! {mem} {
+    Slab { slots: Vec::new(a), free: 0usize, live: 0usize }
+  }
+  // số phần tử đang sống
+  ƒ len(&self) → usize ! ∅ { self.live }
+  // số ô từng cấp (không bao giờ giảm) == số phần tử sống tối đa từng có
+  ƒ capacity(&self) → usize ! ∅ { self.slots.len() }
+  // thêm `v`, trả khoá; tái dùng ô trống gần nhất nếu có
+  ƒ insert(&!self, v: T) → SlabKey ! {mem} {
+    self.live ← self.live + 1usize;
+    ⎇ self.free == 0usize {
+      self.slots.push(SlabSlot { v: v, gen: 0u64, live: true, next_free: 0usize });
+      SlabKey { idx: self.slots.len() - 1usize, gen: 0u64 }
+    } ⇝ {
+      i ≔ self.free - 1usize;
+      μs ≔ self.slots.as_mut_slice();
+      μsl ≔ s[i];
+      sl.v ← v;
+      sl.live ← true;
+      s[i] ← sl;
+      self.free ← sl.next_free;
+      SlabKey { idx: i, gen: sl.gen }
+    }
+  }
+  // phần tử của khoá `k`, hoặc None nếu đã xoá (kể cả khi ô đã được tái dùng cho phần tử khác)
+  ƒ get(&self, k: SlabKey) → Option<T> ! ∅ {
+    ⌥ self.slots.get(k.idx) {
+      Some(sl) ↦ { ⎇ sl.live ∧ sl.gen == k.gen { Some(sl.v) } ⇝ { None } },
+      None ↦ None,
+    }
+  }
+  ƒ contains(&self, k: SlabKey) → bool ! ∅ { ¬self.get(k).is_none() }
+  // ghi đè phần tử của khoá `k`; false nếu khoá không còn sống
+  ƒ set(&!self, k: SlabKey, v: T) → bool ! ∅ {
+    ⎇ self.contains(k) {
+      μs ≔ self.slots.as_mut_slice();
+      μsl ≔ s[k.idx];
+      sl.v ← v;
+      s[k.idx] ← sl;
+      true
+    } ⇝ { false }
+  }
+  // xoá phần tử của khoá `k` (trả nó); ô vào danh sách trống, thế hệ tăng nên mọi bản sao của `k` hết hiệu lực
+  ƒ remove(&!self, k: SlabKey) → Option<T> ! ∅ {
+    ⌥ self.get(k) {
+      Some(v) ↦ {
+        μs ≔ self.slots.as_mut_slice();
+        μsl ≔ s[k.idx];
+        sl.live ← false;
+        sl.gen ← sl.gen +% 1u64;
+        sl.next_free ← self.free;
+        s[k.idx] ← sl;
+        self.free ← k.idx + 1usize;
+        self.live ← self.live - 1usize;
+        Some(v)
+      },
+      None ↦ None,
+    }
+  }
+}

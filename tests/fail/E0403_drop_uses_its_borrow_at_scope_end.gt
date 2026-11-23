@@ -1,0 +1,10 @@
+// expect: fail E0403
+// note: giá trị có Drop giữ `&!n`: drop ở cuối phạm vi là một lần DÙNG nên đọc `n` trước đó là xung đột (dropck như Rust) — ADR-C18
+▢ M<'a> { r: &!'a u64 }
+⊐ <'a> Drop for M<'a> { ƒ drop(&!self) ! ∅ { *self.r ← 1u64; } }
+ƒ main() → u64 ! ∅ {
+  μn ≔ 0u64;
+  m ≔ M { r: &!n };
+  x ≔ n;
+  x
+}

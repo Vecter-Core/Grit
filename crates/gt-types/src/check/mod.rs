@@ -762,7 +762,24 @@ impl<'e, 'a> Checker<'e, 'a> {
         let Ty::Adt(d, _) = &imp.self_ty else {
             return;
         };
-        if self.env.db.adts.get(d).and_then(|a| a.lang) != Some(Lang::Vec) {
+        let lang = self.env.db.adts.get(d).and_then(|a| a.lang);
+        if lang == Some(Lang::Arena) {
+            // ADR-C18: `Arena::alloc(v)` không bao giờ chạy destructor ⇒ giá trị có `drop` người dùng / `Owned` (trả khối heap) bị âm thầm
+            // bỏ drop. Từ chối như Vec (E0318) khi kiểu đã biết; tham số kiểu thì chưa biết (KNOWN_LIMITATIONS: chỉ rò rỉ, không mất an toàn).
+            if let Some(t) = c.args.first()
+                && self.env.db.holds_glue_source(t)
+            {
+                let shown = t.render(self.env.defs());
+                self.err(
+                    "E0318",
+                    c.caller,
+                    c.span,
+                    format!("`Arena::alloc` với `{shown}`: giá trị có Drop/`Owned` sẽ không bao giờ được drop (Arena không chạy destructor)"),
+                );
+            }
+            return;
+        }
+        if lang != Some(Lang::Vec) {
             return;
         }
         let Some(t) = c.args.first() else {

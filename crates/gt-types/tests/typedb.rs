@@ -136,9 +136,10 @@ fn bodies_list_functions_members_consts_and_statics_but_not_the_prelude() {
 }
 
 #[test]
-fn user_drop_impls_are_rejected_in_phase_1_e0313() {
+fn user_drop_impls_outside_the_narrow_rule_are_rejected_e0313() {
+    // ADR-C18: Drop người dùng được phép (kiểu cùng tệp, không tham số kiểu…); kiểu có tham số KIỂU thì vẫn E0313 (corpus phủ các luật còn lại)
     err(
-        "▢ S { n: i32 } ⊐ Drop for S { ƒ drop(&!self) ! ∅ { } }",
+        "▢ S<T> { n: T } ⊐ <T> Drop for S<T> { ƒ drop(&!self) ! ∅ { } }",
         "E0313",
         1,
     );

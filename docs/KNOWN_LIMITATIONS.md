@@ -102,7 +102,7 @@
 ## gt-mir / gt-dataflow (M5, ADR-020, ADR-022)
 - **Chưa hạ (ICE E9901, không bỏ qua):** lượng từ `∀ ∃` ngoài hợp đồng; hợp đồng `⊳ ⊲ ↓ ⋈` và chứng cứ của `⚠` chỉ được GHI NHẬN (`Body.contracts`), hạ ở M7/M10; hàm tạo biến thể có trường dùng như giá trị; phương thức trait dùng như giá trị; `⟳` trên range ký tự.
 - **Không có crate gt-hir** (hoãn, Q27): bước hạ MIR đọc thẳng AST + bảng của gt-types.
-- **Không elaboration drop** (cờ drop) — `Drop` vô điều kiện ở cuối phạm vi, kể cả biến đã move; M10 làm elaboration.
+- ~~Không elaboration drop~~ — ĐÃ CÓ (ADR-C18 bước 1, 2026-11-22): cờ drop + drop mở chạy sau M5, trước M6 (`gt-dataflow/src/elaborate.rs`).
 - **Không tối ưu MIR:** `⌥` kiểm từng nhánh tuần tự (đọc lại discriminant mỗi nhánh); nhiều biến tạm/`StorageLive` hơn cần thiết. Đúng trước, nhanh sau.
 - **Biến tạm của đuôi khối chết ở cuối khối** (chặt hơn Rust, ADR-022 §4); người nhận theo giá trị bị move sau đối số (ADR-022 §5).
 - **Thứ tự đánh giá của phép gán khác Rust:** chỗ trước, giá trị sau (semantics §3a).
@@ -230,7 +230,11 @@ Lập luận từng nhóm (KHÔNG phải chứng minh):
 ## M10 — backend LLVM (ghi 2026-10-13)
 - **Nghĩa vụ nhạy cảm theo LỚP, không theo điểm:** IR Guard đòi mỗi atomic/spawn/mutex mang `!gt.obl` đúng lớp (E0503/E0501/E0502) nhưng chưa trỏ tới từng nghĩa vụ đã giải cụ thể (M7/M8 chưa có ID nghĩa vụ ổn định theo điểm). Hệ quả: một thao tác nhạy cảm do bug codegen thêm vào mà vẫn được gắn đúng lớp sẽ lọt Guard; phát hiện nhờ test đối chiếu, không nhờ Guard.
 - **Chưa hạ được (⇒ `Unsupported`, gritc exit 3, không exe):** số thực; gọi qua trait (`Callee::TraitMethod`); nhân/chia/`*?` 128 bit (cần `__multi3`/`__divti3`); `MulSat`; `Atomic<bool>`; ordering không phải hằng lúc biên dịch; sao chép giá trị `static` có Atomic/Mutex/Cell; thân hợp đồng `Pre/Post` như hàm.
-- **`Drop` người dùng bị bỏ qua** (cùng ngữ nghĩa thông dịch; Phase 1 chỉ có `Drop` giả trong prelude).
+- **`Drop` người dùng (ADR-C18 bước 1, 2026-11-22):** chạy thật ở thông dịch và LLVM, nhưng HẸP: chỉ kiểu cùng tệp, không tham số KIỂU, không `Copy`, `drop` `! ∅` không hợp đồng (E0313). `Vec`/`HashMap`/`Cell`/`Mutex`… không chứa được giá trị có Drop (E0318). Abort không chạy drop (D3). `Drop` của prelude (`Buf`, `Guard`) vẫn là giả (thân rỗng).
+- **Không có `GlobalAlloc`** dù GRIT_PLAN §4.0(a) đòi ở Phase 1: mọi cấp phát của người dùng đi qua Arena (bump, chỉ trả cả khối). Đối tượng sống lâu thêm/xoá liên tục: dùng `std::Slab` (ADR-C17, tái dùng ô, `T: Copy`). `Drop` người dùng đã hạ (ADR-C18 bước 1); `Owned<T>` (khối heap trả khi drop, TCB B5) đã có ở bước 2.
+- **`Owned<T>` (ADR-C18 bước 2):** không đệ quy được qua `Owned` (E0301 — cấu trúc liên kết dùng `std::Slab`); KHÔNG `Send`/`Sync` (trường con trỏ thô;
+  bảo thủ — `Box<T>: Send` khi `T: Send` là đúng nhưng chưa làm); `Cell`/`Mutex`/`Vec` không chứa được `Owned` (E0318). `Arena::alloc` của kiểu
+  CỤ THỂ có Drop/`Owned` bị E0318; qua tham số kiểu generic thì chưa bắt được — hậu quả chỉ là RÒ RỈ (drop không chạy), không mất an toàn bộ nhớ.
 - **`spawn` không có `join`:** chương trình kết thúc khi `main` trả về, luồng còn chạy bị dừng cùng tiến trình; hộp tham số của `spawn` không giải phóng (rò rỉ có chủ đích, nhỏ).
 - **Thứ tự khởi tạo `static`** (FB-C21, đã sửa): theo bao đóng BẮC CẦU qua đồ thị gọi/giá trị hàm của initializer; vòng phụ thuộc ⇒ `Unsupported` (mã 3). Bảo thủ: hàm chỉ NHẮC tới `g` cũng tạo cạnh (có thể từ chối nhầm một vòng giả; không bao giờ bỏ sót). Thông dịch không chạy được `■` nào (ICE "hằng ngoài phạm vi") nên đối chiếu thông dịch≡exe không áp dụng cho static.
 - **TSan không dùng được** với toolchain MSVC hiện tại: đa luồng được kiểm bằng chạy lặp (4 luồng × 1000 lần, 68/68 vòng đúng) chứ không bằng bộ phát hiện đua dữ liệu. Không thay được chứng minh tuyệt đối.

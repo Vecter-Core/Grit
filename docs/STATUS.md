@@ -27,6 +27,12 @@ Nhãn hiện hành: **`1.0.0-rc7`** (ứng viên, **CHƯA** phải `1.0.0-seed`)
 **GÓI 12 phần 2 (2026-11-21):** mượn hai pha (ADR-C14), ép `&[T; N]` → `&[T]` (ADR-C15), vòng/đệ quy qua `/` và `%` chứng minh được dừng
 (ADR-C16). Nhãn GIỮ `1.0.0-rc7` (chưa có cổng đầy đủ trên mã mới — không đổi nhãn khi chưa có bằng chứng). Kế hoạch từng M: `docs/ROADMAP.md` mục 0b.
 
+**GÓI 12 phần 3 (2026-11-22):** thẩm định đánh giá quản lý bộ nhớ của Gemini; làm phần dùng được: `std::Slab` (ADR-C17, oracle 40×120 thao tác, 2 đột biến bị giết); đề xuất `GlobalAlloc` + hạ `Drop` (ADR-C18, CHƯA LÀM — cần hợp đồng TCB + LLVM). Nhãn GIỮ `1.0.0-rc7`.
+
+**GÓI 12 phần 4 (2026-11-23):** ADR-C18 bước 1 — `Drop` người dùng CHẠY THẬT (thông dịch + exe LLVM): luật M4 (E0313), cờ drop/drop mở (elaboration giữa M5 và M6), dropck ở M6, đệ quy qua drop ⇒ E0703 ở M8. Oracle 60 chương trình × 2 backend; đột biến tự động 107 (70 giết / 25 tương đương / 12 không biên dịch). Container đám mây giờ có LLVM 20 (`tools/setup_cloud.sh --install-system`). Nhãn GIỮ `1.0.0-rc7` (chưa có cổng đầy đủ trong clone sạch).
+
+**GÓI 12 phần 5 (2026-11-23):** `Owned<T>` (ADR-C18 bước 2, TCB B5 — bằng chứng có, CHƯA duyệt). Cổng clone sạch trên `102d968`: test 955/0 nhưng RED ở `failopen` (thiếu baseline, đã sửa ở `3b17f1f`); **cổng clone sạch trên `3b17f1f` XANH liền mạch (957/0, 202 bộ, Linux + LLVM 20)**. Nhãn GIỮ `1.0.0-rc7` (đổi nhãn là quyết định của Giang).
+
 ## 3. Luật làm việc (bản đầy đủ: `AGENTS.md`, `.claude/skills/grit-contract.md`)
 - Chỉ báo số liệu THẬT từ lệnh đã chạy; ghi `CHƯA KIỂM` cho phần chưa kiểm. Không báo xong khi chưa có cổng liền mạch xanh trên đúng mã đó.
 - Lỗi soundness/false negative = lỗi nghiêm trọng nhất: test ĐỎ trước, sửa sau trong commit riêng, ghi `docs/FIELD_BUGS.md`, mở rộng bộ sinh/oracle, kiểm bằng cách tắt bản sửa.

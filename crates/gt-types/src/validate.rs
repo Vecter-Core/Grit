@@ -34,15 +34,19 @@ impl Env<'_> {
         };
         let node = imp.node;
         let tname = self.defs()[tr.trait_def.index()].path.clone();
-        // Drop: Phase 1 chỉ lib/core được viết `⊐ Drop for` (ADR-020 §9, Q26)
+        // Drop người dùng (ADR-C18 bước 1; trước đó chỉ lib/core — ADR-020 §9): luật hẹp để mọi drop có sẵn instance và gọi ngầm an toàn
         if self.db.lang.get(&Lang::Drop) == Some(&tr.trait_def) && !self.is_prelude(node.file()) {
-            self.err(
-                "E0313",
-                node,
-                imp.span,
-                "`⊐ Drop for …` chỉ được viết trong lib/core ở Phase 1 (ADR-020 §9)".to_string(),
-            );
-            return;
+            match self.user_drop_violation(&imp) {
+                Some(why) => {
+                    self.err("E0313", node, imp.span, format!("`⊐ Drop for …`: {why}"));
+                    return;
+                }
+                None => {
+                    if let (Ty::Adt(d, _), Some(m)) = (&imp.self_ty, imp.members.first()) {
+                        self.db.user_drops.insert(*d, m.node);
+                    }
+                }
+            }
         }
         // Send: trait tự động (M8), suy theo cấu trúc; không cho viết impl
         if td.lang == Some(Lang::Send) || td.lang == Some(Lang::Sync) {
@@ -99,6 +103,45 @@ impl Env<'_> {
                 }
             }
         }
+    }
+
+    /// Lý do `⊐ Drop for` của người dùng bị từ chối (ADR-C18), hoặc `None` nếu hợp lệ:
+    /// (1) đích là struct/enum khai trong CÙNG tệp (luật mồ côi: không đổi hành vi drop của kiểu thư viện/kiểu lang);
+    /// (2) không có tham số KIỂU ở kiểu lẫn impl (tham số vùng được): instance của `drop` luôn là một instance gốc, có sẵn ở bảng instance;
+    /// (3) kiểu không `Copy` (chép bit rồi drop hai lần); (4) `drop` là `! ∅` và không có hợp đồng (gọi ngầm: không có điểm gọi để kiểm `⊳`).
+    fn user_drop_violation(&self, imp: &ImplDef) -> Option<String> {
+        let Ty::Adt(d, args) = &imp.self_ty else {
+            return Some("chỉ cho struct/enum khai trong cùng tệp".to_string());
+        };
+        let Some(adt) = self.db.adts.get(d) else {
+            // db không nhất quán: KHÔNG được coi là hợp lệ (fail-closed)
+            return Some("lỗi nội bộ: ADT không có trong cơ sở kiểu".to_string());
+        };
+        let def = &self.defs()[d.index()];
+        if adt.lang.is_some() || def.file != imp.node.file() {
+            return Some(format!(
+                "chỉ cho struct/enum khai trong CÙNG tệp với impl; `{}` thì không (ADR-C18)",
+                def.path
+            ));
+        }
+        if !adt.generics.is_empty() || !imp.generics.is_empty() || !args.is_empty() {
+            return Some("kiểu có tham số KIỂU chưa được có Drop ở Giai đoạn 1 (tham số vùng `'a` thì được) — ADR-C18".to_string());
+        }
+        if self.db.is_copy_resolved(&imp.self_ty, &[]) {
+            return Some("kiểu `Copy` không được có Drop (chép bit rồi drop hai lần)".to_string());
+        }
+        for m in &imp.members {
+            if !m.effects.is_empty() {
+                return Some(format!(
+                    "`drop` phải là `! ∅` (được gọi ngầm ở mọi hàm, kể cả hàm `! ∅`); khai báo `{{{}}}`",
+                    m.effects.join(", ")
+                ));
+            }
+            if m.has_contracts {
+                return Some("`drop` không được có hợp đồng `⊳`/`⊲` (được gọi ngầm: không có điểm gọi để kiểm)".to_string());
+            }
+        }
+        None
     }
 
     /// Chữ ký REGION của impl không được hứa ít hơn trait (ADR-023 §4): với mỗi vị trí kết quả, tập đầu vào mà region của nó
@@ -225,6 +268,7 @@ impl Env<'_> {
                 Lang::Secret
                     | Lang::Cap
                     | Lang::Vec
+                    | Lang::Owned
                     | Lang::Text
                     | Lang::Arena
                     | Lang::Mutex

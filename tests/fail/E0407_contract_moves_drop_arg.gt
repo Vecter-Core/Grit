@@ -1,0 +1,7 @@
+// expect: fail E0407
+// note: hợp đồng chỉ nhìn BẢN SAO của đối số; move bản sao có Drop vào hàm khác sẽ drop nó hai lần ⇒ từ chối (ADR-C18)
+▢ D { v: u32 }
+⊐ Drop for D { ƒ drop(&!self) ! ∅ { } }
+ƒ ok(d: D) → bool ! ∅ { true }
+ƒ f(d: D) ! ∅ ⊳ ok(d) { }
+ƒ main() ! ∅ { f(D { v: 1u32 }); }

@@ -1,0 +1,7 @@
+// expect: fail E0404
+// note: tham chiếu lấy từ `get` của Owned cục bộ không được thoát khỏi hàm (khối bị trả khi Owned hết phạm vi) — ADR-C18 bước 2
+ƒ leak(al: &Cap<Alloc>) → &u64 ! {mem} {
+  o ≔ Owned::new(al, 5u64);
+  o.get()
+}
+ƒ main() ! {mem} { al ≔ root_alloc(); r ≔ leak(&al); }

@@ -1,0 +1,6 @@
+// expect: fail E0318
+// note: Vec trên Arena không chạy destructor ⇒ phần tử `Owned` (cần drop: trả khối heap) bị từ chối (ADR-C18 bước 3 mới mở)
+ƒ main() ! {mem} {
+  ar ≔ Arena::new();
+  μv: Vec<Owned<u64>> ≔ Vec::new(&ar);
+}

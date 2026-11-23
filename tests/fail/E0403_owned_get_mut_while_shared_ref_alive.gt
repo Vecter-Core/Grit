@@ -1,0 +1,10 @@
+// expect: fail E0403
+// note: `get` trả `&T` mượn từ `&self`; `get_mut` cần `&!self` trong khi `&T` còn được dùng ⇒ xung đột (ADR-C18 bước 2)
+ƒ main() → u64 ! {mem} {
+  al ≔ root_alloc();
+  μo ≔ Owned::new(&al, 5u64);
+  r ≔ o.get();
+  w ≔ o.get_mut();
+  *w ← 6u64;
+  *r
+}

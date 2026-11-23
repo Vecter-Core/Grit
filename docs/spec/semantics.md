@@ -62,6 +62,19 @@ Chỗ nào plan chưa nói và agent phải chọn → đánh dấu **[ĐỀ XU�
 - `Arena` là một region có tên `'r`; tham chiếu `&'r T` không được thoát khỏi phạm vi của arena → E0405.
 - Elision lifetime (đã cài ở M4.5, E0315): chỉ khi chữ ký có đúng một vị trí tham chiếu vào; không có thì `'static`; còn lại phải ghi `'r`. Mô hình region đầy đủ và hợp đồng cho M6: `docs/spec/regions.md`.
 
+## 5a. Drop người dùng (ADR-C18 bước 1, 2026-11-22)
+- `⊐ Drop for T { ƒ drop(&!self) ! ∅ { … } }` viết được ở mã người dùng khi: `T` là struct/enum khai trong CÙNG tệp, KHÔNG có tham số
+  KIỂU (tham số vùng `'a` được), không `Copy`; `drop` là `! ∅` và không có hợp đồng. Sai ⇒ E0313.
+- **Khi nào drop chạy:** khi một chỗ còn khởi tạo hết đời — cuối khối (biến theo thứ tự NGƯỢC khai báo), cuối câu lệnh (biến tạm), khi
+  gán đè (`x ← v`: giá trị cũ, sau khi tính `v`), khi hàm trả về (tham số còn giữ). Giá trị đã move KHÔNG drop; move có điều kiện ⇒ cờ
+  drop lúc chạy; move một phần ⇒ chỉ drop phần còn lại. Abort (D3) không chạy drop. Giá trị trả về do người gọi drop.
+- **Glue:** `drop` của chính kiểu chạy TRƯỚC, rồi từng trường theo thứ tự khai báo (enum: trường của biến thể đang có; mảng: phần tử theo
+  chỉ số tăng; tuple: theo vị trí). Kiểu lang đục (`Vec`, `Text`, `Arena`, `Mutex`, `Atomic`, `Cell`, `Secret`, `Cap`) không chứa được giá
+  trị có Drop người dùng: `Vec` ⇒ E0318 (M4), còn lại ⇒ E0318 tại chỗ drop.
+- **Sở hữu:** drop của giá trị có thể có glue là một lần DÙNG mọi khoản mượn nó giữ (như dropck của Rust) ⇒ E0403/E0402 nếu dữ liệu bị
+  mượn bị dùng trước đó; move trường ra khỏi kiểu có `drop` ⇒ E0407; hợp đồng move đối số có thể có glue ⇒ E0407.
+- **Dừng:** lời gọi `drop` ngầm là cạnh của đồ thị gọi M8 ⇒ đệ quy qua drop không có `↓` ⇒ E0703.
+
 ## 6. Capability (D28/D29, M4.5)
 - `Cap<Fs|Net|Env|Clock|Secret|Alloc>` là kiểu affine: không `Copy`, không `Default`, không có literal.
 - Hàm dùng thao tác cần capability mà `Cap<…>` không có trong chữ ký → E0310 (lỗi kiểu).

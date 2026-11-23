@@ -22,6 +22,7 @@ gt-fmt = { path = "../gt-fmt" }
 gt-resolve = { path = "../gt-resolve" }
 gt-types = { path = "../gt-types" }
 gt-mir = { path = "../gt-mir" }
+gt-dataflow = { path = "../gt-dataflow" }
 gt-borrowck = { path = "../gt-borrowck" }
 gt-oblig = { path = "../gt-oblig" }
 gt-term = { path = "../gt-term" }

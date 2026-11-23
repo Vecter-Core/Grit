@@ -1,0 +1,4 @@
+// expect: fail E0313
+// note: `Owned` không bao giờ Copy (chép con trỏ ⇒ trả khối hai lần) — ADR-C18 bước 2
+⊐ Copy for Owned<u64> { }
+ƒ main() ! ∅ { }

@@ -96,6 +96,10 @@ ABORTS = {
     "Cell::new": "không",
     "Cell::get": "không",
     "Cell::set": "không",
+    "Owned::new": "hết bộ nhớ ⇒ abort `heap_exhausted` (ADR-C18 bước 2; cần `&Cap<Alloc>`, hiệu ứng `mem`)",
+    "Owned::get": "không",
+    "Owned::get_mut": "không",
+    "Owned::into_inner": "không (trả khối heap; Owned bị move)",
 }
 
 STD_ABORT_DEFAULT = (

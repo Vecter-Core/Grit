@@ -87,10 +87,38 @@ Kiểu `f64` (LLVM `double`); `f32` bị E0319. **Số học IEEE-754 thuần** 
 | `f64::is_nan(self) → bool` | `∅` | không | `fcmp uno x, x` | không | thay cho `x != x` | ỦY QUYỀN: KIẾN TRÚC SƯ DUYỆT HỢP ĐỒNG (2026-10-15) |
 NaN: dấu/payload của NaN KHÔNG được đặc tả; mọi so sánh bit phải chuẩn hoá NaN trước (test dùng 0x7FF8000000000000).
 
+## B5. `Owned<T>` — sở hữu một khối heap, trả khi drop (ADR-C18 bước 2, 2026-11-23) — lớp nghĩa vụ IR Guard: **E0401** (sở hữu/move)
+Hợp đồng VIẾT TRƯỚC mã (AGENTS: intrinsic mới cần hợp đồng TCB trước). Kiểu `#lang(owned) ▢ Owned<T> { ptr: *μ T }` (trường private, literal
+ngoài lib/core bị E0313, `⊐ Copy for Owned` bị E0313). Bố cục LLVM `{ ptr }`. **Bất biến:** một giá trị `Owned<T>` còn khởi tạo trỏ tới đúng MỘT khối
+heap còn sống, cấp bằng `gritrt_heap_alloc(size_of T, align_of T)`, chứa một `T` đã khởi tạo; không hai giá trị `Owned` sống nào cùng trỏ một khối
+(Owned không Copy; move chép con trỏ và làm nguồn chưa khởi tạo — M6 E0401 + cờ drop của ADR-C18 bước 1 bảo đảm khối được trả ĐÚNG một lần).
+**Giới hạn cố ý:** M4 coi `Owned<T>` là chứa `T` THEO GIÁ TRỊ khi kiểm kích thước vô hạn ⇒ kiểu đệ quy qua `Owned` bị E0301; nhờ đó drop glue
+luôn hữu hạn và được trải phẳng tại chỗ (không sinh hàm glue ngoài dòng mà IR Guard sẽ từ chối). Cấu trúc liên kết: dùng `std::Slab`.
+| intrinsic (prelude) | hiệu ứng | capability cần | hạ thành | điều kiện abort | bất biến | người duyệt |
+|---|---|---|---|---|---|---|
+| `Owned::new(a: &Cap<Alloc>, v: T) → Owned<T>` | `mem` | `&Cap<Alloc>` (D26: cấp phát truy được tới capability) | `gritrt_heap_alloc(size_of T, align_of T)` (kích thước 0 ⇒ runtime cấp ≥ 1 byte để con trỏ duy nhất) + `store v` | hết bộ nhớ/`Layout` không hợp lệ ⇒ abort `heap_exhausted` (20) | khối mới, căn đúng `align_of T`, chứa `v` | BẰNG CHỨNG ĐỦ + cổng clone sạch XANH liền mạch trên `3b17f1f` (2026-11-23) — CHỜ DUYỆT (Giang hoặc kiến trúc sư; tác giả không tự duyệt) |
+| `Owned::get(&self) → &T` / `get_mut(&!self) → &!T` | `∅` | không | trả `ptr` | không | tham chiếu sống không quá khoản mượn `self` (M6): không drop/move/`into_inner` được trong lúc đó | BẰNG CHỨNG ĐỦ + cổng clone sạch XANH liền mạch trên `3b17f1f` (2026-11-23) — CHỜ DUYỆT (Giang hoặc kiến trúc sư; tác giả không tự duyệt) |
+| `Owned::into_inner(self) → T` | `∅` | không | `load` `T` từ `ptr` rồi `gritrt_heap_free(ptr, size, align)` | khối không sống (chỉ do lỗi TCB) ⇒ abort `heap_invalid_free` (21) ở dev | `self` bị move (M6) ⇒ khối không còn ai trỏ | BẰNG CHỨNG ĐỦ + cổng clone sạch XANH liền mạch trên `3b17f1f` (2026-11-23) — CHỜ DUYỆT (Giang hoặc kiến trúc sư; tác giả không tự duyệt) |
+| drop glue của `Owned<T>` (ngầm, ADR-C18) | `∅` | không | glue của `T` tại `ptr` RỒI `gritrt_heap_free(ptr, size, align)` | như trên | chạy ĐÚNG một lần cho mỗi giá trị còn khởi tạo (cờ drop); không chạy sau `into_inner` (đã move) | BẰNG CHỨNG ĐỦ + cổng clone sạch XANH liền mạch trên `3b17f1f` (2026-11-23) — CHỜ DUYỆT (Giang hoặc kiến trúc sư; tác giả không tự duyệt) |
+Hàm runtime mới: `gritrt_heap_alloc(size: u64, align: u64) → ptr`, `gritrt_heap_free(ptr, size: u64, align: u64)` (bảng `RUNTIME` của IR Guard,
+lớp E0401). **Kiểm động ở dev** (như Arena H2): `gritrt_dev_checks` bật sổ khối sống; `free` một khối không có trong sổ, hoặc với `size/align`
+khác lúc cấp ⇒ abort `heap_invalid_free` (21) — bắt double-free/free-lạ do lỗi TCB; release không kiểm (`GRITRT_HEAP_CHECK=1` ép bật).
+Bằng chứng cần trước khi duyệt: E2E thông dịch ≡ exe (dev và release-o2) trên chương trình sinh ngẫu nhiên; đếm khối sống = 0 khi kết thúc
+(dev); lỗi chèn `GRITC_FAULT=rt:heap-double-free` bị kiểm động bắt; mẫu tấn công M6 (dùng sau `into_inner`, giữ `get` qua move, hai `get_mut`);
+đột biến hàm kiểm của runtime.
+**Bằng chứng (2026-11-23):** `user_drop.rs::owned_frees_every_block_exactly_once_and_drops_its_content_on_both_backends` (8 ca: phạm vi,
+`into_inner`, move có điều kiện ×2, struct chứa Owned, Owned lồng, ghi qua `get_mut`, Option + Owned số) — giá trị đúng VÀ 0 khối sống lúc kết thúc ở
+thông dịch và exe dev; oracle ngẫu nhiên 60 chương trình (biến `Owned<D>`: khai báo, move, move có điều kiện, `into_inner`, gán đè) × 2 backend,
+0 khối sống; `heap_dev_check_catches_an_injected_double_free` (chèn `GRITRT_FAULT=heap_double_free` ⇒ abort `heap_invalid_free` mã 70, kể cả khi
+`GRITRT_HEAP_CHECK=0`); đột biến tay bỏ `free` trong glue (LLVM, thông dịch) ⇒ test báo "còn 1 khối"; mẫu M6 E0401/E0403/E0404 và M4
+E0313×2/E0301/E0318×3/E0801; chương trình Owned lồng/`into_inner`/gán đè: thông dịch ≡ exe dev ≡ release ≡ release-o2 (cùng giá trị, 0 khối sống);
+đột biến TAY hàm kiểm heap của runtime 3/3 bị bắt (tắt kiểm, bỏ đối chiếu sổ, bỏ đường chèn lỗi); cổng clone sạch `3b17f1f` XANH (957/0, 202 bộ).
+**CHƯA:** đột biến tự động hàm runtime, Windows.
+
 ## C. Runtime `gt-rt` (staticlib, `panic = "abort"`): hàm xuất ra cho mã sinh
-Đây là các hàm runtime (`gt-rt`) mà mã Grit có thể gọi. Bảng đóng hiện hành gồm 27 hàm; xem danh sách đầy đủ ngay dưới đây để tránh nhầm danh sách tóm tắt lịch sử với ABI hiện tại. IR Guard từ chối hàm runtime ngoài bảng.
+Đây là các hàm runtime (`gt-rt`) mà mã Grit có thể gọi. Bảng đóng hiện hành gồm 29 hàm; xem danh sách đầy đủ ngay dưới đây để tránh nhầm danh sách tóm tắt lịch sử với ABI hiện tại. IR Guard từ chối hàm runtime ngoài bảng.
 Ranh giới `unsafe` của gt-rt: ADR-031.
-Danh sách ĐẦY ĐỦ (27, khớp từng tên với `gt_guard::RUNTIME`; lớp nghĩa vụ IR Guard trong ngoặc, `—` = không cần lớp): `gritrt_abort` (—), `gritrt_exit` (—), `gritrt_start` (—), `gritrt_dev_checks` (—), `gritrt_report_int` (—), `gritrt_alloc` (—), `gritrt_spawn` (E0501), `gritrt_mutex_lock` (E0502), `gritrt_mutex_unlock` (E0502), `gritrt_arg_count` (E0310), `gritrt_ewrite_u64` (E0310), `gritrt_ewrite_str` (E0310), `gritrt_arg_ptr` (E0310), `gritrt_arg_len` (E0310), `gritrt_fs_read` (E0310), `gritrt_fs_open` (E0310), `gritrt_stdin_read` (E0310), `gritrt_fs_write` (E0310), `gritrt_utf8_valid` (—), `gritrt_bytes_eq` (—), `gritrt_arena_new` (E0405), `gritrt_arena_alloc` (E0405), `gritrt_arena_reset` (E0405), `gritrt_file_len` (E0310), `gritrt_file_ptr` (E0310), `gritrt_write_u64` (E0310), `gritrt_write_str` (E0310).
+Danh sách ĐẦY ĐỦ (29, khớp từng tên với `gt_guard::RUNTIME`; lớp nghĩa vụ IR Guard trong ngoặc, `—` = không cần lớp): `gritrt_abort` (—), `gritrt_exit` (—), `gritrt_start` (—), `gritrt_dev_checks` (—), `gritrt_report_int` (—), `gritrt_alloc` (—), `gritrt_spawn` (E0501), `gritrt_mutex_lock` (E0502), `gritrt_mutex_unlock` (E0502), `gritrt_arg_count` (E0310), `gritrt_ewrite_u64` (E0310), `gritrt_ewrite_str` (E0310), `gritrt_arg_ptr` (E0310), `gritrt_arg_len` (E0310), `gritrt_fs_read` (E0310), `gritrt_fs_open` (E0310), `gritrt_stdin_read` (E0310), `gritrt_fs_write` (E0310), `gritrt_utf8_valid` (—), `gritrt_bytes_eq` (—), `gritrt_arena_new` (E0405), `gritrt_arena_alloc` (E0405), `gritrt_arena_reset` (E0405), `gritrt_file_len` (E0310), `gritrt_file_ptr` (E0310), `gritrt_write_u64` (E0310), `gritrt_write_str` (E0310), `gritrt_heap_alloc` (E0401), `gritrt_heap_free` (E0401).
 
 ## Cập nhật kiểm động đua dữ liệu (GÓI 4 S3, 2026-11-19) — H7 `Atomic`, H8 `Mutex`/`spawn`
 ThreadSanitizer (Linux, build phân tích, KHÔNG phải binary đã qua Guard cuối): đối chứng dương BẮT (IR có đua đã biết, cả qua `gritrt_spawn`), đối chứng âm không báo; 8 mẫu đa luồng × 50 lần: **không phát hiện đua dữ liệu** (`docs/TSAN_RESULTS.md`). Điều này CHỈ là bằng chứng thực nghiệm bổ sung; rủi ro H7/H8 vẫn do kiến trúc sư chấp nhận có ý thức (không nâng trạng thái dòng nào): bộ nhớ yếu và Windows (SRWLOCK) chưa kiểm.

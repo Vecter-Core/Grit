@@ -218,6 +218,18 @@ impl Ty {
         }
     }
 
+    /// Có nhắc tới ADT `d` (ở bất kỳ độ sâu nào của cú pháp kiểu)?
+    #[must_use]
+    pub fn mentions_adt(&self, d: gt_resolve::DefId) -> bool {
+        match self {
+            Ty::Adt(x, v) => *x == d || v.iter().any(|t| t.mentions_adt(d)),
+            Ty::Tuple(v) => v.iter().any(|t| t.mentions_adt(d)),
+            Ty::Array(t, _) | Ty::Slice(t) | Ty::Ref(_, t) | Ty::RawPtr(_, t) => t.mentions_adt(d),
+            Ty::Fn(p, r, _) => p.iter().any(|t| t.mentions_adt(d)) || r.mentions_adt(d),
+            _ => false,
+        }
+    }
+
     /// Độ lồng của kiểu (dùng cho ngưỡng đệ quy đa hình, ADR-018 §1).
     #[must_use]
     pub fn depth(&self) -> u32 {

@@ -30,11 +30,14 @@ fn borrowck_codes(name: &str, src: &str) -> Vec<String> {
         "{name}: M4 báo {:?}",
         show(&t)
     );
-    let m = gt_mir::lower_program(&t);
+    let mut m = gt_mir::lower_program(&t);
     assert!(m.report.diagnostics.is_empty(), "{name}: M5 báo lỗi");
+    // như pipeline: elaboration drop (ADR-C18) chạy giữa M5 và M6; lỗi của nó (E0407 ở hợp đồng) cũng là lỗi sở hữu
+    let e = gt_dataflow::elaborate_program(&t, &mut m);
     let r = gt_borrowck::check_program(&t, &m);
-    r.diagnostics
+    e.diagnostics
         .iter()
+        .chain(r.diagnostics.iter())
         .map(|d| d.code.as_str().to_string())
         .collect()
 }

@@ -18,7 +18,7 @@ use std::io::Write;
 pub const ABORT_EXIT_CODE: i32 = 70;
 
 /// Loại abort; số thứ tự là hợp đồng với codegen; TÊN trùng `AssertKind::name` của MIR (đối chiếu với thông dịch).
-pub const ABORT_KINDS: [&str; 20] = [
+pub const ABORT_KINDS: [&str; 22] = [
     "unknown",
     "overflow",
     "index_out_of_bounds",
@@ -39,6 +39,8 @@ pub const ABORT_KINDS: [&str; 20] = [
     "arena_exhausted",
     "arena_overlap",
     "spawn_failed",
+    "heap_exhausted",
+    "heap_invalid_free",
 ];
 
 #[unsafe(no_mangle)]
@@ -107,7 +109,14 @@ pub extern "C" fn gritrt_start(main: extern "C" fn()) -> i32 {
     match spawn_main_thread(main) {
         // `panic = "abort"` nên `join` chỉ Err khi luồng chết bất thường; không để lỗi đó thành "thành công"
         Ok(h) => match h.join() {
-            Ok(()) => 0,
+            Ok(()) => {
+                if std::env::var("GRITRT_HEAP_REPORT").is_ok_and(|v| v == "1") {
+                    let mut err = std::io::stderr().lock();
+                    let _ = writeln!(err, "gritrt_heap_live={}", heap_live_count());
+                    let _ = err.flush();
+                }
+                0
+            }
             Err(_) => gritrt_abort(ABORT_KINDS.len().try_into().unwrap_or(i32::MAX)),
         },
         // Không được âm thầm chạy trên stack nhỏ của luồng hiện tại.
@@ -716,6 +725,92 @@ pub extern "C" fn gritrt_alloc(size: u64) -> *mut u8 {
         gritrt_abort(0);
     }
     p
+}
+
+// ---------------------------------------------------------------- heap của `Owned<T>` (ADR-C18 bước 2, hợp đồng TCB B5)
+
+/// Loại abort `heap_exhausted`: hết bộ nhớ hoặc `size/align` không tạo được `Layout`.
+const HEAP_EXHAUSTED: i32 = 20;
+/// Loại abort `heap_invalid_free`: trả một khối không sống (double-free, con trỏ lạ) hoặc với `size/align` khác lúc cấp — chỉ do lỗi TCB.
+const HEAP_INVALID_FREE: i32 = 21;
+
+/// Kiểm động heap: bật cùng kiểm Arena (hồ sơ `dev`, `gritrt_dev_checks`) hoặc `GRITRT_HEAP_CHECK=1`. Biến môi trường CHỈ THÊM kiểm tra (R4).
+fn heap_check_on() -> bool {
+    static E: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    arena_check_on()
+        || *E.get_or_init(|| std::env::var("GRITRT_HEAP_CHECK").is_ok_and(|v| v == "1"))
+}
+
+/// Sổ khối sống (địa chỉ → (size, align)) khi kiểm động bật.
+static HEAP_LIVE: std::sync::Mutex<Option<std::collections::HashMap<usize, (u64, u64)>>> =
+    std::sync::Mutex::new(None);
+
+fn heap_live_with<R>(f: impl FnOnce(&mut std::collections::HashMap<usize, (u64, u64)>) -> R) -> R {
+    let mut g = HEAP_LIVE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    f(g.get_or_insert_with(std::collections::HashMap::new))
+}
+
+/// Số khối heap còn sống (chỉ có nghĩa khi kiểm động bật); `gritrt_start` in ra stderr khi `GRITRT_HEAP_REPORT=1` để test phát hiện rò rỉ.
+fn heap_live_count() -> usize {
+    heap_live_with(|m| m.len())
+}
+
+/// Chèn lỗi `GRITRT_FAULT=heap_double_free` (CHỈ khi kiểm động bật): `free` kiểm sổ HAI lần cho cùng khối ⇒ lần hai phải abort `heap_invalid_free`.
+fn heap_fault_double_free() -> bool {
+    static F: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *F.get_or_init(|| std::env::var("GRITRT_FAULT").is_ok_and(|v| v == "heap_double_free"))
+}
+
+fn heap_layout(size: u64, align: u64) -> Option<std::alloc::Layout> {
+    // kích thước 0 ⇒ cấp 1 byte: mỗi `Owned` có con trỏ riêng, `dealloc` luôn với kích thước khác 0
+    let size = usize::try_from(size.max(1)).ok()?;
+    let align = usize::try_from(align.max(1)).ok()?;
+    std::alloc::Layout::from_size_align(size, align).ok()
+}
+
+/// `Owned::new`: cấp một khối `size` byte căn `align` (hợp đồng B5). Hết bộ nhớ/`Layout` sai ⇒ abort `heap_exhausted`.
+#[unsafe(no_mangle)]
+pub extern "C" fn gritrt_heap_alloc(size: u64, align: u64) -> *mut u8 {
+    let Some(layout) = heap_layout(size, align) else {
+        gritrt_abort(HEAP_EXHAUSTED)
+    };
+    // SAFETY: `layout` có kích thước khác 0 (heap_layout nâng 0 lên 1) và căn lề hợp lệ (Layout::from_size_align đã kiểm).
+    let p = unsafe { std::alloc::alloc(layout) };
+    if p.is_null() {
+        gritrt_abort(HEAP_EXHAUSTED);
+    }
+    if heap_check_on() && heap_live_with(|m| m.insert(p as usize, (size, align))).is_some() {
+        // allocator trả lại một khối đang sống: không bao giờ xảy ra với allocator đúng
+        gritrt_abort(HEAP_INVALID_FREE);
+    }
+    p
+}
+
+/// `Owned::into_inner` / drop glue của `Owned`: trả khối.
+///
+/// # Safety
+/// `p` do `gritrt_heap_alloc(size, align)` trả về, CHƯA được trả (hợp đồng B5: Owned không Copy + cờ drop ⇒ đúng một lần). Ở dev, vi phạm
+/// bị sổ khối sống bắt (abort `heap_invalid_free`) thay vì thành hành vi không xác định.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gritrt_heap_free(p: *mut u8, size: u64, align: u64) {
+    let Some(layout) = heap_layout(size, align) else {
+        gritrt_abort(HEAP_INVALID_FREE)
+    };
+    if p.is_null() {
+        gritrt_abort(HEAP_INVALID_FREE);
+    }
+    if heap_check_on() {
+        let rounds = if heap_fault_double_free() { 2 } else { 1 };
+        for _ in 0..rounds {
+            if heap_live_with(|m| m.remove(&(p as usize))) != Some((size, align)) {
+                gritrt_abort(HEAP_INVALID_FREE);
+            }
+        }
+    }
+    // SAFETY: theo điều kiện của hàm, `p` được cấp với đúng `layout` và chưa trả.
+    unsafe { std::alloc::dealloc(p, layout) }
 }
 
 /// # Safety

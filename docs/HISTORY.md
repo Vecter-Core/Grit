@@ -92,3 +92,51 @@ Lệnh Giang: kế hoạch tối ưu từng M, gộp chỗ thừa, viết chỗ 
 - **Kiểm cuối**: 264 test của các crate đổi đạt; clippy -D warnings rc=0; fmt; check_expectations; nul; failopen 0 mới; platform_tests;
   mọi unittest công cụ của cổng đạt. **CHƯA**: cổng đầy đủ trong clone sạch, test nhị phân LLVM (máy không có LLVM 20).
 
+
+### GÓI 12 phần 3 (2026-11-22, Claude Opus 5.5) — thẩm định đánh giá quản lý bộ nhớ của Gemini
+Lệnh Giang: "đánh giá của Gemini có thật không? chỗ dùng được thì làm, chỗ sai thì đề xuất".
+- **Đúng (đã là thiết kế Grit):** không GC (GRIT_PLAN); allocator tường minh kiểu Zig (D26, `Vec::new(&ar)`); Arena giải phóng theo lô và borrowck
+  cấm dùng sau Arena; Perceus chỉ để tham khảo.
+- **Sai/lệch:** `Cap<Mem>` không tồn tại (thật là `Cap<Alloc>` + hiệu ứng `mem`); `Drop` một mình không trả bộ nhớ nào trong Arena (cần
+  `GlobalAlloc`); `std::HashMap` đã có `remove` tái dùng dung lượng; thời gian thực là Phase 2 (8.I); ví dụ web server chưa áp dụng được (Grit chưa có mạng).
+- **Đã làm:** `std::Slab` (ADR-C17) + oracle `std_slab.rs` (40×120 thao tác, so mô hình Rust, `capacity == đỉnh sống`); 2 đột biến tay bị giết;
+  `STD_REFERENCE.md` sinh lại; băm `std` trong 8 `rig.lock`.
+- **Đề xuất (chưa làm):** `GlobalAlloc` + hạ `Drop` (ADR-C18) — lỗ hổng Phase 1 thật so với GRIT_PLAN §4.0(a).
+- **CHƯA KIỂM (lúc đó):** exe LLVM, cổng đầy đủ trong clone sạch. *(Phần 4: exe LLVM của `Slab` ĐÃ KIỂM — `std_slab.rs` dựng 10 exe.)*
+
+### GÓI 12 phần 4 (2026-11-22/23, Claude Opus 5.5) — ADR-C18 bước 1: `Drop` người dùng chạy thật
+Lệnh Giang: "duyệt, làm đi" (duyệt ADR-C18).
+- **Môi trường:** container đám mây CÀI ĐƯỢC LLVM 20 (`apt libllvm20` 20.1.2) bằng `bash tools/setup_cloud.sh --install-system`; `gritc doctor`
+  XANH ⇒ từ phần này mọi khẳng định về exe LLVM là ĐÃ CHẠY, không còn "CHƯA KIỂM vì không có LLVM".
+- **Đo trước:** `⊐ Drop for` ở mã người dùng ⇒ E0313; `user_drop.rs` ĐỎ 4/4. Sau khi bỏ lệnh cấm (trước khi sửa M8): đệ quy qua `drop` được
+  CHẤP NHẬN (XANH) — chương trình không dừng lọt qua M8 ⇒ thêm cạnh gọi ngầm (mẫu `E0703_recursion_through_drop*`).
+- **Đã làm:** luật M4 (E0313), `TypeDb::drop_glue`, elaboration drop (`gt-dataflow/src/elaborate.rs`, chạy giữa M5 và M6), M6 đọc thẻ nông,
+  M8 cạnh tới `drop`, glue ở thông dịch và LLVM (ADR-C18 mục "BƯỚC 1"). Đặc tả: `docs/spec/semantics.md` §5a.
+- **Bằng chứng:** `user_drop.rs` 6 test (5 viết tay + oracle 60 chương trình ngẫu nhiên), MỖI ca chạy thông dịch VÀ exe LLVM, so mô hình phạm vi
+  độc lập; 15 mẫu corpus mới; snapshot E04xx chỉ THÊM 3 dòng; golden IR chỉ đổi băm attestation (MIR có trường mới). Đột biến TỰ ĐỘNG
+  `elaborate.rs` 107: lượt đầu 49 giết/46 sống ⇒ sửa BỘ SINH 3 lần ⇒ cuối 70 giết / 25 sống tương đương (có lập luận) / 12 không biên dịch
+  (`docs/MUT_DROP_ELAB_GOI12.md`). Phát hiện đáng ghi: điều kiện literal `⎇ true/false` bị bước hạ MIR cắt nhánh nên bộ sinh ban đầu gần như
+  KHÔNG thử cờ drop — chỉ đột biến mới lộ ra.
+- **Hồi quy bắt trước commit:** `deep_tuple_types` (tuple lồng 100 tầng toàn `u32`) bị E0318 giả do giới hạn độ sâu glue 64 ⇒ glue rỗng khi chương
+  trình không có `drop` người dùng + giới hạn 1024 (chương trình cũ không đổi hành vi).
+- **Chạy (có LLVM, theo lô ≤15 phút):** 55 + 47 + 22 + 2 + 43 + 9 bộ và rig — 0 lỗi sau khi sửa (4 lỗi giữa chừng: 3 golden IR = băm attestation,
+  1 hồi quy độ sâu ở trên); clippy `-D warnings` có/không LLVM rc=0; fmt; check_expectations; fail-open 0 nghi vấn (32 mục mới đã phân loại).
+- **Kiểm thêm phần 3:** `std::Slab` trên exe LLVM (`std_slab.rs` dựng 10 exe, khớp mô hình).
+- **CHƯA:** cổng đầy đủ `tools/gate_clean.sh` trong clone sạch; Windows; ADR-C18 bước 2 (`GlobalAlloc`/`Owned<T>`, cần hợp đồng TCB) và bước 3.
+
+
+### GÓI 12 phần 5 (2026-11-23, Claude Opus 5.5) — cổng clone sạch; ADR-C18 bước 2 `Owned<T>`
+Lệnh Giang: "tiếp đi".
+- **Cổng clone sạch trên `102d968` (`tools/gate_clean.sh`, 4 lô ≤ ~15 phút có điểm lưu):** gtrt, fmt, clippy, audit PASS; **test 955 đạt / 0 lỗi / 202
+  bộ** (mọi crate, có LLVM, rig 48); expect, nul, doc, deletions PASS; **failopen ĐỎ** ⇒ `GATE_RESULT=RED`: 5 mục fail-open MỚI của phần 4 đã được
+  phân loại trong `docs/fail_open_classification.tsv` nhưng `docs/fail_open_baseline.json` CHƯA được ghi lại (lỗi quy trình của tôi, không phải lỗi mã).
+  Sửa ở `3b17f1f` (ghi baseline 9 mục, đều đã phân loại) và chạy lại: **cổng clone sạch trên `3b17f1f` XANH liền mạch** — test 957/0, 202 bộ
+  (có LLVM 20.1.2 apt, Linux), gtrt/fmt/clippy/audit/expect/nul/doc/deletions/failopen/track đều đạt, `GATE_TREE=389b0f0a…`.
+- **ADR-C18 bước 2 — `Owned<T>` (`9159d32`):** hợp đồng TCB viết TRƯỚC (`docs/TCB_INTRINSICS.md` B5). Prelude `#lang(owned)`, M4 (E0313 literal/Copy,
+  E0301 đệ quy qua Owned, E0318 `Arena::alloc` của kiểu có Drop/Owned — lỗ ngữ nghĩa có từ bước 1: Arena âm thầm bỏ drop), glue `Free`, thông dịch,
+  LLVM, runtime `gritrt_heap_alloc/free` (bảng RUNTIME IR Guard lớp E0401) có sổ khối sống ở dev.
+- **Bằng chứng:** 8 ca × 2 backend (giá trị đúng + 0 khối sống); oracle ngẫu nhiên có biến `Owned<D>` × 2 backend, 0 khối sống; double-free chèn bị kiểm
+  dev bắt (mã 70, kể cả `GRITRT_HEAP_CHECK=0`); đột biến tay bỏ `free` (LLVM, thông dịch) bị bắt; 11 mẫu corpus; golden IR chỉ đổi băm attestation;
+  `unsafe` gt-rt 72 → 77 (đều có SAFETY); fail-open 16 mục mới phân loại.
+- **Thêm sau cổng:** thông dịch ≡ exe dev ≡ release ≡ release-o2 cho chương trình Owned lồng (0 khối sống); đột biến tay hàm kiểm heap runtime 3/3 bị bắt.
+- **CHƯA:** DUYỆT hợp đồng B5 (bằng chứng đủ, cổng xanh — tác giả không tự duyệt); đột biến tự động hàm runtime; `Owned: Send`; Windows.

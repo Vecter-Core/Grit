@@ -106,6 +106,7 @@ dependencies = [
  "gt-borrowck",
  "gt-codegen-llvm",
  "gt-conc",
+ "gt-dataflow",
  "gt-diag",
  "gt-effects",
  "gt-fmt",

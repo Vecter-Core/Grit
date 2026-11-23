@@ -1,0 +1,14 @@
+// expect: pass
+// note: giá trị có Drop đi qua hàm generic và `Option`; drop tự gọi hàm khác (không đệ quy) nên M8 vẫn chứng minh được dừng — ADR-C18
+▢ D { v: u32 }
+⊐ Drop for D { ƒ drop(&!self) ! ∅ { g(self.v); } }
+ƒ g(x: u32) ! ∅ { }
+ƒ keep<T>(x: T) ! ∅ { }
+ƒ id<T>(x: T) → T ! ∅ { x }
+ƒ f(d: D) ! ∅ { }
+ƒ main() ! ∅ {
+  keep(D { v: 1u32 });
+  e ≔ id(D { v: 2u32 });
+  o ≔ Some(D { v: 3u32 });
+  f(D { v: 4u32 });
+}

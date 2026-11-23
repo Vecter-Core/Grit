@@ -84,6 +84,17 @@
 ▢ Arena { x: i32 }
 // Vec<'a, T> (ADR-032 phụ lục A, TCB): mảng tăng trưởng nằm trong MỘT Arena. Giữ `&'a Arena` CHIA SẺ (ADR-038 hướng (ii), Seed 1.0 R6): nhiều Vec/Text dùng chung một Arena; `reset` (`&!`) bị M6 chặn khi còn Vec sống. Không Drop (arena giải phóng cả khối); T không được
 // cần drop (E0318). Phần tử đọc qua `as_slice` (kiểm biên có sẵn). Trường private + literal ngoài lib/core bị cấm (E0313).
+// Owned<T> (ADR-C18 bước 2, TCB B5): sở hữu MỘT khối heap cấp qua `Cap<Alloc>` (D26); drop = glue của T rồi trả khối (đúng một lần nhờ cờ drop).
+// Trường private + literal ngoài lib/core bị cấm (E0313); không Copy; đệ quy qua Owned bị E0301 (glue phải hữu hạn).
+#lang(owned)
+▢ Owned<T> { ptr: *μ T }
+⊐ <T> Owned<T> {
+  ƒ new(a: &Cap<Alloc>, v: T) → Owned<T> ! {mem} { }
+  ƒ get(&self) → &T ! ∅ { }
+  ƒ get_mut(&!self) → &!T ! ∅ { }
+  ƒ into_inner(self) → T ! ∅ { }
+}
+⊐ <T> Drop for Owned<T> { ƒ drop(&!self) ! ∅ { } }
 #lang(vec)
 ▢ Vec<'a, T> { arena: &'a Arena, ptr: *μ T, len: usize, cap: usize }
 ▢ File { x: i32 }

@@ -23,7 +23,7 @@ pub use check::{CallRec, CallSite, CallTarget};
 pub use collect::{
     AdtDef, AdtKind, FieldInfo, FnSigInfo, GParam, ImplDef, Lang, TraitDef, VariantInfo,
 };
-pub use db::{TypeDb, set_select_impl_fault_for_test, set_select_impl_first_for_test};
+pub use db::{Glue, TypeDb, set_select_impl_fault_for_test, set_select_impl_first_for_test};
 pub use mono::{Instance, MAX_INSTANCE_DEPTH, MAX_PROGRAM_INSTANCES, fnv1a64, instance_name};
 pub use region::{RegionRef, RegionSig};
 pub use traits::Bound;
@@ -394,6 +394,12 @@ fn run(resolve: &ResolveOutput, names: Vec<String>) -> Outputs {
         }
     }
     out_bodies.sort_by_key(|b| b.node);
+    // ADR-C18 bước 2: có biểu thức nào mang kiểu `Owned<_>` không (quyết định có cần drop glue)
+    env.db.owned_used = env
+        .db
+        .lang
+        .get(&Lang::Owned)
+        .is_some_and(|d| env.out_types.values().any(|t| t.mentions_adt(*d)));
     let mut bag = Diagnostics::new(LIMIT);
     for d in std::mem::take(&mut env.diags) {
         bag.push(d);

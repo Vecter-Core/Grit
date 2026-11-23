@@ -91,6 +91,7 @@ pub fn body(locals: Vec<Ty>, args: usize, blocks: Vec<(Vec<Statement>, Terminato
         uncheckable: Vec::new(),
         loops: Vec::new(),
         var_map: Vec::new(),
+        drops_elaborated: false,
         span: Span::new(0, 0),
     }
 }
