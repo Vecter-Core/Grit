@@ -71,6 +71,25 @@ pub fn ast_of(src: &str) -> String {
     mask_spans(&format!("{:?}", out.program))
 }
 
+/// như `ast_of` nhưng parse theo `edition` (ADR-P2-09: `e?` chỉ có từ edition 2)
+pub fn ast_of_edition(src: &str, edition: u32) -> String {
+    let out = gt_parser::parse_file_with_edition(gt_span::FileId::new(0), "t.gt", src, edition);
+    assert!(
+        out.report.diagnostics.is_empty(),
+        "{src}\n{:?}",
+        out.report.diagnostics
+    );
+    mask_spans(&format!("{:?}", out.program))
+}
+
+pub fn comment_texts_edition(src: &str, edition: u32) -> Vec<String> {
+    gt_lexer::lex_with_edition(src, edition)
+        .trivia
+        .iter()
+        .map(|t| t.text.clone())
+        .collect()
+}
+
 pub fn comment_texts(src: &str) -> Vec<String> {
     gt_lexer::lex(src)
         .trivia
