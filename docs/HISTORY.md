@@ -164,3 +164,12 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
 - **Phát hiện:** Farkas thêm 0 chứng minh mới trên corpus vì M7 chỉ xuất giả thiết khoảng + zone ⇒ bước 2: M7 giữ sự kiện tuyến tính tổng quát.
 - **Phụ:** danh sách test nền Windows thiếu 10 test có sẵn (bước diff CI sẽ đỏ) — đã bổ sung, kiểm bằng đúng lệnh CI (`PLATFORM_DIFF_OK`).
 - **CHƯA:** cổng liền mạch trên mã này; TCB của kernel CHỜ DUYỆT.
+
+### P2-A2 bước 2 (2026-11-23, Claude Opus 5.5) — M7 giữ sự kiện tuyến tính (ADR-P2-05)
+- **Đã làm:** `AState.facts` (điều kiện nhánh/assert/hợp đồng số học thuần; xoá cùng `defs`; giao ở điểm hợp/mở rộng) vào `hyps_for`; chứng minh hai bước
+  (không sự kiện trước); `CertifiedProver` thử chứng chỉ trước khi tin "sai mọi nơi" (E0901 sai trên mã không tới được); FM bỏ hàng thừa.
+- **Bằng chứng:** `linear_facts.rs` (ca tay + oracle 240 chương trình kiểm vét cạn `u8 × u8`): trước 15 `⊳` chứng minh tĩnh (7/72 ca từ đường đi) + 1
+  E0901 sai; sau 82/82, 0 sai. Tắt xoá-khi-gán / tắt giao ⇒ ĐỎ. Corpus: chứng minh mới 0 (corpus gần như không có điều kiện tổng/hệ số), không hồi quy.
+- **Hồi quy tự gây, bắt bởi `hashmap_collide`:** sự kiện thừa làm FM vượt giới hạn ⇒ E0702 sai trong `std`; sửa bằng hai bước + prune; mẫu hồi quy 265.
+- **Quy trình:** commit 03acc63 lọt lỗi clippy (lệnh `clippy | head` nuốt mã thoát) — sửa ở commit kế; từ nay đọc `PIPESTATUS`.
+- **CHƯA:** đột biến tự động phần M7 mới; cổng sạch; đo thời gian M7 trước/sau.

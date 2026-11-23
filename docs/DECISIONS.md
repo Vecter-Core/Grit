@@ -1482,3 +1482,8 @@ giải ngoài vào TCB); 8.A đầy đủ (bit-vector, mảng, LRAT) là các b�
 chừng, `⊳` lấy từ điều kiện đường đi / nhánh đã đóng / ngẫu nhiên), mỗi `⊳` M7 coi là chứng minh được kiểm VÉT CẠN `u8 × u8` bằng mô hình độc lập: 0 sai.
 Trên 160 seed đầu: trước 15 `⊳` chứng minh tĩnh (7/72 ca lấy từ đường đi) + 1 E0901 sai; sau 95 (72/72), 0 E0901 sai. Tắt từng cơ chế: bỏ xoá khi gán lại ⇒
 cả oracle và ca tay ĐỎ; bỏ giao ở điểm hợp ⇒ cả hai ĐỎ (oracle chỉ sau khi bộ sinh thêm ca "`⊳` từ nhánh đã đóng"); bỏ loại `&!` ⇒ vẫn xanh (phòng thủ chiều sâu, như trên).
+**Hồi quy bắt được và sửa (cùng ngày):** `hashmap_collide` ĐỎ — biến thể `↓` của `std` `ends_with` bị E0702 sai: hai sự kiện (độ dài hai slice, kiểm
+tràn của phép trừ) làm Fourier–Motzkin vượt `MAX_ROWS` dù chứng chỉ tồn tại (thêm giả thiết đúng có thể làm bộ TÌM thất bại). Sửa: (1) M7 chứng minh HAI
+BƯỚC — nghĩa vụ không sự kiện trước (đúng nghĩa vụ Phase 1 ⇒ không bao giờ kém trước), chưa được mới thử có sự kiện; nghĩa vụ ghi lại là nghĩa vụ đã dùng;
+(2) `search.rs` (ngoài TCB) bỏ hàng bị trội (cùng phần biến, giữ hằng chặt nhất) và hàng hằng đúng; tràn i128 ở một cặp chỉ bỏ cặp đó. Oracle kernel:
+863/3000 được chấp nhận (trước 855), 0 sai. Mẫu hồi quy `tests/pass/265_linear_facts_keep_variant_provable.gt`.
