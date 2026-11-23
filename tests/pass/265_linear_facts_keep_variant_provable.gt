@@ -1,0 +1,14 @@
+// expect: pass
+// note: A2 bước 2 (ADR-P2-05) hồi quy: sự kiện tuyến tính (độ dài hai slice, kiểm tràn của phép trừ) làm FM vượt giới hạn hàng ⇒ biến thể ↓ của vòng (từ std ends_with) bị E0702 sai
+ƒ ends_with(s: &[u8], p: &[u8]) → bool ! ∅ {
+    ⎇ p.len() > s.len() { false } ⇝ {
+      off_ ≔ s.len() - p.len();
+      μi ≔ 0usize;
+      μok ≔ true;
+      ⟳ i < p.len() ↓ p.len() - i {
+        ⎇ s[off_ + i] != p[i] { ok ← false; } ⇝ { }
+        i ← i + 1usize;
+      }
+      ok
+    }
+}

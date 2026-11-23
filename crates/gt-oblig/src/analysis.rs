@@ -1131,10 +1131,12 @@ impl<'a> Ctx<'a> {
 
     // ------------------------------------------------------------------ nghĩa vụ
 
+    /// Giả thiết cho mục tiêu: khoảng + zone của các biến liên quan; `with_facts` ⇒ thêm sự kiện tuyến tính liên quan (A2 bước 2) và biến của chúng.
     fn hyps_for(
         &self,
         st: &AState,
         goal: &Prop,
+        with_facts: bool,
     ) -> (Vec<VarDecl>, Vec<(VarId, String)>, Vec<Prop>) {
         let mut vars = Vec::new();
         let mut atoms = Vec::new();
@@ -1144,7 +1146,7 @@ impl<'a> Ctx<'a> {
         // A2 bước 2: sự kiện tuyến tính LIÊN QUAN (đóng bắc cầu theo biến chung với mục tiêu)
         let mut used = vec![false; st.facts.len()];
         let mut facts = Vec::new();
-        loop {
+        while with_facts {
             let mut grew = false;
             for (i, f) in st.facts.iter().enumerate() {
                 if used[i] {
@@ -2026,8 +2028,8 @@ impl Judge<'_> {
         is_assert: bool,
         tag: Option<(u32, u32)>,
     ) {
-        let (vars, atoms, hyps) = cx.hyps_for(st, &goal);
-        let ob = Obligation {
+        let (vars, atoms, hyps) = cx.hyps_for(st, &goal, false);
+        let mut ob = Obligation {
             id: format!("{}#{}", self.key, self.ordinal),
             kind,
             body: self.key.clone(),
@@ -2042,7 +2044,26 @@ impl Judge<'_> {
         };
         self.ordinal += 1;
         let mut b = Budget::new(self.budget_per_ob);
-        let status = match self.prover.prove(&ob, &mut b) {
+        let mut verdict = self.prover.prove(&ob, &mut b);
+        // A2 bước 2: trước hết nghĩa vụ như Phase 1 (không sự kiện — không bao giờ kém hơn trước); chưa chứng minh được ⇒ thử lại có sự kiện
+        // tuyến tính. Cả hai đường đều qua kernel; nghĩa vụ ghi lại là nghĩa vụ ĐÃ dùng cho phán quyết cuối.
+        if !matches!(verdict, Verdict::Proved(_)) {
+            let (fvars, fatoms, fhyps) = cx.hyps_for(st, &ob.goal, true);
+            if fhyps != ob.hyps {
+                let fob = Obligation {
+                    vars: fvars,
+                    atoms: fatoms,
+                    hyps: fhyps,
+                    ..ob.clone()
+                };
+                let mut fb = Budget::new(self.budget_per_ob);
+                if let v @ Verdict::Proved(_) = self.prover.prove(&fob, &mut fb) {
+                    verdict = v;
+                    ob = fob;
+                }
+            }
+        }
+        let status = match verdict {
             Verdict::Proved(c) => {
                 if is_assert {
                     self.discharged.insert(bb as u32);
