@@ -167,13 +167,13 @@ impl Lin {
     fn src(&self, names: [&str; 3]) -> String {
         let side = |pos: bool| -> String {
             let mut t: Vec<String> = Vec::new();
-            for i in 0..3 {
-                let c = if pos { self.c[i] } else { -self.c[i] };
+            for (ci, name) in self.c.iter().zip(names) {
+                let c = if pos { *ci } else { -ci };
                 if c > 0 {
                     t.push(if c == 1 {
-                        names[i].to_string()
+                        name.to_string()
                     } else {
-                        format!("{c} * {}", names[i])
+                        format!("{c} * {name}")
                     });
                 }
             }
@@ -253,7 +253,7 @@ impl Gen {
         let mut v = Vec::new();
         for _ in 0..1 + self.r.below(3) {
             match self.r.below(6) {
-                0 | 1 | 2 if depth < 3 => {
+                0..=2 if depth < 3 => {
                     let l = self.lin();
                     self.path.push((l.clone(), false));
                     let t = self.block(depth + 1);

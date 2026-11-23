@@ -1146,7 +1146,10 @@ impl<'a> Ctx<'a> {
         // A2 bước 2: sự kiện tuyến tính LIÊN QUAN (đóng bắc cầu theo biến chung với mục tiêu)
         let mut used = vec![false; st.facts.len()];
         let mut facts = Vec::new();
-        while with_facts {
+        loop {
+            if !with_facts {
+                break;
+            }
             let mut grew = false;
             for (i, f) in st.facts.iter().enumerate() {
                 if used[i] {
