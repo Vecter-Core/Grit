@@ -174,3 +174,11 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
 - **Quy trình:** commit 03acc63 lọt lỗi clippy (lệnh `clippy | head` nuốt mã thoát) — sửa ở commit kế; từ nay đọc `PIPESTATUS`.
 - **Cổng:** clone sạch trên 52cf4f5 (chạy lại từ đầu sau khi sửa sổ fail-open) XANH liền mạch 4 lượt: 970 test đạt, 0 lỗi, 208 bộ, `GATE_TREE=10940c1f…`. Lần chạy trước trên 5d5069d ĐỎ đúng một bước `failopen` (4 chỗ mới chưa phân loại — tôi quên ghi sổ lần thứ hai).
 - **CHƯA:** đột biến tự động phần M7 mới; đo thời gian M7 trước/sau; cổng trên Windows.
+
+### P2-B0 + P2-C1 (2026-11-23, Claude Sonnet 5.5) — khảo sát LLVM + `rig test --auto`
+- **B0:** bảng phụ thuộc LLVM + số đo thật ở `docs/PHASE2_FACTCHECK.md` mục 12 (dựng không-LLVM xanh 54 s; release 59 s, 6,8 MB; ranh giới L0 gọn trong `gt-llvm`/`gt-codegen-llvm`/`gt-guard`). Mục #2–7, #9 CHƯA ĐO.
+- **C1 (ADR-P2-06, NGOÀI TCB):** `rig test --auto` — ứng viên đối số hằng biên, `gritc` làm bộ lọc (E0901 ⇒ ngoài miền), chạy thông dịch, báo abort là phản ví dụ. 6 test E2E (`crates/rig/tests/auto.rs`, đỏ trước), 3 đột biến tay bị bắt.
+  Thử trên `lib/std`: `next_cap(usize::MAX[-1])` abort overflow (an toàn); "hết nhiên liệu" ban đầu bị báo như lỗi — sửa thành "chậm" vì mọi `⟳` có biến thể được chứng minh dừng.
+- **Sự cố nhỏ:** lần thử trong `lib/std` để lại `lib/std/rig.lock` (tệp lạ làm vô hiệu cổng) — đã xoá đúng tệp đó ngay; từ nay chạy thử công cụ trên BẢN SAO.
+- **Quyết định của Giang (2026-11-23):** KHÔNG gán nhãn seed (hay nhãn phiên bản khác) cho tới khi viết Grit hoàn chỉnh như viết Rust.
+- **CHƯA:** cổng đầy đủ trên mã C1; đo thời gian `--auto` trên dự án lớn; hỗ trợ f32/f64/char/slice.

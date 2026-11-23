@@ -50,7 +50,7 @@ Ký hiệu nguồn: "Opus §x" = `PHASE2_PLAN.md`; "GP 8.x" = `GRIT_PLAN.md`. M�
 ### C. Dùng được cho AI
 | Mục | Nguồn | ADR | TCB | Cổng | Rủi ro | Cú pháp? |
 |---|---|---|---|---|---|---|
-| **C1 — N1 sinh test từ hợp đồng** (`rig test --auto`; NGOÀI TCB) | Opus §6.1 | ADR ngắn | KHÔNG (chỉ tìm lỗi, không cấp phép) | test của công cụ; oracle hợp đồng; không đổi phán quyết `gritc` | công cụ sai ≠ false negative (không quyết định); phụ thuộc: hợp đồng `⊳⊲` | Không |
+| **C1 — N1 sinh test từ hợp đồng** (BƯỚC 1 ĐÃ LÀM 2026-11-23, ADR-P2-06: số nguyên/bool, đối số biên) (`rig test --auto`; NGOÀI TCB) | Opus §6.1 | ADR ngắn | KHÔNG (chỉ tìm lỗi, không cấp phép) | test của công cụ; oracle hợp đồng; không đổi phán quyết `gritc` | công cụ sai ≠ false negative (không quyết định); phụ thuộc: hợp đồng `⊳⊲` | Không |
 | **C2 — N7 `?`** | Opus §6.1; `SEED_LIMITATIONS.md:14` | ADR-P2-01 | không (hạ thành `⌥`+return sớm) nếu desugar trước M4; CHƯA KIỂM chỗ desugar | corpus + test từ chối; round-trip `fmt` | cú pháp mới ⇒ đợt edition | **CÓ** |
 | **C3 — N8 edition + `gritc fix`** | Opus §6.1; FACTCHECK #24 (khẳng định FREEZE chưa kiểm được) | ADR-P2-01 | không | `rig.toml edition`; golden `fix`; cổng | PHẢI trước mọi cú pháp mới | Không (khoá cấu hình; CHƯA xác minh FREEZE cho phép) |
 | **C4 — N9 nhãn đối số** | Opus §6.1; FACTCHECK #26 | ADR riêng, **CHỈ nếu Q1.h #6 cho thấy tần suất đáng kể** | không | corpus; đột biến E03xx | không có số liệu hiện tại; có thể KHÔNG làm | **CÓ** (nếu duyệt) |
