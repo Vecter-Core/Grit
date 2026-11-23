@@ -18,6 +18,8 @@ path = "src/main.rs"
 gt-driver = { path = "../gt-driver", default-features = false }
 gt-fmt = { path = "../gt-fmt" }
 gt-resolve = { path = "../gt-resolve" }
+gt-ast = { path = "../gt-ast" }
+gt-parser = { path = "../gt-parser" }
 gt-diag = { path = "../gt-diag" }
 gt-span = { path = "../gt-span" }
 
