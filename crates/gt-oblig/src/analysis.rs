@@ -41,6 +41,8 @@ pub const GHOST_BASE: u32 = 1 << 28;
 pub const GHOST_MAX_VARS: usize = 24;
 /// vị từ thuần một đối số trên một local (vd `is_some(&x)`): `PRED_BASE + chỉ_số_vị_từ·1024 + local`
 pub const PRED_BASE: u32 = 7 << 20;
+/// A2 bước 2: số sự kiện tuyến tính tối đa giữ ở một điểm chương trình (vượt ⇒ bỏ sự kiện MỚI; chỉ mất độ chính xác)
+pub const MAX_FACTS: usize = 16;
 
 pub const MAX_BLOCK_STEPS: u64 = 400_000;
 
@@ -258,6 +260,10 @@ struct AState {
     env: Env,
     /// điều kiện đường đi (chỉ ghi khi `Ctx.record_pc`, dùng để trích mệnh đề hợp đồng)
     pc: Vec<Prop>,
+    /// A2 bước 2 (ADR-P2-05): mệnh đề số học tuyến tính ĐÚNG tại điểm này mà khoảng/zone không giữ được (điều kiện nhánh, assert, hợp đồng).
+    /// Chỉ nhắc local nguyên không bị mượn `&!` (và độ dài slice của chúng); bị xoá cùng lúc với `defs` khi một local nó nhắc bị gán lại/hết sống;
+    /// điểm hợp/mở rộng = GIAO (đúng ở mọi đường tới).
+    facts: Vec<Prop>,
     /// `defs[l]` = biểu thức toán học bằng giá trị HIỆN TẠI của `l`; bị xoá ngay khi một local nó tham chiếu bị gán lại
     defs: BTreeMap<usize, Def>,
 }
@@ -271,9 +277,16 @@ impl AState {
             .filter(|(k, d)| o.defs.get(k) == Some(d))
             .map(|(k, d)| (*k, d.clone()))
             .collect();
+        let facts = self
+            .facts
+            .iter()
+            .filter(|f| o.facts.contains(f))
+            .cloned()
+            .collect();
         AState {
             env,
             pc: Vec::new(),
+            facts,
             defs,
         }
     }
@@ -611,6 +624,55 @@ impl<'a> Ctx<'a> {
         for k in dead {
             st.defs.remove(&k);
         }
+        st.facts.retain(|f| !self.fact_locals(f).contains(&l));
+    }
+
+    /// local mà một sự kiện nhắc tới (`None` ⇒ sự kiện nhắc thứ không phải local nguyên được theo dõi ⇒ không giữ)
+    fn fact_locals_opt(&self, p: &Prop) -> Option<Vec<usize>> {
+        let mut vs = Vec::new();
+        let mut at = Vec::new();
+        p.vars(&mut vs, &mut at);
+        if !at.is_empty() {
+            return None;
+        }
+        let mut ls = Vec::new();
+        for v in vs {
+            let l = if v < LEN_BASE {
+                v as usize
+            } else if v < BOOL_BASE {
+                (v - LEN_BASE) as usize
+            } else {
+                return None;
+            };
+            if l >= self.nl || self.aliased[l] {
+                return None;
+            }
+            ls.push(l);
+        }
+        ls.sort_unstable();
+        ls.dedup();
+        Some(ls)
+    }
+
+    fn fact_locals(&self, p: &Prop) -> Vec<usize> {
+        self.fact_locals_opt(p).unwrap_or_default()
+    }
+
+    /// Ghi `p` (hoặc `¬p`) là sự kiện nếu nó là số học thuần trên ≥ 2 local được theo dõi, hoặc là `≠` (khoảng không biểu diễn được).
+    fn add_fact(&self, st: &mut AState, p: &Prop, val: bool) {
+        if st.env.is_dead() || st.facts.len() >= MAX_FACTS {
+            return;
+        }
+        let Some(ls) = self.fact_locals_opt(p) else {
+            return;
+        };
+        let p = if val { p.clone() } else { p.clone().not() };
+        let ne =
+            matches!(p, Prop::Ne(..)) || matches!(&p, Prop::Not(q) if matches!(**q, Prop::Eq(..)));
+        if ls.is_empty() || (ls.len() < 2 && !ne) || st.facts.contains(&p) {
+            return;
+        }
+        st.facts.push(p);
     }
 
     fn init(&self) -> AState {
@@ -644,11 +706,21 @@ impl<'a> Ctx<'a> {
                 }
             }
         }
-        AState {
+        let mut st = AState {
             env,
             pc: Vec::new(),
+            facts: Vec::new(),
             defs: BTreeMap::new(),
+        };
+        if self.body.kind == gt_mir::BodyKind::Fn && self.info.assume_pre.contains(&self.body.node)
+        {
+            for cp in self.info.pre.get(&self.body.node).into_iter().flatten() {
+                if let Some(p) = &cp.prop {
+                    self.add_fact(&mut st, p, true);
+                }
+            }
         }
+        st
     }
 
     // ------------------------------------------------------------------ toán hạng
@@ -1069,6 +1141,32 @@ impl<'a> Ctx<'a> {
         goal.vars(&mut vars, &mut atoms);
         vars.sort_unstable();
         vars.dedup();
+        // A2 bước 2: sự kiện tuyến tính LIÊN QUAN (đóng bắc cầu theo biến chung với mục tiêu)
+        let mut used = vec![false; st.facts.len()];
+        let mut facts = Vec::new();
+        loop {
+            let mut grew = false;
+            for (i, f) in st.facts.iter().enumerate() {
+                if used[i] {
+                    continue;
+                }
+                let mut fv = Vec::new();
+                f.vars(&mut fv, &mut Vec::new());
+                if fv.iter().any(|v| vars.binary_search(v).is_ok()) {
+                    used[i] = true;
+                    grew = true;
+                    facts.push(f.clone());
+                    for v in fv {
+                        if let Err(k) = vars.binary_search(&v) {
+                            vars.insert(k, v);
+                        }
+                    }
+                }
+            }
+            if !grew {
+                break;
+            }
+        }
         atoms.sort_unstable();
         atoms.dedup();
         let mut decls = Vec::new();
@@ -1105,6 +1203,7 @@ impl<'a> Ctx<'a> {
                 }
             }
         }
+        hyps.extend(facts);
         let mut atom_names = Vec::new();
         for a in &atoms {
             atom_names.push((*a, format!("a{a}")));
@@ -1323,6 +1422,7 @@ impl<'a> Ctx<'a> {
             }
             if let Some(g) = goal {
                 s.env.assume(&g, true);
+                self.add_fact(s, &g, true);
             }
         }
     }
@@ -1387,6 +1487,7 @@ impl<'a> Ctx<'a> {
             }
             if let Some(g) = self.subst_prop_k(p, &ints, &props, &keys, bb) {
                 s.env.assume(&g, true);
+                self.add_fact(s, &g, true);
             }
         }
     }
@@ -1674,6 +1775,7 @@ impl<'a> Ctx<'a> {
                         && matches!(discr, Operand::Copy(_) | Operand::Move(_))
                     {
                         s.env.assume(p, *val != 0);
+                        self.add_fact(&mut s, p, *val != 0);
                         self.push_pc(
                             &mut s,
                             if *val != 0 {
@@ -1697,12 +1799,14 @@ impl<'a> Ctx<'a> {
                     && targets[0].0 == 0
                 {
                     s.env.assume(p, true);
+                    self.add_fact(&mut s, p, true);
                     self.push_pc(&mut s, p.clone());
                 } else if let Some(p) = &prop
                     && targets.len() == 1
                     && targets[0].0 == 1
                 {
                     s.env.assume(p, false);
+                    self.add_fact(&mut s, p, false);
                     self.push_pc(&mut s, p.clone().not());
                 } else if let Some(t) = &int_term {
                     for (val, _) in targets {
@@ -1741,6 +1845,7 @@ impl<'a> Ctx<'a> {
                 // đường thất bại abort tức thì: sau Assert điều kiện đúng
                 if let Some(g) = goal {
                     s.env.assume(&g, true);
+                    self.add_fact(&mut s, &g, true);
                     self.push_pc(&mut s, g);
                 } else {
                     self.push_pc(&mut s, Prop::Atom(OPAQUE_BASE + bb as VarId));
