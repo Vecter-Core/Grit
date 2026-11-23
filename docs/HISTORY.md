@@ -172,4 +172,5 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
   E0901 sai; sau 82/82, 0 sai. Tắt xoá-khi-gán / tắt giao ⇒ ĐỎ. Corpus: chứng minh mới 0 (corpus gần như không có điều kiện tổng/hệ số), không hồi quy.
 - **Hồi quy tự gây, bắt bởi `hashmap_collide`:** sự kiện thừa làm FM vượt giới hạn ⇒ E0702 sai trong `std`; sửa bằng hai bước + prune; mẫu hồi quy 265.
 - **Quy trình:** commit 03acc63 lọt lỗi clippy (lệnh `clippy | head` nuốt mã thoát) — sửa ở commit kế; từ nay đọc `PIPESTATUS`.
-- **CHƯA:** đột biến tự động phần M7 mới; cổng sạch; đo thời gian M7 trước/sau.
+- **Cổng:** clone sạch trên 52cf4f5 (chạy lại từ đầu sau khi sửa sổ fail-open) XANH liền mạch 4 lượt: 970 test đạt, 0 lỗi, 208 bộ, `GATE_TREE=10940c1f…`. Lần chạy trước trên 5d5069d ĐỎ đúng một bước `failopen` (4 chỗ mới chưa phân loại — tôi quên ghi sổ lần thứ hai).
+- **CHƯA:** đột biến tự động phần M7 mới; đo thời gian M7 trước/sau; cổng trên Windows.

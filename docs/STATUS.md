@@ -33,7 +33,7 @@ Nhãn hiện hành: **`1.0.0-rc7`** (ứng viên, **CHƯA** phải `1.0.0-seed`)
 
 **GÓI 12 phần 5 (2026-11-23):** `Owned<T>` (ADR-C18 bước 2, TCB B5 — bằng chứng có, CHƯA duyệt). Cổng clone sạch trên `102d968`: test 955/0 nhưng RED ở `failopen` (thiếu baseline, đã sửa ở `3b17f1f`); **cổng clone sạch trên `3b17f1f` XANH liền mạch (957/0, 202 bộ, Linux + LLVM 20)**. Nhãn GIỮ `1.0.0-rc7` (đổi nhãn là quyết định của Giang).
 
-**GIAI ĐOẠN 2 ĐÃ MỞ (2026-11-23, lệnh Giang; ADR-P2-00).** Xong: **A1 xoá Secret** (ADR-P2-03, TCB B6 CHỜ DUYỆT); **A2/A3 bước 1** kernel chứng chỉ Farkas `gt-kernel` (ADR-P2-04; M7/M8 chỉ tin kernel; đột biến 72/76, 4 sống có lập luận). Tiếp: A2 bước 2 (M7 giữ sự kiện tuyến tính), B0 (khoanh phụ thuộc LLVM + đo) và ADR thiết kế SMT (A2). Hiệu năng (dòng D) để CUỐI theo lệnh.
+**GIAI ĐOẠN 2 ĐÃ MỞ (2026-11-23, lệnh Giang; ADR-P2-00).** Xong: **A1 xoá Secret** (ADR-P2-03, TCB B6 CHỜ DUYỆT); **A2/A3 bước 1** kernel chứng chỉ Farkas `gt-kernel` (ADR-P2-04; M7/M8 chỉ tin kernel; đột biến 72/76, 4 sống có lập luận). **A2 bước 2** M7 giữ sự kiện tuyến tính (ADR-P2-05; oracle 82/82, cổng sạch Linux XANH 970/0 trên 52cf4f5). Tiếp: B0 (khoanh phụ thuộc LLVM + đo) và ADR thiết kế SMT (A2). Hiệu năng (dòng D) để CUỐI theo lệnh.
 
 ## 3. Luật làm việc (bản đầy đủ: `AGENTS.md`, `.claude/skills/grit-contract.md`)
 - Chỉ báo số liệu THẬT từ lệnh đã chạy; ghi `CHƯA KIỂM` cho phần chưa kiểm. Không báo xong khi chưa có cổng liền mạch xanh trên đúng mã đó.
