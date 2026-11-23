@@ -78,6 +78,30 @@ fn preconditions_that_need_a_linear_branch_fact_are_proved() {
 }",
             "qua điểm hợp",
         ),
+        // `⊳` của CHÍNH hàm là sự kiện cho thân: x + y ≤ 100 ⇒ gọi được hàm cần x + y ≤ 100
+        (
+            "ƒ need(a: u32, b: u32) → u32 ! ∅ ⊳ a + b ≤ 100 { a }
+ƒ f(x: u32, y: u32) → u32 ! ∅ ⊳ x + y ≤ 100 { need(x, y) }",
+            "⊳ của chính hàm",
+        ),
+        // `≠` một biến: khoảng không biểu diễn được, chỉ có sự kiện mới giữ
+        (
+            "ƒ need(a: u32) → u32 ! ∅ ⊳ a != 5 { a }
+ƒ f(p: u8) → u32 ! ∅ {
+  x ≔ p as u32;
+  ⎇ x != 5 { need(x) } ⇝ { 0 }
+}",
+            "≠ một biến",
+        ),
+        // độ dài slice là một biến trong sự kiện
+        (
+            "ƒ need(a: usize, b: usize) → usize ! ∅ ⊳ a + b ≤ 100 { a }
+ƒ f(xs: &[u8], q: u8) → usize ! ∅ {
+  y ≔ q as usize;
+  ⎇ xs.len() + y ≤ 100 { need(xs.len(), y) } ⇝ { 0 }
+}",
+            "độ dài slice",
+        ),
     ];
     for (src, name) in cases {
         let (errs, all) = notes(src);
@@ -125,6 +149,30 @@ fn a_linear_fact_dies_when_a_variable_it_mentions_is_reassigned() {
   ⎇ x + y ≤ 60 { bump(&!y); need(x, y) } ⇝ { 0 }
 }",
             "ghi qua &!",
+        ),
+        // sự kiện chứa NGUYÊN TỬ (bool `c`) không được sống qua phép gán lại `c` (nguyên tử không nằm trong tập local của sự kiện)
+        (
+            "ƒ need(a: bool) → u32 ! ∅ ⊳ a { 0 }
+ƒ f(p: u8, q: u8, c: bool) → u32 ! ∅ {
+  μcc ≔ c; x ≔ p as u32; y ≔ q as u32;
+  ⎇ cc ∧ x + y ≤ 60 { cc ← false; need(cc) } ⇝ { 0 }
+}",
+            "nguyên tử bị gán lại",
+        ),
+        // `⊳` của hàm KHÔNG được bị đảo dấu: ở thân x + y ≤ 100 đúng, nên x + y > 100 KHÔNG được coi là đã biết
+        (
+            "ƒ need(a: u32, b: u32) → u32 ! ∅ ⊳ a + b > 100 { a }
+ƒ f(x: u32, y: u32) → u32 ! ∅ ⊳ x + y ≤ 100 { need(x, y) }",
+            "⊳ không bị đảo",
+        ),
+        // độ dài slice: gán lại slice làm sự kiện về độ dài mất hiệu lực
+        (
+            "ƒ need(a: usize, b: usize) → usize ! ∅ ⊳ a + b ≤ 100 { a }
+ƒ f(xs0: &[u8], xs1: &[u8], q: u8) → usize ! ∅ {
+  μxs ≔ xs0; y ≔ q as usize;
+  ⎇ xs.len() + y ≤ 100 { xs ← xs1; need(xs.len(), y) } ⇝ { 0 }
+}",
+            "slice bị gán lại",
         ),
     ];
     for (src, name) in cases {
