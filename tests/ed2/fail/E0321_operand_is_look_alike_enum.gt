@@ -1,0 +1,4 @@
+// expect: fail E0321
+// note: enum người dùng trông giống Option (Nothing/Just) vẫn KHÔNG phải Option — `?` chỉ định nghĩa cho lang item option/result
+⊔ Maybe<T> { Nothing, Just(T) }
+ƒ f(m: Maybe<u32>) → Option<u32> ! ∅ { v ≔ m?; Some(v) }
