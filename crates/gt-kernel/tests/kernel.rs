@@ -246,3 +246,130 @@ fn every_kernel_accepted_certificate_agrees_with_exhaustive_enumeration() {
         "quá ít chứng chỉ được chấp nhận ({accepted}/{total}) — bộ sinh hoặc bộ tìm hỏng?"
     );
 }
+
+/// Đột biến tự động lượt 1 (kernel TCB): ba luật của `check` SỐNG vì test chứng chỉ giả cũ luôn có lỗi khác đi kèm. Mỗi chứng chỉ dưới đây sai
+/// ĐÚNG MỘT điều và chứng minh một điều SAI — kernel phải từ chối. Ràng buộc của ca (x: u8): [0] −x ≤ 0, [1] x − 255 ≤ 0, [2] x − 5 ≤ 0 (giả thiết),
+/// [3] 4 − x ≤ 0 (¬ mục tiêu `x ≤ 3`). Nghĩa vụ `x ≤ 5 ⊢ x ≤ 3` là SAI (x = 4).
+#[test]
+fn each_kernel_rule_alone_rejects_a_certificate_for_a_false_claim() {
+    let o = ob(
+        &[(0, 8, false)],
+        vec![Prop::Le(v(0), Term::int(5))],
+        Prop::Le(v(0), Term::int(3)),
+    );
+    // hệ số ÂM: (−1)·[2] + (−1)·[3] = −x+5 + x−4 = 1 > 0, mọi biến triệt tiêu — chỉ luật "hệ số ≥ 0" chặn được
+    let neg = FarkasCert {
+        cases: vec![CaseCert::Farkas(vec![(2, -1), (3, -1)])],
+    };
+    assert!(check(&o, &neg).is_err(), "kernel chấp nhận hệ số âm");
+    // CÒN BIẾN: 1·[3] = 4 − x, hằng 4 > 0 nhưng x chưa triệt tiêu — chỉ luật "mọi biến triệt tiêu" chặn được
+    let left = FarkasCert {
+        cases: vec![CaseCert::Farkas(vec![(3, 1)])],
+    };
+    assert!(
+        check(&o, &left).is_err(),
+        "kernel chấp nhận tổ hợp còn biến"
+    );
+    // NGUYÊN TỬ một chiều: ca có a7 (dương) và ¬a8, chứng chỉ "mâu thuẫn a7" — chỉ luật "phải có CẢ a và ¬a" chặn được
+    let oa = ob(&[(0, 8, false)], vec![Prop::Atom(7)], Prop::Atom(8));
+    let one_sided = FarkasCert {
+        cases: vec![CaseCert::Atom(7)],
+    };
+    assert!(
+        check(&oa, &one_sided).is_err(),
+        "kernel chấp nhận nguyên tử chỉ dương"
+    );
+    let one_sided8 = FarkasCert {
+        cases: vec![CaseCert::Atom(8)],
+    };
+    assert!(
+        check(&oa, &one_sided8).is_err(),
+        "kernel chấp nhận nguyên tử chỉ âm"
+    );
+}
+
+/// Đầy đủ: mỗi dạng công thức phải chứng minh ĐƯỢC (bắt đột biến làm kernel "yếu đi" — vẫn sound nhưng mất chứng minh ⇒ gritc từ chối nhầm).
+#[test]
+fn every_formula_shape_the_kernel_understands_is_provable() {
+    let x = || v(0);
+    let i = Term::int;
+    let not = |p: Prop| Prop::Not(Box::new(p));
+    let cases: Vec<(&str, Vec<Prop>, Prop)> = vec![
+        ("⊢ True", vec![], Prop::True),
+        ("False ⊢ x < 0", vec![Prop::False], Prop::Lt(x(), i(0))),
+        (
+            "x ≤ 5 ⊢ x ≤ 7",
+            vec![Prop::Le(x(), i(5))],
+            Prop::Le(x(), i(7)),
+        ),
+        (
+            "x = 3 ⊢ x = 3",
+            vec![Prop::Eq(x(), i(3))],
+            Prop::Eq(x(), i(3)),
+        ),
+        (
+            "x ≤ 2 ⊢ x ≠ 5",
+            vec![Prop::Le(x(), i(2))],
+            Prop::Ne(x(), i(5)),
+        ),
+        (
+            "x ≠ 5, x ≤ 5 ⊢ x ≤ 4",
+            vec![Prop::Ne(x(), i(5)), Prop::Le(x(), i(5))],
+            Prop::Le(x(), i(4)),
+        ),
+        (
+            "x ≤ 1 ∨ x ≤ 2 ⊢ x ≤ 2",
+            vec![Prop::Or(vec![Prop::Le(x(), i(1)), Prop::Le(x(), i(2))])],
+            Prop::Le(x(), i(2)),
+        ),
+        (
+            "x ≤ 1 ⊢ ¬(3 ≤ x ∧ x ≤ 9)",
+            vec![Prop::Le(x(), i(1))],
+            not(Prop::And(vec![Prop::Le(i(3), x()), Prop::Le(x(), i(9))])),
+        ),
+        (
+            "¬(x > 5) ⊢ x ≤ 5",
+            vec![not(Prop::Lt(i(5), x()))],
+            Prop::Le(x(), i(5)),
+        ),
+        (
+            "x ≤ 5 ⊢ 2·x ≤ 10",
+            vec![Prop::Le(x(), i(5))],
+            Prop::Le(Term::Mul(Box::new(i(2)), Box::new(x())), i(10)),
+        ),
+        (
+            "x ≤ 5 ⊢ x·2 ≤ 10",
+            vec![Prop::Le(x(), i(5))],
+            Prop::Le(Term::Mul(Box::new(x()), Box::new(i(2))), i(10)),
+        ),
+        ("a ⊢ a", vec![Prop::Atom(9)], Prop::Atom(9)),
+    ];
+    for (name, hyps, goal) in cases {
+        let o = ob(&[(0, 8, false)], hyps, goal);
+        let c = find_cert(&o, &mut 50_000)
+            .unwrap_or_else(|| panic!("{name}: không tìm được chứng chỉ"));
+        assert_eq!(check(&o, &c), Ok(()), "{name}");
+        assert_eq!(
+            FarkasCert::decode(&c.encode()),
+            Ok(c),
+            "{name}: mã hoá ⇄ giải mã"
+        );
+    }
+    // biên số ca: ĐÚNG 64 ca (6 giả thiết `≠`) vẫn chứng minh được; Or 64 nhánh cũng vậy
+    let nes: Vec<Prop> = (0..6)
+        .map(|k| Prop::Ne(x(), i(100 + k)))
+        .chain([Prop::Le(x(), i(5))])
+        .collect();
+    let o = ob(&[(0, 8, false)], nes, Prop::Le(x(), i(5)));
+    let c = find_cert(&o, &mut 1_000_000).expect("64 ca");
+    assert_eq!(c.cases.len(), 64);
+    assert_eq!(check(&o, &c), Ok(()));
+    let or64 = Prop::Or((0..64).map(|k| Prop::Eq(x(), i(k))).collect());
+    let o = ob(&[(0, 8, false)], vec![or64], Prop::Le(x(), i(63)));
+    let c = find_cert(&o, &mut 1_000_000).expect("Or 64 nhánh");
+    assert_eq!(check(&o, &c), Ok(()));
+    // KHÔNG ca nào (giả thiết False): mã hoá riêng, không nhầm với "một ca rỗng"
+    let empty = FarkasCert { cases: vec![] };
+    assert_eq!(FarkasCert::decode(&empty.encode()), Ok(empty.clone()));
+    assert_ne!(FarkasCert::decode("farkas:v1:"), Ok(empty));
+}
