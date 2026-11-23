@@ -96,10 +96,10 @@ heap còn sống, cấp bằng `gritrt_heap_alloc(size_of T, align_of T)`, chứ
 luôn hữu hạn và được trải phẳng tại chỗ (không sinh hàm glue ngoài dòng mà IR Guard sẽ từ chối). Cấu trúc liên kết: dùng `std::Slab`.
 | intrinsic (prelude) | hiệu ứng | capability cần | hạ thành | điều kiện abort | bất biến | người duyệt |
 |---|---|---|---|---|---|---|
-| `Owned::new(a: &Cap<Alloc>, v: T) → Owned<T>` | `mem` | `&Cap<Alloc>` (D26: cấp phát truy được tới capability) | `gritrt_heap_alloc(size_of T, align_of T)` (kích thước 0 ⇒ runtime cấp ≥ 1 byte để con trỏ duy nhất) + `store v` | hết bộ nhớ/`Layout` không hợp lệ ⇒ abort `heap_exhausted` (20) | khối mới, căn đúng `align_of T`, chứa `v` | BẰNG CHỨNG ĐÃ CÓ (2026-11-23, xem cuối B5) — CHƯA DUYỆT: chờ cổng liền mạch xanh trên đúng mã này (AGENTS) |
-| `Owned::get(&self) → &T` / `get_mut(&!self) → &!T` | `∅` | không | trả `ptr` | không | tham chiếu sống không quá khoản mượn `self` (M6): không drop/move/`into_inner` được trong lúc đó | BẰNG CHỨNG ĐÃ CÓ (2026-11-23, xem cuối B5) — CHƯA DUYỆT: chờ cổng liền mạch xanh trên đúng mã này (AGENTS) |
-| `Owned::into_inner(self) → T` | `∅` | không | `load` `T` từ `ptr` rồi `gritrt_heap_free(ptr, size, align)` | khối không sống (chỉ do lỗi TCB) ⇒ abort `heap_invalid_free` (21) ở dev | `self` bị move (M6) ⇒ khối không còn ai trỏ | BẰNG CHỨNG ĐÃ CÓ (2026-11-23, xem cuối B5) — CHƯA DUYỆT: chờ cổng liền mạch xanh trên đúng mã này (AGENTS) |
-| drop glue của `Owned<T>` (ngầm, ADR-C18) | `∅` | không | glue của `T` tại `ptr` RỒI `gritrt_heap_free(ptr, size, align)` | như trên | chạy ĐÚNG một lần cho mỗi giá trị còn khởi tạo (cờ drop); không chạy sau `into_inner` (đã move) | BẰNG CHỨNG ĐÃ CÓ (2026-11-23, xem cuối B5) — CHƯA DUYỆT: chờ cổng liền mạch xanh trên đúng mã này (AGENTS) |
+| `Owned::new(a: &Cap<Alloc>, v: T) → Owned<T>` | `mem` | `&Cap<Alloc>` (D26: cấp phát truy được tới capability) | `gritrt_heap_alloc(size_of T, align_of T)` (kích thước 0 ⇒ runtime cấp ≥ 1 byte để con trỏ duy nhất) + `store v` | hết bộ nhớ/`Layout` không hợp lệ ⇒ abort `heap_exhausted` (20) | khối mới, căn đúng `align_of T`, chứa `v` | BẰNG CHỨNG ĐỦ + cổng clone sạch XANH liền mạch trên `3b17f1f` (2026-11-23) — CHỜ DUYỆT (Giang hoặc kiến trúc sư; tác giả không tự duyệt) |
+| `Owned::get(&self) → &T` / `get_mut(&!self) → &!T` | `∅` | không | trả `ptr` | không | tham chiếu sống không quá khoản mượn `self` (M6): không drop/move/`into_inner` được trong lúc đó | BẰNG CHỨNG ĐỦ + cổng clone sạch XANH liền mạch trên `3b17f1f` (2026-11-23) — CHỜ DUYỆT (Giang hoặc kiến trúc sư; tác giả không tự duyệt) |
+| `Owned::into_inner(self) → T` | `∅` | không | `load` `T` từ `ptr` rồi `gritrt_heap_free(ptr, size, align)` | khối không sống (chỉ do lỗi TCB) ⇒ abort `heap_invalid_free` (21) ở dev | `self` bị move (M6) ⇒ khối không còn ai trỏ | BẰNG CHỨNG ĐỦ + cổng clone sạch XANH liền mạch trên `3b17f1f` (2026-11-23) — CHỜ DUYỆT (Giang hoặc kiến trúc sư; tác giả không tự duyệt) |
+| drop glue của `Owned<T>` (ngầm, ADR-C18) | `∅` | không | glue của `T` tại `ptr` RỒI `gritrt_heap_free(ptr, size, align)` | như trên | chạy ĐÚNG một lần cho mỗi giá trị còn khởi tạo (cờ drop); không chạy sau `into_inner` (đã move) | BẰNG CHỨNG ĐỦ + cổng clone sạch XANH liền mạch trên `3b17f1f` (2026-11-23) — CHỜ DUYỆT (Giang hoặc kiến trúc sư; tác giả không tự duyệt) |
 Hàm runtime mới: `gritrt_heap_alloc(size: u64, align: u64) → ptr`, `gritrt_heap_free(ptr, size: u64, align: u64)` (bảng `RUNTIME` của IR Guard,
 lớp E0401). **Kiểm động ở dev** (như Arena H2): `gritrt_dev_checks` bật sổ khối sống; `free` một khối không có trong sổ, hoặc với `size/align`
 khác lúc cấp ⇒ abort `heap_invalid_free` (21) — bắt double-free/free-lạ do lỗi TCB; release không kiểm (`GRITRT_HEAP_CHECK=1` ép bật).
@@ -111,7 +111,9 @@ Bằng chứng cần trước khi duyệt: E2E thông dịch ≡ exe (dev và re
 thông dịch và exe dev; oracle ngẫu nhiên 60 chương trình (biến `Owned<D>`: khai báo, move, move có điều kiện, `into_inner`, gán đè) × 2 backend,
 0 khối sống; `heap_dev_check_catches_an_injected_double_free` (chèn `GRITRT_FAULT=heap_double_free` ⇒ abort `heap_invalid_free` mã 70, kể cả khi
 `GRITRT_HEAP_CHECK=0`); đột biến tay bỏ `free` trong glue (LLVM, thông dịch) ⇒ test báo "còn 1 khối"; mẫu M6 E0401/E0403/E0404 và M4
-E0313×2/E0301/E0318×3/E0801. **CHƯA:** hồ sơ release-o2 cho Owned, đột biến tự động hàm kiểm runtime, Windows.
+E0313×2/E0301/E0318×3/E0801; chương trình Owned lồng/`into_inner`/gán đè: thông dịch ≡ exe dev ≡ release ≡ release-o2 (cùng giá trị, 0 khối sống);
+đột biến TAY hàm kiểm heap của runtime 3/3 bị bắt (tắt kiểm, bỏ đối chiếu sổ, bỏ đường chèn lỗi); cổng clone sạch `3b17f1f` XANH (957/0, 202 bộ).
+**CHƯA:** đột biến tự động hàm runtime, Windows.
 
 ## C. Runtime `gt-rt` (staticlib, `panic = "abort"`): hàm xuất ra cho mã sinh
 Đây là các hàm runtime (`gt-rt`) mà mã Grit có thể gọi. Bảng đóng hiện hành gồm 29 hàm; xem danh sách đầy đủ ngay dưới đây để tránh nhầm danh sách tóm tắt lịch sử với ABI hiện tại. IR Guard từ chối hàm runtime ngoài bảng.

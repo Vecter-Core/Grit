@@ -124,3 +124,19 @@ Lệnh Giang: "duyệt, làm đi" (duyệt ADR-C18).
 - **Kiểm thêm phần 3:** `std::Slab` trên exe LLVM (`std_slab.rs` dựng 10 exe, khớp mô hình).
 - **CHƯA:** cổng đầy đủ `tools/gate_clean.sh` trong clone sạch; Windows; ADR-C18 bước 2 (`GlobalAlloc`/`Owned<T>`, cần hợp đồng TCB) và bước 3.
 
+
+### GÓI 12 phần 5 (2026-11-23, Claude Opus 5.5) — cổng clone sạch; ADR-C18 bước 2 `Owned<T>`
+Lệnh Giang: "tiếp đi".
+- **Cổng clone sạch trên `102d968` (`tools/gate_clean.sh`, 4 lô ≤ ~15 phút có điểm lưu):** gtrt, fmt, clippy, audit PASS; **test 955 đạt / 0 lỗi / 202
+  bộ** (mọi crate, có LLVM, rig 48); expect, nul, doc, deletions PASS; **failopen ĐỎ** ⇒ `GATE_RESULT=RED`: 5 mục fail-open MỚI của phần 4 đã được
+  phân loại trong `docs/fail_open_classification.tsv` nhưng `docs/fail_open_baseline.json` CHƯA được ghi lại (lỗi quy trình của tôi, không phải lỗi mã).
+  Sửa ở `3b17f1f` (ghi baseline 9 mục, đều đã phân loại) và chạy lại: **cổng clone sạch trên `3b17f1f` XANH liền mạch** — test 957/0, 202 bộ
+  (có LLVM 20.1.2 apt, Linux), gtrt/fmt/clippy/audit/expect/nul/doc/deletions/failopen/track đều đạt, `GATE_TREE=389b0f0a…`.
+- **ADR-C18 bước 2 — `Owned<T>` (`9159d32`):** hợp đồng TCB viết TRƯỚC (`docs/TCB_INTRINSICS.md` B5). Prelude `#lang(owned)`, M4 (E0313 literal/Copy,
+  E0301 đệ quy qua Owned, E0318 `Arena::alloc` của kiểu có Drop/Owned — lỗ ngữ nghĩa có từ bước 1: Arena âm thầm bỏ drop), glue `Free`, thông dịch,
+  LLVM, runtime `gritrt_heap_alloc/free` (bảng RUNTIME IR Guard lớp E0401) có sổ khối sống ở dev.
+- **Bằng chứng:** 8 ca × 2 backend (giá trị đúng + 0 khối sống); oracle ngẫu nhiên có biến `Owned<D>` × 2 backend, 0 khối sống; double-free chèn bị kiểm
+  dev bắt (mã 70, kể cả `GRITRT_HEAP_CHECK=0`); đột biến tay bỏ `free` (LLVM, thông dịch) bị bắt; 11 mẫu corpus; golden IR chỉ đổi băm attestation;
+  `unsafe` gt-rt 72 → 77 (đều có SAFETY); fail-open 16 mục mới phân loại.
+- **Thêm sau cổng:** thông dịch ≡ exe dev ≡ release ≡ release-o2 cho chương trình Owned lồng (0 khối sống); đột biến tay hàm kiểm heap runtime 3/3 bị bắt.
+- **CHƯA:** DUYỆT hợp đồng B5 (bằng chứng đủ, cổng xanh — tác giả không tự duyệt); đột biến tự động hàm runtime; `Owned: Send`; Windows.
