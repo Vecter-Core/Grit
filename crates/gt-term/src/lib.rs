@@ -378,6 +378,26 @@ fn instance_graph(
                     }
                     continue;
                 };
+                // ADR-C18: `Drop` gọi NGẦM `drop` người dùng của mọi phần của giá trị ⇒ cạnh GIÁN TIẾP (không có đối số để giảm). Kiểu chưa
+                // cụ thể/glue lỗi ⇒ lùi về đồ thị bảo thủ, không bao giờ bỏ cạnh.
+                if let TerminatorKind::Drop { place, .. } = &term.kind
+                    && !t.db.user_drops.is_empty()
+                {
+                    let ty = sub(&gt_mir::types::place_ty(body, place)?);
+                    if ty.has_param() || ty.has_infer() {
+                        return None;
+                    }
+                    let mut calls = Vec::new();
+                    t.db.drop_glue(&ty).ok()?.calls(&mut calls);
+                    for n2 in calls {
+                        if by_node.contains_key(&n2) {
+                            let j = add((n2, Vec::new()), &mut idx, &mut list)?;
+                            edges[k].push((j, true));
+                        } else {
+                            return None;
+                        }
+                    }
+                }
                 let TerminatorKind::Call {
                     callee,
                     args: cargs,
@@ -615,6 +635,18 @@ fn conservative_graph(
         }
         for b in srcs {
             for bb in &b.blocks {
+                // ADR-C18: drop có thể có glue ⇒ cạnh gián tiếp tới MỌI `drop` người dùng (bảo thủ)
+                if let Some(TerminatorKind::Drop { place, .. }) =
+                    bb.terminator.as_ref().map(|t| &t.kind)
+                    && gt_mir::types::place_ty(b, place).is_none_or(|ty| t.db.may_have_glue(&ty))
+                {
+                    for n in t.db.user_drops.values() {
+                        if let Some(&j) = by_node.get(n) {
+                            adj[i].push(j);
+                            indirect[i].push(j);
+                        }
+                    }
+                }
                 let Some(TerminatorKind::Call { callee, args, .. }) =
                     bb.terminator.as_ref().map(|t| &t.kind)
                 else {

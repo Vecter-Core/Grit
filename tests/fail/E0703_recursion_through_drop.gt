@@ -1,0 +1,6 @@
+// expect: fail E0703
+// note: `drop` được gọi NGẦM ở cuối phạm vi: `f` tạo `R` ⇒ drop của `R` gọi `f` ⇒ đệ quy vô hạn qua drop; M8 phải thấy cạnh gọi ngầm (ADR-C18)
+▢ R { n: u32 }
+⊐ Drop for R { ƒ drop(&!self) ! ∅ { f(); } }
+ƒ f() ! ∅ { r ≔ R { n: 1u32 }; }
+ƒ main() ! ∅ { f(); }

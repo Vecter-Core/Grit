@@ -1,0 +1,6 @@
+// expect: fail E0313
+// note: kiểu Copy không được có Drop (chép bit rồi drop hai lần) — ADR-C18
+▢ C { v: u32 }
+⊐ Copy for C { }
+⊐ Drop for C { ƒ drop(&!self) ! ∅ { } }
+ƒ main() ! ∅ { }

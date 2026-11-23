@@ -17,6 +17,53 @@ pub struct TypeDb {
     pub consts: BTreeMap<DefId, Ty>,
     pub impls: Vec<ImplDef>,
     pub lang: BTreeMap<Lang, DefId>,
+    /// `Drop` NGƯỜI DÙNG đã qua kiểm của M4 (ADR-C18): ADT → thành viên `drop` của impl (thân có MIR, instance không đối số kiểu).
+    /// Chỉ các mục ở đây được drop glue GỌI; `⊐ Drop for` của prelude (`Buf`, `Guard`: thân rỗng, không có MIR) không có mặt.
+    pub user_drops: BTreeMap<DefId, NodeId>,
+}
+
+/// Các trường cần glue của một struct/tuple/biến thể: (chỉ số trường, kiểu trường, glue), theo thứ tự khai báo.
+pub type GlueFields = Vec<(u32, Ty, Glue)>;
+
+/// Drop glue của một kiểu CỤ THỂ (ADR-C18): việc cần làm khi một giá trị kiểu đó hết đời. Một nguồn sự thật cho thông dịch, codegen,
+/// M6 (drop có ý nghĩa là một lần dùng) và M8 (cạnh gọi ngầm tới `drop`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Glue {
+    /// không có gì để chạy
+    Nothing,
+    /// gọi `drop` người dùng (thành viên impl `NodeId`, instance không đối số) trên chính chỗ, RỒI glue của các trường
+    Call(NodeId, Box<Glue>),
+    /// struct/tuple: các trường có glue ≠ `Nothing`, theo thứ tự khai báo: (chỉ số trường, kiểu trường, glue)
+    Fields(GlueFields),
+    /// enum: chỉ biến thể đang có chạy; (chỉ số biến thể, các trường có glue của biến thể đó)
+    Variants(Vec<(u32, GlueFields)>),
+    /// mảng `[T; n]`: glue của từng phần tử theo chỉ số tăng
+    Array(u64, Ty, Box<Glue>),
+}
+
+impl Glue {
+    #[must_use]
+    pub fn is_nothing(&self) -> bool {
+        matches!(self, Glue::Nothing)
+    }
+
+    /// Mọi `drop` người dùng mà glue này có thể gọi (cho đồ thị gọi của M8 và bảng instance).
+    pub fn calls(&self, out: &mut Vec<NodeId>) {
+        match self {
+            Glue::Nothing => {}
+            Glue::Call(n, g) => {
+                if !out.contains(n) {
+                    out.push(*n);
+                }
+                g.calls(out);
+            }
+            Glue::Fields(fs) => fs.iter().for_each(|(_, _, g)| g.calls(out)),
+            Glue::Variants(vs) => vs
+                .iter()
+                .for_each(|(_, fs)| fs.iter().for_each(|(_, _, g)| g.calls(out))),
+            Glue::Array(_, _, g) => g.calls(out),
+        }
+    }
 }
 
 impl TypeDb {
@@ -322,6 +369,138 @@ impl TypeDb {
                         })
                     }),
                 }
+            }
+        }
+    }
+
+    /// Drop glue của kiểu `ty` (ADR-C18). Kiểu phải CỤ THỂ (không tham số/biến suy diễn) — người gọi thế tham số của instance trước.
+    /// `Err` (lý do): kiểu còn tham số, ADT không có trong db, kiểu quá sâu, hoặc kiểu lang ĐỤC (Vec/Text/Arena/Mutex/Atomic/Cell/Secret/Cap)
+    /// chứa giá trị có Drop người dùng — biểu diễn của chúng không phải trường thường nên glue không đi vào được (fail-closed).
+    pub fn drop_glue(&self, ty: &Ty) -> Result<Glue, String> {
+        if self.user_drops.is_empty() {
+            // chỉ `drop` người dùng tạo lời gọi trong glue: không có cái nào ⇒ mọi glue rỗng (chương trình không dùng Drop không đổi gì)
+            return Ok(Glue::Nothing);
+        }
+        self.glue_inner(ty, 0)
+    }
+
+    /// Glue của kiểu có thể CÒN tham số: tham số kiểu coi là "có thể có glue" (`true`). Dùng ở MIR đa hình (M6: drop là một lần dùng).
+    #[must_use]
+    pub fn may_have_glue(&self, ty: &Ty) -> bool {
+        if self.user_drops.is_empty() {
+            return false;
+        }
+        if ty.has_param() || ty.has_infer() {
+            return self.needs_drop(ty);
+        }
+        !matches!(self.drop_glue(ty), Ok(Glue::Nothing))
+    }
+
+    fn glue_fields(&self, tys: impl Iterator<Item = Ty>, depth: u32) -> Result<GlueFields, String> {
+        let mut out = Vec::new();
+        for (i, t) in tys.enumerate() {
+            let g = self.glue_inner(&t, depth + 1)?;
+            if !g.is_nothing() {
+                out.push((u32::try_from(i).unwrap_or(u32::MAX), t, g));
+            }
+        }
+        Ok(out)
+    }
+
+    fn glue_inner(&self, ty: &Ty, depth: u32) -> Result<Glue, String> {
+        if depth > 1024 {
+            // độ sâu bất thường ⇒ lỗi (không bao giờ coi là "không có glue")
+            return Err("kiểu lồng quá sâu cho drop glue".to_string());
+        }
+        match ty {
+            Ty::Int(_)
+            | Ty::Float(_)
+            | Ty::Bool
+            | Ty::Char
+            | Ty::Str
+            | Ty::Never
+            | Ty::Err
+            | Ty::Fn(..)
+            | Ty::RawPtr(..)
+            | Ty::Ref(..)
+            | Ty::Slice(_) => Ok(Glue::Nothing),
+            Ty::Param(_) | Ty::Infer(_) => Err(format!("drop glue của kiểu chưa cụ thể `{ty:?}`")),
+            Ty::Tuple(v) => {
+                let fs = self.glue_fields(v.iter().cloned(), depth)?;
+                Ok(if fs.is_empty() {
+                    Glue::Nothing
+                } else {
+                    Glue::Fields(fs)
+                })
+            }
+            Ty::Array(t, n) => {
+                let g = self.glue_inner(t, depth + 1)?;
+                Ok(if g.is_nothing() || *n == 0 {
+                    Glue::Nothing
+                } else {
+                    Glue::Array(*n, (**t).clone(), Box::new(g))
+                })
+            }
+            Ty::Adt(d, args) => {
+                let Some(adt) = self.adts.get(d) else {
+                    return Err(format!("ADT {d:?} không có trong cơ sở kiểu (drop_glue)"));
+                };
+                if let Some(l) = adt.lang
+                    && matches!(
+                        l,
+                        Lang::Vec
+                            | Lang::Text
+                            | Lang::Arena
+                            | Lang::Mutex
+                            | Lang::Atomic
+                            | Lang::Cell
+                            | Lang::Secret
+                            | Lang::Cap
+                    )
+                {
+                    for a in args {
+                        if !self.glue_inner(a, depth + 1)?.is_nothing() {
+                            return Err(format!(
+                                "kiểu lang đục `{l:?}` chứa giá trị có Drop người dùng: chưa hỗ trợ (ADR-C18)"
+                            ));
+                        }
+                    }
+                    return Ok(Glue::Nothing);
+                }
+                let inner = match &adt.kind {
+                    AdtKind::Struct(fs) => {
+                        let fs = self.glue_fields(
+                            fs.iter().map(|f| subst_with(&f.ty, &adt.generics, args)),
+                            depth,
+                        )?;
+                        if fs.is_empty() {
+                            Glue::Nothing
+                        } else {
+                            Glue::Fields(fs)
+                        }
+                    }
+                    AdtKind::Enum(vs) => {
+                        let mut out = Vec::new();
+                        for (vi, v) in vs.iter().enumerate() {
+                            let fs = self.glue_fields(
+                                v.fields.iter().map(|f| subst_with(f, &adt.generics, args)),
+                                depth,
+                            )?;
+                            if !fs.is_empty() {
+                                out.push((u32::try_from(vi).unwrap_or(u32::MAX), fs));
+                            }
+                        }
+                        if out.is_empty() {
+                            Glue::Nothing
+                        } else {
+                            Glue::Variants(out)
+                        }
+                    }
+                };
+                Ok(match self.user_drops.get(d) {
+                    Some(n) => Glue::Call(*n, Box::new(inner)),
+                    None => inner,
+                })
             }
         }
     }

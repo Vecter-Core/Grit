@@ -162,10 +162,17 @@ fn stmt_accesses(body: &Body, s: &Statement) -> Vec<Access> {
                 }),
                 // độ dài mảng cố định là hằng theo kiểu: không đọc chỗ (như Rust)
                 Rvalue::Len(p) if matches!(place_ty(body, p), Some(Ty::Array(..))) => {}
-                Rvalue::Len(p) | Rvalue::Discriminant(p) => v.push(Access {
+                Rvalue::Len(p) => v.push(Access {
                     place: p.clone(),
                     kind: Kind::Read,
                     depth: Depth::Deep,
+                }),
+                // đọc THẺ biến thể là đọc NÔNG (ADR-C18): move một trường ra khỏi biến thể hay `&!` vào một trường không đổi thẻ. Drop mở của
+                // enum bị move một phần đọc thẻ để chỉ drop trường còn lại; `⌥` của người dùng vẫn có `FakeRead` SÂU nên vẫn E0401.
+                Rvalue::Discriminant(p) => v.push(Access {
+                    place: p.clone(),
+                    kind: Kind::Read,
+                    depth: Depth::Shallow,
                 }),
             }
             v.push(Access {
@@ -427,7 +434,14 @@ impl<'a> Checker<'a> {
                 }
                 continue;
             }
-            if Self::maybe_uninit(mp, &*us, &a.place) {
+            let uninit = if a.kind == Kind::Read && a.depth == Depth::Shallow {
+                // đọc nông (thẻ biến thể): chỉ chính chỗ phải còn, các trường con có thể đã move
+                let (node, exact) = Self::resolve_path(mp, &a.place);
+                us.contains(node) || !exact && Self::maybe_uninit(mp, &*us, &a.place)
+            } else {
+                Self::maybe_uninit(mp, &*us, &a.place)
+            };
+            if uninit {
                 self.report_use_after_move(&a.place, src, "dùng");
             }
             if a.kind == Kind::Move && !a.place.has_deref() {

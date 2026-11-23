@@ -84,6 +84,9 @@ pub struct Body {
     pub loops: Vec<LoopInfo>,
     /// Ánh xạ định danh biến của resolver → local MIR (tham số và `≔`), để dịch biểu thức biến thể từ AST.
     pub var_map: Vec<(LocalId, Local)>,
+    /// Đã qua elaboration drop (ADR-C18: bỏ drop của chỗ chắc chắn đã move, cờ drop cho chỗ có thể đã move, drop mở theo trường khi move
+    /// một phần). Backend CHỈ chạy drop glue có `drop` người dùng trên thân đã elaboration — thân chưa elaboration thì lỗi nội bộ, không đoán.
+    pub drops_elaborated: bool,
 }
 
 /// Hình dạng vòng lặp.

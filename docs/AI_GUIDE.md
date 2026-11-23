@@ -135,7 +135,7 @@ cannot open
   Đệ quy tương hỗ (`expr→term→primary→expr`): mỗi hàm có `↓ budget` và mỗi lời gọi truyền `budget - 1`. `main` chạy trên ngăn xếp 256 MiB.
 
 ## 6. Arena, Vec, HashMap, sắp xếp (bộ nhớ động)
-- `μar ≔ Arena::new();` (hiệu ứng `{mem}`). `Vec<'a, T>`/`Text<'a>`/`HashMap` đều trỏ vào Arena (CHIA SẺ: một Arena cho nhiều Vec). KHÔNG có free/drop từng phần; Arena sống tới hết hàm. **Phần tử Vec/HashMap không được cần drop** (E0318); các hàm của std (`get`, `pop`, `contains`, HashMap…) đòi thêm `T: Copy`: dùng số, bool, char, `&T`, struct có `⊐ Copy for T { }`, `std::Bytes`.
+- `μar ≔ Arena::new();` (hiệu ứng `{mem}`). `Vec<'a, T>`/`Text<'a>`/`HashMap` đều trỏ vào Arena (CHIA SẺ: một Arena cho nhiều Vec). KHÔNG có free từng phần; Arena sống tới hết hàm. Dọn tài nguyên khi hết phạm vi: `⊐ Drop for T { ƒ drop(&!self) ! ∅ { … } }` (T cùng tệp, không tham số kiểu, không Copy; chạy theo thứ tự ngược khai báo, không chạy với giá trị đã move). **Phần tử Vec/HashMap không được cần drop** (E0318); các hàm của std (`get`, `pop`, `contains`, HashMap…) đòi thêm `T: Copy`: dùng số, bool, char, `&T`, struct có `⊐ Copy for T { }`, `std::Bytes`.
 - Khung nhìn lấy từ Vec (`v.as_slice()`) vô hiệu khi `push`/`insert`/`clear`… tiếp theo (E0403) hoặc sau `ar.reset()` (E0405): lấy lại khung nhìn sau mỗi lần sửa.
 ```grit std run
 ƒ main() ! {io, div, mem} {

@@ -83,6 +83,7 @@ E0403_array_index_read_while_unique | E0403 | `a[0]` | [khoản mượn bắt đ
 E0403_branch_shared_unique | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_compare_while_unique | E0403 | `x == 1` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_copy_arg_while_unique | E0403 | `use_i(x)` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
+E0403_drop_uses_its_borrow_at_scope_end | E0403 | `n` | [khoản mượn bắt đầu ở đây @ `&!n`] | dùng/mượn chung `n` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
 E0403_field_shared_whole_unique | E0403 | `&!w` | [khoản mượn bắt đầu ở đây @ `&w.n`] | mượn duy nhất `&!` `w` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_loop_shared_vs_unique | E0403 | `&!x` | [khoản mượn bắt đầu ở đây @ `&x`] | mượn duy nhất `&!` `x` trong khi còn khoản mượn chung `&` đang được dùng về sau
 E0403_loop_unique_carried_shared_inside | E0403 | `&x` | [khoản mượn bắt đầu ở đây @ `&!x`] | dùng/mượn chung `x` trong khi còn khoản mượn duy nhất `&!` đang được dùng về sau
@@ -227,6 +228,7 @@ E0406_unsized_slice_alive_while_array_written | E0406 | `a[0usize] ← 5u32;` | 
 E0406_write_through_origin_while_reborrowed | E0406 | `*p ← 1;` | [khoản mượn bắt đầu ở đây @ `&*p`] | gán vào `p` trong khi nó đang bị mượn (mượn chung `&`) và khoản mượn còn được dùng về sau
 E0407_array_element | E0407 | `eat(a[0])` | [] | không thể move ra khỏi `a`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
 E0407_array_element_in_let | E0407 | `a[1]` | [] | không thể move ra khỏi `a`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
+E0407_contract_moves_drop_arg | E0407 | `ok(d)` | [] | hợp đồng không được move giá trị có thể có `Drop` ra khỏi tham số (hợp đồng chỉ nhìn bản sao của giá trị thật; ADR-C18)
 E0407_deref_in_let | E0407 | `*r` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
 E0407_deref_in_struct_literal | E0407 | `W { b: *r, n: 0 }` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)
 E0407_deref_shared_ref | E0407 | `*r` | [] | không thể move ra khỏi `r`: chỗ này nằm sau một tham chiếu/chỉ số/lát (chỉ được copy hoặc mượn)

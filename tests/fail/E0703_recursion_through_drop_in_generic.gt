@@ -1,0 +1,7 @@
+// expect: fail E0703
+// note: như E0703_recursion_through_drop nhưng giá trị bị drop trong hàm GENERIC (`T` = `R` chỉ biết ở instance) — ADR-C18
+▢ R { n: u32 }
+⊐ Drop for R { ƒ drop(&!self) ! ∅ { f(); } }
+ƒ keep<T>(x: T) ! ∅ { }
+ƒ f() ! ∅ { keep(R { n: 1u32 }); }
+ƒ main() ! ∅ { f(); }

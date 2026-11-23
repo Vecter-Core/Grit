@@ -96,6 +96,7 @@ impl<'t> Builder<'t> {
             uncheckable: Vec::new(),
             loops: Vec::new(),
             var_map: Vec::new(),
+            drops_elaborated: false,
         };
         Builder {
             t,

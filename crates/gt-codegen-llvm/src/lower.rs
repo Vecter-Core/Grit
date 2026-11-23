@@ -2002,8 +2002,28 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                         .build_unconditional_branch(fx.blocks[b.index()]),
                 )?;
             }
-            TerminatorKind::Drop { target, .. } => {
-                // Phase 1: không có destructor người dùng (cùng ngữ nghĩa thông dịch; KNOWN_LIMITATIONS)
+            TerminatorKind::Drop { place, target } => {
+                // drop glue (ADR-C18): một nguồn sự thật `TypeDb::drop_glue` với thông dịch; không có `drop` người dùng ⇒ chỉ nhảy
+                if !self.t.db.user_drops.is_empty() {
+                    let Some(pty) = gt_mir::types::place_ty(fx.body, place) else {
+                        return internal(format!("drop: kiểu của {place:?}"));
+                    };
+                    let ty = Self::sub(fx, &pty);
+                    let glue = match self.t.db.drop_glue(&ty) {
+                        Ok(g) => g,
+                        Err(e) => return internal(format!("drop glue: {e}")),
+                    };
+                    if !glue.is_nothing() {
+                        if !fx.body.drops_elaborated {
+                            return internal(format!(
+                                "drop glue có `drop` người dùng trên thân chưa elaboration `{}`",
+                                fx.body.key
+                            ));
+                        }
+                        let pv = self.place(fx, place)?;
+                        self.drop_glue_at(fx, pv.ptr, &ty, &glue)?;
+                    }
+                }
                 llvm(
                     self.builder
                         .build_unconditional_branch(fx.blocks[target.index()]),
@@ -2318,6 +2338,106 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
             }
         }
         Ok(())
+    }
+
+    /// Phát drop glue (ADR-C18) cho giá trị kiểu `ty` ở `ptr`: `drop` người dùng của chính kiểu (gọi với `&!self` = `ptr`) RỒI các trường theo
+    /// thứ tự khai báo; enum: chọn theo thẻ, chỉ biến thể đang có; mảng: từng phần tử theo chỉ số tăng (vòng lặp IR, không trải phẳng).
+    fn drop_glue_at(
+        &mut self,
+        fx: &mut Fx<'ctx, '_>,
+        ptr: PointerValue<'ctx>,
+        ty: &Ty,
+        g: &gt_types::Glue,
+    ) -> R<()> {
+        use gt_types::Glue;
+        match g {
+            Glue::Nothing => Ok(()),
+            Glue::Call(node, inner) => {
+                if !self.has_body(*node) {
+                    return internal("drop: `drop` người dùng không có thân MIR");
+                }
+                let f = self.get_fn(&Inst {
+                    node: *node,
+                    args: Vec::new(),
+                })?;
+                llvm(self.builder.build_call(f, &[ptr.into()], "drop"))?;
+                self.drop_glue_at(fx, ptr, ty, inner)
+            }
+            Glue::Fields(fs) => {
+                let BasicTypeEnum::StructType(st) = self.lower_ty(ty)? else {
+                    return internal("drop glue: trường trên kiểu không phải struct");
+                };
+                for (i, fty, fg) in fs {
+                    let fp = llvm(self.builder.build_struct_gep(st, ptr, *i, "dfld"))?;
+                    self.drop_glue_at(fx, fp, fty, fg)?;
+                }
+                Ok(())
+            }
+            Glue::Variants(vs) => {
+                let Ty::Adt(def, args) = ty else {
+                    return internal("drop glue: biến thể trên kiểu không phải enum");
+                };
+                let (def, args) = (*def, args.clone());
+                let et = self.lower_ty(ty)?.into_struct_type();
+                let tagp = llvm(self.builder.build_struct_gep(et, ptr, 0, "dtag"))?;
+                let tag =
+                    llvm(self.builder.build_load(self.i64t(), tagp, "dtagv"))?.into_int_value();
+                let cont = self.ctx.append_basic_block(fx.f, "drop.cont");
+                let mut arms = Vec::new();
+                for (vi, _) in vs {
+                    let bb = self.ctx.append_basic_block(fx.f, "drop.variant");
+                    arms.push((self.i64t().const_int(u64::from(*vi), false), bb));
+                }
+                llvm(self.builder.build_switch(tag, cont, &arms))?;
+                for ((vi, fs), (_, bb)) in vs.iter().zip(arms) {
+                    self.builder.position_at_end(bb);
+                    let payload = llvm(self.builder.build_struct_gep(et, ptr, 1, "dpay"))?;
+                    let vst = self.variant_struct(def, &args, *vi)?;
+                    for (i, fty, fg) in fs {
+                        let fp = llvm(self.builder.build_struct_gep(vst, payload, *i, "dvf"))?;
+                        self.drop_glue_at(fx, fp, fty, fg)?;
+                    }
+                    llvm(self.builder.build_unconditional_branch(cont))?;
+                }
+                self.builder.position_at_end(cont);
+                Ok(())
+            }
+            Glue::Array(n, ety, eg) => {
+                let at = self.lower_ty(ty)?;
+                let i64t = self.i64t();
+                let Some(pre) = self.builder.get_insert_block() else {
+                    return internal("drop glue: không có khối hiện tại");
+                };
+                let head = self.ctx.append_basic_block(fx.f, "drop.arr.head");
+                let body = self.ctx.append_basic_block(fx.f, "drop.arr.body");
+                let exit = self.ctx.append_basic_block(fx.f, "drop.arr.exit");
+                llvm(self.builder.build_unconditional_branch(head))?;
+                self.builder.position_at_end(head);
+                let phi = llvm(self.builder.build_phi(i64t, "di"))?;
+                let i = phi.as_basic_value().into_int_value();
+                let more = llvm(self.builder.build_int_compare(
+                    IntPredicate::ULT,
+                    i,
+                    i64t.const_int(*n, false),
+                    "dmore",
+                ))?;
+                llvm(self.builder.build_conditional_branch(more, body, exit))?;
+                self.builder.position_at_end(body);
+                let ep = self.gep(at, ptr, &[i64t.const_zero(), i])?;
+                self.drop_glue_at(fx, ep, ety, eg)?;
+                let next = llvm(
+                    self.builder
+                        .build_int_add(i, i64t.const_int(1, false), "dnext"),
+                )?;
+                let Some(body_end) = self.builder.get_insert_block() else {
+                    return internal("drop glue: mất khối thân vòng");
+                };
+                llvm(self.builder.build_unconditional_branch(head))?;
+                phi.add_incoming(&[(&i64t.const_zero(), pre), (&next, body_end)]);
+                self.builder.position_at_end(exit);
+                Ok(())
+            }
+        }
     }
 
     // ---------------------------------------------------------------- lang item / runtime

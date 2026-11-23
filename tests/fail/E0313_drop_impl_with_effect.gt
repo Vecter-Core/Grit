@@ -1,0 +1,5 @@
+// expect: fail E0313
+// note: `drop` được gọi ngầm ở mọi hàm (kể cả `! ∅`) nên phải `! ∅` như khai báo của trait (ADR-C18)
+▢ D { v: u32 }
+⊐ Drop for D { ƒ drop(&!self) ! {io} { } }
+ƒ main() ! ∅ { d ≔ D { v: 1u32 }; }

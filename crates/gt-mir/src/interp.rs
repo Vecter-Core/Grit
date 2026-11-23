@@ -205,7 +205,12 @@ impl<'a> Interp<'a> {
                 TerminatorKind::Unreachable => {
                     return Flow::Bug(format!("tới `unreachable` ở bb{}", cur.0));
                 }
-                TerminatorKind::Drop { target, .. } => cur = *target,
+                TerminatorKind::Drop { place, target } => {
+                    if let Err(e) = self.drop_place(b, place) {
+                        return e;
+                    }
+                    cur = *target;
+                }
                 TerminatorKind::SwitchInt {
                     discr,
                     targets,
@@ -379,6 +384,94 @@ impl<'a> Interp<'a> {
                         None => return Flow::Bug("hàm `→ !` trả về".to_string()),
                     }
                 }
+            }
+        }
+    }
+
+    /// Chạy drop glue của `place` (ADR-C18): một nguồn sự thật `TypeDb::drop_glue` với codegen. Không có bảng kiểu ⇒ chỉ chạy được khi
+    /// chắc chắn không có `drop` người dùng nào (db rỗng); glue có lời gọi trên thân CHƯA elaboration ⇒ `Bug` (không đoán cờ drop).
+    fn drop_place(&mut self, b: &'a Body, place: &Place) -> Result<(), Flow> {
+        let Some(t) = self.types else {
+            return Ok(());
+        };
+        if t.db.user_drops.is_empty() {
+            return Ok(());
+        }
+        let ty = crate::types::place_ty(b, place)
+            .ok_or_else(|| Flow::Bug(format!("drop: kiểu của {place:?}")))?;
+        let ty = self.sub_env(&ty);
+        let glue =
+            t.db.drop_glue(&ty)
+                .map_err(|e| Flow::Bug(format!("drop glue: {e}")))?;
+        if glue.is_nothing() {
+            return Ok(());
+        }
+        if !b.drops_elaborated {
+            return Err(Flow::Bug(format!(
+                "drop glue có `drop` người dùng trên thân chưa elaboration `{}`",
+                b.key
+            )));
+        }
+        let (fr, local, path) = self.resolve(place)?;
+        self.run_glue(fr, local, path, &glue)
+    }
+
+    fn run_glue(
+        &mut self,
+        fr: usize,
+        local: usize,
+        path: Vec<Step>,
+        g: &gt_types::Glue,
+    ) -> Result<(), Flow> {
+        use gt_types::Glue;
+        match g {
+            Glue::Nothing => Ok(()),
+            Glue::Call(node, inner) => {
+                let mir = self.mir;
+                let Some(cb) = mir.bodies.iter().find(|x| x.node == *node) else {
+                    return Err(Flow::Bug("drop: không có thân MIR của `drop`".to_string()));
+                };
+                match self.run_env(
+                    cb,
+                    vec![V::Ref(fr, local, path.clone())],
+                    (Vec::new(), Vec::new()),
+                ) {
+                    Outcome::Value(_) => {}
+                    Outcome::Abort(k) => return Err(Flow::Abort(k)),
+                    Outcome::Bug(m) => return Err(Flow::Bug(m)),
+                    Outcome::OutOfFuel => return Err(Flow::Fuel),
+                }
+                self.run_glue(fr, local, path, inner)
+            }
+            Glue::Fields(fs) => {
+                for (i, _, fg) in fs {
+                    let mut p = path.clone();
+                    p.push(Step::Field(*i as usize));
+                    self.run_glue(fr, local, p, fg)?;
+                }
+                Ok(())
+            }
+            Glue::Variants(vs) => {
+                let vi = match self.get(fr, local, &path)? {
+                    V::Adt(vi, _) => vi,
+                    other => return Err(Flow::Bug(format!("drop enum trên {other:?}"))),
+                };
+                if let Some((_, fs)) = vs.iter().find(|(v, _)| *v == vi) {
+                    for (i, _, fg) in fs {
+                        let mut p = path.clone();
+                        p.push(Step::Field(*i as usize));
+                        self.run_glue(fr, local, p, fg)?;
+                    }
+                }
+                Ok(())
+            }
+            Glue::Array(n, _, eg) => {
+                for i in 0..*n {
+                    let mut p = path.clone();
+                    p.push(Step::Index(usize::try_from(i).unwrap_or(usize::MAX)));
+                    self.run_glue(fr, local, p, eg)?;
+                }
+                Ok(())
             }
         }
     }

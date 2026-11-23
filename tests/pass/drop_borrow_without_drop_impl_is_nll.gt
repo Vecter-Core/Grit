@@ -1,0 +1,9 @@
+// expect: pass
+// note: đối chứng của E0403_drop_uses_its_borrow_at_scope_end: KHÔNG có Drop thì hết phạm vi không phải lần dùng (NLL) — ADR-C18
+▢ M<'a> { r: &!'a u64 }
+ƒ main() → u64 ! ∅ {
+  μn ≔ 0u64;
+  m ≔ M { r: &!n };
+  x ≔ n;
+  x
+}

@@ -1,0 +1,5 @@
+// expect: fail E0313
+// note: Giai đoạn 1 (ADR-C18): `⊐ Drop for` chỉ cho kiểu không có tham số KIỂU (tham số vùng được) — instance của drop phải có sẵn, không đơn hình hoá theo kiểu
+▢ G<T> { v: T }
+⊐ <T> Drop for G<T> { ƒ drop(&!self) ! ∅ { } }
+ƒ main() ! ∅ { }

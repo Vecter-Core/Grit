@@ -1,0 +1,4 @@
+// expect: fail E0313
+// note: `⊐ Drop for` chỉ cho kiểu khai trong CÙNG tệp (luật mồ côi của Drop) — đổi hành vi drop của kiểu thư viện là cấm (ADR-C18)
+⊐ Drop for Option<u32> { ƒ drop(&!self) ! ∅ { } }
+ƒ main() ! ∅ { }

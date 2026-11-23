@@ -1,0 +1,5 @@
+// expect: fail E0313
+// note: `drop` được gọi NGẦM nên không có chỗ kiểm `⊳` của người gọi — cấm hợp đồng trên `drop` (ADR-C18)
+▢ D { v: u32 }
+⊐ Drop for D { ƒ drop(&!self) ! ∅ ⊳ self.v > 0u32 { } }
+ƒ main() ! ∅ { d ≔ D { v: 1u32 }; }

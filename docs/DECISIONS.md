@@ -1376,8 +1376,28 @@ Trả lời từng câu của điều kiện R6, KÈM bằng chứng chạy đư
 **Giới hạn (cố ý):** `T: Copy` (cùng lý do `Vec` không-Copy là E0318: `Drop` người dùng chưa được hạ — ADR-C18); ô nằm trong Arena nên Arena chỉ trả bộ nhớ khi chết; thế hệ `u64` quấn sau 2^64 lần xoá cùng một ô (thực tế không đạt).
 **Bằng chứng:** oracle `crates/gt-driver/tests/std_slab.rs` (40 chương trình × 120 thao tác ngẫu nhiên, gồm đọc/xoá bằng khoá cũ; đi qua `check` M4–M9 rồi thông dịch MIR; so với mô hình Rust độc lập; khẳng định `capacity == đỉnh sống`): ĐỎ trước (E0201 `Slab` chưa định nghĩa), XANH sau. **Đột biến (tay, 2):** bỏ tăng thế hệ ở `remove` ⇒ oracle ĐỎ; bỏ tái dùng ô trống ở `insert` ⇒ oracle ĐỎ. `docs/STD_REFERENCE.md` sinh lại, `docs_lock` đạt; băm gói `std` trong 8 `rig.lock` cập nhật (băm gói không phụ thuộc đường dẫn; tính bằng `rig lock` trên bản sao). **CHƯA KIỂM:** exe LLVM (máy không có LLVM 20); cổng đầy đủ.
 
-## ADR-C18 — `GlobalAlloc` + hạ `Drop` người dùng: ĐỀ XUẤT, CHƯA LÀM (2026-11-22; GÓI 12 phần 3)
+## ADR-C18 — `GlobalAlloc` + hạ `Drop` người dùng (2026-11-22; GÓI 12 phần 3; Giang DUYỆT 2026-11-22 "duyệt, làm đi"; bước 1 ĐÃ LÀM — xem cuối mục)
 **Lỗ hổng đo được:** GRIT_PLAN §4.0(a) (dòng 124–140) và D26 đòi `GlobalAlloc` ngay Phase 1; prelude KHÔNG có (`git grep GlobalAlloc lib/` rỗng). `Drop` người dùng có lang item (`#lang(drop)`) nhưng bị bỏ qua lúc chạy ⇒ `Vec<T>`/`HashMap` với `T` cần drop bị E0318.
 **Phản biện đề xuất "RAII/Drop là đủ" (Gemini):** trong Grit hiện tại `Drop` một mình KHÔNG giải phóng gì: mọi bộ nhớ của người dùng nằm trong Arena (bump, không có `free` từng ô). `Drop` chỉ có ích khi đi cùng một allocator trả được từng khối (`GlobalAlloc`) hoặc tài nguyên ngoài bộ nhớ (tệp, khoá).
 **Thứ tự đề xuất (mỗi bước một gói, test-trước):** (1) drop elaboration ở M5 (cờ drop, drop ở mọi lối ra kể cả `?`/abort-không-unwind), corpus E2E + oracle "mỗi giá trị drop đúng một lần"; (2) intrinsic `gritrt_heap_alloc/free` với HỢP ĐỒNG TCB trước (`docs/TCB_INTRINSICS.md`), bảng IR Guard, kiểu sở hữu `Owned<T>` có `Drop` gọi `free`, đi qua `Cap<Alloc>`; (3) container tổng quát theo allocator. Phase 2 (8.I thời gian thực) mới tính pool cố định kích thước ở runtime.
 **Không làm ở đây vì:** mỗi bước đổi TCB hoặc ngữ nghĩa ⇒ cần quyết định Giang + hợp đồng TCB (AGENTS.md); bước (2) chỉ kiểm được bằng LLVM (máy GÓI 12 không có). **Không chọn:** GC (GRIT_PLAN cấm), RC/Perceus (thêm đếm tham chiếu vào TCB, mâu thuẫn mô hình Arena + borrowck; Slab đã giải quyết ca đồ thị sống lâu).
+
+**BƯỚC 1 — ĐÃ LÀM (2026-11-22, GÓI 12 phần 4): `Drop` người dùng chạy thật, ở cả thông dịch và exe LLVM.**
+- **M4 (`gt-types/validate.rs`):** bỏ lệnh cấm `⊐ Drop for` ngoài lib/core; thay bằng luật hẹp (E0313): kiểu là struct/enum CÙNG tệp, không
+  tham số KIỂU (vùng được) ⇒ instance của `drop` luôn là instance gốc có sẵn trong bảng instance (IR Guard không cần đổi); không `Copy`;
+  `drop` `! ∅`, không hợp đồng. Impl hợp lệ ghi vào `TypeDb::user_drops` — CHỈ các mục ở đây được glue gọi (`Buf`/`Guard` của prelude thì không).
+- **Glue (`TypeDb::drop_glue`, MỘT nguồn sự thật):** cây `Glue` cho kiểu cụ thể: `drop` của chính kiểu rồi trường theo thứ tự khai báo /
+  biến thể đang có / phần tử mảng. Kiểu lang đục chứa Drop người dùng ⇒ `Err` (E0318 ở M5; lỗi nội bộ nếu chỉ lộ ra ở instance).
+- **M5 — elaboration (`gt-dataflow/src/elaborate.rs`, chạy NGAY sau hạ MIR, TRƯỚC M6):** dùng đúng move path/MaybeInit/MaybeUninit của M6:
+  bỏ drop của chỗ chắc chắn đã move, cờ drop (local `bool` cập nhật tại MỌI điểm phân tích đổi bit) cho chỗ tuỳ đường, drop MỞ theo trường
+  khi move một phần (enum: đọc thẻ rồi rẽ). Thân hợp đồng không drop tham số (bản sao bit) và không được move chúng (E0407). `Body::drops_elaborated`
+  bắt buộc: backend gặp glue có `drop` trên thân chưa elaboration ⇒ lỗi nội bộ.
+- **M6:** đọc `Discriminant` là đọc NÔNG (thẻ không đổi khi move/mượn một trường); `⌥` của người dùng vẫn có `FakeRead` sâu. Drop vốn đã là
+  một lần dùng trong liveness ⇒ dropck như Rust (mẫu `E0403_drop_uses_its_borrow_at_scope_end`); elaboration bỏ drop của giá trị đã move nên
+  `drop_borrow_released_after_move` XANH (trước đó ĐỎ giả).
+- **M8 (`gt-term`):** cạnh GIÁN TIẾP từ mỗi `Drop` tới các `drop` trong glue (đồ thị instance: theo kiểu đã thế; đồ thị bảo thủ: tới mọi `drop`
+  người dùng) ⇒ đệ quy qua drop ⇒ E0703 (trước khi sửa: XANH — chương trình không dừng được chấp nhận; hai mẫu `E0703_recursion_through_drop*`).
+- **Backend:** thông dịch (`Interp::drop_place`) và LLVM (`drop_glue_at`: gọi `drop` với con trỏ chỗ, GEP trường, `switch` theo thẻ, vòng IR cho mảng).
+- **Bằng chứng:** `crates/gt-driver/tests/user_drop.rs` (ĐỎ trước: E0313; XANH sau) — 15 ca, mỗi ca chạy bằng thông dịch VÀ exe LLVM, so dãy
+  drop mã hoá thứ tự; 13 mẫu corpus mới (E0313 ×5, E0318, E0403, E0407, E0703 ×2, pass ×3). Oracle ngẫu nhiên và đột biến: xem HISTORY.
+- **Còn lại (bước 2–3):** `GlobalAlloc` (intrinsic + hợp đồng TCB) và `Owned<T>`; container chứa phần tử có Drop; Drop cho kiểu generic theo kiểu.

@@ -1,0 +1,5 @@
+// expect: fail E0318
+// note: `Cell` là kiểu lang ĐỤC: drop glue không đi vào được ⇒ giá trị `Cell<D>` không drop được — từ chối thay vì âm thầm bỏ drop (ADR-C18)
+▢ D { v: u32 }
+⊐ Drop for D { ƒ drop(&!self) ! ∅ { } }
+ƒ main() ! ∅ { c ≔ Cell::new(D { v: 1u32 }); }
