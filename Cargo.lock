@@ -111,6 +111,7 @@ dependencies = [
  "gt-effects",
  "gt-fmt",
  "gt-guard",
+ "gt-kernel",
  "gt-mir",
  "gt-oblig",
  "gt-parser",
@@ -153,6 +154,13 @@ name = "gt-guard"
 version = "0.1.0"
 dependencies = [
  "gt-llvm",
+]
+
+[[package]]
+name = "gt-kernel"
+version = "0.1.0"
+dependencies = [
+ "gt-oblig",
 ]
 
 [[package]]

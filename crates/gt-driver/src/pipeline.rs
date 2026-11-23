@@ -4,6 +4,7 @@ use crate::render::{ChecksReport, checks_report};
 use crate::sha256::sha256_hex;
 use crate::verdict::{Verdict, decide};
 use gt_diag::{Code, Diagnostic, Diagnostics, Report};
+use gt_kernel::CertifiedProver;
 use gt_mir::MirOutput;
 use gt_oblig::driver::{Checks, OblOutput, analyze_program_with, build_prog_info};
 use gt_oblig::prover::ZoneProver;
@@ -80,6 +81,14 @@ pub struct PassRecord {
 pub enum Fault {
     Panic(String),
     Skip(String),
+}
+
+/// Bộ chứng minh của M7/M8 (Giai đoạn 2, ADR-P2-04): zone TÌM, KERNEL quyết định — mọi "đã chứng minh" phải có chứng chỉ Farkas được kernel chấp
+/// nhận (chứng minh của zone mà kernel không xác nhận được ⇒ "chưa chứng minh": giữ kiểm lúc chạy / từ chối nghĩa vụ không kiểm được).
+fn kernel_prover() -> CertifiedProver<ZoneProver> {
+    let mut p = CertifiedProver::new(ZoneProver::new(24));
+    p.require_kernel = true;
+    p
 }
 
 /// Chế độ check mặc định của gritc. Chỉ đổi sang `Proven` khi điều kiện đột biến "xoá thêm check" giải quyết VÀ Giang duyệt (ADR-028 §2).
@@ -378,7 +387,8 @@ fn run_passes(
     // ---- M7
     let checks = opts.checks;
     let obl = run.stage("m7.obligations", || {
-        analyze_program_with(&t, &m, &mut ZoneProver::new(24), checks)
+        // Giai đoạn 2 (ADR-P2-04): zone như Phase 1; khi zone "Unknown" ⇒ chứng chỉ Farkas, CHỈ tính khi kernel chấp nhận
+        analyze_program_with(&t, &m, &mut kernel_prover(), checks)
     });
     if let Some(o) = &obl {
         // E0601 (literal ngoài phạm vi) do chính `analyze_program` báo
@@ -390,7 +400,7 @@ fn run_passes(
     // ---- M8
     if let Some(r) = run.stage("m8.termination", || {
         let info = build_prog_info(&t, &m);
-        gt_term::check_termination(&t, &m, &info, &mut ZoneProver::new(24)).report
+        gt_term::check_termination(&t, &m, &info, &mut kernel_prover()).report
     }) {
         merge(&mut run.bag, &r);
     }

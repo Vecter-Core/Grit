@@ -375,7 +375,7 @@ pub fn elaborate_drops(body: &mut Body, db: &TypeDb) -> Result<Vec<DropDiag>, St
                     StatementKind::StorageLive(l) | StatementKind::StorageDead(l) => {
                         flag_updates(&mp, &flags, mp.roots[l.index()], false, &mut ups);
                     }
-                    StatementKind::FakeRead(..) | StatementKind::Nop => {}
+                    StatementKind::FakeRead(..) | StatementKind::Wipe(_) | StatementKind::Nop => {}
                 }
                 let src = s.source;
                 stmts.push(s);
@@ -584,4 +584,97 @@ fn emit(
         };
     }
     Ok(next)
+}
+
+/// ADR-P2-03: chèn `Wipe(chỗ)` ngay sau mỗi MOVE ra khỏi một chỗ (không qua `*`) có thể chứa `Secret` — move để lại bản sao bit ở chỗ nguồn.
+/// Move trong lệnh gán ⇒ `Wipe` ngay sau lệnh; move qua đối số lời gọi ⇒ `Wipe` trên cạnh TRỞ VỀ (khối mới giữa lời gọi và đích; lời gọi
+/// không trở về thì tiến trình dừng — D3). Backend chỉ xoá khi kiểu SAU KHI THẾ thật sự chứa Secret.
+pub fn insert_secret_wipes(body: &mut Body, db: &TypeDb) -> Result<(), String> {
+    if !db.secret_used {
+        return Ok(());
+    }
+    let wipe_ty = |b: &Body, p: &Place| -> Result<bool, String> {
+        let t =
+            place_ty(b, p).ok_or_else(|| format!("kiểu của chỗ bị move {p:?} không xác định"))?;
+        Ok(db.may_contain_secret(&t))
+    };
+    // lệnh gán
+    for bi in 0..body.blocks.len() {
+        let mut plan: Vec<(usize, Vec<Place>)> = Vec::new();
+        for (si, s) in body.blocks[bi].statements.iter().enumerate() {
+            if let StatementKind::Assign(_, rv) = &s.kind {
+                let mut ps = Vec::new();
+                for p in moved_places_of_rvalue(rv) {
+                    if wipe_ty(body, p)? {
+                        ps.push(p.clone());
+                    }
+                }
+                if !ps.is_empty() {
+                    plan.push((si, ps));
+                }
+            }
+        }
+        for (si, ps) in plan.into_iter().rev() {
+            let src = body.blocks[bi].statements[si].source;
+            let ws: Vec<Statement> = ps
+                .into_iter()
+                .map(|p| Statement {
+                    kind: StatementKind::Wipe(p),
+                    source: src,
+                })
+                .collect();
+            body.blocks[bi].statements.splice(si + 1..si + 1, ws);
+        }
+    }
+    // đối số lời gọi
+    let n = body.blocks.len();
+    for bi in 0..n {
+        let Some(Terminator {
+            kind:
+                TerminatorKind::Call {
+                    args,
+                    target: Some(target),
+                    ..
+                },
+            source,
+        }) = &body.blocks[bi].terminator
+        else {
+            continue;
+        };
+        let mut ps = Vec::new();
+        for a in args {
+            if let Operand::Move(p) = a
+                && !p.has_deref()
+                && wipe_ty(body, p)?
+            {
+                ps.push(p.clone());
+            }
+        }
+        if ps.is_empty() {
+            continue;
+        }
+        let (target, source) = (*target, *source);
+        let w = BasicBlock(u32::try_from(body.blocks.len()).map_err(|_| "quá nhiều khối")?);
+        body.blocks.push(BlockData {
+            statements: ps
+                .into_iter()
+                .map(|p| Statement {
+                    kind: StatementKind::Wipe(p),
+                    source,
+                })
+                .collect(),
+            terminator: Some(Terminator {
+                kind: TerminatorKind::Goto(target),
+                source,
+            }),
+        });
+        if let Some(Terminator {
+            kind: TerminatorKind::Call { target: t, .. },
+            ..
+        }) = &mut body.blocks[bi].terminator
+        {
+            *t = Some(w);
+        }
+    }
+    Ok(())
 }

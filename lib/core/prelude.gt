@@ -65,8 +65,14 @@
 ⊐ Drop for Guard { ƒ drop(&!self) ! ∅ { } }
 ƒ mk_guard() → Guard ! ∅ { }
 #lang(secret)
+// Secret<T> (D13; ADR-P2-03): `new` bọc dữ liệu (không lộ gì); `declassify` mở (S201). Cần drop: glue XOÁ toàn bộ byte khi chết; chỗ nguồn bị xoá
+// sau mỗi move (gritrt_secret_wipe, TCB). Vec/Arena không bao giờ xoá ⇒ không chứa được Secret (E0318).
 ▢ Secret<T> { v: T }
-⊐ <T> Secret<T> { ƒ declassify(self) → T ! ∅ { } }
+⊐ <T> Secret<T> {
+  ƒ new(v: T) → Secret<T> ! ∅ { }
+  ƒ declassify(self) → T ! ∅ { }
+}
+⊐ <T> Drop for Secret<T> { ƒ drop(&!self) ! ∅ { } }
 #lang(cap)
 ▢ Cap<T> { v: T }
 ▢ Fs { x: i32 }

@@ -1,0 +1,13 @@
+[package]
+name = "gt-kernel"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Grit Giai đoạn 2 (A2/A3, ADR-P2-04): kernel nhỏ KIỂM chứng chỉ Farkas cho nghĩa vụ số học tuyến tính + bộ tìm chứng chỉ (ngoài TCB)"
+
+[dependencies]
+gt-oblig = { path = "../gt-oblig" }
+
+[lints]
+workspace = true

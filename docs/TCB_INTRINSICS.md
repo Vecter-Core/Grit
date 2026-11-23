@@ -115,10 +115,21 @@ E0313×2/E0301/E0318×3/E0801; chương trình Owned lồng/`into_inner`/gán đ
 đột biến TAY hàm kiểm heap của runtime 3/3 bị bắt (tắt kiểm, bỏ đối chiếu sổ, bỏ đường chèn lỗi); cổng clone sạch `3b17f1f` XANH (957/0, 202 bộ).
 **CHƯA:** đột biến tự động hàm runtime, Windows.
 
+## B6. Xoá `Secret` (Giai đoạn 2 — A1, ADR-P2-03, 2026-11-23) — lớp nghĩa vụ IR Guard: **D13**
+| intrinsic (prelude) | hiệu ứng | capability cần | hạ thành | điều kiện abort | bất biến | người duyệt |
+|---|---|---|---|---|---|---|
+| `Secret::new(v: T) → Secret<T>` | `∅` | không (bọc dữ liệu không lộ gì) | dựng `{ v }` | không | không | BẰNG CHỨNG CÓ (2026-11-23) — CHỜ DUYỆT |
+| `Secret::declassify(self) → T` | `∅` (S201 VÀNG do M9) | (D13: cần `Cap<Secret>` — CHƯA thi hành, ADR-C13) | lấy trường `v`; chỗ nguồn bị `Wipe` sau move | không | `self` move ⇒ chỗ nguồn bị xoá ngay sau lời gọi | BẰNG CHỨNG CÓ (2026-11-23) — CHỜ DUYỆT |
+| drop glue / `Wipe` / xoá `_0` khi trả về | `∅` | không | `gritrt_secret_wipe(ptr, size_of)`: ghi 0 volatile từng byte + rào compiler | không | sau thao tác, mọi byte của ô nhớ do Grit quản lý từng chứa Secret (chỗ chết, chỗ bị move ra, `_0`) bằng 0; KHÔNG bảo vệ thanh ghi/bản sao do LLVM tạo, swap, core dump, đường abort | BẰNG CHỨNG CÓ (2026-11-23) — CHỜ DUYỆT |
+**Bằng chứng (2026-11-23):** `secret_wipe.rs` — oracle 24 chương trình ngẫu nhiên (declassify có/không điều kiện, khối lồng) × thông dịch + exe dev/release/
+release-o2: số lần xoá = mô hình độc lập, giá trị đúng (O2 KHÔNG loại được xoá: lời gọi ra thư viện tĩnh); 5 ca tính tay (gồm qua hàm, gán đè — đối chiếu MIR);
+đột biến tay 3/3 bị bắt (bỏ xoá-sau-move, bỏ xoá trong glue, bỏ xoá `_0`); unit gt-rt `secret_wipe_zeroes_exactly_the_given_bytes` (đúng `len` byte, không tràn).
+**CHƯA:** luật IR Guard "mọi alloca Secret được xoá trên mọi đường"; đột biến tự động; cổng liền mạch trên mã này.
+
 ## C. Runtime `gt-rt` (staticlib, `panic = "abort"`): hàm xuất ra cho mã sinh
-Đây là các hàm runtime (`gt-rt`) mà mã Grit có thể gọi. Bảng đóng hiện hành gồm 29 hàm; xem danh sách đầy đủ ngay dưới đây để tránh nhầm danh sách tóm tắt lịch sử với ABI hiện tại. IR Guard từ chối hàm runtime ngoài bảng.
+Đây là các hàm runtime (`gt-rt`) mà mã Grit có thể gọi. Bảng đóng hiện hành gồm 30 hàm; xem danh sách đầy đủ ngay dưới đây để tránh nhầm danh sách tóm tắt lịch sử với ABI hiện tại. IR Guard từ chối hàm runtime ngoài bảng.
 Ranh giới `unsafe` của gt-rt: ADR-031.
-Danh sách ĐẦY ĐỦ (29, khớp từng tên với `gt_guard::RUNTIME`; lớp nghĩa vụ IR Guard trong ngoặc, `—` = không cần lớp): `gritrt_abort` (—), `gritrt_exit` (—), `gritrt_start` (—), `gritrt_dev_checks` (—), `gritrt_report_int` (—), `gritrt_alloc` (—), `gritrt_spawn` (E0501), `gritrt_mutex_lock` (E0502), `gritrt_mutex_unlock` (E0502), `gritrt_arg_count` (E0310), `gritrt_ewrite_u64` (E0310), `gritrt_ewrite_str` (E0310), `gritrt_arg_ptr` (E0310), `gritrt_arg_len` (E0310), `gritrt_fs_read` (E0310), `gritrt_fs_open` (E0310), `gritrt_stdin_read` (E0310), `gritrt_fs_write` (E0310), `gritrt_utf8_valid` (—), `gritrt_bytes_eq` (—), `gritrt_arena_new` (E0405), `gritrt_arena_alloc` (E0405), `gritrt_arena_reset` (E0405), `gritrt_file_len` (E0310), `gritrt_file_ptr` (E0310), `gritrt_write_u64` (E0310), `gritrt_write_str` (E0310), `gritrt_heap_alloc` (E0401), `gritrt_heap_free` (E0401).
+Danh sách ĐẦY ĐỦ (30, khớp từng tên với `gt_guard::RUNTIME`; lớp nghĩa vụ IR Guard trong ngoặc, `—` = không cần lớp): `gritrt_abort` (—), `gritrt_exit` (—), `gritrt_start` (—), `gritrt_dev_checks` (—), `gritrt_report_int` (—), `gritrt_alloc` (—), `gritrt_spawn` (E0501), `gritrt_mutex_lock` (E0502), `gritrt_mutex_unlock` (E0502), `gritrt_arg_count` (E0310), `gritrt_ewrite_u64` (E0310), `gritrt_ewrite_str` (E0310), `gritrt_arg_ptr` (E0310), `gritrt_arg_len` (E0310), `gritrt_fs_read` (E0310), `gritrt_fs_open` (E0310), `gritrt_stdin_read` (E0310), `gritrt_fs_write` (E0310), `gritrt_utf8_valid` (—), `gritrt_bytes_eq` (—), `gritrt_arena_new` (E0405), `gritrt_arena_alloc` (E0405), `gritrt_arena_reset` (E0405), `gritrt_file_len` (E0310), `gritrt_file_ptr` (E0310), `gritrt_write_u64` (E0310), `gritrt_write_str` (E0310), `gritrt_heap_alloc` (E0401), `gritrt_heap_free` (E0401), `gritrt_secret_wipe` (D13).
 
 ## Cập nhật kiểm động đua dữ liệu (GÓI 4 S3, 2026-11-19) — H7 `Atomic`, H8 `Mutex`/`spawn`
 ThreadSanitizer (Linux, build phân tích, KHÔNG phải binary đã qua Guard cuối): đối chứng dương BẮT (IR có đua đã biết, cả qua `gritrt_spawn`), đối chứng âm không báo; 8 mẫu đa luồng × 50 lần: **không phát hiện đua dữ liệu** (`docs/TSAN_RESULTS.md`). Điều này CHỈ là bằng chứng thực nghiệm bổ sung; rủi ro H7/H8 vẫn do kiến trúc sư chấp nhận có ý thức (không nâng trạng thái dòng nào): bộ nhớ yếu và Windows (SRWLOCK) chưa kiểm.

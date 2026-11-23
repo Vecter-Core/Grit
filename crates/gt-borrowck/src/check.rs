@@ -191,7 +191,8 @@ fn stmt_accesses(body: &Body, s: &Statement) -> Vec<Access> {
             kind: Kind::Read,
             depth: Depth::Deep,
         }),
-        StatementKind::StorageLive(_) | StatementKind::Nop => {}
+        // Wipe (ADR-P2-03): ghi 0 vào chỗ vừa bị move ra — chỗ đã chưa khởi tạo, không có khoản mượn nào hợp lệ trỏ vào ⇒ không phải truy cập
+        StatementKind::StorageLive(_) | StatementKind::Wipe(_) | StatementKind::Nop => {}
     }
     v
 }

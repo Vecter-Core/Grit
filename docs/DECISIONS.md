@@ -1416,3 +1416,52 @@ Trả lời từng câu của điều kiện R6, KÈM bằng chứng chạy đư
   Drop/`Owned` ⇒ E0318 (Arena không chạy destructor — lỗ ngữ nghĩa phát hiện khi làm bước này, có từ bước 1); glue `Glue::Free`; thông dịch (khối =
   ô trong kho khung 0, trả = đánh dấu chết ⇒ dùng-sau-trả/trả-hai-lần là `Bug`) và LLVM (`gritrt_heap_alloc/free`, lớp IR Guard E0401); runtime có sổ
   khối sống ở dev + `GRITRT_HEAP_REPORT`. Bằng chứng: `docs/TCB_INTRINSICS.md` cuối mục B5.
+
+## ADR-P2-00 — MỞ Giai đoạn 2 theo lệnh Giang (2026-11-23)
+**Lệnh (văn bản, Giang):** "bây giờ hãy bắt tay vào phát triển giai đoạn 2 đi, ko đợi nữa … hoàn thiện xong giai đoạn 2 rồi mới tối ưu hiệu năng".
+**Điều kiện vào của `PHASE2_PLAN.md` §1 lúc mở:** (1) nhãn `1.0.0-seed` — CHƯA (nhãn `1.0.0-rc7`); (2) các mục §7 GRIT_PLAN — CHƯA kiểm hết (fuzz 24 giờ…);
+(3) cổng đầy đủ xanh — Linux XANH liền mạch trên `3b17f1f` (957/0), Windows chưa chạy lại; (4) lệnh bằng văn bản của Giang — CÓ. Giang chủ động bỏ qua (1)–(2).
+**Thứ tự áp dụng (theo lệnh: hoàn thiện trước, hiệu năng sau):** dòng A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) → D (hiệu năng) cuối cùng;
+trong A: A1 (xoá Secret) trước vì là lỗ hổng thật. `PHASE2_PLAN.md` chuyển từ ĐỀ XUẤT thành KẾ HOẠCH ĐANG THỰC HIỆN; từng mục vẫn cần ADR riêng + test-trước +
+cổng; mục đổi TCB vẫn ghi "CHỜ DUYỆT" tới khi Giang (hoặc kiến trúc sư) duyệt. Giai đoạn 2 là dự án nhiều năm (GRIT_PLAN mục 9): KHÔNG hứa mốc.
+
+## ADR-P2-03 — Xoá Secret có bảo đảm (2026-11-23; thay bản nháp ở `PHASE2_ADR_DRAFTS.md`)
+**Đo trước:** (i) KHÔNG có chỗ nào xoá nội dung `Secret` (FACTCHECK mục 3); (ii) MỚI: chương trình người dùng KHÔNG tạo được giá trị `Secret` nào (literal bị cấm
+ngoài lib/core, prelude không có hàm tạo, không I/O nào trả `Secret`) ⇒ lỗ (i) hiện chỉ là lý thuyết, và kiểu `Secret` gần như không dùng được.
+**Quyết định:**
+1. **Nguồn:** `Secret::new(v: T) → Secret<T> ! ∅` (prelude, intrinsic đồng nhất). Bọc dữ liệu vào Secret không làm lộ gì; chiều mở (`declassify`) giữ S201.
+2. **Xoá khi chết:** `Secret` có drop glue `Wipe` (glue của `T` rồi xoá TOÀN BỘ byte của `Secret<T>`) — dùng elaboration drop của ADR-C18 nên phủ mọi lối ra
+   phạm vi, gán đè, trả về. `Secret` vì vậy "cần drop": `Vec<Secret>`/`Arena::alloc(Secret)` ⇒ E0318 (Arena/Vec không bao giờ xoá).
+3. **Xoá chỗ nguồn sau MOVE:** move để lại bản sao bit ở chỗ nguồn (kể cả `declassify(self)`) ⇒ câu lệnh MIR mới `Wipe(chỗ)` ngay sau mỗi move của chỗ CÓ THỂ chứa
+   Secret (theo kiểu sau khi thế; tham số kiểu ⇒ có thể); move qua đối số lời gọi ⇒ xoá trên cạnh trở về. `_0` chứa Secret được xoá sau khi nạp giá trị trả về.
+4. **Thao tác:** hàm runtime `gritrt_secret_wipe(ptr, len)` ghi 0 bằng `write_volatile` + rào compiler; nằm trong thư viện tĩnh riêng nên tối ưu LLVM (O2) không
+   loại được lời gọi. Bảng RUNTIME của IR Guard, lớp `D13`.
+5. **Bằng chứng:** runtime đếm lời gọi/byte đã xoá (`GRITRT_SECRET_REPORT=1`), thông dịch đếm độc lập theo cùng ngữ nghĩa ⇒ đối chiếu ở dev/release/release-o2;
+   đột biến "bỏ xoá" phải bị bắt.
+**Giới hạn công khai:** KHÔNG bảo vệ thanh ghi/bản sao do LLVM tạo (truyền theo giá trị, tràn thanh ghi), swap, core dump, bản đã `declassify`, đường abort (tiến
+trình dừng ngay, không chạy drop — D3). Luật Guard "mọi alloca Secret có xoá trên mọi đường" CHƯA làm (bước sau).
+
+## ADR-P2-04 — A2/A3 bước 1: chứng chỉ Farkas + kernel kiểm bằng chứng (2026-11-23; Giai đoạn 2)
+**Theo GRIT_PLAN 8.B lộ trình (1):** "số học tuyến tính qua chứng chỉ Farkas (kiểm bằng phép nhân-cộng đơn giản)". Bước này KHÔNG thêm Z3/cvc5 (không đưa bộ
+giải ngoài vào TCB); 8.A đầy đủ (bit-vector, mảng, LRAT) là các bước sau.
+- **Crate mới `gt-kernel`** (`forbid(unsafe_code)`). Phần TCB: `linear.rs` (dịch `Obligation` → DNF các ràng buộc `Σ aᵢxᵢ + c ≤ 0` trên số nguyên, kèm cận
+  kiểu của từng biến) và `check.rs` (với MỖI ca của DNF, tổ hợp tuyến tính với hệ số nguyên ≥ 0 phải triệt tiêu mọi biến và cho hằng > 0 ⇒ `0 ≥ dương`,
+  mâu thuẫn). Số học i128 KIỂM TRÀN; tràn ⇒ từ chối. Phần NGOÀI TCB: `search.rs` (Fourier–Motzkin có theo dõi hệ số, tìm chứng chỉ) và `CertifiedProver`.
+- **Ngữ nghĩa dịch (sound):** `a<b` trên số nguyên ⇒ `a−b+1 ≤ 0`; `≠` ⇒ hai ca; phủ định đẩy vào trong (NNF). Mọi thứ kernel không hiểu (tích hai số
+  không hằng, `Uf`, `Pred`, `Atom`, lượng từ, hằng ngoài i128) ⇒ tích phi tuyến thành NGUYÊN TỬ mờ, còn lại thay bằng `True` — chỉ làm công thức
+  `giả thiết ∧ ¬mục tiêu` YẾU đi, nên chứng minh nó mâu thuẫn vẫn đúng cho bản gốc. DNF quá 64 ca ⇒ không chứng minh (Unknown).
+- **Tích hợp (M7, M8):** `CertifiedProver(ZoneProver)`: kết quả zone giữ nguyên (đường cũ, vẫn trong TCB như Phase 1); khi zone "Unknown" ⇒ tìm Farkas, và
+  CHỈ trả `Proved` khi kernel chấp nhận chứng chỉ (chứng chỉ mã hoá trong `Cert`, `farkas:v1:…`). Có chế độ đo độ phủ: tỉ lệ chứng minh của zone cũng có
+  chứng chỉ kernel (mục tiêu 8.B "≥X% Obligation được kernel xác nhận" — X do ĐO).
+- **Bằng chứng cần:** test ĐỘC HẠI (chứng chỉ sai/âm/thiếu ca/tràn/của nghĩa vụ khác ⇒ kernel từ chối); oracle với bộ giải vét cạn (mọi `Proved` của Farkas
+  không có phản ví dụ); mẫu corpus mà Phase 1 từ chối nay chấp nhận nhờ Farkas + đối chứng vẫn từ chối; oracle dừng M8 (`term_oracle`) vẫn 0 âm tính giả.
+**Kết quả (2026-11-23):**
+- Kernel ~250 dòng TCB (`linear.rs` + `check.rs`); luật thêm: ca chứa cả `a` và `¬a` (nguyên tử logic) là vô nghiệm — cần cho `⟳ x … ⋈ x`.
+- Oracle soundness: 3000 nghĩa vụ ngẫu nhiên (biến 3–4 bit, có/không dấu, `≤ < = ≠`, `∧ ∨ ¬`, nguyên tử): kernel chấp nhận 855, bộ giải vét cạn độc lập xác
+  nhận ĐỦ 855 (0 sai). Test độc hại: 9 loại chứng chỉ giả bị từ chối (hệ số âm/lệch, thiếu ràng buộc, chỉ số ngoài, thừa/thiếu ca, ca rỗng, tràn, mâu thuẫn nguyên
+  tử bịa, chứng chỉ của nghĩa vụ khác) + 7 chuỗi mã hoá sai.
+- **Độ phủ 8.B trên corpus (445 chương trình `tests/pass`): zone chứng minh 105 nghĩa vụ, kernel xác nhận 105 (100%).** ⇒ BẬT chế độ **CHỈ TIN KERNEL** ở
+  `gritc` (M7 và M8): mọi "đã chứng minh" phải có chứng chỉ Farkas được kernel chấp nhận; bộ chứng minh zone chỉ còn là bộ TÌM (ra khỏi TCB cho quyết định
+  chứng minh). Bộ PHÂN TÍCH M7 (sinh giả thiết) vẫn trong TCB.
+- Farkas tự tìm được chứng minh mới trên corpus: 0 — vì M7 chỉ xuất giả thiết khoảng + hiệu (zone); sự kiện tuyến tính tổng quát (`i + j < n`, `2·i < n`, theo
+  nhánh) bị mất trước khi tới bộ chứng minh. **Bước 2 của A2:** M7 giữ thêm sự kiện tuyến tính của điều kiện rẽ nhánh/vòng (miền đa diện rút gọn).

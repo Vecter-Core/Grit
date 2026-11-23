@@ -1,44 +1,45 @@
 # file	line	mẫu	phân loại	tham chiếu sửa	lý do	dòng mã (chuẩn hoá)
 crates/gt-borrowck/src/check.rs	80	_ =>	AN TOÀN		câu lệnh khác (StorageLive/FakeRead/Nop) không đổi tập khoản mượn đang sống	_ => {}
-crates/gt-borrowck/src/check.rs	248	_ =>	AN TOÀN		projection khác Field/Downcast khác nhau ⇒ coi là chồng lấn (có xung đột) — bảo thủ	_ => {}
-crates/gt-borrowck/src/check.rs	358	_ =>	AN TOÀN		kiểu không phải ADT không có Drop riêng; ADT thiếu trong db đã xử lý riêng (fault ⇒ ICE)	_ => false,
-crates/gt-borrowck/src/check.rs	482	_ =>	AN TOÀN		chỉ để tìm nhãn vị trí move cho thông báo	_ => {}
-crates/gt-borrowck/src/check.rs	499	unwrap_or	AN TOÀN		chỉ chọn span cho nhãn thông báo	return Some(arg_spans.get(i).copied().unwrap_or(source.span));
+crates/gt-borrowck/src/check.rs	249	_ =>	AN TOÀN		projection khác Field/Downcast khác nhau ⇒ coi là chồng lấn (có xung đột) — bảo thủ	_ => {}
+crates/gt-borrowck/src/check.rs	359	_ =>	AN TOÀN		kiểu không phải ADT không có Drop riêng; ADT thiếu trong db đã xử lý riêng (fault ⇒ ICE)	_ => false,
+crates/gt-borrowck/src/check.rs	483	_ =>	AN TOÀN		chỉ để tìm nhãn vị trí move cho thông báo	_ => {}
+crates/gt-borrowck/src/check.rs	500	unwrap_or	AN TOÀN		chỉ chọn span cho nhãn thông báo	return Some(arg_spans.get(i).copied().unwrap_or(source.span));
 crates/gt-borrowck/src/lib.rs	99	unwrap_or	AN TOÀN		chỉ chọn span của E0404; chẩn đoán vẫn phát	let span = cause_span(&g, g.univ[k].0, g.univ[j].0).unwrap_or(body.span);
 crates/gt-borrowck/src/regions.rs	293	is_some_and	AN TOÀN		ADT không có `lang` ⇒ không phải interior_mutable ⇒ đi tiếp tính bất biến theo trường (đúng); ADT thiếu trong db ⇒ defend + trả true (bất biến, bảo thủ).	.is_some_and(gt_types::Lang::interior_mutable)
 crates/gt-borrowck/src/regions.rs	320	_ =>	AN TOÀN		ty_invariant: kiểu không chứa region (int/bool/char/str/never/param) ⇒ false vì không có vị trí region (region_slots cũng cho 0); Adt xét qua đối số kiểu.	_ => false,
 crates/gt-borrowck/src/regions.rs	378	_ =>	AN TOÀN		relate: kiểu không có vị trí region (region_slots `_ => 0`) nên không có gì để ràng buộc; nhất quán với region_slots.	_ => {}
 crates/gt-borrowck/src/regions.rs	442	let _ =	AN TOÀN		`let _ = pty;` chỉ tránh cảnh báo biến không dùng.	let _ = pty;
 crates/gt-codegen-llvm/src/lower.rs	157	_ =>	AN TOÀN		find_main: không có hoặc nhiều hơn một `main` đều trả internal (ICE), không chọn bừa.	_ => internal("có nhiều hàm `main`"),
-crates/gt-codegen-llvm/src/lower.rs	452	is_some_and	AN TOÀN		Chỉ trong inject_post (chèn lỗi test GRITC_FAULT làm IR XẤU hơn); không thấy lời gọi thì trả internal, không im lặng.	.is_some_and(|c| c.get_name().to_bytes() == b"gritrt_abort")
-crates/gt-codegen-llvm/src/lower.rs	494	let _ =	AN TOÀN		Chèn lỗi test: bỏ qua kết quả đặt cờ fast-math chỉ làm lỗi chèn mất tác dụng (test sẽ đỏ), không làm IR thật bớt an toàn; Guard-post vẫn chạy sau.	let _ = i.set_fast_math_flags(
-crates/gt-codegen-llvm/src/lower.rs	537	_ =>	AN TOÀN		`_` của inject_post chỉ gồm các Inject không-post (đã lọc bằng is_post trước khi gọi); chỉ liên quan harness fault-injection.	_ => {}
-crates/gt-codegen-llvm/src/lower.rs	1052	unwrap_or	AN TOÀN		get_nth_param trả None ⇒ internal "thiếu tham số hàm"; u32::MAX chỉ khi >4 tỷ tham số.	let Some(arg) = f.get_nth_param(u32::try_from(i).unwrap_or(u32::MAX)) else {
-crates/gt-codegen-llvm/src/lower.rs	1114	_ =>	SỬA	FB-C22	prescan coi local `AtomicOrdering` là hằng nếu chỉ có MỘT câu lệnh gán trực tiếp, nhưng KHÔNG tính ghi gián tiếp qua `&!o` (gán `*p` đếm cho local `p`, không phải `o`) ⇒ ordering bị cố định sai (cùng giới hạn ở gt-conc::variant_of nên E0503 cũng không bắt): `μo ≔ Relaxed; set(&!o)` (đặt SeqCst) rồi `a.load(o)` biên dịch thành monotonic.	_ => {}
-crates/gt-codegen-llvm/src/lower.rs	1250	_ =>	AN TOÀN		`_` = struct/tuple (enum luôn đi qua Downcast do MIR builder phát, pv.variant=Some); kiểu sai ⇒ internal "Field trên kiểu không phải struct" hoặc LLVM từ chối chỉ số.	_ => {
-crates/gt-codegen-llvm/src/lower.rs	1430	_ =>	AN TOÀN		Const::Item không phải const/static ⇒ internal (ICE), fail-closed.	_ => return internal("Const::Item không phải const/static"),
-crates/gt-codegen-llvm/src/lower.rs	1454	is_some_and	AN TOÀN		has_interior_mut: ADT không có trong db ⇒ true (đóng); lang Cell/Mutex/Atomic ⇒ true; chỉ dùng để TỪ CHỐI sao chép static (unsupported).	if adt.lang.is_some_and(Lang::interior_mutable) {
-crates/gt-codegen-llvm/src/lower.rs	1469	_ =>	GHI NHẬN		`_ => false` đúng cho Int/Ref/RawPtr/Fn/Str (sao chép tham chiếu không sao chép ô); Param/Infer/Err ⇒ true (đóng). Giới hạn: ở dòng 1381 `variant_fields(..).is_ok_and(..)` coi lỗi là 'không có ô' (mở) nhưng static không generic nên Err chỉ khi db hỏng; thử static có Atomic bên trong struct: bị từ chối đúng (exit 3 unsupported).	_ => false,
-crates/gt-codegen-llvm/src/lower.rs	1489	_ =>	AN TOÀN		`_` = mọi Rvalue khác đi tiếp đường rvalue() chung; không bỏ qua câu lệnh nào.	_ => {}
-crates/gt-codegen-llvm/src/lower.rs	1540	unwrap_or	AN TOÀN		u32::MAX chỉ khi >4 tỷ trường; build_struct_gep chỉ số sai bị LLVM/inkwell từ chối (llvm()?).	u32::try_from(i).unwrap_or(u32::MAX),
-crates/gt-codegen-llvm/src/lower.rs	1543	_ =>	AN TOÀN		Aggregate trên kiểu không khớp ⇒ internal (ICE).	_ => return internal("Aggregate trên kiểu không khớp"),
-crates/gt-codegen-llvm/src/lower.rs	1638	_ =>	AN TOÀN		Phép một ngôi lạ ⇒ unsupported (build thất bại, exit 3), không sinh mã.	_ => unsupported(format!("phép một ngôi {op:?} trên {ty:?}")),
-crates/gt-codegen-llvm/src/lower.rs	1693	_ =>	AN TOÀN		Chỉ tới được với BinOp::Ne (nhánh ngoài chỉ nhận Lt..Ne) ⇒ UNE là đúng cho `!=` của IEEE; không phải mặc định bừa.	_ => inkwell::FloatPredicate::UNE,
-crates/gt-codegen-llvm/src/lower.rs	1872	_ =>	AN TOÀN		None ⇒ cast/cast_fits trả unsupported (không sinh mã); chỉ là bảng bit/dấu.	_ => None,
-crates/gt-codegen-llvm/src/lower.rs	2106	unwrap_or	AN TOÀN		rsplit().next() luôn Some; "" chỉ là dự phòng, không khớp quy tắc nào ngoài lỗi unsupported.	let m = key.rsplit("::").next().unwrap_or("");
-crates/gt-codegen-llvm/src/lower.rs	2128	_ =>	AN TOÀN		Tên phương thức Text lạ ⇒ None ⇒ call() trả unsupported "hàm không có thân MIR".	_ => None,
-crates/gt-codegen-llvm/src/lower.rs	2140	_ =>	AN TOÀN		Tên phương thức f64 lạ ⇒ None ⇒ unsupported.	_ => None,
-crates/gt-codegen-llvm/src/lower.rs	2161	_ =>	AN TOÀN		Tên phương thức Vec lạ ⇒ None ⇒ unsupported.	_ => None,
-crates/gt-codegen-llvm/src/lower.rs	2169	_ =>	AN TOÀN		Không phải phép bit ⇒ None, rơi tiếp các quy tắc sau rồi unsupported.	_ => None,
-crates/gt-codegen-llvm/src/lower.rs	2184	_ =>	AN TOÀN		Toán hạng ordering không phải local trần/hằng ⇒ unsupported "E0503 đòi tường minh"; (lỗ thật nằm ở prescan dòng 1029, không ở đây).	_ => None,
-crates/gt-codegen-llvm/src/lower.rs	2250	_ =>	GHI NHẬN		Cuối intr_of ⇒ None ⇒ unsupported (đóng). Giới hạn: định tuyến intrinsic bằng key.contains("Atomic"/"Cell"/"File"/"Arena") là khớp chuỗi con, chỉ áp cho hàm KHÔNG có thân MIR (prelude) nên người dùng không chen vào được; nên đổi sang so khoá đầy đủ.	_ => return None,
-crates/gt-codegen-llvm/src/lower.rs	2282	unwrap_or_default	AN TOÀN		Thiếu key ⇒ "" ⇒ intr_of("") = None ⇒ unsupported (không khớp quy tắc nào).	let key = self.keys.get(node).cloned().unwrap_or_default();
-crates/gt-codegen-llvm/src/lower.rs	2475	_ =>	AN TOÀN		phương thức Owned lạ không phải intrinsic ⇒ prelude không có thân ⇒ unsupported/ICE	_ => None,
-crates/gt-codegen-llvm/src/lower.rs	2488	_ =>	AN TOÀN		Biến thể AtomicOrdering ngoài 0..4 ⇒ internal (ICE).	_ => return internal("biến thể AtomicOrdering lạ"),
-crates/gt-codegen-llvm/src/lower.rs	3032	_ =>	AN TOÀN		Chỉ tới được với AtomicFetchSub (arm ngoài chỉ nhận Swap/FetchAdd/FetchSub) ⇒ Sub đúng.	_ => AtomicRMWBinOp::Sub,
-crates/gt-codegen-llvm/src/lower.rs	3207	_ =>	AN TOÀN		Chỉ tới được với Rotr/Rotl (arm ngoài chỉ nhận Shl/Shr/Rotr/Rotl; nhánh trong chọn fshr/fshl theo op); đã có guard n<32 trước đó.	_ => {
-crates/gt-codegen-llvm/src/lower.rs	3283	_ =>	AN TOÀN		Caller (dòng 2716) chỉ gọi với AtomicNew/MutexNew/CellNew; None ⇒ internal "không thấy lang item".	_ => Lang::Cell,
-crates/gt-codegen-llvm/src/lower.rs	3820	unwrap_or	AN TOÀN		get_abi_size của kiểu nguyên tử luôn vừa u32; u64→u32 lỗi chỉ khi kiểu >4GiB.	llvm(inst.set_alignment(u32::try_from(sz).unwrap_or(8)))?;
+crates/gt-codegen-llvm/src/lower.rs	455	is_some_and	AN TOÀN		Chỉ trong inject_post (chèn lỗi test GRITC_FAULT làm IR XẤU hơn); không thấy lời gọi thì trả internal, không im lặng.	.is_some_and(|c| c.get_name().to_bytes() == b"gritrt_abort")
+crates/gt-codegen-llvm/src/lower.rs	497	let _ =	AN TOÀN		Chèn lỗi test: bỏ qua kết quả đặt cờ fast-math chỉ làm lỗi chèn mất tác dụng (test sẽ đỏ), không làm IR thật bớt an toàn; Guard-post vẫn chạy sau.	let _ = i.set_fast_math_flags(
+crates/gt-codegen-llvm/src/lower.rs	540	_ =>	AN TOÀN		`_` của inject_post chỉ gồm các Inject không-post (đã lọc bằng is_post trước khi gọi); chỉ liên quan harness fault-injection.	_ => {}
+crates/gt-codegen-llvm/src/lower.rs	1055	unwrap_or	AN TOÀN		get_nth_param trả None ⇒ internal "thiếu tham số hàm"; u32::MAX chỉ khi >4 tỷ tham số.	let Some(arg) = f.get_nth_param(u32::try_from(i).unwrap_or(u32::MAX)) else {
+crates/gt-codegen-llvm/src/lower.rs	1129	_ =>	SỬA	FB-C22	prescan coi local `AtomicOrdering` là hằng nếu chỉ có MỘT câu lệnh gán trực tiếp, nhưng KHÔNG tính ghi gián tiếp qua `&!o` (gán `*p` đếm cho local `p`, không phải `o`) ⇒ ordering bị cố định sai (cùng giới hạn ở gt-conc::variant_of nên E0503 cũng không bắt): `μo ≔ Relaxed; set(&!o)` (đặt SeqCst) rồi `a.load(o)` biên dịch thành monotonic.	_ => {}
+crates/gt-codegen-llvm/src/lower.rs	1265	_ =>	AN TOÀN		`_` = struct/tuple (enum luôn đi qua Downcast do MIR builder phát, pv.variant=Some); kiểu sai ⇒ internal "Field trên kiểu không phải struct" hoặc LLVM từ chối chỉ số.	_ => {
+crates/gt-codegen-llvm/src/lower.rs	1445	_ =>	AN TOÀN		Const::Item không phải const/static ⇒ internal (ICE), fail-closed.	_ => return internal("Const::Item không phải const/static"),
+crates/gt-codegen-llvm/src/lower.rs	1469	is_some_and	AN TOÀN		has_interior_mut: ADT không có trong db ⇒ true (đóng); lang Cell/Mutex/Atomic ⇒ true; chỉ dùng để TỪ CHỐI sao chép static (unsupported).	if adt.lang.is_some_and(Lang::interior_mutable) {
+crates/gt-codegen-llvm/src/lower.rs	1484	_ =>	GHI NHẬN		`_ => false` đúng cho Int/Ref/RawPtr/Fn/Str (sao chép tham chiếu không sao chép ô); Param/Infer/Err ⇒ true (đóng). Giới hạn: ở dòng 1381 `variant_fields(..).is_ok_and(..)` coi lỗi là 'không có ô' (mở) nhưng static không generic nên Err chỉ khi db hỏng; thử static có Atomic bên trong struct: bị từ chối đúng (exit 3 unsupported).	_ => false,
+crates/gt-codegen-llvm/src/lower.rs	1504	_ =>	AN TOÀN		`_` = mọi Rvalue khác đi tiếp đường rvalue() chung; không bỏ qua câu lệnh nào.	_ => {}
+crates/gt-codegen-llvm/src/lower.rs	1555	unwrap_or	AN TOÀN		u32::MAX chỉ khi >4 tỷ trường; build_struct_gep chỉ số sai bị LLVM/inkwell từ chối (llvm()?).	u32::try_from(i).unwrap_or(u32::MAX),
+crates/gt-codegen-llvm/src/lower.rs	1558	_ =>	AN TOÀN		Aggregate trên kiểu không khớp ⇒ internal (ICE).	_ => return internal("Aggregate trên kiểu không khớp"),
+crates/gt-codegen-llvm/src/lower.rs	1653	_ =>	AN TOÀN		Phép một ngôi lạ ⇒ unsupported (build thất bại, exit 3), không sinh mã.	_ => unsupported(format!("phép một ngôi {op:?} trên {ty:?}")),
+crates/gt-codegen-llvm/src/lower.rs	1708	_ =>	AN TOÀN		Chỉ tới được với BinOp::Ne (nhánh ngoài chỉ nhận Lt..Ne) ⇒ UNE là đúng cho `!=` của IEEE; không phải mặc định bừa.	_ => inkwell::FloatPredicate::UNE,
+crates/gt-codegen-llvm/src/lower.rs	1887	_ =>	AN TOÀN		None ⇒ cast/cast_fits trả unsupported (không sinh mã); chỉ là bảng bit/dấu.	_ => None,
+crates/gt-codegen-llvm/src/lower.rs	2126	unwrap_or	AN TOÀN		rsplit().next() luôn Some; "" chỉ là dự phòng, không khớp quy tắc nào ngoài lỗi unsupported.	let m = key.rsplit("::").next().unwrap_or("");
+crates/gt-codegen-llvm/src/lower.rs	2148	_ =>	AN TOÀN		Tên phương thức Text lạ ⇒ None ⇒ call() trả unsupported "hàm không có thân MIR".	_ => None,
+crates/gt-codegen-llvm/src/lower.rs	2160	_ =>	AN TOÀN		Tên phương thức f64 lạ ⇒ None ⇒ unsupported.	_ => None,
+crates/gt-codegen-llvm/src/lower.rs	2181	_ =>	AN TOÀN		Tên phương thức Vec lạ ⇒ None ⇒ unsupported.	_ => None,
+crates/gt-codegen-llvm/src/lower.rs	2188	_ =>	AN TOÀN		Không phải phép bit ⇒ None, rơi tiếp các quy tắc sau rồi unsupported.	_ => None,
+crates/gt-codegen-llvm/src/lower.rs	2196	_ =>	AN TOÀN		Toán hạng ordering không phải local trần/hằng ⇒ unsupported "E0503 đòi tường minh"; (lỗ thật nằm ở prescan dòng 1029, không ở đây).	_ => None,
+crates/gt-codegen-llvm/src/lower.rs	2211	_ =>	AN TOÀN		phương thức Owned lạ không phải intrinsic ⇒ prelude không có thân ⇒ unsupported/ICE	_ => None,
+crates/gt-codegen-llvm/src/lower.rs	2277	_ =>	GHI NHẬN		Cuối intr_of ⇒ None ⇒ unsupported (đóng). Giới hạn: định tuyến intrinsic bằng key.contains("Atomic"/"Cell"/"File"/"Arena") là khớp chuỗi con, chỉ áp cho hàm KHÔNG có thân MIR (prelude) nên người dùng không chen vào được; nên đổi sang so khoá đầy đủ.	_ => return None,
+crates/gt-codegen-llvm/src/lower.rs	2309	unwrap_or_default	AN TOÀN		Thiếu key ⇒ "" ⇒ intr_of("") = None ⇒ unsupported (không khớp quy tắc nào).	let key = self.keys.get(node).cloned().unwrap_or_default();
+crates/gt-codegen-llvm/src/lower.rs	2516	_ =>	AN TOÀN		phương thức Secret lạ không phải intrinsic ⇒ prelude không có thân ⇒ unsupported/ICE	_ => None,
+crates/gt-codegen-llvm/src/lower.rs	2529	_ =>	AN TOÀN		Biến thể AtomicOrdering ngoài 0..4 ⇒ internal (ICE).	_ => return internal("biến thể AtomicOrdering lạ"),
+crates/gt-codegen-llvm/src/lower.rs	3083	_ =>	AN TOÀN		Chỉ tới được với AtomicFetchSub (arm ngoài chỉ nhận Swap/FetchAdd/FetchSub) ⇒ Sub đúng.	_ => AtomicRMWBinOp::Sub,
+crates/gt-codegen-llvm/src/lower.rs	3258	_ =>	AN TOÀN		Chỉ tới được với Rotr/Rotl (arm ngoài chỉ nhận Shl/Shr/Rotr/Rotl; nhánh trong chọn fshr/fshl theo op); đã có guard n<32 trước đó.	_ => {
+crates/gt-codegen-llvm/src/lower.rs	3334	_ =>	AN TOÀN		Caller (dòng 2716) chỉ gọi với AtomicNew/MutexNew/CellNew; None ⇒ internal "không thấy lang item".	_ => Lang::Cell,
+crates/gt-codegen-llvm/src/lower.rs	3889	unwrap_or	AN TOÀN		get_abi_size của kiểu nguyên tử luôn vừa u32; u64→u32 lỗi chỉ khi kiểu >4GiB.	llvm(inst.set_alignment(u32::try_from(sz).unwrap_or(8)))?;
 crates/gt-conc/src/lib.rs	69	_ =>	AN TOÀN		không truy ngược được biến thể ordering ⇒ None ⇒ E0503 (từ chối)	_ => None,
 crates/gt-conc/src/lib.rs	121	_ =>	AN TOÀN		các terminator còn lại (Goto/Return/Unreachable/Drop) không mang toán hạng; Call/SwitchInt/Assert đã xử lý	_ => {}
 crates/gt-conc/src/lib.rs	198	unwrap_or	AN TOÀN		chỉ là tên hiển thị trong thông báo	let name = |v: u32| NAMES.get(v as usize).copied().unwrap_or("?");
@@ -85,7 +86,7 @@ crates/gt-driver/src/native.rs	365	unwrap_or_default	AN TOÀN		stdout đọc kh�
 crates/gt-driver/src/native.rs	367	let _ =	AN TOÀN		Dọn tệp phụ; không ảnh hưởng kết quả.	let _ = std::fs::remove_file(f);
 crates/gt-driver/src/native.rs	379	unwrap_or	AN TOÀN		Thiếu dòng `abort: ` ⇒ lý do "unknown" nhưng vẫn RunEnd::Aborted (mã 70) — không bị đọc thành Normal.	.unwrap_or("unknown")
 crates/gt-driver/src/native.rs	382	unwrap_or	AN TOÀN		clamp(1,255) rồi u8: luôn vừa, 255 chỉ là dự phòng vô hại; mã 0 đã xử lý riêng (Normal) trước đó.	Some(c) => RunEnd::ProgramExit(u8::try_from(c.clamp(1, 255)).unwrap_or(255)),
-crates/gt-driver/src/pipeline.rs	223	_ =>	AN TOÀN		alias chỉ gọi SAU khi pass cha đã chạy xong (Done) và chỉ ghi Done khi không có Fault chèn; để kiểm cổng.	_ => self.record(name, PassStatus::Done),
+crates/gt-driver/src/pipeline.rs	232	_ =>	AN TOÀN		alias chỉ gọi SAU khi pass cha đã chạy xong (Done) và chỉ ghi Done khi không có Fault chèn; để kiểm cổng.	_ => self.record(name, PassStatus::Done),
 crates/gt-driver/src/render.rs	129	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
 crates/gt-driver/src/render.rs	181	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
 crates/gt-driver/src/render.rs	192	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
@@ -99,8 +100,8 @@ crates/gt-driver/src/render.rs	264	is_some_and	AN TOÀN		Chỉ ẩn ghi chú N�
 crates/gt-driver/src/render.rs	282	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(
 crates/gt-driver/src/render.rs	292	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(out, "; pass hỏng: {}", failed.join(", "));
 crates/gt-driver/src/render.rs	295	let _ =	AN TOÀN		write! vào String không thể lỗi; chỉ định dạng đầu ra.	let _ = write!(out, " (ghi chú ẩn; GRIT_NOTES=1 hoặc --json để xem)");
-crates/gt-driver/src/runner.rs	150	let _ =	AN TOÀN		dọn tệp tạm khi ghi lỗi; lỗi vẫn được trả ra, không ảnh hưởng phán quyết	let _ = std::fs::remove_file(&tmp);
-crates/gt-driver/src/runner.rs	154	let _ =	AN TOÀN		dọn tệp tạm khi đổi tên lỗi; lỗi vẫn được trả ra	let _ = std::fs::remove_file(&tmp);
+crates/gt-driver/src/runner.rs	169	let _ =	AN TOÀN		dọn tệp tạm khi ghi lỗi; lỗi vẫn được trả ra, không ảnh hưởng phán quyết	let _ = std::fs::remove_file(&tmp);
+crates/gt-driver/src/runner.rs	173	let _ =	AN TOÀN		dọn tệp tạm khi đổi tên lỗi; lỗi vẫn được trả ra	let _ = std::fs::remove_file(&tmp);
 crates/gt-effects/src/lib.rs	239	unwrap_or	AN TOÀN		rsplit("::").next() luôn Some nên "" không xảy ra; trùng tên ngắn với cấp khác nhau ⇒ báo E0502 ngay bên dưới.	let short = def.path.rsplit("::").next().unwrap_or("").to_string();
 crates/gt-effects/src/lib.rs	289	_ =>	AN TOÀN		impl không phải `Mutex` ⇒ không có tham số cấp khoá, hiệu ứng khai báo được giữ nguyên (nhánh `x => out.push`); đúng.	_ => None,
 crates/gt-effects/src/lib.rs	313	unwrap_or	AN TOÀN		rsplit("::").next() luôn Some; chuỗi rỗng không xảy ra.	.unwrap_or("")
@@ -109,19 +110,31 @@ crates/gt-effects/src/lib.rs	361	_ =>	AN TOÀN		không xác định hàm đối 
 crates/gt-guard/src/lib.rs	48	is_some_and	AN TOÀN		tên không khớp ba dạng hỗ trợ ⇒ không phải hàm hỗ trợ ⇒ phải thuộc bảng instance, nếu không bị từ chối	.is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 crates/gt-guard/src/lib.rs	57	ok()?	SỬA	FB-C27	callee_name trả None cho lời gọi gián tiếp; luật địa chỉ G1 chỉ cấm lấy địa chỉ hàm gritrt_*, nên khai báo ngoài khác (vd declare @system) có địa chỉ được lưu rồi call gián tiếp thì không bị luật 3b (đích mọi lời gọi) hay luật lớp nghĩa vụ kiểm; cần codegen lỗi mới phát ra, không tái hiện được từ nguồn Grit (nên mở rộng luật địa chỉ cho mọi hàm chỉ khai báo không phải llvm.*)	let call = CallSiteValue::try_from(*inst).ok()?;
 crates/gt-guard/src/lib.rs	78	_ =>	GHI NHẬN		is_atomic chỉ gồm load/store atomic, atomicrmw, cmpxchg; lệnh fence không thuộc lớp E0503; fence không sinh UB/race dữ liệu và codegen không phát	_ => false,
-crates/gt-guard/src/lib.rs	152	is_some_and	AN TOÀN	FB-C30	Chỉ khớp hậu tố độ rộng nguyên nằm trong allowlist; hậu tố lạ làm predicate false và Guard từ chối intrinsic, không thể nới chấp nhận.	.is_some_and(|width| WIDTHS.contains(&width))
-crates/gt-guard/src/lib.rs	167	_ =>	AN TOÀN		loại giá trị lạ ⇒ None ⇒ user_inst None ⇒ direct=false ⇒ báo vi phạm (đóng)	_ => None,
-crates/gt-guard/src/lib.rs	204	_ =>	AN TOÀN		người dùng không phải lệnh call ⇒ direct=false ⇒ vi phạm (đóng)	_ => false,
-crates/gt-guard/src/lib.rs	242	unwrap_or_default	AN TOÀN		thiếu metadata !gt.instances ⇒ tập rỗng ⇒ lệch tập hàm đã định nghĩa ⇒ vi phạm	.flat_map(|md| md.get_node_values().unwrap_or_default())
-crates/gt-guard/src/lib.rs	247	unwrap_or	AN TOÀN		split().next() không bao giờ None; chuỗi rỗng ⇒ lệch tập ⇒ vi phạm	t.split('=').next().unwrap_or("").to_string()
-crates/gt-guard/src/lib.rs	308	_ =>	AN TOÀN		toán hạng không phải hằng ⇒ khoá '?' riêng; hằng bị tối ưu thành không hằng làm số lần loại gốc giảm ⇒ R1 báo	_ => None,
-crates/gt-guard/src/lib.rs	349	unwrap_or	AN TOÀN		thiếu mục sau tối ưu ⇒ 0 < n ⇒ vi phạm (đóng)	let now = post.get(&(f.clone(), k.clone())).copied().unwrap_or(0);
-crates/gt-guard/src/lib.rs	371	is_some_and	GHI NHẬN		cấm FMA theo tiền tố tên llvm.fmuladd/llvm.fma nên sót biến thể như llvm.experimental.constrained.fma hay llvm.vp.fma, và 3b cho phép mọi llvm.*; chỉ ảnh hưởng bit số thực, codegen không phát	if callee_name(&inst).is_some_and(|c| fused_intrinsic(&c)) {
-crates/gt-guard/src/lib.rs	398	unwrap_or_default	AN TOÀN		thiếu !gt.attest ⇒ got rỗng ⇒ vi phạm 'thiếu metadata'	.flat_map(|md| md.get_node_values().unwrap_or_default())
-crates/gt-guard/src/lib.rs	444	is_some_and	AN TOÀN		không thấy hàm hoặc không có thân ⇒ defined=false ⇒ từ chối trừ llvm.*	.is_some_and(|c| c.count_basic_blocks() > 0);
-crates/gt-guard/src/lib.rs	473	is_some_and	AN TOÀN		unreachable không có lệnh liền trước ⇒ ok=false ⇒ vi phạm	&& prev.as_ref().is_some_and(|p| {
-crates/gt-guard/src/lib.rs	475	is_some_and	AN TOÀN		không có gritrt_abort hoặc thiếu noreturn ⇒ ok=false ⇒ vi phạm	&& m.get_function("gritrt_abort").is_some_and(|a| {
-crates/gt-guard/src/lib.rs	491	unwrap_or	AN TOÀN		split().next() không bao giờ None; cờ UB đứng ngay sau opcode nên đứng trước mọi ', !'; tên local có ', !' không sinh từ định danh Grit	let body = text.split(", !").next().unwrap_or(&text);
+crates/gt-guard/src/lib.rs	154	is_some_and	AN TOÀN	FB-C30	Chỉ khớp hậu tố độ rộng nguyên nằm trong allowlist; hậu tố lạ làm predicate false và Guard từ chối intrinsic, không thể nới chấp nhận.	.is_some_and(|width| WIDTHS.contains(&width))
+crates/gt-guard/src/lib.rs	169	_ =>	AN TOÀN		loại giá trị lạ ⇒ None ⇒ user_inst None ⇒ direct=false ⇒ báo vi phạm (đóng)	_ => None,
+crates/gt-guard/src/lib.rs	206	_ =>	AN TOÀN		người dùng không phải lệnh call ⇒ direct=false ⇒ vi phạm (đóng)	_ => false,
+crates/gt-guard/src/lib.rs	244	unwrap_or_default	AN TOÀN		thiếu metadata !gt.instances ⇒ tập rỗng ⇒ lệch tập hàm đã định nghĩa ⇒ vi phạm	.flat_map(|md| md.get_node_values().unwrap_or_default())
+crates/gt-guard/src/lib.rs	249	unwrap_or	AN TOÀN		split().next() không bao giờ None; chuỗi rỗng ⇒ lệch tập ⇒ vi phạm	t.split('=').next().unwrap_or("").to_string()
+crates/gt-guard/src/lib.rs	310	_ =>	AN TOÀN		toán hạng không phải hằng ⇒ khoá '?' riêng; hằng bị tối ưu thành không hằng làm số lần loại gốc giảm ⇒ R1 báo	_ => None,
+crates/gt-guard/src/lib.rs	351	unwrap_or	AN TOÀN		thiếu mục sau tối ưu ⇒ 0 < n ⇒ vi phạm (đóng)	let now = post.get(&(f.clone(), k.clone())).copied().unwrap_or(0);
+crates/gt-guard/src/lib.rs	373	is_some_and	GHI NHẬN		cấm FMA theo tiền tố tên llvm.fmuladd/llvm.fma nên sót biến thể như llvm.experimental.constrained.fma hay llvm.vp.fma, và 3b cho phép mọi llvm.*; chỉ ảnh hưởng bit số thực, codegen không phát	if callee_name(&inst).is_some_and(|c| fused_intrinsic(&c)) {
+crates/gt-guard/src/lib.rs	400	unwrap_or_default	AN TOÀN		thiếu !gt.attest ⇒ got rỗng ⇒ vi phạm 'thiếu metadata'	.flat_map(|md| md.get_node_values().unwrap_or_default())
+crates/gt-guard/src/lib.rs	446	is_some_and	AN TOÀN		không thấy hàm hoặc không có thân ⇒ defined=false ⇒ từ chối trừ llvm.*	.is_some_and(|c| c.count_basic_blocks() > 0);
+crates/gt-guard/src/lib.rs	475	is_some_and	AN TOÀN		unreachable không có lệnh liền trước ⇒ ok=false ⇒ vi phạm	&& prev.as_ref().is_some_and(|p| {
+crates/gt-guard/src/lib.rs	477	is_some_and	AN TOÀN		không có gritrt_abort hoặc thiếu noreturn ⇒ ok=false ⇒ vi phạm	&& m.get_function("gritrt_abort").is_some_and(|a| {
+crates/gt-guard/src/lib.rs	493	unwrap_or	AN TOÀN		split().next() không bao giờ None; cờ UB đứng ngay sau opcode nên đứng trước mọi ', !'; tên local có ', !' không sinh từ định danh Grit	let body = text.split(", !").next().unwrap_or(&text);
+crates/gt-kernel/src/lib.rs	88	_ =>	AN TOÀN		require_kernel: không có chứng chỉ được kernel chấp nhận ⇒ Unknown (fail-closed: giữ kiểm/từ chối)	_ => {
+crates/gt-kernel/src/lib.rs	96	is_some_and	AN TOÀN		chỉ đếm độ phủ (measure), không ảnh hưởng phán quyết	if find_cert(ob, &mut steps).is_some_and(|c| check(ob, &c).is_ok()) {
+crates/gt-kernel/src/lib.rs	106	let _ =	AN TOÀN		trừ ngân sách bước đã dùng; bộ tìm đã bị giới hạn bởi min(search_steps, budget.steps)	let _ = budget.spend(before - steps);
+crates/gt-kernel/src/linear.rs	70	_ =>	AN TOÀN		số hạng lạ ⇒ biến mờ: chỉ bỏ quên quan hệ ⇒ công thức yếu hơn ⇒ khó bác bỏ hơn (sound cho chứng minh vô nghiệm)	_ => Some(Lin::key(Key::Opaque(format!("{t:?}")))),
+crates/gt-kernel/src/linear.rs	137	_ =>	AN TOÀN		không tuyến tính hoá được ⇒ True: làm YẾU công thức cần bác bỏ (sound)	_ => one(Vec::new()),
+crates/gt-kernel/src/linear.rs	154	_ =>	AN TOÀN		không tuyến tính hoá được ⇒ True: làm YẾU (sound)	_ => one(Vec::new()),
+crates/gt-kernel/src/linear.rs	159	_ =>	AN TOÀN		không tuyến tính hoá được ⇒ True: làm YẾU (sound)	_ => one(Vec::new()),
+crates/gt-kernel/src/linear.rs	180	_ =>	AN TOÀN		vị từ/lượng từ không diễn giải ⇒ True: làm YẾU công thức cần bác bỏ (sound)	_ => one(Vec::new()),
+crates/gt-kernel/src/search.rs	66	is_some_and	AN TOÀN		bộ TÌM (ngoài TCB): chọn biến khử; sai chỉ làm mất chứng minh, kernel kiểm lại	.filter(|r| r.lin.coef.get(*k).is_some_and(|v| *v > 0))
+crates/gt-kernel/src/search.rs	70	is_some_and	AN TOÀN		bộ TÌM ngoài TCB	.filter(|r| r.lin.coef.get(*k).is_some_and(|v| *v < 0))
+crates/gt-kernel/src/search.rs	77	is_some_and	AN TOÀN		bộ TÌM ngoài TCB	.partition(|r| r.lin.coef.get(&k).is_some_and(|v| *v > 0));
+crates/gt-kernel/src/search.rs	80	is_some_and	AN TOÀN		bộ TÌM ngoài TCB	.partition(|r| r.lin.coef.get(&k).is_some_and(|v| *v < 0));
 crates/gt-mir/src/build/expr.rs	18	unwrap_or	AN TOÀN		không bóc được cặp nháy thì giữ nguyên chuỗi (AST không chứa nháy); chỉ là cách giải escape, không ảnh hưởng phán quyết an toàn	.unwrap_or(s);
 crates/gt-mir/src/build/expr.rs	46	ok()?	AN TOÀN		hex/codepoint hỏng ⇒ None ⇒ người gọi lit_const trả ICE 'literal chuỗi hỏng' (từ chối)	out.push(char::from_u32(u32::from_str_radix(&hex, 16).ok()?)?);
 crates/gt-mir/src/build/expr.rs	48	_ =>	AN TOÀN		escape lạ ⇒ None ⇒ lit_const ICE (từ chối)	_ => return None,
@@ -185,43 +198,46 @@ crates/gt-mir/src/build/mod.rs	243	unwrap_or	AN TOÀN		u32::MAX chỉ khi >4 t�
 crates/gt-mir/src/build/mod.rs	315	unwrap_or	AN TOÀN		u32::MAX chỉ khi >4 tỷ scope.	self.scope = ScopeId(u32::try_from(self.body.scopes.len() - 1).unwrap_or(u32::MAX));
 crates/gt-mir/src/build/mod.rs	494	is_none_or	AN TOÀN		Không có đuôi ⇒ open_end=true ⇒ nhánh E0307 (fall_off + Unreachable) nếu tới được: fail-closed (thử canary E0307 trong selftest).	let open_end = body_block.tail.as_ref().is_none_or(|t| {
 crates/gt-mir/src/build/mod.rs	607	unwrap_or	AN TOÀN		map[b] luôn Some vì reach là bao đóng successor của khối tới được; dự phòng giữ nguyên chỉ số.	let m = |b: BasicBlock| map[b.index()].unwrap_or(b);
-crates/gt-mir/src/interp.rs	309	unwrap_or_default	AN TOÀN		khoá thiếu ⇒ chuỗi rỗng, không khớp `core::abort`/`len` ⇒ rơi xuống lang_ops rồi `Flow::Bug("không có thân MIR")`: từ chối, và interp ngoài TCB.	let k = self.mir.keys.get(&node).cloned().unwrap_or_default();
-crates/gt-mir/src/interp.rs	453	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => return Err(Flow::Bug("drop Owned: con trỏ lạ".to_string())),
-crates/gt-mir/src/interp.rs	485	unwrap_or	AN TOÀN		drop glue thông dịch (ADR-C18): nhánh lạ ⇒ Flow::Bug; chuyển chỉ số mảng; thiếu bảng kiểu chỉ ở bộ chạy tham chiếu ngoài TCB (runner luôn with_types)	p.push(Step::Index(usize::try_from(i).unwrap_or(usize::MAX)));
-crates/gt-mir/src/interp.rs	602	_ =>	AN TOÀN		ghi trường vào giá trị không phải aggregate ⇒ Err ⇒ Flow::Bug (map_err ở set_at). Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err("ghi trường vào giá trị không phải aggregate".to_string()),
-crates/gt-mir/src/interp.rs	606	_ =>	AN TOÀN		ghi chỉ số vào giá trị không phải mảng ⇒ Err ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err("ghi chỉ số vào giá trị không phải mảng".to_string()),
-crates/gt-mir/src/interp.rs	618	_ =>	AN TOÀN		ghi lát đổi độ dài ⇒ Err ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err("ghi vào lát đổi độ dài".to_string()),
-crates/gt-mir/src/interp.rs	621	_ =>	AN TOÀN		ghi vào lát của giá trị không phải mảng ⇒ Err ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err("ghi vào lát của giá trị không phải mảng".to_string()),
-crates/gt-mir/src/interp.rs	653	_ =>	AN TOÀN		str_op: đối số sai dạng ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err(Flow::Bug(format!("str::{m}: đối số không đúng dạng"))),
-crates/gt-mir/src/interp.rs	665	_ =>	AN TOÀN		bytes_of: phần tử không phải byte ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err(Flow::Bug("phần tử không phải byte".to_string())),
-crates/gt-mir/src/interp.rs	686	_ =>	AN TOÀN		f64_op: đối số sai dạng ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err(Flow::Bug(format!("f64::{m}: đối số không đúng dạng"))),
-crates/gt-mir/src/interp.rs	764	_ =>	AN TOÀN		text_op push_*: đối số sai dạng ⇒ bug(...). Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => return Err(bug("đối số không đúng dạng")),
-crates/gt-mir/src/interp.rs	791	_ =>	AN TOÀN		text_op: phương thức/đối số lạ ⇒ bug(...), không trả giá trị. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err(bug("đối số không đúng dạng")),
-crates/gt-mir/src/interp.rs	813	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => Err(bug("khối đã trả hoặc con trỏ lạ")),
-crates/gt-mir/src/interp.rs	815	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => Err(bug("không phải Owned")),
-crates/gt-mir/src/interp.rs	819	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => Err(bug("con trỏ lạ")),
-crates/gt-mir/src/interp.rs	821	_ =>	AN TOÀN		vec_op: phương thức/đối số lạ ⇒ bug(...), từ chối.	_ => Err(bug("đối số không đúng dạng")),
-crates/gt-mir/src/interp.rs	876	unwrap_or	AN TOÀN		truncate: n không vừa usize ⇒ usize::MAX rồi .min(len) = đúng ngữ nghĩa `min(n,len)`; n là usize nên không âm.	let keep = usize::try_from(*n).unwrap_or(usize::MAX).min(a.len());
-crates/gt-mir/src/interp.rs	918	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => Err(bug("đối số không đúng dạng")),
-crates/gt-mir/src/interp.rs	932	_ =>	AN TOÀN		lang_ops bit-op prelude: đối số không phải số nguyên ⇒ Flow::Bug.	_ => Err(Flow::Bug(format!("{name}: đối số không phải số nguyên"))),
-crates/gt-mir/src/interp.rs	943	_ =>	AN TOÀN		nhánh `_` của match con chỉ nhận "band"|"bor"|"bxor" (đã lọc bởi matches! phía trên) ⇒ chỉ có thể là bxor, đúng.	_ => a ^ b,
-crates/gt-mir/src/interp.rs	946	_ =>	AN TOÀN		nhánh `_` của match ngoài là shl/shr/rotr/rotl (band/bor/bxor/bnot đã xử lý), n ≥ 32 trả Flow::Bug; đúng.	_ => {
-crates/gt-mir/src/interp.rs	955	_ =>	AN TOÀN		nhánh `_` cuối là rotl (tên đã bị giới hạn bởi matches! trên); n<32 đã kiểm nên không tràn dịch bit.	_ => ((a << n) | (a >> (32 - n))) & m,
-crates/gt-mir/src/interp.rs	962	unwrap_or	AN TOÀN		rsplit("::").next() luôn có phần tử ⇒ unwrap_or("") không bao giờ chạy; chỉ dùng để chọn toán tử trong bộ chạy ngoài TCB.	let m = key.rsplit("::").next().unwrap_or("");
-crates/gt-mir/src/interp.rs	995	_ =>	AN TOÀN		str::as_bytes: giá trị không phải chuỗi ⇒ Flow::Bug.	_ => return Err(Flow::Bug("str::as_bytes: không phải chuỗi".to_string())),
-crates/gt-mir/src/interp.rs	997	_ =>	AN TOÀN		str::as_bytes: đối số sai dạng ⇒ Flow::Bug.	_ => {
-crates/gt-mir/src/interp.rs	1024	_ =>	AN TOÀN		Cell/Mutex/Atomic::new sai số đối số ⇒ Flow::Bug.	_ => Err(Flow::Bug("new: sai số đối số".to_string())),
-crates/gt-mir/src/interp.rs	1040	_ =>	AN TOÀN		fetch_add/sub trên giá trị không nguyên ⇒ Flow::Bug.	_ => Err(Flow::Bug(
-crates/gt-mir/src/interp.rs	1096	_ =>	AN TOÀN		method Cell/Mutex/Atomic lạ ⇒ Ok(None) ⇒ người gọi rơi xuống "không có thân MIR cho {k}" = Flow::Bug (không im lặng thành công).	_ => Ok(None),
-crates/gt-mir/src/interp.rs	1170	_ =>	AN TOÀN		checked op lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug("checked op lạ".to_string())),
-crates/gt-mir/src/interp.rs	1179	_ =>	AN TOÀN		CheckedBinaryOp với phép không nằm trong Add/Sub/Mul trả Err(Flow::Bug); Interp::run_env đổi thành Outcome::Bug, không trả giá trị thành công.	_ => return Err(Flow::Bug("checked op lạ".to_string())),
-crates/gt-mir/src/interp.rs	1263	_ =>	AN TOÀN		nhánh `_` của match con trong khối `AddSat|SubSat|MulSat` chỉ có thể là MulSat; đúng.	_ => x.saturating_mul(y),
-crates/gt-mir/src/interp.rs	1266	unwrap_or	GHI NHẬN		hi = i128::MAX khi max_val của u128 không vừa i128 ⇒ saturating u128 trong bộ chạy tham chiếu có thể lệch LLVM (V::Int dùng i128); giới hạn của interp ngoài TCB, không ảnh hưởng phán quyết an toàn.	let hi = i128::try_from(t.max_val()).unwrap_or(i128::MAX);
-crates/gt-mir/src/interp.rs	1288	_ =>	AN TOÀN		binop float với toán tử lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug(format!("phép {op:?} trên số thực"))),
-crates/gt-mir/src/interp.rs	1294	_ =>	AN TOÀN		binop bool với toán tử lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug("phép bool lạ".to_string())),
-crates/gt-mir/src/interp.rs	1304	_ =>	AN TOÀN		binop char với toán tử lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug(format!("phép {op:?} trên char"))),
-crates/gt-mir/src/interp.rs	1309	_ =>	AN TOÀN		binop kiểu/toán tử lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug(format!("binop {op:?} trên {a:?} {b:?}"))),
-crates/gt-mir/src/interp.rs	1351	unwrap_or	AN TOÀN		ép Int→char chỉ có `u8 as char` (check/expr.rs:427 chỉ cho (U8→Char)) nên u32::try_from không thể thất bại; nhánh 0 không tới được.	(V::Int(x, _), Ty::Char) => Ok(V::Char(u32::try_from(x).unwrap_or(0))),
+crates/gt-mir/src/interp.rs	318	unwrap_or_default	AN TOÀN		khoá thiếu ⇒ chuỗi rỗng, không khớp `core::abort`/`len` ⇒ rơi xuống lang_ops rồi `Flow::Bug("không có thân MIR")`: từ chối, và interp ngoài TCB.	let k = self.mir.keys.get(&node).cloned().unwrap_or_default();
+crates/gt-mir/src/interp.rs	462	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => return Err(Flow::Bug("drop Owned: con trỏ lạ".to_string())),
+crates/gt-mir/src/interp.rs	502	unwrap_or	AN TOÀN		drop glue thông dịch (ADR-C18): nhánh lạ ⇒ Flow::Bug; chuyển chỉ số mảng; thiếu bảng kiểu chỉ ở bộ chạy tham chiếu ngoài TCB (runner luôn with_types)	p.push(Step::Index(usize::try_from(i).unwrap_or(usize::MAX)));
+crates/gt-mir/src/interp.rs	518	is_some_and	AN TOÀN		thông dịch tham chiếu (ngoài TCB): kiểu chỗ luôn xác định vì validator MIR đã kiểm; không đếm thì oracle secret_wipe ĐỎ (không lặng lẽ)	crate::types::place_ty(b, p).is_some_and(|ty| t.db.contains_secret(&self.sub_env(&ty)))
+crates/gt-mir/src/interp.rs	644	_ =>	AN TOÀN		ghi trường vào giá trị không phải aggregate ⇒ Err ⇒ Flow::Bug (map_err ở set_at). Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err("ghi trường vào giá trị không phải aggregate".to_string()),
+crates/gt-mir/src/interp.rs	648	_ =>	AN TOÀN		ghi chỉ số vào giá trị không phải mảng ⇒ Err ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err("ghi chỉ số vào giá trị không phải mảng".to_string()),
+crates/gt-mir/src/interp.rs	660	_ =>	AN TOÀN		ghi lát đổi độ dài ⇒ Err ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err("ghi vào lát đổi độ dài".to_string()),
+crates/gt-mir/src/interp.rs	663	_ =>	AN TOÀN		ghi vào lát của giá trị không phải mảng ⇒ Err ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err("ghi vào lát của giá trị không phải mảng".to_string()),
+crates/gt-mir/src/interp.rs	695	_ =>	AN TOÀN		str_op: đối số sai dạng ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err(Flow::Bug(format!("str::{m}: đối số không đúng dạng"))),
+crates/gt-mir/src/interp.rs	707	_ =>	AN TOÀN		bytes_of: phần tử không phải byte ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err(Flow::Bug("phần tử không phải byte".to_string())),
+crates/gt-mir/src/interp.rs	728	_ =>	AN TOÀN		f64_op: đối số sai dạng ⇒ Flow::Bug. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err(Flow::Bug(format!("f64::{m}: đối số không đúng dạng"))),
+crates/gt-mir/src/interp.rs	806	_ =>	AN TOÀN		text_op push_*: đối số sai dạng ⇒ bug(...). Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => return Err(bug("đối số không đúng dạng")),
+crates/gt-mir/src/interp.rs	833	_ =>	AN TOÀN		text_op: phương thức/đối số lạ ⇒ bug(...), không trả giá trị. Interp ngoài TCB (ADR-020 §9a), không ảnh hưởng phán quyết an toàn.	_ => Err(bug("đối số không đúng dạng")),
+crates/gt-mir/src/interp.rs	855	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => Err(bug("khối đã trả hoặc con trỏ lạ")),
+crates/gt-mir/src/interp.rs	857	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => Err(bug("không phải Owned")),
+crates/gt-mir/src/interp.rs	861	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => Err(bug("con trỏ lạ")),
+crates/gt-mir/src/interp.rs	863	_ =>	AN TOÀN		vec_op: phương thức/đối số lạ ⇒ bug(...), từ chối.	_ => Err(bug("đối số không đúng dạng")),
+crates/gt-mir/src/interp.rs	918	unwrap_or	AN TOÀN		truncate: n không vừa usize ⇒ usize::MAX rồi .min(len) = đúng ngữ nghĩa `min(n,len)`; n là usize nên không âm.	let keep = usize::try_from(*n).unwrap_or(usize::MAX).min(a.len());
+crates/gt-mir/src/interp.rs	960	_ =>	AN TOÀN		Owned ở thông dịch (ADR-C18 bước 2): nhánh lạ ⇒ Flow::Bug	_ => Err(bug("đối số không đúng dạng")),
+crates/gt-mir/src/interp.rs	974	_ =>	AN TOÀN		lang_ops bit-op prelude: đối số không phải số nguyên ⇒ Flow::Bug.	_ => Err(Flow::Bug(format!("{name}: đối số không phải số nguyên"))),
+crates/gt-mir/src/interp.rs	985	_ =>	AN TOÀN		nhánh `_` của match con chỉ nhận "band"|"bor"|"bxor" (đã lọc bởi matches! phía trên) ⇒ chỉ có thể là bxor, đúng.	_ => a ^ b,
+crates/gt-mir/src/interp.rs	988	_ =>	AN TOÀN		nhánh `_` của match ngoài là shl/shr/rotr/rotl (band/bor/bxor/bnot đã xử lý), n ≥ 32 trả Flow::Bug; đúng.	_ => {
+crates/gt-mir/src/interp.rs	997	_ =>	AN TOÀN		nhánh `_` cuối là rotl (tên đã bị giới hạn bởi matches! trên); n<32 đã kiểm nên không tràn dịch bit.	_ => ((a << n) | (a >> (32 - n))) & m,
+crates/gt-mir/src/interp.rs	1004	unwrap_or	AN TOÀN		rsplit("::").next() luôn có phần tử ⇒ unwrap_or("") không bao giờ chạy; chỉ dùng để chọn toán tử trong bộ chạy ngoài TCB.	let m = key.rsplit("::").next().unwrap_or("");
+crates/gt-mir/src/interp.rs	1017	unwrap_or	AN TOÀN		tên phương thức lạ ⇒ rơi vào nhánh Bug bên dưới	return match (key.rsplit("::").next().unwrap_or(""), vals) {
+crates/gt-mir/src/interp.rs	1024	_ =>	AN TOÀN		thao tác Secret lạ ⇒ Flow::Bug (lỗi nội bộ)	_ => Err(Flow::Bug(format!("Secret: thao tác lạ {key}"))),
+crates/gt-mir/src/interp.rs	1049	_ =>	AN TOÀN		str::as_bytes: giá trị không phải chuỗi ⇒ Flow::Bug.	_ => return Err(Flow::Bug("str::as_bytes: không phải chuỗi".to_string())),
+crates/gt-mir/src/interp.rs	1051	_ =>	AN TOÀN		str::as_bytes: đối số sai dạng ⇒ Flow::Bug.	_ => {
+crates/gt-mir/src/interp.rs	1078	_ =>	AN TOÀN		Cell/Mutex/Atomic::new sai số đối số ⇒ Flow::Bug.	_ => Err(Flow::Bug("new: sai số đối số".to_string())),
+crates/gt-mir/src/interp.rs	1094	_ =>	AN TOÀN		fetch_add/sub trên giá trị không nguyên ⇒ Flow::Bug.	_ => Err(Flow::Bug(
+crates/gt-mir/src/interp.rs	1150	_ =>	AN TOÀN		method Cell/Mutex/Atomic lạ ⇒ Ok(None) ⇒ người gọi rơi xuống "không có thân MIR cho {k}" = Flow::Bug (không im lặng thành công).	_ => Ok(None),
+crates/gt-mir/src/interp.rs	1224	_ =>	AN TOÀN		checked op lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug("checked op lạ".to_string())),
+crates/gt-mir/src/interp.rs	1233	_ =>	AN TOÀN		CheckedBinaryOp với phép không nằm trong Add/Sub/Mul trả Err(Flow::Bug); Interp::run_env đổi thành Outcome::Bug, không trả giá trị thành công.	_ => return Err(Flow::Bug("checked op lạ".to_string())),
+crates/gt-mir/src/interp.rs	1317	_ =>	AN TOÀN		nhánh `_` của match con trong khối `AddSat|SubSat|MulSat` chỉ có thể là MulSat; đúng.	_ => x.saturating_mul(y),
+crates/gt-mir/src/interp.rs	1320	unwrap_or	GHI NHẬN		hi = i128::MAX khi max_val của u128 không vừa i128 ⇒ saturating u128 trong bộ chạy tham chiếu có thể lệch LLVM (V::Int dùng i128); giới hạn của interp ngoài TCB, không ảnh hưởng phán quyết an toàn.	let hi = i128::try_from(t.max_val()).unwrap_or(i128::MAX);
+crates/gt-mir/src/interp.rs	1342	_ =>	AN TOÀN		binop float với toán tử lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug(format!("phép {op:?} trên số thực"))),
+crates/gt-mir/src/interp.rs	1348	_ =>	AN TOÀN		binop bool với toán tử lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug("phép bool lạ".to_string())),
+crates/gt-mir/src/interp.rs	1358	_ =>	AN TOÀN		binop char với toán tử lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug(format!("phép {op:?} trên char"))),
+crates/gt-mir/src/interp.rs	1363	_ =>	AN TOÀN		binop kiểu/toán tử lạ ⇒ Flow::Bug.	_ => return Err(Flow::Bug(format!("binop {op:?} trên {a:?} {b:?}"))),
+crates/gt-mir/src/interp.rs	1405	unwrap_or	AN TOÀN		ép Int→char chỉ có `u8 as char` (check/expr.rs:427 chỉ cho (U8→Char)) nên u32::try_from không thể thất bại; nhánh 0 không tới được.	(V::Int(x, _), Ty::Char) => Ok(V::Char(u32::try_from(x).unwrap_or(0))),
 crates/gt-mir/src/lib.rs	66	_ =>	AN TOÀN		mục khác (struct/trait/...) không có thân hàm cần hạ; trait không có thân mặc định (cú pháp bắt buộc ';')	_ => {}
 crates/gt-mir/src/lib.rs	160	unwrap_or	AN TOÀN		thiếu kiểu const ⇒ Ty::Err ⇒ validate.rs bắt 'kiểu chưa giải quyết' ⇒ ICE E9901	.unwrap_or(Ty::Err);
 crates/gt-mir/src/lib.rs	168	_ =>	AN TOÀN		không tìm thấy AST ⇒ BuildError ⇒ ICE E9901	_ => Err(build::BuildError(format!(
@@ -233,18 +249,18 @@ crates/gt-mir/src/print.rs	77	let _ =	AN TOÀN		print.rs chỉ để in MIR cho 
 crates/gt-mir/src/print.rs	81	let _ =	AN TOÀN		print.rs chỉ để in MIR cho snapshot/test (không được driver hay crate phán quyết gọi); writeln! vào String không thể lỗi; `let _ = b` là tham số không dùng.	let _ = writeln!(s, " {}", terminator(cx, b, &t.kind));
 crates/gt-mir/src/print.rs	84	let _ =	AN TOÀN		in "<thiếu terminator>" tường minh khi block không có terminator (không che giấu); chỉ định dạng, chỉ dùng trong tests.	let _ = writeln!(s, " <thiếu terminator>");
 crates/gt-mir/src/print.rs	87	let _ =	AN TOÀN		print.rs chỉ để in MIR cho snapshot/test (không được driver hay crate phán quyết gọi); writeln! vào String không thể lỗi; `let _ = b` là tham số không dùng.	let _ = writeln!(s, " }}");
-crates/gt-mir/src/print.rs	140	let _ =	AN TOÀN		escape ký tự điều khiển; writeln!/write! vào String không thể lỗi; chỉ định dạng.	let _ = write!(o, "\\u{{{:x}}}", c as u32);
-crates/gt-mir/src/print.rs	155	_ =>	AN TOÀN		ký tự không in được/ đặc biệt ⇒ định dạng `\u{..}` tường minh; chỉ định dạng.	_ => format!("'\\u{{{c:x}}}'"),
-crates/gt-mir/src/print.rs	191	let _ =	AN TOÀN		`let _ = b;` chỉ tránh cảnh báo tham số không dùng.	let _ = b;
-crates/gt-mir/src/print.rs	314	let _ =	AN TOÀN		`let _ = b;` chỉ tránh cảnh báo tham số không dùng.	let _ = b;
+crates/gt-mir/src/print.rs	141	let _ =	AN TOÀN		escape ký tự điều khiển; writeln!/write! vào String không thể lỗi; chỉ định dạng.	let _ = write!(o, "\\u{{{:x}}}", c as u32);
+crates/gt-mir/src/print.rs	156	_ =>	AN TOÀN		ký tự không in được/ đặc biệt ⇒ định dạng `\u{..}` tường minh; chỉ định dạng.	_ => format!("'\\u{{{c:x}}}'"),
+crates/gt-mir/src/print.rs	192	let _ =	AN TOÀN		`let _ = b;` chỉ tránh cảnh báo tham số không dùng.	let _ = b;
+crates/gt-mir/src/print.rs	315	let _ =	AN TOÀN		`let _ = b;` chỉ tránh cảnh báo tham số không dùng.	let _ = b;
 crates/gt-mir/src/types.rs	17	_ =>	GHI NHẬN		region_slots đếm 0 cho Ty::Fn/Param/Infer/Err (Fn 'không đi vào kiểu hàm' theo thiết kế ADR-019/021); an toàn chỉ chừng nào kiểu hàm không mang tham chiếu có region trong chữ ký đã được ADR bảo đảm — chưa kiểm chứng được ở đây.	_ => 0,
 crates/gt-mir/src/types.rs	40	unwrap_or_default	AN TOÀN		Chỉ số biến thể/ADT luôn do MIR lấy từ chính enum đã phân giải; nếu lệch thì seq_pats/fts[k] báo ICE hoặc panic, không chấp nhận.	.unwrap_or_default(),
 crates/gt-mir/src/types.rs	55	_ =>	AN TOÀN		place_ty None ⇒ validate (chạy trong lower_program) báo lỗi và pipeline dừng trước borrowck; nơi gọi trong build ICE.	_ => return None,
 crates/gt-mir/src/types.rs	110	let _ =	AN TOÀN		Chỉ tắt cảnh báo biến không dùng.	let _ = db;
 crates/gt-mir/src/validate.rs	49	_ =>	AN TOÀN		local trong projection khác (Deref/Field/Downcast) không mang local — PlaceElem chỉ Index/Subslice có local	_ => {}
 crates/gt-mir/src/validate.rs	216	_ =>	AN TOÀN		rvalue không chứa kiểu Err/Infer tường minh; mọi kiểu còn lại đã gom từ locals/operands	_ => {}
-crates/gt-mir/src/validate.rs	407	_ =>	AN TOÀN		terminator khác không cần kiểm thêm	_ => {}
-crates/gt-mir/src/validate.rs	452	_ =>	AN TOÀN		câu lệnh còn lại kiểm 'dùng ngoài storage' đúng chỗ	_ => {
+crates/gt-mir/src/validate.rs	409	_ =>	AN TOÀN		terminator khác không cần kiểm thêm	_ => {}
+crates/gt-mir/src/validate.rs	454	_ =>	AN TOÀN		câu lệnh còn lại kiểm 'dùng ngoài storage' đúng chỗ	_ => {
 crates/gt-oblig/src/analysis.rs	201	_ =>	AN TOÀN		kiểu không phải số nguyên ⇒ None ⇒ local không được theo dõi (khoảng top)	_ => None,
 crates/gt-oblig/src/analysis.rs	368	_ =>	AN TOÀN		rvalue khác không tạo liên kết tái mượn ⇒ nguyên tử độ dài riêng của local đó, chỉ mất chính xác	_ => {}
 crates/gt-oblig/src/analysis.rs	390	_ =>	AN TOÀN		ngắt chuỗi tái mượn ⇒ root_of lùi về chính local (nguyên tử riêng), không gộp nhầm	_ => break,
@@ -273,22 +289,22 @@ crates/gt-oblig/src/analysis.rs	966	_ =>	AN TOÀN		thiếu/không diễn giải 
 crates/gt-oblig/src/analysis.rs	978	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => Val::Unknown,
 crates/gt-oblig/src/analysis.rs	988	_ =>	AN TOÀN		GÓI 12 (ADR-C16) `div_rem_facts`: toán hạng không phải chính `dst` ⇒ KHÔNG có sự thật dịch `dst_mới ≤ dst_cũ + c` (ít thông tin hơn, chỉ có thể từ chối thêm)	_ => None,
 crates/gt-oblig/src/analysis.rs	1013	_ =>	AN TOÀN		thiếu/không diễn giải được ⇒ trả None/Val::Unknown ⇒ quên quan hệ (mất chính xác, không khẳng định gì)	_ => {
-crates/gt-oblig/src/analysis.rs	1123	_ =>	AN TOÀN		chỉ gán nhãn loại nghĩa vụ (Overflow cho phép còn lại); mục tiêu vẫn lấy từ điều kiện Assert	_ => ObKind::Overflow,
-crates/gt-oblig/src/analysis.rs	1151	_ =>	AN TOÀN		không phải RefOf thì khoá là chính local; nguyên tử vị từ bị xoá khi local gán lại (forget_local/retain_atoms)	_ => l,
-crates/gt-oblig/src/analysis.rs	1289	unwrap_or	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	let g = goal.clone().unwrap_or(Prop::Atom(self.unrep_atom(bb, idx)));
-crates/gt-oblig/src/analysis.rs	1399	_ =>	AN TOÀN		không Copy mặc định ⇒ NotCheckable ⇒ Rejected (đúng chiều an toàn)	_ => false,
-crates/gt-oblig/src/analysis.rs	1405	unwrap_or	AN TOÀN		thiếu bảng local_copy ⇒ coi không Copy ⇒ từ chối, an toàn	Some(v) => v.get(l).copied().unwrap_or(false),
-crates/gt-oblig/src/analysis.rs	1477	unwrap_or	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	let g = goal.unwrap_or(Prop::Atom(self.unrep_atom(bb, idx)));
-crates/gt-oblig/src/analysis.rs	1625	_ =>	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	_ => Prop::Atom(self.unrep_atom(bb, UNREP_SLOTS - 1)),
-crates/gt-oblig/src/analysis.rs	1952	_ =>	AN TOÀN		không chứng minh được ⇒ Lowered (giữ Assert) hoặc Rejected (không kiểm được lúc chạy)	_ => match &ob.runtime {
-crates/gt-oblig/src/analysis.rs	1962	_ =>	AN TOÀN		chỉ chọn mã ghi chú N0604 cho loại còn lại	_ => "N0604",
-crates/gt-oblig/src/analysis.rs	2096	let _ =	AN TOÀN		bỏ giá trị trả về vì chỉ chạy để Judge ghi nghĩa vụ; khối không tới được không có nghĩa vụ ⇒ Assert giữ nguyên	let _ = cx.block_out(s, bb, Some(&mut judge));
-crates/gt-oblig/src/analysis.rs	2125	let _ =	AN TOÀN		collect_unknown dùng NoProver ⇒ mọi nghĩa vụ Unknown ⇒ giữ check/Rejected	let _ = cx.block_out(&init, bb, Some(judge));
-crates/gt-oblig/src/analysis.rs	2218	_ =>	AN TOÀN		check_post_fixpoint: cạnh không thoả ⇒ Err ⇒ bỏ narrowing hoặc ICE	_ => {
-crates/gt-oblig/src/analysis.rs	2279	unwrap_or	AN TOÀN		giá trị trả về của thân hợp đồng không diễn giải ⇒ nguyên tử BOOL_BASE, canon_prop đổi thành nguyên tử mờ riêng của hợp đồng (không bao giờ chứng minh được)	let v = cx.prop_of(&s, &ret).unwrap_or(Prop::Atom(BOOL_BASE));
-crates/gt-oblig/src/analysis.rs	2286	_ =>	AN TOÀN		vòng lặp/không biểu diễn được ⇒ walk_paths false ⇒ extract_contract None ⇒ nghĩa vụ không biểu diễn được	_ => {
-crates/gt-oblig/src/analysis.rs	2371	_ =>	AN TOÀN		chỉ cách dựng Or các đường (0 đường ⇒ False, 1 ⇒ chính nó), không mặc định đúng	_ => Prop::Or(paths),
-crates/gt-oblig/src/analysis.rs	2397	ok()?	AN TOÀN		DomainQuery::new trả None = 'không biết' (fail-closed); chỉ test dùng, không có người gọi trong crate quyết định	check_post_fixpoint(&cx, &states).ok()?;
+crates/gt-oblig/src/analysis.rs	1124	_ =>	AN TOÀN		chỉ gán nhãn loại nghĩa vụ (Overflow cho phép còn lại); mục tiêu vẫn lấy từ điều kiện Assert	_ => ObKind::Overflow,
+crates/gt-oblig/src/analysis.rs	1152	_ =>	AN TOÀN		không phải RefOf thì khoá là chính local; nguyên tử vị từ bị xoá khi local gán lại (forget_local/retain_atoms)	_ => l,
+crates/gt-oblig/src/analysis.rs	1290	unwrap_or	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	let g = goal.clone().unwrap_or(Prop::Atom(self.unrep_atom(bb, idx)));
+crates/gt-oblig/src/analysis.rs	1400	_ =>	AN TOÀN		không Copy mặc định ⇒ NotCheckable ⇒ Rejected (đúng chiều an toàn)	_ => false,
+crates/gt-oblig/src/analysis.rs	1406	unwrap_or	AN TOÀN		thiếu bảng local_copy ⇒ coi không Copy ⇒ từ chối, an toàn	Some(v) => v.get(l).copied().unwrap_or(false),
+crates/gt-oblig/src/analysis.rs	1478	unwrap_or	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	let g = goal.unwrap_or(Prop::Atom(self.unrep_atom(bb, idx)));
+crates/gt-oblig/src/analysis.rs	1626	_ =>	SỬA	FB-C26	nguyên tử `unrep_atom` = UNREP_BASE + bb*1024 + idx tràn sang dải PRED_BASE khi bb ≥ 1024 (6<<20 + 1024*1024 = 7<<20): nghĩa vụ hợp đồng không biểu diễn được ở khối bb=1024+B có thể trùng nguyên tử vị từ thuần (pi=B, local=idx) đã được giả định đúng ⇒ bị 'chứng minh' sai; kịch bản: hàm >1024 khối có `⎇ p(x)` rồi gọi f có ⊳ thứ hai không biểu diễn được và đối số không Copy (đúng ra E0902)	_ => Prop::Atom(self.unrep_atom(bb, UNREP_SLOTS - 1)),
+crates/gt-oblig/src/analysis.rs	1953	_ =>	AN TOÀN		không chứng minh được ⇒ Lowered (giữ Assert) hoặc Rejected (không kiểm được lúc chạy)	_ => match &ob.runtime {
+crates/gt-oblig/src/analysis.rs	1963	_ =>	AN TOÀN		chỉ chọn mã ghi chú N0604 cho loại còn lại	_ => "N0604",
+crates/gt-oblig/src/analysis.rs	2097	let _ =	AN TOÀN		bỏ giá trị trả về vì chỉ chạy để Judge ghi nghĩa vụ; khối không tới được không có nghĩa vụ ⇒ Assert giữ nguyên	let _ = cx.block_out(s, bb, Some(&mut judge));
+crates/gt-oblig/src/analysis.rs	2126	let _ =	AN TOÀN		collect_unknown dùng NoProver ⇒ mọi nghĩa vụ Unknown ⇒ giữ check/Rejected	let _ = cx.block_out(&init, bb, Some(judge));
+crates/gt-oblig/src/analysis.rs	2219	_ =>	AN TOÀN		check_post_fixpoint: cạnh không thoả ⇒ Err ⇒ bỏ narrowing hoặc ICE	_ => {
+crates/gt-oblig/src/analysis.rs	2280	unwrap_or	AN TOÀN		giá trị trả về của thân hợp đồng không diễn giải ⇒ nguyên tử BOOL_BASE, canon_prop đổi thành nguyên tử mờ riêng của hợp đồng (không bao giờ chứng minh được)	let v = cx.prop_of(&s, &ret).unwrap_or(Prop::Atom(BOOL_BASE));
+crates/gt-oblig/src/analysis.rs	2287	_ =>	AN TOÀN		vòng lặp/không biểu diễn được ⇒ walk_paths false ⇒ extract_contract None ⇒ nghĩa vụ không biểu diễn được	_ => {
+crates/gt-oblig/src/analysis.rs	2372	_ =>	AN TOÀN		chỉ cách dựng Or các đường (0 đường ⇒ False, 1 ⇒ chính nó), không mặc định đúng	_ => Prop::Or(paths),
+crates/gt-oblig/src/analysis.rs	2398	ok()?	AN TOÀN		DomainQuery::new trả None = 'không biết' (fail-closed); chỉ test dùng, không có người gọi trong crate quyết định	check_post_fixpoint(&cx, &states).ok()?;
 crates/gt-oblig/src/driver.rs	82	_ =>	AN TOÀN		definite_code: kind lạ ⇒ E0901 là mã LỖI (ĐỎ); fail-closed (chỉ chọn mã chẩn đoán).	_ => "E0901",
 crates/gt-oblig/src/driver.rs	121	_ =>	AN TOÀN		note_msg: chỉ thông điệp; mã lạ vẫn là ghi chú 'giữ kiểm tra lúc chạy'.	_ => "kiểm tra giữ lại lúc chạy",
 crates/gt-oblig/src/driver.rs	533	is_some_and	AN TOÀN		imp=None chỉ với hàm tự do/khai báo trait (trait chưa có thân mặc định: thử `ƒ ok(&self){..}` trong ⊏ ⇒ E0101); hàm thành viên impl luôn tìm thấy impl nên self_ty được kiểm; thử `⊐ H{ƒ ok(&self)}` với Cell ⇒ N0901 giữ kiểm tra (/tmp/fo/t/a1.gt: abort precondition lúc chạy).	|| imp.is_some_and(|i| t.db.may_have_interior_mut(&i.self_ty, &gens));
@@ -455,14 +471,15 @@ crates/gt-types/src/collect.rs	876	_ =>	AN TOÀN		Pha 1 chỉ cần struct/enum/
 crates/gt-types/src/collect.rs	968	_ =>	AN TOÀN		Chỉ cắt vòng ở tham chiếu/con trỏ/Param/Fn (đúng ý); gặp chính root hoặc quá DEPTH ⇒ coi là vòng (từ chối).	_ => false,
 crates/gt-types/src/collect.rs	1256	_ =>	AN TOÀN		Trait path không phải trait ⇒ E0311 (Res::Err/None đã có lỗi phân giải).	_ => {
 crates/gt-types/src/collect.rs	1350	ok()?	AN TOÀN		Literal sai/quá lớn ⇒ None ⇒ expr.rs báo E0301; trong pattern ⇒ XPat::Opaque (không phủ gì, bảo thủ).	let v = u128::from_str_radix(digits, radix).ok()?;
-crates/gt-types/src/db.rs	94	is_some_and	AN TOÀN		params=None chỉ khi duyệt trường ADT mà tham số ADT đã được xét qua đối số; ở gốc luôn Some	Ty::Param(p) => params.is_some_and(|gs| {
-crates/gt-types/src/db.rs	97	is_none_or	AN TOÀN		tham số không tìm thấy trong generics ⇒ is_none_or ⇒ true (có thể có biến đổi bên trong, bảo thủ)	.is_none_or(|g| !g.bounds.is_empty())
-crates/gt-types/src/db.rs	108	is_some_and	AN TOÀN		lang mutability bên trong gồm Cell/Mutex/Atomic; ADT khác thì duyệt trường; (ghi chú: ở dòng 51-53 ADT thiếu trong db trả false, lệch với needs_drop bảo thủ nhưng db luôn đủ)	if adt.lang.is_some_and(Lang::interior_mutable) {
-crates/gt-types/src/db.rs	124	_ =>	AN TOÀN		các kiểu còn lại (Int/Float/Bool/Char/Str/Never/Fn/Err) không chứa ô có thể ghi	_ => false,
-crates/gt-types/src/db.rs	252	_ =>	AN TOÀN		kiểu cụ thể: Copy qua is_copy, trait khác qua find_impl đòi đúng một impl (mơ hồ/không có ⇒ false, bảo thủ)	_ => {
-crates/gt-types/src/db.rs	410	unwrap_or	AN TOÀN		drop glue (ADR-C18): ADT thiếu ⇒ Err (E0318/ICE); chuyển chỉ số u32; chỉ impl người dùng đã qua kiểm mới được gọi (Drop của prelude là thân rỗng)	out.push((u32::try_from(i).unwrap_or(u32::MAX), t, g));
-crates/gt-types/src/db.rs	504	unwrap_or	AN TOÀN		drop glue (ADR-C18): ADT thiếu ⇒ Err (E0318/ICE); chuyển chỉ số u32; chỉ impl người dùng đã qua kiểm mới được gọi (Drop của prelude là thân rỗng)	out.push((u32::try_from(vi).unwrap_or(u32::MAX), fs));
-crates/gt-types/src/db.rs	564	_ =>	AN TOÀN		holds_glue_source/drop_glue (ADR-C18): kiểu không phải ADT/tuple/mảng không sở hữu nguồn glue; tham số kiểu chưa biết (KNOWN_LIMITATIONS)	_ => false,
+crates/gt-types/src/db.rs	98	is_some_and	AN TOÀN		params=None chỉ khi duyệt trường ADT mà tham số ADT đã được xét qua đối số; ở gốc luôn Some	Ty::Param(p) => params.is_some_and(|gs| {
+crates/gt-types/src/db.rs	101	is_none_or	AN TOÀN		tham số không tìm thấy trong generics ⇒ is_none_or ⇒ true (có thể có biến đổi bên trong, bảo thủ)	.is_none_or(|g| !g.bounds.is_empty())
+crates/gt-types/src/db.rs	112	is_some_and	AN TOÀN		lang mutability bên trong gồm Cell/Mutex/Atomic; ADT khác thì duyệt trường; (ghi chú: ở dòng 51-53 ADT thiếu trong db trả false, lệch với needs_drop bảo thủ nhưng db luôn đủ)	if adt.lang.is_some_and(Lang::interior_mutable) {
+crates/gt-types/src/db.rs	128	_ =>	AN TOÀN		các kiểu còn lại (Int/Float/Bool/Char/Str/Never/Fn/Err) không chứa ô có thể ghi	_ => false,
+crates/gt-types/src/db.rs	256	_ =>	AN TOÀN		kiểu cụ thể: Copy qua is_copy, trait khác qua find_impl đòi đúng một impl (mơ hồ/không có ⇒ false, bảo thủ)	_ => {
+crates/gt-types/src/db.rs	414	unwrap_or	AN TOÀN		drop glue (ADR-C18): ADT thiếu ⇒ Err (E0318/ICE); chuyển chỉ số u32; chỉ impl người dùng đã qua kiểm mới được gọi (Drop của prelude là thân rỗng)	out.push((u32::try_from(i).unwrap_or(u32::MAX), t, g));
+crates/gt-types/src/db.rs	513	unwrap_or	AN TOÀN		drop glue (ADR-C18): ADT thiếu ⇒ Err (E0318/ICE); chuyển chỉ số u32; chỉ impl người dùng đã qua kiểm mới được gọi (Drop của prelude là thân rỗng)	out.push((u32::try_from(vi).unwrap_or(u32::MAX), fs));
+crates/gt-types/src/db.rs	587	_ =>	AN TOÀN		holds_glue_source/drop_glue (ADR-C18): kiểu không phải ADT/tuple/mảng không sở hữu nguồn glue; tham số kiểu chưa biết (KNOWN_LIMITATIONS)	_ => false,
+crates/gt-types/src/db.rs	629	_ =>	AN TOÀN		contains_lang: tham chiếu/nguyên thuỷ/lát/hàm không SỞ HỮU Secret (move tham chiếu không cần xoá chỗ của nó)	_ => false,
 crates/gt-types/src/exhaust.rs	33	_ =>	AN TOÀN		kiểu không phải int/char ⇒ None ⇒ miền vô hạn, chỉ nhánh bắt-mọi-thứ phủ được	_ => None,
 crates/gt-types/src/exhaust.rs	38	unwrap_or	AN TOÀN		u128 đã bị loại khỏi mô hình miền (all_ctors trả None); các IntTy còn lại vừa i128 nên unwrap_or không bao giờ chạy	i128::try_from(v).unwrap_or(i128::MAX)
 crates/gt-types/src/exhaust.rs	96	_ =>	AN TOÀN		hàng không khớp ctor bị loại khỏi ma trận ⇒ chỉ làm báo thiếu nhiều hơn (E0305), không bao giờ ít hơn	_ => None,

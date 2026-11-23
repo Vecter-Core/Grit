@@ -101,7 +101,7 @@ fn statement_uses(s: &Statement) -> Vec<Local> {
                 place_locals(p, &mut out);
             }
         }
-        StatementKind::FakeRead(_, p) => place_locals(p, &mut out),
+        StatementKind::FakeRead(_, p) | StatementKind::Wipe(p) => place_locals(p, &mut out),
         StatementKind::StorageLive(_) | StatementKind::StorageDead(_) | StatementKind::Nop => {}
     }
     out
@@ -216,7 +216,9 @@ impl V<'_> {
                             _ => {}
                         }
                     }
-                    StatementKind::FakeRead(_, p) => place_tys(p, &mut tys),
+                    StatementKind::FakeRead(_, p) | StatementKind::Wipe(p) => {
+                        place_tys(p, &mut tys)
+                    }
                     StatementKind::StorageLive(_)
                     | StatementKind::StorageDead(_)
                     | StatementKind::Nop => {}
@@ -355,7 +357,7 @@ impl V<'_> {
                             )),
                         }
                     }
-                    StatementKind::FakeRead(_, p) => {
+                    StatementKind::FakeRead(_, p) | StatementKind::Wipe(p) => {
                         if place_ty(b, p).is_none() {
                             self.err(format!("bb{bi}[{si}]: chỗ không hợp lệ"));
                         }

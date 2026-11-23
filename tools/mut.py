@@ -210,12 +210,20 @@ class Worker:
     def run_tests(self, timeout=None):
         for attempt in range(4):
             proc = subprocess.Popen(TEST_CMD, cwd=self.dir, env=self.env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                    text=True, encoding="utf-8", errors="replace")
+                                    text=True, encoding="utf-8", errors="replace", start_new_session=(os.name != "nt"))
             try:
                 so, se = proc.communicate(timeout=timeout or TIMEOUT)
             except subprocess.TimeoutExpired:
                 # treo = bị bắt; giết CẢ CÂY (tệp thực thi test mồ côi vẫn chạy và khoá `target/`)
-                subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+                if os.name == "nt":
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+                else:
+                    # POSIX: tiến trình test chạy trong nhóm riêng (start_new_session) ⇒ giết cả nhóm
+                    import signal
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
                 proc.communicate()
                 return "killed", "timeout"
             out = so + se

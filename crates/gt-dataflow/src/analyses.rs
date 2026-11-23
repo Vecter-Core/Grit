@@ -183,7 +183,7 @@ fn init_effects(s: &mut BitSet, mp: &MovePaths, stmt: &Statement, init_bit: bool
         StatementKind::StorageLive(l) | StatementKind::StorageDead(l) => {
             set_tree(s, mp, mp.roots[l.index()], !init_bit);
         }
-        StatementKind::FakeRead(..) | StatementKind::Nop => {}
+        StatementKind::FakeRead(..) | StatementKind::Wipe(_) | StatementKind::Nop => {}
     }
 }
 
@@ -338,7 +338,7 @@ impl Analysis for Liveness {
                 s.remove(l.index());
             }
             StatementKind::FakeRead(_, p) => place_uses(p, s, false),
-            StatementKind::Nop => {}
+            StatementKind::Wipe(_) | StatementKind::Nop => {}
         }
     }
     fn terminator_effect(&self, s: &mut BitSet, t: &Terminator, _: Location) {

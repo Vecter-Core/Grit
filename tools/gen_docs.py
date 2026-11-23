@@ -96,6 +96,7 @@ ABORTS = {
     "Cell::new": "không",
     "Cell::get": "không",
     "Cell::set": "không",
+    "Secret::new": "không (bọc dữ liệu; bản này bị xoá khi chết và sau mỗi move — ADR-P2-03)",
     "Owned::new": "hết bộ nhớ ⇒ abort `heap_exhausted` (ADR-C18 bước 2; cần `&Cap<Alloc>`, hiệu ứng `mem`)",
     "Owned::get": "không",
     "Owned::get_mut": "không",

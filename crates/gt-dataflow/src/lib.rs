@@ -46,7 +46,9 @@ pub fn check_invariants(t: &TypesOutput, m: &MirOutput) -> Report {
 pub fn elaborate_program(t: &TypesOutput, m: &mut MirOutput) -> Report {
     let mut bag = Diagnostics::new(200);
     for b in &mut m.bodies {
-        match elaborate_drops(b, &t.db) {
+        match elaborate_drops(b, &t.db)
+            .and_then(|ds| elaborate::insert_secret_wipes(b, &t.db).map(|()| ds))
+        {
             Ok(ds) => {
                 for d in ds {
                     if let Ok(c) = Code::parse(d.code) {
