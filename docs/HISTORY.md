@@ -181,4 +181,5 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
   Thử trên `lib/std`: `next_cap(usize::MAX[-1])` abort overflow (an toàn); "hết nhiên liệu" ban đầu bị báo như lỗi — sửa thành "chậm" vì mọi `⟳` có biến thể được chứng minh dừng.
 - **Sự cố nhỏ:** lần thử trong `lib/std` để lại `lib/std/rig.lock` (tệp lạ làm vô hiệu cổng) — đã xoá đúng tệp đó ngay; từ nay chạy thử công cụ trên BẢN SAO.
 - **Quyết định của Giang (2026-11-23):** KHÔNG gán nhãn seed (hay nhãn phiên bản khác) cho tới khi viết Grit hoàn chỉnh như viết Rust.
-- **CHƯA:** cổng đầy đủ trên mã C1; đo thời gian `--auto` trên dự án lớn; hỗ trợ f32/f64/char/slice.
+- **Cổng:** clone sạch trên d558cda XANH liền mạch 4 lượt: 976 test đạt, 0 lỗi, 209 bộ, `GATE_TREE=9d9b5813…`.
+- **CHƯA:** đo thời gian `--auto` trên dự án lớn; hỗ trợ f32/f64/char/slice; cổng Windows.
