@@ -184,7 +184,9 @@ fn a_returned_value_is_dropped_by_the_caller_not_the_callee() {
 
 // ======================= ORACLE ngẫu nhiên =======================
 // Chương trình sinh ngẫu nhiên (khối lồng, move toàn phần/có điều kiện/một phần trường, gán đè, biến tạm, vòng lặp có move theo vòng) với
-// MÔ HÌNH Rust độc lập: mô hình biết đường đi thật (điều kiện là literal hoặc `i == m`), mô phỏng phạm vi và tính dãy drop. Bộ sinh chỉ
+// MÔ HÌNH Rust độc lập: mô hình biết đường đi thật (điều kiện `opq(true|false)` hoặc `i == m`), mô phỏng phạm vi và tính dãy drop. Điều kiện
+// đi qua lời gọi `opq` vì bước hạ MIR CẮT nhánh `⎇ true/false` literal (khi đó không có move có điều kiện nào, cờ drop không được thử —
+// đột biến tự động lượt 2 lộ ra điều này). Bộ sinh chỉ
 // dùng lại biến CHẮC CHẮN còn khởi tạo theo luật tĩnh (biến bị move có điều kiện thì không dùng nữa, trừ gán đè), để gritc chấp nhận.
 
 struct Rng(u64);
@@ -325,7 +327,7 @@ impl Gen {
                         format!("z ≔ {name};")
                     };
                     self.src
-                        .push_str(&format!("{ind}⎇ {c} {{ {how} }} ⇝ {{ }}\n"));
+                        .push_str(&format!("{ind}⎇ opq({c}) {{ {how} }} ⇝ {{ }}\n"));
                     if c {
                         self.log.push(id);
                         self.scopes[s][i] = Var::D(name, None, false);
@@ -371,7 +373,7 @@ impl Gen {
                 } else if mv == 2 {
                     let c = self.r.below(2) == 0;
                     self.src
-                        .push_str(&format!("{ind}⎇ {c} {{ consume(w{n}.y); }} ⇝ {{ }}\n"));
+                        .push_str(&format!("{ind}⎇ opq({c}) {{ consume(w{n}.y); }} ⇝ {{ }}\n"));
                     if c {
                         self.log.push(y);
                         ys = None;
@@ -400,9 +402,9 @@ impl Gen {
                 let (id, k) = (self.id(), self.id());
                 let c = self.r.below(2) == 0;
                 let call = if self.r.below(2) == 0 {
-                    format!("maybe_first(mk(&log, {id}u64), &log, {c}, {k}u64);")
+                    format!("maybe_first(mk(&log, {id}u64), &log, opq({c}), {k}u64);")
                 } else {
-                    format!("maybe_last(&log, {c}, {k}u64, mk(&log, {id}u64));")
+                    format!("maybe_last(&log, opq({c}), {k}u64, mk(&log, {id}u64));")
                 };
                 self.src.push_str(&format!("{ind}{call}\n"));
                 if c {
@@ -461,7 +463,7 @@ impl Gen {
                         // move CÓ ĐIỀU KIỆN ra khỏi enum: trên đường còn lại phải drop phần tải qua thẻ
                         let c = self.r.below(2) == 0;
                         self.src
-                            .push_str(&format!("{ind}⎇ {c} {{ {m} }} ⇝ {{ }}\n"));
+                            .push_str(&format!("{ind}⎇ opq({c}) {{ {m} }} ⇝ {{ }}\n"));
                         c
                     }
                 };
@@ -489,6 +491,7 @@ fn random_program(seed: u64) -> (String, Vec<u64>, [u32; 8]) {
              ⊐ <'a> Drop for P<'a> { ƒ drop(&!self) ! ∅ { self.log.set(self.log.get() *% 31u64 +% self.id); } }\n\
              ƒ maybe_first<'a>(d: D<'a>, l: &'a Cell<u64>, c: bool, k: u64) ! ∅ { ⎇ c { consume(d); } ⇝ { } e ≔ mk(l, k); }\n\
              ƒ maybe_last<'a>(l: &'a Cell<u64>, c: bool, k: u64, d: D<'a>) ! ∅ { ⎇ c { consume(d); } ⇝ { } e ≔ mk(l, k); }\n\
+             ƒ opq(x: bool) → bool ! ∅ { x }\n\
              ƒ main() → u64 ! ∅ {\n  log ≔ Cell::new(0u64);\n  {\n",
         ),
         log: Vec::new(),
