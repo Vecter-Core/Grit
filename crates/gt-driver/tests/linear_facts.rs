@@ -476,3 +476,30 @@ fn every_precondition_m7_claims_proved_holds_on_every_input() {
         "sự kiện tuyến tính chứng minh quá ít: {needs_fact_proved}/{from_path}"
     );
 }
+
+fn count(src: &str, code: &str) -> usize {
+    let (errs, all) = notes(src);
+    assert!(errs.is_empty(), "gritc từ chối {errs:?}\n{src}");
+    all.iter().filter(|c| *c == code).count()
+}
+
+/// Đột biến M7 (dòng pres_common/assume_posts): sau lời gọi, `⊳` của callee (đã kiểm hoặc đã chứng minh) và `⊲` là sự kiện ĐÚNG cho phần còn lại — KHÔNG phải phủ định của chúng.
+/// Mỗi cặp tách riêng (một dương, một âm) để hai lỗi không triệt tiêu nhau trong phép đếm.
+#[test]
+fn facts_assumed_after_a_call_are_the_callee_contract_not_its_negation() {
+    let defs = "ƒ n1(a: u32, b: u32) → u32 ! ∅ ⊳ a + b <= 60 { a }
+ƒ n2(a: u32, b: u32) → u32 ! ∅ ⊳ a + b <= 60 { a }
+ƒ n3(a: u32, b: u32) → u32 ! ∅ ⊳ a + b > 60 { a }
+ƒ g(a: u32, b: u32) → u32 ! ∅ ⊲ a + b <= 60 { 0 }\n";
+    let body = |calls: &str| {
+        format!("{defs}ƒ f(p: u8, q: u8) → u32 ! ∅ {{ x ≔ p as u32; y ≔ q as u32; {calls} 0 }}")
+    };
+    // sau n1(x, y) (kiểm lúc chạy), x + y ≤ 60 đúng ⇒ n2 chứng minh được; n1 là N0901 duy nhất
+    assert_eq!(count(&body("u ≔ n1(x, y); v ≔ n2(x, y);"), "N0901"), 1);
+    // …và n3 (cần x + y > 60) KHÔNG được chứng minh: hai N0901
+    assert_eq!(count(&body("u ≔ n1(x, y); v ≔ n3(x, y);"), "N0901"), 2);
+    // `⊲` của g (trên đối số) đúng sau lời gọi ⇒ n2 chứng minh được; không còn N0901
+    assert_eq!(count(&body("u ≔ g(x, y); v ≔ n2(x, y);"), "N0901"), 0);
+    // …và n3 KHÔNG được chứng minh
+    assert_eq!(count(&body("u ≔ g(x, y); v ≔ n3(x, y);"), "N0901"), 1);
+}
