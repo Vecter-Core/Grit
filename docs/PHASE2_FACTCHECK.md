@@ -151,3 +151,14 @@ Xem dòng "Tổng" dưới bảng mục 1 (44 khẳng định). Mục 7 (ADR): 7
 7. **Ngầm theo ADR-038 cũ (mục 7):** `Vec` giữ `&'a Arena` chia sẻ từ ADR-C03, không phải `&!Arena` độc quyền.
 8. **Mâu thuẫn spawn/detach (mục 6):** không có trong đề xuất; vẫn mở.
 9. **Chưa có trong đề xuất:** hệ số tăng `Vec` thực là ×2 sàn 4; chunk Arena không nhân đôi (cho thấy lãng phí "~2×" của đề xuất là của `Vec`, không phải của Arena).
+
+## 12. Kết quả đo B0 (2026-11-23, Linux x86-64 đám mây, `CARGO_BUILD_JOBS=2`, mỗi lần một Cargo; số THẬT, không phải máy Windows của dự án)
+| # đo (mục 10) | Kết quả | Ghi chú / giới hạn |
+|---|---|---|
+| 8 dựng không LLVM | **xanh**: `cargo build --no-default-features -p gt-driver --bin gritc` 54 giây (thư mục đích riêng, dựng từ đầu), `ldd` không có LLVM, `gritc check` 9/9 mẫu `tests/pass/01–09` xanh | `build` không-LLVM chỉ dùng thông dịch (`backend: interpreter`) |
+| 1 dựng `gritc` release | **59 giây** từ đầu (cùng điều kiện), `gritc` release 6,8 MB | thời gian dựng debug không đo |
+| 1 `gritc check` bản release | `tests/pass/02_sum_loop.gt` 38–45 ms; `examples/sha256/src` 222–231 ms; `examples/wordfreq/src` 188–205 ms; `examples/json/src` 643–758 ms (phán quyết vàng) | 2 lần mỗi mẫu; `sortlines` cần `rig` (phụ thuộc `std`) nên KHÔNG đo bằng `gritc` trực tiếp (ra E0309 vì thiếu `std`, đã xác nhận `dogfood_sortlines` 7/7 đạt) |
+| 2–7, 9 | **CHƯA ĐO** | cần bản dựng thử ngoài cây / công cụ riêng (profiler, `bench_*.py`, VirtualAlloc Windows) |
+
+**Bảng phụ thuộc LLVM (đo bằng `grep`/`wc`, HEAD 212e0aa):** chỉ ba crate liên kết LLVM thật — `gt-llvm` (66 dòng, vỏ `inkwell`), `gt-codegen-llvm` (4019 dòng, riêng `lower.rs` 3962), `gt-guard` (522 dòng; đọc IR qua `gt-llvm`). `gt-driver` chỉ chạm LLVM qua feature `llvm` (mặc định BẬT; `cli.rs` có mô-đun giả khi tắt) ở `native.rs`/`cli.rs`/`lib.rs`. `gt-mir` (6448 dòng), `gt-types`: các lần nhắc "LLVM" đều là chú thích, không phải mã. ⇒ Ranh giới L0 sạch: bỏ 3 crate này thì M1–M9 và thông dịch vẫn nguyên (đã đo bằng dựng không-LLVM xanh).
+**Hệ quả cho ADR-P2-02:** phần cần tách để có GLIR nằm gọn trong `lower.rs` (3962 dòng) và luật của `gt-guard` (522 dòng); không có phụ thuộc ngầm vào LLVM ở các crate phân tích.

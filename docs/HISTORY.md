@@ -153,3 +153,32 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
   phải sửa kỳ vọng sau khi ĐỌC MIR: biến tạm của gán đè cũng bị xoá — đúng đặc tả); đột biến tay 3/3 bị bắt; unit gt-rt xoá đúng `len` byte; 3 mẫu corpus.
   Chạy: 66 bộ/372 test của các crate bị đụng + 7 bộ driver/58 test đạt; clippy (có/không LLVM, runtime) sạch.
 - **CHƯA:** luật Guard "mọi alloca Secret được xoá"; đột biến tự động; cổng liền mạch trên mã này; `declassify` cần `Cap<Secret>` (ADR-C13, vẫn hoãn).
+
+### P2-A2/A3 bước 1 (2026-11-23, Claude Opus 5.5) — kernel chứng chỉ Farkas (ADR-P2-04)
+- **Đã làm:** crate `gt-kernel` — phần TCB (`linear.rs`: dịch nghĩa vụ sang DNF ràng buộc tuyến tính, cái không hiểu ⇒ làm yếu; `check.rs`: kiểm chứng chỉ
+  Farkas từng ca + luật `a ∧ ¬a`) tách khỏi phần tìm (`search.rs`, Fourier–Motzkin, NGOÀI TCB). `CertifiedProver{require_kernel}` bật ở M7 và M8:
+  mọi "đã chứng minh" phải có chứng chỉ kernel chấp nhận.
+- **Bằng chứng:** corpus 105/105 chứng minh zone có chứng chỉ (`kernel_coverage.rs`, `rejected == 0`); oracle vét cạn 3000 nghĩa vụ; chế độ chỉ-tin-kernel:
+  63 bộ/240 test (corpus, gt-driver, rig) đạt. Đột biến tự động `docs/MUT_KERNEL_P2.md`: 76 → 72 giết, 4 sống có lập luận; lượt 1 lộ 3 đột biến
+  KHÔNG SOUND sống (test độc hại cũ vi phạm nhiều luật cùng lúc) — đã thêm test cô lập từng luật. `mut.py` sửa giết nhóm tiến trình trên POSIX.
+- **Phát hiện:** Farkas thêm 0 chứng minh mới trên corpus vì M7 chỉ xuất giả thiết khoảng + zone ⇒ bước 2: M7 giữ sự kiện tuyến tính tổng quát.
+- **Phụ:** danh sách test nền Windows thiếu 10 test có sẵn (bước diff CI sẽ đỏ) — đã bổ sung, kiểm bằng đúng lệnh CI (`PLATFORM_DIFF_OK`).
+- **CHƯA:** cổng liền mạch trên mã này; TCB của kernel CHỜ DUYỆT.
+
+### P2-A2 bước 2 (2026-11-23, Claude Opus 5.5) — M7 giữ sự kiện tuyến tính (ADR-P2-05)
+- **Đã làm:** `AState.facts` (điều kiện nhánh/assert/hợp đồng số học thuần; xoá cùng `defs`; giao ở điểm hợp/mở rộng) vào `hyps_for`; chứng minh hai bước
+  (không sự kiện trước); `CertifiedProver` thử chứng chỉ trước khi tin "sai mọi nơi" (E0901 sai trên mã không tới được); FM bỏ hàng thừa.
+- **Bằng chứng:** `linear_facts.rs` (ca tay + oracle 240 chương trình kiểm vét cạn `u8 × u8`): trước 15 `⊳` chứng minh tĩnh (7/72 ca từ đường đi) + 1
+  E0901 sai; sau 82/82, 0 sai. Tắt xoá-khi-gán / tắt giao ⇒ ĐỎ. Corpus: chứng minh mới 0 (corpus gần như không có điều kiện tổng/hệ số), không hồi quy.
+- **Hồi quy tự gây, bắt bởi `hashmap_collide`:** sự kiện thừa làm FM vượt giới hạn ⇒ E0702 sai trong `std`; sửa bằng hai bước + prune; mẫu hồi quy 265.
+- **Quy trình:** commit 03acc63 lọt lỗi clippy (lệnh `clippy | head` nuốt mã thoát) — sửa ở commit kế; từ nay đọc `PIPESTATUS`.
+- **Cổng:** clone sạch trên 52cf4f5 (chạy lại từ đầu sau khi sửa sổ fail-open) XANH liền mạch 4 lượt: 970 test đạt, 0 lỗi, 208 bộ, `GATE_TREE=10940c1f…`. Lần chạy trước trên 5d5069d ĐỎ đúng một bước `failopen` (4 chỗ mới chưa phân loại — tôi quên ghi sổ lần thứ hai).
+- **CHƯA:** đột biến tự động phần M7 mới; đo thời gian M7 trước/sau; cổng trên Windows.
+
+### P2-B0 + P2-C1 (2026-11-23, Claude Sonnet 5.5) — khảo sát LLVM + `rig test --auto`
+- **B0:** bảng phụ thuộc LLVM + số đo thật ở `docs/PHASE2_FACTCHECK.md` mục 12 (dựng không-LLVM xanh 54 s; release 59 s, 6,8 MB; ranh giới L0 gọn trong `gt-llvm`/`gt-codegen-llvm`/`gt-guard`). Mục #2–7, #9 CHƯA ĐO.
+- **C1 (ADR-P2-06, NGOÀI TCB):** `rig test --auto` — ứng viên đối số hằng biên, `gritc` làm bộ lọc (E0901 ⇒ ngoài miền), chạy thông dịch, báo abort là phản ví dụ. 6 test E2E (`crates/rig/tests/auto.rs`, đỏ trước), 3 đột biến tay bị bắt.
+  Thử trên `lib/std`: `next_cap(usize::MAX[-1])` abort overflow (an toàn); "hết nhiên liệu" ban đầu bị báo như lỗi — sửa thành "chậm" vì mọi `⟳` có biến thể được chứng minh dừng.
+- **Sự cố nhỏ:** lần thử trong `lib/std` để lại `lib/std/rig.lock` (tệp lạ làm vô hiệu cổng) — đã xoá đúng tệp đó ngay; từ nay chạy thử công cụ trên BẢN SAO.
+- **Quyết định của Giang (2026-11-23):** KHÔNG gán nhãn seed (hay nhãn phiên bản khác) cho tới khi viết Grit hoàn chỉnh như viết Rust.
+- **CHƯA:** cổng đầy đủ trên mã C1; đo thời gian `--auto` trên dự án lớn; hỗ trợ f32/f64/char/slice.

@@ -118,7 +118,21 @@ impl<P: Prover> Prover for CertifiedProver<P> {
                     None => Verdict::Unknown,
                 }
             }
-            r @ Verdict::Refuted { .. } => r,
+            // "sai mọi nơi" của bộ trong tính trên giả thiết nó HIỂU; nếu các giả thiết đầy đủ mâu thuẫn (mã không tới được) thì mục tiêu đúng
+            // rỗng — thử chứng chỉ trước khi báo E0901 (chứng minh vẫn qua kernel; không chứng minh được ⇒ giữ bác bỏ, fail-closed)
+            r @ Verdict::Refuted { .. } => {
+                let mut steps = self.search_steps.min(budget.steps);
+                let before = steps;
+                let found = find_cert(ob, &mut steps);
+                let _ = budget.spend(before - steps);
+                match found {
+                    Some(c) if check(ob, &c).is_ok() => {
+                        self.stats.farkas_only += 1;
+                        Verdict::Proved(Cert(c.encode()))
+                    }
+                    _ => r,
+                }
+            }
         }
     }
 }

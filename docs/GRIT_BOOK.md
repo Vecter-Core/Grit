@@ -1159,6 +1159,7 @@ rig check           lock + gritc check cả đồ thị gói
 rig run             build rồi chạy
 rig build           dựng target/<tên>.exe
 rig test            mỗi tests/*.gt là một chương trình có main; thoát 0 là qua
+rig test --auto     sinh test từ hợp đồng ⊳ ⊲ của hàm công khai (đối số biên); thoát 1 nếu tìm thấy phản ví dụ
 rig fmt             định dạng src/ và tests/
 ```
 

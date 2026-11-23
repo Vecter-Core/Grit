@@ -1,7 +1,7 @@
 //! NGOÀI TCB (ADR-P2-04): TÌM chứng chỉ Farkas bằng khử Fourier–Motzkin, mỗi hàng mang vector hệ số trên các ràng buộc GỐC của ca.
 //! Sai ở đây chỉ làm mất chứng minh (kernel từ chối), không bao giờ làm sai phán quyết. Giới hạn số hàng/bước ⇒ bỏ cuộc (`None`).
 use crate::linear::{Key, Lin};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Số hàng tối đa trong lúc khử.
 pub const MAX_ROWS: usize = 400;
@@ -29,6 +29,25 @@ fn gcd(a: i128, b: i128) -> i128 {
     a
 }
 
+/// Bỏ hàng thừa: hàng hằng đúng hiển nhiên (`c ≤ 0`), và trong các hàng CÙNG phần biến chỉ giữ hàng chặt nhất (`c` lớn nhất: `Σ + c ≤ 0`).
+/// Hàng giữ lại vẫn mang hệ số Farkas của chính nó nên mọi chứng chỉ tìm được vẫn đúng dạng; kernel kiểm lại tất cả.
+fn prune(rows: Vec<Row>) -> Vec<Row> {
+    let mut best: BTreeMap<Vec<(Key, i128)>, Row> = BTreeMap::new();
+    for r in rows {
+        if r.lin.coef.is_empty() && r.lin.c <= 0 {
+            continue;
+        }
+        let key: Vec<(Key, i128)> = r.lin.coef.iter().map(|(k, v)| (k.clone(), *v)).collect();
+        match best.get(&key) {
+            Some(o) if o.lin.c >= r.lin.c => {}
+            _ => {
+                best.insert(key, r);
+            }
+        }
+    }
+    best.into_values().collect()
+}
+
 /// Tìm hệ số `λ ≥ 0` (theo chỉ số ràng buộc của ca) cho thấy ca vô nghiệm; `steps` là ngân sách (trừ dần).
 pub fn refute_case(cons: &[Lin], steps: &mut u64) -> Option<Vec<(usize, i128)>> {
     let n = cons.len();
@@ -44,6 +63,7 @@ pub fn refute_case(cons: &[Lin], steps: &mut u64) -> Option<Vec<(usize, i128)>> 
             }
         })
         .collect();
+    rows = prune(rows);
     loop {
         if let Some(r) = rows.iter().find(|r| r.lin.coef.is_empty() && r.lin.c > 0) {
             return Some(
@@ -83,13 +103,15 @@ pub fn refute_case(cons: &[Lin], steps: &mut u64) -> Option<Vec<(usize, i128)>> 
                 *steps = steps.checked_sub(1)?;
                 let (a, b) = (p.lin.coef[&k], -q.lin.coef[&k]);
                 let g = gcd(a, b).max(1);
-                let r = combine(p, b / g, q, a / g)?;
-                next.push(r);
-                if next.len() > MAX_ROWS {
-                    return None;
+                // tràn i128 ở một cặp ⇒ bỏ cặp đó (chỉ mất một đường suy diễn), không bỏ cả lần tìm
+                if let Some(r) = combine(p, b / g, q, a / g) {
+                    next.push(r);
                 }
             }
         }
-        rows = next;
+        rows = prune(next);
+        if rows.len() > MAX_ROWS {
+            return None;
+        }
     }
 }

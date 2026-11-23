@@ -12,7 +12,7 @@ use gt_driver::verdict::{RunEnd, check_exit_code, run_exit_code};
 use gt_resolve::SourceInput;
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "dùng: rig <lệnh> …\n  rig new <tên>            tạo gói mới (rig.toml, src/main.gt, rig.lock)\n  rig check [[--locked] [--deny-yellow]  khoá + gritc check toàn bộ đồ thị gói\n  rig build [--locked] [--deny-yellow]  check rồi dựng target/<tên>.exe (hai lần dựng ⇒ nhị phân giống hệt)\n  rig run                  build rồi chạy\n  rig test                 mỗi tests/*.gt là một chương trình có `main`; qua = thoát 0\n  rig add <đường-dẫn>      thêm phụ thuộc cục bộ vào rig.toml rồi khoá lại\n  rig lock                 ghi rig.lock (băm nội dung từng gói)\n  rig fmt [--check]        định dạng src/ và tests/ của gói gốc\n  rig clean                xoá target/\nMã thoát: mã gritc chuyển nguyên (0 qua | 1 ĐỎ/test hỏng | 2 ICE | 3 lỗi của gritc | run: 70 abort, 100+s) | mã riêng của rig: 10 rig.lock thiếu/lệch | 11 dự án/manifest sai | 12 dùng sai | 13 IO/môi trường\n";
+const USAGE: &str = "dùng: rig <lệnh> …\n  rig new <tên>            tạo gói mới (rig.toml, src/main.gt, rig.lock)\n  rig check [[--locked] [--deny-yellow]  khoá + gritc check toàn bộ đồ thị gói\n  rig build [--locked] [--deny-yellow]  check rồi dựng target/<tên>.exe (hai lần dựng ⇒ nhị phân giống hệt)\n  rig run                  build rồi chạy\n  rig test                 mỗi tests/*.gt là một chương trình có `main`; qua = thoát 0\n  rig test --auto          sinh test từ hợp đồng ⊳ ⊲ của hàm công khai (đối số biên; tìm phản ví dụ abort); thoát 1 nếu có\n  rig add <đường-dẫn>      thêm phụ thuộc cục bộ vào rig.toml rồi khoá lại\n  rig lock                 ghi rig.lock (băm nội dung từng gói)\n  rig fmt [--check]        định dạng src/ và tests/ của gói gốc\n  rig clean                xoá target/\nMã thoát: mã gritc chuyển nguyên (0 qua | 1 ĐỎ/test hỏng | 2 ICE | 3 lỗi của gritc | run: 70 abort, 100+s) | mã riêng của rig: 10 rig.lock thiếu/lệch | 11 dự án/manifest sai | 12 dùng sai | 13 IO/môi trường\n";
 
 /// Mã thoát của lỗi do CHÍNH rig (không lẫn với mã gritc 0–3/70/71/100+).
 pub const E_LOCK: i32 = 10;
@@ -42,6 +42,7 @@ struct Args {
     check: bool,
     locked: bool,
     no_std: bool,
+    auto: bool,
 }
 
 fn parse(args: &[String]) -> Result<Args, String> {
@@ -54,6 +55,7 @@ fn parse(args: &[String]) -> Result<Args, String> {
         check: false,
         locked: false,
         no_std: false,
+        auto: false,
     };
     for s in it {
         match s.as_str() {
@@ -61,6 +63,7 @@ fn parse(args: &[String]) -> Result<Args, String> {
             "--check" => a.check = true,
             "--locked" => a.locked = true,
             "--no-std" => a.no_std = true,
+            "--auto" => a.auto = true,
             x if x.starts_with('-') => return Err(format!("đối số lạ `{x}`")),
             x => a.pos.push(x.to_string()),
         }
@@ -338,6 +341,84 @@ fn cmd_test(a: &Args) -> i32 {
     if ice { 2 } else { i32::from(failed > 0) }
 }
 
+/// `rig test --auto` (C1, ADR-P2-06): NGOÀI TCB — chỉ tìm phản ví dụ, không đổi phán quyết gritc; chạy trên thông dịch tham chiếu (không cần LLVM).
+fn cmd_test_auto(a: &Args) -> i32 {
+    use crate::autotest::{self, Outcome};
+    const CAP: usize = 24;
+    let dir = match cwd() {
+        Ok(d) => d,
+        Err(c) => return c,
+    };
+    let p = match load_locked(&dir, a.locked) {
+        Ok(p) => p,
+        Err(c) => return c,
+    };
+    let root_files: Vec<(String, String)> = p
+        .pkgs
+        .iter()
+        .filter(|k| k.is_root)
+        .flat_map(|k| k.files.iter())
+        .filter(|(n, _)| n != "main.gt")
+        .cloned()
+        .collect();
+    let base = p.sources(true);
+    let opts = Options {
+        checks: DEFAULT_CHECKS,
+        deny_yellow: false,
+        fault: None,
+    };
+    let ts = autotest::targets(&root_files);
+    if ts.is_empty() {
+        println!("0 hàm công khai để sinh test (cần `◈ ƒ` trong src/ ngoài main.gt)");
+        return 0;
+    }
+    let (mut ok, mut failed, mut skipped) = (0, 0, 0);
+    for (t, skip, prims) in &ts {
+        let label = format!("auto {}::{}", t.module, t.name);
+        let outcome = match skip {
+            Some(why) => Outcome::Skipped(why.clone()),
+            None => autotest::run_target(&base, t, prims, CAP, &opts),
+        };
+        match outcome {
+            Outcome::Ok {
+                ran: 0,
+                dropped,
+                slow: 0,
+            } => {
+                println!(
+                    "{label} ... BỎ QUA (cả {dropped} ứng viên đều ngoài miền ⊳: không có đầu vào hợp lệ để thử)"
+                );
+                skipped += 1;
+            }
+            Outcome::Ok { ran, dropped, slow } => {
+                let slow_note = if slow > 0 {
+                    format!(", {slow} chậm (hết nhiên liệu — không phải lỗi)")
+                } else {
+                    String::new()
+                };
+                println!("{label} ... ok (chạy {ran}, bỏ {dropped} vì ⊳ sai{slow_note})");
+                ok += 1;
+            }
+            Outcome::Failed { found, ran } => {
+                println!(
+                    "{label} ... FAILED ({} phản ví dụ trong {ran} lần chạy)",
+                    found.len()
+                );
+                for f in found.iter().take(3) {
+                    println!("    {f}");
+                }
+                failed += 1;
+            }
+            Outcome::Skipped(why) => {
+                println!("{label} ... BỎ QUA ({why})");
+                skipped += 1;
+            }
+        }
+    }
+    println!("kết quả: {ok} qua, {failed} có phản ví dụ, {skipped} bỏ qua");
+    i32::from(failed > 0)
+}
+
 #[cfg(not(feature = "llvm"))]
 fn cmd_test(_a: &Args) -> i32 {
     fail("bản rig này dựng không có backend llvm (--no-default-features)")
@@ -609,6 +690,7 @@ pub fn main(args: Vec<String>) -> i32 {
         "check" => cmd_check(&a),
         "build" => cmd_build(&a),
         "run" => cmd_run(&a),
+        "test" if a.auto => cmd_test_auto(&a),
         "test" => cmd_test(&a),
         "add" => cmd_add(&a),
         "lock" => cmd_lock(),

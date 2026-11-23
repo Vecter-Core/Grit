@@ -1465,3 +1465,42 @@ giải ngoài vào TCB); 8.A đầy đủ (bit-vector, mảng, LRAT) là các b�
   chứng minh). Bộ PHÂN TÍCH M7 (sinh giả thiết) vẫn trong TCB.
 - Farkas tự tìm được chứng minh mới trên corpus: 0 — vì M7 chỉ xuất giả thiết khoảng + hiệu (zone); sự kiện tuyến tính tổng quát (`i + j < n`, `2·i < n`, theo
   nhánh) bị mất trước khi tới bộ chứng minh. **Bước 2 của A2:** M7 giữ thêm sự kiện tuyến tính của điều kiện rẽ nhánh/vòng (miền đa diện rút gọn).
+
+## ADR-P2-05 — A2 bước 2: M7 giữ sự kiện tuyến tính (2026-11-23; Giai đoạn 2)
+**Vấn đề (đo ở ADR-P2-04):** Farkas không thêm chứng minh nào vì M7 chỉ xuất khoảng + zone; điều kiện như `x ≤ 100 − y` (tức `x + y ≤ 100`) bị mất.
+- **Thiết kế:** trạng thái M7 (`AState`) có thêm `facts`: các mệnh đề ĐÚNG tại điểm chương trình, lấy từ điều kiện rẽ nhánh (cả phía phủ định), `Assert`
+  (sau assert điều kiện đúng), `⊳` đầu thân và `⊳`/`⊲` của lời gọi. Không đổi cú pháp/ngữ nghĩa ngôn ngữ; chỉ tăng độ chính xác của M7.
+- **Điều kiện giữ:** số học thuần (KHÔNG nguyên tử: nguyên tử mờ theo khối đổi nghĩa qua vòng lặp), chỉ nhắc local nguyên < `LEN_BASE` hoặc độ dài slice
+  `LEN_BASE + l`, local không bị mượn `&!`; ≥ 2 biến hoặc dạng `≠` (một biến khác đã chính xác trong khoảng); tối đa `MAX_FACTS = 16` (vượt ⇒ bỏ sự kiện mới).
+- **Soundness:** (1) bị XOÁ trong `purge` — cùng chỗ với `defs` — khi một local nó nhắc bị gán lại / `StorageLive|Dead` / làm đích lời gọi; (2) điểm hợp VÀ mở
+  rộng ở đầu vòng = GIAO (đúng trên mọi đường tới; dãy giảm đơn điệu nên điểm bất động vẫn hữu hạn); (3) loại local bị mượn `&!` (phòng thủ chiều sâu:
+  M7 vốn không dựng term cho chúng). Sự kiện chỉ thành GIẢ THIẾT; "đã chứng minh" vẫn phải qua kernel (ADR-P2-04).
+- **Dùng:** `hyps_for` thêm các sự kiện liên quan (đóng bắc cầu theo biến chung với mục tiêu) và khai báo kiểu của biến mới.
+- **Kèm:** `CertifiedProver` khi bộ trong trả "sai mọi nơi" thì thử chứng chỉ trước: giả thiết đầy đủ mâu thuẫn (mã không tới được) ⇒ mục tiêu đúng rỗng.
+  Trước đây trường hợp này báo E0901 sai cho chương trình ĐÚNG (oracle tìm ra, seed #84).
+**Kết quả (2026-11-23):** `crates/gt-driver/tests/linear_facts.rs`: oracle 240 chương trình (nhánh lồng, điều kiện tuyến tính hệ số 1–3, gán lại biến giữa
+chừng, `⊳` lấy từ điều kiện đường đi / nhánh đã đóng / ngẫu nhiên), mỗi `⊳` M7 coi là chứng minh được kiểm VÉT CẠN `u8 × u8` bằng mô hình độc lập: 0 sai.
+Trên 160 seed đầu: trước 15 `⊳` chứng minh tĩnh (7/72 ca lấy từ đường đi) + 1 E0901 sai; sau 95 (72/72), 0 E0901 sai. Tắt từng cơ chế: bỏ xoá khi gán lại ⇒
+cả oracle và ca tay ĐỎ; bỏ giao ở điểm hợp ⇒ cả hai ĐỎ (oracle chỉ sau khi bộ sinh thêm ca "`⊳` từ nhánh đã đóng"); bỏ loại `&!` ⇒ vẫn xanh (phòng thủ chiều sâu, như trên).
+**Hồi quy bắt được và sửa (cùng ngày):** `hashmap_collide` ĐỎ — biến thể `↓` của `std` `ends_with` bị E0702 sai: hai sự kiện (độ dài hai slice, kiểm
+tràn của phép trừ) làm Fourier–Motzkin vượt `MAX_ROWS` dù chứng chỉ tồn tại (thêm giả thiết đúng có thể làm bộ TÌM thất bại). Sửa: (1) M7 chứng minh HAI
+BƯỚC — nghĩa vụ không sự kiện trước (đúng nghĩa vụ Phase 1 ⇒ không bao giờ kém trước), chưa được mới thử có sự kiện; nghĩa vụ ghi lại là nghĩa vụ đã dùng;
+(2) `search.rs` (ngoài TCB) bỏ hàng bị trội (cùng phần biến, giữ hằng chặt nhất) và hàng hằng đúng; tràn i128 ở một cặp chỉ bỏ cặp đó. Oracle kernel:
+863/3000 được chấp nhận (trước 855), 0 sai. Mẫu hồi quy `tests/pass/265_linear_facts_keep_variant_provable.gt`.
+
+## ADR-P2-06 — C1: `rig test --auto`, sinh test từ hợp đồng (2026-11-23; Giai đoạn 2)
+**Mục tiêu:** cho người (và AI) viết Grit một cách rẻ để tìm lỗi của hàm công khai mà không tự viết test. **Không đổi cú pháp/ngữ nghĩa; NGOÀI TCB** — công cụ chỉ TÌM
+phản ví dụ, không bao giờ cấp phép hay đổi phán quyết `gritc`; công cụ sai chỉ làm thiếu phản ví dụ hoặc báo thừa một ứng viên.
+- **Phạm vi:** hàm tự do `◈ ƒ` của gói gốc (trừ `main.gt`), thuần (`! ∅`), không generic, MỌI tham số là số nguyên hoặc `bool`. Hàm khác được LIỆT KÊ "BỎ QUA" kèm
+  lý do (f32/f64, `char`, `&str`, slice, generic, có hiệu ứng), không bao giờ lặng lẽ bỏ. Hàm riêng tư không phải API nên không nằm trong phạm vi.
+- **Cách làm:** ứng viên đối số HẰNG ở biên (0, 1, 2, 7, 100, max−1, max; có dấu: −1, −2, −7, −100, min, min+1), tối đa 24 tổ hợp mỗi hàm (lấy mẫu tất định theo tên hàm). Mỗi
+  ứng viên là một chương trình `main` đi qua CHÍNH `gritc`: E0901 (`⊳` luôn sai tại điểm gọi) ⇒ ứng viên ngoài miền của hàm ⇒ BỎ (không phải lỗi); lỗi khác ⇒ BỎ QUA hàm;
+  xanh ⇒ chạy trên thông dịch tham chiếu. Dùng `gritc` làm bộ lọc nên KHÔNG cần bộ tính hợp đồng riêng (không có hai bản ngữ nghĩa của biểu thức hợp đồng).
+- **Phản ví dụ:** mọi abort (`postcondition`, `overflow`, `precondition` của hàm được gọi, `index`…). Hết nhiên liệu ghi là "chậm", KHÔNG phải lỗi (mọi vòng `⟳` có biến
+  thể `↓` được M8 chứng minh dừng nên chạy lâu ≠ không dừng) — phát hiện sau khi thử `std::pow_u64` với số mũ 2³².
+- **Giới hạn công khai:** đối số chỉ là hằng biên (không phải fuzz); kiểu chưa hỗ trợ bị bỏ qua; mỗi ứng viên chạy lại `gritc check` nên chậm với dự án lớn (CHƯA đo); hợp đồng
+  chỉ được thử ở các điểm biên, không chứng minh gì — chứng minh vẫn là việc của M7/kernel.
+**Kết quả:** `crates/rig/tests/auto.rs` (6 test E2E qua tiến trình `rig`): hàm đúng qua và ứng viên vi phạm `⊳` bị loại chứ không bị đổ lỗi; `⊲` sai báo `postcondition` kèm lời gọi phản
+ví dụ; tràn số không hợp đồng báo `lib1::dec(0u8) → abort overflow`; vi phạm `⊳` của hàm được gọi báo `precondition`; hàm không lái được được liệt kê; hàm chạy lâu không bị báo lỗi. Ba đột biến
+tay (bỏ lọc E0901 / nuốt abort / bỏ ứng viên âm) đều bị test bắt. Chạy thử trên `lib/std`: 2 phát hiện thật — `std::next_cap(usize::MAX)` và `next_cap(usize::MAX−1)` abort `overflow`
+(an toàn: abort có kiểm, không UB; chỉ gọi nội bộ với `(live+1)*4` nên không tới được) — và 11 hàm bị BỎ QUA vì kiểu tham số chưa hỗ trợ.

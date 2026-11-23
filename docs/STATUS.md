@@ -9,7 +9,7 @@
 2. `gritc` (Rust, workspace gồm 21 crate `gt-*` + `rig`; `runtime/gt-rt` là workspace riêng): kiểu → MIR → mượn/sở hữu → nghĩa vụ số học → dừng/hiệu ứng/đa luồng → quét secret → PHÁN QUYẾT → LLVM → IR Guard.
 3. **Fail-closed**: ĐỎ (`E…`) hoặc ICE (`E9901`) ⇒ không binary, không chạy; "không biết" = chưa chứng minh = không qua; VÀNG (`S…`) vẫn chạy và cảnh báo.
 4. Bằng chứng an toàn = corpus có oracle + đột biến + đọc mã (cùng họ model). **KHÔNG phải chứng minh hình thức; chưa có kiểm toán độc lập** (`docs/SAFETY_CLAIMS.md`).
-5. M0–M11 có mã; có `lib/std`, 6 công cụ dogfood (`examples/`), 4 capstone (`capstone/`), 3 app mẫu (`apps/`), LSP mức tối thiểu. **Giai đoạn 2 chưa bắt đầu và CẤM mở mã khi chưa có lệnh của Giang.**
+5. M0–M11 có mã; có `lib/std`, 6 công cụ dogfood (`examples/`), 4 capstone (`capstone/`), 3 app mẫu (`apps/`), LSP mức tối thiểu. **Giai đoạn 2 đã mở 2026-11-23 theo lệnh Giang (mục dưới).**
 6. Vai trò: Giang = chủ dự án; Claude = kiến trúc sư; người thực thi = Claude Sonnet 5.5 (Giang CHỈ dùng Claude từ 2026-11-19).
 
 ## 2. Nhãn và cổng
@@ -33,7 +33,7 @@ Nhãn hiện hành: **`1.0.0-rc7`** (ứng viên, **CHƯA** phải `1.0.0-seed`)
 
 **GÓI 12 phần 5 (2026-11-23):** `Owned<T>` (ADR-C18 bước 2, TCB B5 — bằng chứng có, CHƯA duyệt). Cổng clone sạch trên `102d968`: test 955/0 nhưng RED ở `failopen` (thiếu baseline, đã sửa ở `3b17f1f`); **cổng clone sạch trên `3b17f1f` XANH liền mạch (957/0, 202 bộ, Linux + LLVM 20)**. Nhãn GIỮ `1.0.0-rc7` (đổi nhãn là quyết định của Giang).
 
-**GIAI ĐOẠN 2 ĐÃ MỞ (2026-11-23, lệnh Giang; ADR-P2-00).** Xong: **A1 xoá Secret** (ADR-P2-03, TCB B6 CHỜ DUYỆT). Tiếp: B0 (khoanh phụ thuộc LLVM + đo) và ADR thiết kế SMT (A2). Hiệu năng (dòng D) để CUỐI theo lệnh.
+**GIAI ĐOẠN 2 ĐÃ MỞ (2026-11-23, lệnh Giang; ADR-P2-00).** Xong: **A1 xoá Secret** (ADR-P2-03, TCB B6 CHỜ DUYỆT); **A2/A3 bước 1** kernel chứng chỉ Farkas `gt-kernel` (ADR-P2-04; M7/M8 chỉ tin kernel; đột biến 72/76, 4 sống có lập luận). **A2 bước 2** M7 giữ sự kiện tuyến tính (ADR-P2-05; oracle 82/82, cổng sạch Linux XANH 970/0 trên 52cf4f5). Tiếp: B0 (khoanh phụ thuộc LLVM + đo) và ADR thiết kế SMT (A2). Hiệu năng (dòng D) để CUỐI theo lệnh.
 
 ## 3. Luật làm việc (bản đầy đủ: `AGENTS.md`, `.claude/skills/grit-contract.md`)
 - Chỉ báo số liệu THẬT từ lệnh đã chạy; ghi `CHƯA KIỂM` cho phần chưa kiểm. Không báo xong khi chưa có cổng liền mạch xanh trên đúng mã đó.
