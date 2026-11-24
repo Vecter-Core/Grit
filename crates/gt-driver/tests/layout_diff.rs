@@ -34,7 +34,7 @@ const SRC: &str = "\
 
 #[test]
 fn gt_layout_agrees_with_llvm_datalayout_on_a_zoo_of_types() {
-    let mut res = check(
+    let res = check(
         &[SourceInput {
             name: "main.gt".to_string(),
             text: SRC.to_string(),
