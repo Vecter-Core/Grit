@@ -191,3 +191,10 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
 - **C3 bước 1 (ADR-P2-08):** khoá `edition` ở `[package]` của `rig.toml` (vắng ⇒ 1; số nguyên `1`; mọi thứ khác mã 11); bộ đọc TOML thêm `Value::Int`; `FREEZE.md` sửa cùng commit; 4 test E2E đỏ trước + đột biến tay 2/2. Cổng clone sạch XANH `ac542b5` (986/0, 210 bộ, `GATE_TREE=ef27a0a5…`).
   Sơ suất: commit WIP 7b2fd49 (chưa biên dịch, do hook buộc commit lúc cổng chiếm Cargo) — đã ghi rõ và thay bằng commit hoàn chỉnh trước khi chạy cổng.
 - **CHƯA:** `gritc` biết `edition`; `gritc fix` + golden (điều kiện TRƯỚC cú pháp mới đầu tiên); hợp đồng TCB cho GLIR/`gt-layout`; đọc chéo khác họ model cho phần Giai đoạn 2; cổng Windows.
+
+### P2-C2 `e?` (2026-11-23, Claude Sonnet 5.5) — toán tử lan truyền lỗi, edition 2 (ADR-P2-09)
+- **Đã làm:** token `?` + `ExprKind::Try` + hậu tố ở parser; `edition` xuyên lexer/parser/fmt/resolve/types/`Options`/`gritc --edition=N`/`rig`; M4 `try_expr` (E0320, E0321) + lang item `result`; M5 `try_into` (Discriminant + SwitchInt + exit_to(0) + Return — không thêm TCB);
+  corpus `tests/ed2/` (4 pass, 7 fail) + `corpus_e2e` chạy `--edition=2`; oracle `qm_oracle.rs` (40 chương trình × thông dịch + LLVM dev/release/release-o2, mô hình độc lập gồm thứ tự drop khi thoát sớm); fmt round-trip `question_mark.rs`; đột biến tay 3/3 bị bắt.
+- **Cổng ĐỎ lần 1 (6b69845):** 3 bài golden IR (`checked_add`, `slice_sum`, `static_atomic`) — nguyên nhân: băm chứng thực bao gồm văn bản prelude, mà tôi thêm `#lang(result)`. Kiểm bằng `git diff` thật: CHỈ đổi dòng băm (+ hai dòng đích Linux/Windows bị bỏ qua khi so). Đã cập nhật chỉ dòng băm, giữ dòng đích Windows. Lẽ ra phải chạy `llvm` trước khi commit: đổi prelude luôn đổi golden.
+- **Cổng:** clone sạch trên 5edc297 XANH liền mạch 4 lượt: 990 test đạt, 0 lỗi, 212 bộ, `GATE_TREE=f807009e…`.
+- **CHƯA:** đột biến tự động M4/M5; M6 oracle động với `?` + `Owned`; LSP biết edition; `std` dùng `?`.

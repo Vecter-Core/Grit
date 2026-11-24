@@ -1,0 +1,3 @@
+// expect: fail E0309
+// note: toán hạng của `?` đã lỗi (phương thức không tồn tại) ⇒ CHỈ báo lỗi gốc E0309, không thêm E0321 dây chuyền
+ƒ f(a: u32) → Option<u32> ! ∅ { v ≔ a.nope()?; Some(v) }

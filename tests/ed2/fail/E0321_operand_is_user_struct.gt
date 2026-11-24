@@ -1,0 +1,4 @@
+// expect: fail E0321
+// note: toán hạng là struct của người dùng — không phải Option/Result (không lẫn với E0320: đây là lỗi về TOÁN HẠNG)
+▢ P { x: u32 }
+ƒ f(p: P) → Option<u32> ! ∅ { v ≔ p?; Some(v) }

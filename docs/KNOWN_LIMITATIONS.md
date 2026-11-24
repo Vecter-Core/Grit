@@ -388,3 +388,8 @@ Khi một phiên công cụ bị ngắt đột ngột, `.git/index`, ref `master
 - **Đột biến gt-term (GÓI 10 S3.b):** 27/110 đột biến ở mã đồ thị gọi/instance của `gt-term` (dòng 293–690) sống sót với bộ test hiện có; khoảng 22 ca đi theo hướng có thể chấp nhận thêm và CHƯA có test bắt hay lập luận tương đương (`docs/MUT_GT_TERM_GOI10.md`). Chưa phát hiện âm tính giả cụ thể; nhánh phòng thủ `None => true` ở `dyn_fn_arg`/`takes_fn_param`/`has_back_edge` chưa được chứng minh là không tới được.
 - **Vòng khởi tạo static qua hàm (GÓI 11):** `■ X ≔ f()` với `f` đọc `X`: `gritc check` XANH nhưng LLVM từ chối ("vòng phụ thuộc khởi tạo giữa các static") và thông dịch báo lỗi nội bộ; không sinh binary nên không có chương trình không dừng chạy được. Xem `docs/CONTROL_TRANSFER_INVENTORY.md` hàng 13.
 - **gt-term: 25/110 đột biến còn sống (GÓI 11):** 0 con có chương trình thật làm chấp nhận chương trình không dừng; các nhánh phòng thủ chỉ có đo "0 lần" (không có test), `docs/MUT_GT_TERM_GOI10.md`.
+
+## `e?` (edition 2, ADR-P2-09)
+- Lỗi kiểu dây chuyền: toán hạng nhị phân sai kiểu (vd `(a + true)?`) báo lỗi gốc rồi CÒN báo E0321 vì biểu thức lỗi vẫn trả kiểu cụ thể thay vì `Err`; chỉ ảnh hưởng số lượng chẩn đoán, không ảnh hưởng soundness.
+- Kiểu của toán hạng phải ĐÃ BIẾT tại điểm `?` (biến suy luận chưa giải ⇒ E0321); `?` chỉ trong thân `ƒ` (chưa có closure); không chuyển đổi lỗi (muốn đổi họ/kiểu lỗi dùng `ok_or`/`map_err` tường minh).
+- `std` và LSP chưa biết edition; `gritc fix` chưa có.
