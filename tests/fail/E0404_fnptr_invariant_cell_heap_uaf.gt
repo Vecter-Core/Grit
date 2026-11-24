@@ -1,0 +1,17 @@
+// expect: fail E0404
+// note: FB-C36 (Gemini G-01) — gọi qua con trỏ hàm: Cell<&T> bất biến, không được thu ngắn rồi ghi tham chiếu tới Owned đã free (heap UAF)
+ƒ id_cell<'a>(c: &'a Cell<&'a u32>) → &'a Cell<&'a u32> ! ∅ { c }
+
+ƒ main() → u32 ! {mem} {
+  a ≔ root_alloc();
+  outer: u32 ≔ 111u32;
+  c: Cell<&u32> ≔ Cell::new(&outer);
+  fp: ƒ(&Cell<&u32>) → &Cell<&u32> ! ∅ ≔ id_cell;
+  {
+    o ≔ Owned::new(&a, 999u32);
+    c2 ≔ fp(&c);
+    c2.set(o.get());
+  };
+  r ≔ c.get();
+  *r
+}
