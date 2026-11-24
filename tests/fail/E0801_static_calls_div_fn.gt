@@ -1,0 +1,5 @@
+// expect: fail E0801
+// note: FB-C37/38 (Gemini G-03a,b) — ■ gọi hàm có hiệu ứng div: thân hằng phải thuần
+ƒ loop_fn() → u32 ! {div} { ⟳ { } 0u32 }
+■ BAD: u32 ≔ loop_fn();
+ƒ main() → u32 ! ∅ { BAD }

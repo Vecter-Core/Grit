@@ -8,7 +8,7 @@
 //! gọi (`a.load(o)`, `Atomic::load(&a, o)`) cùng đi qua một chỗ.
 use gt_diag::{Code, Diagnostic, Diagnostics};
 use gt_mir::{
-    AggregateKind, Body, BodyKind, BorrowKind, Callee, Const, Local, MirOutput, Operand, Rvalue,
+    AggregateKind, Body, BorrowKind, Callee, Const, Local, MirOutput, Operand, Rvalue,
     StatementKind, TerminatorKind,
 };
 use gt_span::Span;
@@ -141,7 +141,8 @@ pub fn check_orderings(t: &TypesOutput, m: &MirOutput, bag: &mut Diagnostics) {
     let Some(&ord_def) = t.db.lang.get(&Lang::AtomicOrdering) else {
         return;
     };
-    for b in m.bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
+    // FB-C37 (Gemini G-03): mọi thân (Fn, Static, Const, Pre, Post) đều được chạy thật nên đều phải được kiểm
+    for b in &m.bodies {
         check_atomic_fn_values(t, b, bag);
         for bb in &b.blocks {
             let Some(term) = &bb.terminator else { continue };

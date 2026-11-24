@@ -8,7 +8,7 @@
 //!
 //! Fail-closed: dùng cờ `unsafe_ctx` do M5 ghi sẵn trong từng phạm vi MIR; thiếu thông tin thì coi như NGOÀI `⚠`.
 use gt_diag::{Code, Diagnostic};
-use gt_mir::{Body, BodyKind, MirOutput, StatementKind, TerminatorKind};
+use gt_mir::{Body, MirOutput, StatementKind, TerminatorKind};
 use gt_span::Span;
 use gt_types::{AdtKind, Ty, TypesOutput};
 use std::collections::BTreeSet;
@@ -167,7 +167,8 @@ fn dst_local(p: &gt_mir::Place) -> usize {
 #[must_use]
 pub fn check_unsafe(t: &TypesOutput, m: &MirOutput) -> Vec<Diagnostic> {
     let mut out = Vec::new();
-    for b in m.bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
+    // FB-C37 (Gemini G-03): mọi thân (Fn, Static, Const, Pre, Post) đều được chạy thật nên đều phải được kiểm
+    for b in &m.bodies {
         if !is_prelude(t, b.node) {
             check_body(t, b, &mut out);
         }

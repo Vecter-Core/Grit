@@ -46,22 +46,29 @@ pub fn check_effects(t: &TypesOutput, m: &MirOutput) -> EffectsOutput {
     let levels = Levels::new(t, &mut bag);
 
     // ---- hiệu ứng suy ra từ thân hàm ----
-    for b in m.bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
-        let Some(sig) = t.db.sig_by_node(b.node) else {
-            // thân Fn mà db không có chữ ký: db không nhất quán ⇒ KHÔNG được bỏ qua (hiệu ứng của thân sẽ không được kiểm) ⇒ ICE
-            bag.push(mk(
-                t,
-                "E9901",
-                b.node,
-                b.span,
-                format!(
-                    "không tìm thấy chữ ký của thân `{}`: không kiểm được hiệu ứng",
-                    b.key
-                ),
-            ));
-            continue;
+    // FB-C37 (Gemini G-03b): MỌI thân đều phải được kiểm — `■`/`□`/`⊳`/`⊲` được chạy thật nên hiệu ứng và thứ tự khoá trong chúng cũng phải kiểm.
+    // Chỉ thân `Fn` mang hiệu ứng khai báo; thân hằng/static/hợp đồng phải THUẦN (khai báo ∅).
+    for b in &m.bodies {
+        let is_fn = b.kind == BodyKind::Fn;
+        let declared: BTreeSet<String> = if is_fn {
+            let Some(sig) = t.db.sig_by_node(b.node) else {
+                // thân Fn mà db không có chữ ký: db không nhất quán ⇒ KHÔNG được bỏ qua (hiệu ứng của thân sẽ không được kiểm) ⇒ ICE
+                bag.push(mk(
+                    t,
+                    "E9901",
+                    b.node,
+                    b.span,
+                    format!(
+                        "không tìm thấy chữ ký của thân `{}`: không kiểm được hiệu ứng",
+                        b.key
+                    ),
+                ));
+                continue;
+            };
+            sig.effects.iter().cloned().collect()
+        } else {
+            BTreeSet::new()
         };
-        let declared: BTreeSet<String> = sig.effects.iter().cloned().collect();
         // (hiệu ứng → nơi đầu tiên sinh ra nó, mô tả nguồn)
         let mut found: BTreeMap<String, (Span, String)> = BTreeMap::new();
         let mut add = |e: &str, span: Span, why: String| {
@@ -152,7 +159,9 @@ pub fn check_effects(t: &TypesOutput, m: &MirOutput) -> EffectsOutput {
                 },
             }
         }
-        inferred_out.insert(b.key.clone(), found.keys().cloned().collect());
+        if is_fn {
+            inferred_out.insert(b.key.clone(), found.keys().cloned().collect());
+        }
         for (e, (span, why)) in &found {
             if !covers(&declared, e) {
                 bag.push(mk(

@@ -871,6 +871,26 @@ pub fn check_termination(
         }
     }
 
+    // ---- thân KHÔNG phải hàm (`■`, `□`, `⊳`, `⊲`) ----
+    // FB-C38 (Gemini G-03a): các thân này cũng được chạy thật. Chúng không có biến thể/`div` để chứng minh, nên chỉ chấp nhận vòng lặp
+    // hữu hạn tự giảm (for-in) hoặc không có cạnh lùi; mọi vòng khác ⇒ E0701 (fail-closed). Lời gọi hàm `div` đã bị gt-effects chặn (khai báo ∅).
+    for b in m.bodies.iter().filter(|b| b.kind != BodyKind::Fn) {
+        for li in &b.loops {
+            if matches!(li.shape, LoopShape::ForRange | LoopShape::ForSlice)
+                || !has_back_edge(b, li.head)
+            {
+                continue;
+            }
+            bag.push(mk(
+                t,
+                "E0701",
+                li.node,
+                li.span,
+                "vòng lặp trong `■`/`□`/hợp đồng phải là vòng for-in hữu hạn: không có chỗ để chứng minh dừng hay khai báo `div`".to_string(),
+            ));
+        }
+    }
+
     // ---- vòng lặp ----
     let mut loop_nodes: Vec<(String, u32, NodeId, Span, bool)> = Vec::new(); // (thân, đầu, nút, span, tự suy)
     for b in &bodies {
