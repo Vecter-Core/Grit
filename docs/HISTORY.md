@@ -198,3 +198,9 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
 - **Cổng ĐỎ lần 1 (6b69845):** 3 bài golden IR (`checked_add`, `slice_sum`, `static_atomic`) — nguyên nhân: băm chứng thực bao gồm văn bản prelude, mà tôi thêm `#lang(result)`. Kiểm bằng `git diff` thật: CHỈ đổi dòng băm (+ hai dòng đích Linux/Windows bị bỏ qua khi so). Đã cập nhật chỉ dòng băm, giữ dòng đích Windows. Lẽ ra phải chạy `llvm` trước khi commit: đổi prelude luôn đổi golden.
 - **Cổng:** clone sạch trên 5edc297 XANH liền mạch 4 lượt: 990 test đạt, 0 lỗi, 212 bộ, `GATE_TREE=f807009e…`.
 - **CHƯA:** đột biến tự động M4/M5; M6 oracle động với `?` + `Owned`; LSP biết edition; `std` dùng `?`.
+
+### P2-C2b `let` phân rã (2026-11-24, Claude Sonnet 5.5) — edition 2 (ADR-P2-10)
+- **Đã làm:** `StmtKind::LetPat`; parser nhìn trước (edition ≥ 2); resolve; M4 (`pat` + `MatchCheck` một nhánh ⇒ E0305 sẵn có); M5 `let_pat_into` (tái dùng `test_pat`, không thêm TCB); fmt; spec §29; 7 mẫu `tests/ed2` + 1 mẫu edition 1 (E0101); oracle `let_pat_oracle.rs`
+  (40 chương trình × thông dịch + LLVM 3 hồ sơ, mô hình độc lập về thứ tự drop kể cả partial move; đột biến tay 2/2 bị bắt); fmt `let_pattern.rs`.
+- **Cổng:** clone sạch trên 5e4a9b8 XANH liền mạch 3 lượt: 994 test đạt, 0 lỗi, 214 bộ, `GATE_TREE=7bfc2a6e…`. Lần này chạy bộ `llvm` golden TRƯỚC khi commit (bài học từ lần đổi prelude).
+- **CHƯA:** đột biến tự động parser/M4/M5 của `let` phân rã; `μ` trong pattern, or-pattern, guard, `let … else`, closure; LSP/`std` biết edition; `gritc fix`.
