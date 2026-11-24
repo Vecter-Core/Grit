@@ -210,3 +210,8 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
   oracle `or_pattern_oracle.rs` (40 chương trình × 120 đầu vào × thông dịch + LLVM 3 hồ sơ, mô hình độc lập chọn nhánh; đột biến tay 2/2 bị bắt); fmt `or_pattern.rs`.
 - **Cổng:** clone sạch trên d1a87c8 XANH liền mạch 3 lượt: 998 test đạt, 0 lỗi, 216 bộ, `GATE_TREE=aec3dca3…`.
 - **CHƯA:** đột biến tự động or-pattern; bind trong or-pattern; guard; `μ` trong pattern; `let … else`; closure; LSP/`std` biết edition; `gritc fix`.
+
+## 2026-11-24 — Xử lý đọc kiểm chéo (Opus F1–F4; Gemini G-01…G-09) — FB-C36…C51, FB-P2-01
+- Commit cuối `7d26f53`. Cổng đầy đủ trong clone sạch (`tools/gate_clean.sh`, tiếp tục từ điểm lưu của `gate.sh` vì môi trường đám mây khởi động lại hai lần giữa chừng, băm cây KHÔNG đổi `a719f716…`): `GATE_RESULT=GREEN`, `TEST_PASSED=1002 FAILED=0 SUITES=218`, `DOC_TEST: 220 khối, 0 sai`, corpus nhất quán.
+- Nội dung: xem `docs/FIELD_BUGS.md` (FB-P2-01, FB-C36…C51). Bài học: kiểm `facts/defs` chặt ở `check_post_fixpoint` phải chỉ áp cho điểm cố định widening (áp cho narrowing làm mất chứng minh ở `std`).
+- CHƯA KIỂM: fuzz/TSan trên mã đã sửa; Windows; `■ Mutex<Secret<T>>` (chính sách D13 cho static); mẫu E1001 trong `■`/`⊳` (G-03d).

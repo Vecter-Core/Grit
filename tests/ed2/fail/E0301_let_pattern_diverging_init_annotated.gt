@@ -1,0 +1,7 @@
+// expect: fail E0301
+// note: F5 (Opus review) — let phân rã có chú thích kiểu với vế phải `!` từng ICE ở M5 (E9901); nay E0301 như khi không chú thích
+ƒ f() → u32 ! ∅ {
+  (a, b): (u32, u32) ≔ { ⏎ 0u32; };
+  a + b
+}
+ƒ main() → u32 ! ∅ { f() }

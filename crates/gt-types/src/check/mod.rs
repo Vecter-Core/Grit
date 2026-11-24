@@ -926,6 +926,15 @@ impl<'e, 'a> Checker<'e, 'a> {
                     Some(a) => {
                         let a2 = a.clone();
                         let t = self.expr(init, Some(&a2));
+                        // FB-P2-01/F5: `coerce` bỏ qua `!` nên vế phải phân kỳ lọt qua rồi M5 ICE (pattern tuple trên kiểu `!`); không chú thích thì đã E0301 ⇒ nhất quán
+                        if self.infer.shallow(&t) == Ty::Never {
+                            self.err(
+                                "E0301",
+                                init.id,
+                                init.span,
+                                "vế phải của `let` phân rã có kiểu `!` (phân kỳ): không có giá trị để phân rã".to_string(),
+                            );
+                        }
                         self.coerce(&t, a, init.id, init.span, init.span.end);
                         a.clone()
                     }
