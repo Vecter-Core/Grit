@@ -393,3 +393,9 @@ Khi một phiên công cụ bị ngắt đột ngột, `.git/index`, ref `master
 - Lỗi kiểu dây chuyền: toán hạng nhị phân sai kiểu (vd `(a + true)?`) báo lỗi gốc rồi CÒN báo E0321 vì biểu thức lỗi vẫn trả kiểu cụ thể thay vì `Err`; chỉ ảnh hưởng số lượng chẩn đoán, không ảnh hưởng soundness.
 - Kiểu của toán hạng phải ĐÃ BIẾT tại điểm `?` (biến suy luận chưa giải ⇒ E0321); `?` chỉ trong thân `ƒ` (chưa có closure); không chuyển đổi lỗi (muốn đổi họ/kiểu lỗi dùng `ok_or`/`map_err` tường minh).
 - `std` và LSP chưa biết edition; `gritc fix` chưa có.
+
+## Giới hạn ghi nhận 2026-11-24 (sau đọc kiểm chéo Opus/Gemini)
+- **`■` chứa `Secret` không bao giờ bị xoá** (`■ Mutex<Secret<T>, L>`…): static sống bằng tiến trình, không có drop. Quyết định (cố vấn Opus, chưa có ADR): KHÔNG cấm, KHÔNG xoá lúc thoát (thêm móc runtime = TCB lớn hơn, đua với luồng `spawn` không join), sẽ có CẢNH BÁO VÀNG riêng (dự kiến S203 "Secret có thời gian sống tĩnh") vì giá trị khởi tạo của `■` là hằng nằm sẵn trong binary. Hợp đồng B6 hiểu là "xoá khi hết thời gian sống". CHƯA cài S203.
+- **`impure_fns` (FB-C39) là danh sách ĐEN**: hàm không có thân MIR (intrinsic) được coi là thuần; chỉ truy cập `■` có mutability bên trong, `Callee::Value` và `Drop` làm hàm không thuần. Đã đo: `□ R: &Atomic ≔ &A` bị E0404 (không lọt); `raw_read` là hàm fixture của prelude (ICE lúc chạy), không phải đường khai thác hiện có. Nếu thêm intrinsic `! ∅` đọc trạng thái ngoài, PHẢI cập nhật `impure_fns` hoặc đảo sang danh sách trắng.
+- **Gọi qua con trỏ hàm (FB-C36)**: kiểu hàm không mang ràng buộc lifetime (kể cả `'static`); bản sửa chỉ bảo đảm đẳng thức vùng ở vị trí bất biến. An toàn VÌ safe-Grit hiện không có chỗ giữ tham chiếu `'static` (tham chiếu không `Send/Sync` ⇒ E0501). Thêm `leak`, thread-local, spawn có phạm vi hay `Atomic<&T>` sẽ mở lại lỗ này.
+- **G-03d**: chưa dựng được mẫu E1001 hợp lệ trong `■`/`⊳` (xem FB-C37).
