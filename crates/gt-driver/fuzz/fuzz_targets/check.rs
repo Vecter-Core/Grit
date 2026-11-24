@@ -6,12 +6,18 @@ use gt_driver::pipeline::{Options, check};
 use gt_resolve::SourceInput;
 use libfuzzer_sys::fuzz_target;
 
-fn codes(src: &str) -> Vec<String> {
+fn codes(src: &str, edition: u32) -> Vec<String> {
     let inputs = [SourceInput {
         name: "f.gt".to_string(),
         text: src.to_string(),
     }];
-    match check(&inputs, &Options::default()) {
+    match check(
+        &inputs,
+        &Options {
+            edition,
+            ..Options::default()
+        },
+    ) {
         Ok(res) => {
             let mut v: Vec<String> = res
                 .report
@@ -30,10 +36,13 @@ fuzz_target!(|data: &[u8]| {
     let Ok(src) = std::str::from_utf8(data) else {
         return;
     };
-    let a = codes(src);
-    assert!(
-        !a.iter().any(|c| c == "E9901"),
-        "ICE (E9901) trên đầu vào hợp lệ UTF-8: {a:?}"
-    );
-    assert_eq!(a, codes(src), "không tất định");
+    // FB-C49 (Gemini G-09a): fuzz CẢ edition 2
+    for edition in [1u32, 2] {
+        let a = codes(src, edition);
+        assert!(
+            !a.iter().any(|c| c == "E9901"),
+            "ICE (E9901) trên đầu vào hợp lệ UTF-8 (edition {edition}): {a:?}"
+        );
+        assert_eq!(a, codes(src, edition), "không tất định");
+    }
 });

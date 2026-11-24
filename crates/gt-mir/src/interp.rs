@@ -531,7 +531,11 @@ impl<'a> Interp<'a> {
         let Some(t) = self.types else {
             return false;
         };
-        t.db.secret_used && self.call_generics.first().is_some_and(|g| t.db.contains_secret(g))
+        t.db.secret_used
+            && self
+                .call_generics
+                .first()
+                .is_some_and(|g| t.db.contains_secret(g))
     }
 
     /// Số lần xoá Secret đã thực hiện (để đối chiếu với `gritrt_secret_wipe` của exe).

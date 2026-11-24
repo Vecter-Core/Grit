@@ -36,7 +36,8 @@ impl Parser {
             let span = r.span;
             return Err(self.error_at(
                 span,
-                "`..` không được là một alternative của `|`; viết `..` riêng trong danh sách".to_string(),
+                "`..` không được là một alternative của `|`; viết `..` riêng trong danh sách"
+                    .to_string(),
             ));
         }
         Ok(self.mk_pat(start, PatternKind::Or(alts)))

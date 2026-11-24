@@ -2,6 +2,10 @@
 //! Chỉ X86 (Phase 1). Đây là chỗ DUY NHẤT của crate dùng `unsafe`/FFI thô.
 #![allow(unsafe_code, non_snake_case)]
 
+// FB-C50 (Gemini G-09b): chỉ X86 — dựng cho kiến trúc khác phải lỗi biên dịch RÕ RÀNG thay vì lỗi liên kết khó hiểu
+#[cfg(not(target_arch = "x86_64"))]
+compile_error!("gt-llvm/shim.rs chỉ hỗ trợ x86_64 (Phase 1)");
+
 unsafe extern "C" {
     fn LLVMInitializeX86TargetInfo();
     fn LLVMInitializeX86Target();

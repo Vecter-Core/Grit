@@ -12,6 +12,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 gt-parser = { path = ".." }
+gt-span = { path = "../../gt-span" }
 
 [workspace]
 

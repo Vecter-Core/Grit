@@ -22,11 +22,12 @@ fn combine(a: &Row, ma: i128, b: &Row, mb: i128) -> Option<Row> {
 }
 
 fn gcd(a: i128, b: i128) -> i128 {
-    let (mut a, mut b) = (a.abs(), b.abs());
+    // FB-C51 (Gemini G-09b): `abs()` panic trên i128::MIN ⇒ dùng `unsigned_abs`; ước chung > i128::MAX ⇒ 1 (an toàn: chỉ không rút gọn)
+    let (mut a, mut b) = (a.unsigned_abs(), b.unsigned_abs());
     while b != 0 {
         (a, b) = (b, a % b);
     }
-    a
+    i128::try_from(a).unwrap_or(1)
 }
 
 /// Bỏ hàng thừa: hàng hằng đúng hiển nhiên (`c ≤ 0`), và trong các hàng CÙNG phần biến chỉ giữ hàng chặt nhất (`c` lớn nhất: `Σ + c ≤ 0`).
@@ -101,7 +102,10 @@ pub fn refute_case(cons: &[Lin], steps: &mut u64) -> Option<Vec<(usize, i128)>> 
         for p in &pos {
             for q in &neg {
                 *steps = steps.checked_sub(1)?;
-                let (a, b) = (p.lin.coef[&k], -q.lin.coef[&k]);
+                let Some(b) = q.lin.coef[&k].checked_neg() else {
+                    continue;
+                };
+                let a = p.lin.coef[&k];
                 let g = gcd(a, b).max(1);
                 // tràn i128 ở một cặp ⇒ bỏ cặp đó (chỉ mất một đường suy diễn), không bỏ cả lần tìm
                 if let Some(r) = combine(p, b / g, q, a / g) {

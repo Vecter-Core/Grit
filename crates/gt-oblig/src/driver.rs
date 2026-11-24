@@ -563,14 +563,17 @@ fn impure_fns(t: &TypesOutput, m: &MirOutput) -> BTreeSet<gt_ast::NodeId> {
                             Callee::TraitMethod {
                                 trait_def, member, ..
                             } => {
-                                let name = t
-                                    .db
-                                    .traits
-                                    .get(trait_def)
-                                    .and_then(|td| td.members.get(*member))
-                                    .map(|mm| mm.name.clone());
+                                let name =
+                                    t.db.traits
+                                        .get(trait_def)
+                                        .and_then(|td| td.members.get(*member))
+                                        .map(|mm| mm.name.clone());
                                 for imp in &t.db.impls {
-                                    if imp.trait_ref.as_ref().is_some_and(|r| r.trait_def == *trait_def) {
+                                    if imp
+                                        .trait_ref
+                                        .as_ref()
+                                        .is_some_and(|r| r.trait_def == *trait_def)
+                                    {
                                         for mm in &imp.members {
                                             if Some(&mm.name) == name.as_ref() {
                                                 callees.insert(mm.node);

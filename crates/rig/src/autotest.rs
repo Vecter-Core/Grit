@@ -288,7 +288,10 @@ fn fnv(s: &str) -> u64 {
 
 /// Tối đa `cap` tổ hợp đối số (tất định theo tên hàm): ít tổ hợp thì lấy hết, nhiều thì lấy mẫu không lặp.
 fn combos(vals: &[Vec<String>], cap: usize, seed: &str) -> Vec<Vec<String>> {
-    let total: usize = vals.iter().map(Vec::len).product();
+    // FB-C51: tích có thể tràn usize khi nhiều tham số ⇒ bão hoà (chỉ ảnh hưởng cách lấy mẫu, không bỏ ca)
+    let total: usize = vals
+        .iter()
+        .fold(1usize, |acc, v| acc.saturating_mul(v.len()));
     let pick = |mut idx: usize| -> Vec<String> {
         vals.iter()
             .map(|v| {
