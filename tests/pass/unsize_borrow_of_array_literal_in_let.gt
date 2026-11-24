@@ -1,0 +1,12 @@
+// expect: pass
+// note: phát hiện khi viết test layout — `sl: &[T] ≔ &[a, b, c]`: luật kéo dài tạm đi trước phép ép unsize ⇒ ICE E9901 (MIR sai kiểu). Nay hạ đúng
+ƒ sum(s: &[u32]) → u32 ! ∅ {
+  μt ≔ 0u32;
+  μi ≔ 0usize;
+  ⟳ i < s.len() ↓ s.len() - i { t ← t + s[i]; i ← i + 1usize; }
+  t
+}
+ƒ main() → u32 ! ∅ {
+  sl: &[u32] ≔ &[10u32, 20u32, 30u32];
+  sum(sl)
+}

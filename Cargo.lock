@@ -57,6 +57,7 @@ name = "gt-codegen-llvm"
 version = "0.1.0"
 dependencies = [
  "gt-ast",
+ "gt-layout",
  "gt-llvm",
  "gt-mir",
  "gt-resolve",
@@ -161,6 +162,14 @@ name = "gt-kernel"
 version = "0.1.0"
 dependencies = [
  "gt-oblig",
+]
+
+[[package]]
+name = "gt-layout"
+version = "0.1.0"
+dependencies = [
+ "gt-resolve",
+ "gt-types",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 # Workspace gốc của Grit (Phase 1 — Seed). Crate được thêm vào `members` ở đúng milestone của nó (crates/TASK.md).
 [workspace]
 resolver = "3"
-members = ["crates/gt-span", "crates/gt-lexer", "crates/gt-diag", "crates/gt-ast", "crates/gt-parser", "crates/gt-stack", "crates/gt-fmt", "crates/gt-resolve", "crates/gt-types", "crates/gt-mir", "crates/gt-dataflow", "crates/gt-borrowck", "crates/gt-oblig", "crates/gt-effects", "crates/gt-conc", "crates/gt-term", "crates/gt-kernel", "crates/gt-secrets", "crates/gt-llvm", "crates/gt-guard", "crates/gt-codegen-llvm", "crates/gt-driver", "crates/rig"]
+members = ["crates/gt-span", "crates/gt-lexer", "crates/gt-diag", "crates/gt-ast", "crates/gt-parser", "crates/gt-stack", "crates/gt-fmt", "crates/gt-resolve", "crates/gt-types", "crates/gt-layout", "crates/gt-mir", "crates/gt-dataflow", "crates/gt-borrowck", "crates/gt-oblig", "crates/gt-effects", "crates/gt-conc", "crates/gt-term", "crates/gt-kernel", "crates/gt-secrets", "crates/gt-llvm", "crates/gt-guard", "crates/gt-codegen-llvm", "crates/gt-driver", "crates/rig"]
 
 [workspace.package]
 edition = "2024"

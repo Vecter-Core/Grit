@@ -10,6 +10,7 @@ description = "Grit M10 (ADR-029): hạ MIR sau M7 thành LLVM IR (inkwell/LLVM-
 gt-ast = { path = "../gt-ast" }
 gt-resolve = { path = "../gt-resolve" }
 gt-types = { path = "../gt-types" }
+gt-layout = { path = "../gt-layout" }
 gt-mir = { path = "../gt-mir" }
 gt-llvm = { path = "../gt-llvm" }
 

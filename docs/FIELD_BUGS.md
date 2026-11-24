@@ -305,3 +305,9 @@ Quy trình: mỗi phát hiện được TÁI HIỆN trên mã hiện tại trư�
 | FB-C51 | G-09b `i128::MIN` ở `search.rs`; tràn `usize` ở `autotest::combos` | ĐÚNG (nhỏ; ngoài TCB) | `unsigned_abs`/`checked_neg`; `saturating_mul` |
 | — | G-09a `scan_text` edition 1; `rig test --auto` edition 1; LSP edition 1 | **PHẢN BIỆN MỘT PHẦN:** `scan_text` vẫn tìm được secret trong tệp edition 2 (lexer hồi phục sau `?`, đã chạy: S101 vẫn ra); `rig test --auto` nay theo edition (a45d7a5, nhưng parser hồi phục theo mục nên chưa tái hiện được lỗi thật); LSP: giới hạn đã biết | |
 **Chưa xử lý / CHƯA KIỂM:** (a) `■ Mutex<Secret<T>>` không bao giờ bị xoá (cần chính sách D13 cho static); (b) mẫu E1001 trong `■`/`⊳` (xem G-03d); (c) fuzz và TSan chưa chạy lại trên mã đã sửa; (d) cổng đầy đủ trong clone sạch cho các commit này — xem HISTORY.
+
+## FB-P2-02 — ICE `sl: &[T] ≔ &[a, b, c]` (phép ép unsize bị nhánh kéo dài tạm bỏ qua) — PHÁT HIỆN 2026-11-24 khi viết test layout (ADR-P2-02)
+- **Triệu chứng (fail-closed, ICE E9901):** `sl: &[u32] ≔ &[1u32, 2u32, 3u32];` ⇒ "MIR không hợp lệ: kiểu phép gán không khớp (chỗ `&[u32]`, giá trị `&[u32; 3]`)". Truyền `f(&[1,2,3])` và `sl ≔ &a` (a là chỗ) vẫn đúng.
+- **Nguyên nhân:** `lower_stmt` (`gt-mir/src/build/expr.rs`): nhánh luật kéo dài tạm (`x ≔ &V`, V không là chỗ) đứng TRƯỚC `expr_into` nên không áp ép unsize M4 đã ghi.
+- **Sửa:** sau khi mượn tạm kéo dài, nếu nút có `unsize_target` thì ép bằng `unsize_from` (tách từ `unsize_of`). Mẫu `tests/pass/unsize_borrow_of_array_literal_in_let.gt`; chạy đúng trên interpreter và LLVM (=60).
+- **Ghi chú trung thực:** sửa và mẫu cùng một commit (không tách đỏ-trước); bắt được nhờ test `layout_diff` mới chứ không nhờ bộ sinh/oracle có sẵn ⇒ oracle unsize chưa phủ `&[literal]` có chú thích.

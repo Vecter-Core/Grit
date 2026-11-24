@@ -663,7 +663,27 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
     }
 
     /// Kiểu LLVM của một kiểu Grit ĐÃ CỤ THỂ. Gặp thứ chưa hỗ trợ ⇒ `Unsupported`.
+    /// ADR-P2-02 bước 1: bản dựng debug ĐỐI CHIẾU cỡ/căn lề `DataLayout` của LLVM với `gt-layout` (Rust thuần) cho MỌI kiểu được hạ; lệch ⇒ ICE.
     fn lower_ty(&self, ty: &Ty) -> R<BasicTypeEnum<'ctx>> {
+        let lt = self.lower_ty_raw(ty)?;
+        if cfg!(debug_assertions)
+            && let Ok(want) = gt_layout::layout_of(&self.t.db, ty)
+        {
+            let got = (
+                self.td.get_abi_size(&lt),
+                u64::from(self.td.get_abi_alignment(&lt)),
+            );
+            if got != (want.size, want.align) {
+                return internal(format!(
+                    "gt-layout lệch DataLayout của LLVM với `{ty:?}`: LLVM (cỡ, căn lề) = {got:?}, gt-layout = ({}, {})",
+                    want.size, want.align
+                ));
+            }
+        }
+        Ok(lt)
+    }
+
+    fn lower_ty_raw(&self, ty: &Ty) -> R<BasicTypeEnum<'ctx>> {
         Ok(match ty {
             Ty::Int(it) => self.int_type(*it).into(),
             Ty::Bool => self.ctx.bool_type().into(),
