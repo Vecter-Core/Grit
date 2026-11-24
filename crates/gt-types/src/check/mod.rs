@@ -788,10 +788,11 @@ impl<'e, 'a> Checker<'e, 'a> {
         }
         if matches!(lang, Some(Lang::Cell | Lang::Mutex)) {
             // FB-C42 (Gemini G-05): glue không đi vào được Cell/Mutex chứa giá trị có Drop/`Owned` — elaborate chỉ bắt kiểu CỤ THỂ, nên trong hàm
-            // generic phải chặn ở đây: `T` đã biết mà giữ nguồn glue, hoặc còn là tham số không ràng buộc `Copy` (có thể là `Owned`/`Secret` khi instance hoá).
+            // generic phải chặn ở đây: `T` còn là tham số không ràng buộc `Copy` (có thể là `Owned`/`Secret` khi instance hoá). Kiểu cụ thể do elaborate bắt
+            // (và `■ Mutex<Secret>` hợp lệ: static không có drop ⇒ chỉ S203).
             if let Some(t) = c.args.first()
-                && (self.env.db.holds_glue_source(t)
-                    || (t.has_param() && !self.env.db.is_copy_resolved(t, scope)))
+                && t.has_param()
+                && !self.env.db.is_copy_resolved(t, scope)
                 && !self.cell_drop_reported
             {
                 self.cell_drop_reported = true;

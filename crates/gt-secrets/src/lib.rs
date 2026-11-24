@@ -24,7 +24,7 @@ use std::collections::BTreeSet;
 const LIMIT: usize = 200;
 
 /// Mã VÀNG đã biết (chỉ những mã này được phép trong `#allow`).
-pub const YELLOW: [&str; 4] = ["S101", "S102", "S201", "S202"];
+pub const YELLOW: [&str; 5] = ["S101", "S102", "S201", "S202", "S203"];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finding {
@@ -423,6 +423,23 @@ pub fn scan_flow(t: &TypesOutput, m: &gt_mir::MirOutput) -> Vec<Finding> {
     // FB-C37 (Gemini G-03): mọi thân (Fn, Static, Const, Pre, Post) đều được chạy thật nên đều phải được kiểm
     for b in &m.bodies {
         scan_body(t, b, &mut out);
+        // S203 (quyết định 2026-11-24, cố vấn Opus): `■` chứa `Secret` sống bằng tiến trình ⇒ KHÔNG bao giờ bị xoá (static không có drop) và giá trị
+        // khởi tạo là hằng nằm sẵn trong binary. Không cấm (khoá API sống suốt tiến trình là dùng hợp lệ) và không thêm móc xoá lúc thoát (TCB lớn hơn).
+        if b.kind == gt_mir::BodyKind::Static
+            && b.locals
+                .first()
+                .is_some_and(|l| t.db.secret_used && t.db.contains_secret(&l.ty))
+        {
+            out.push(Finding {
+                code: "S203",
+                file: t.file_name(b.node),
+                span: b.span,
+                message: format!(
+                    "`{}` là `■` chứa `Secret`: sống bằng tiến trình, không bao giờ bị xoá (và giá trị khởi tạo nằm sẵn trong binary)",
+                    b.key
+                ),
+            });
+        }
     }
     out.sort_by(|a, b| {
         (&a.file, a.span.start, a.span.end, a.code).cmp(&(
