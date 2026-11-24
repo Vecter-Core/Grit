@@ -19,7 +19,7 @@ const SRC: &str = "\
 #[test]
 fn a_predicate_that_touches_an_atomic_static_is_not_removed_under_checks_proven() {
     for checks in [Checks::All, Checks::Proven] {
-        let mut res = check(
+        let res = check(
             &[SourceInput {
                 name: "main.gt".to_string(),
                 text: SRC.to_string(),
