@@ -146,56 +146,56 @@ crates/gt-mir/src/build/expr.rs	92	_ =>	AN TOÀN		cast_may_lose mặc định tr
 crates/gt-mir/src/build/expr.rs	180	unwrap_or	AN TOÀN		chỉ số local vượt u32 là bất khả thi (cần >4 tỷ local); không ảnh hưởng phán quyết	Local(u32::try_from(self.body.locals.len() - 1).unwrap_or(u32::MAX))
 crates/gt-mir/src/build/expr.rs	249	_ =>	AN TOÀN		nhánh mặc định của cond_branch là biểu thức bool thường, hạ thành SwitchInt; đúng ngữ nghĩa	_ => self.with_at(e, |b| {
 crates/gt-mir/src/build/expr.rs	327	_ =>	AN TOÀN		nhánh mặc định của let là hạ biểu thức vào đích; không có dữ liệu thiếu bị đọc thành đúng	_ => b.expr_into(&dest, init)?,
-crates/gt-mir/src/build/expr.rs	381	_ =>	AN TOÀN		is_place_expr false ⇒ coi là giá trị (tạo biến tạm); static/const là bất biến (D5: ghi/&! vào static bị E0308) và chạy thử static Atomic qua llvm cho kết quả đúng (3)	_ => false,
-crates/gt-mir/src/build/expr.rs	393	_ =>	AN TOÀN		như dòng 7: đường dẫn không phải biến cục bộ đi qua temp_place/Const::Item; static bất biến nên không mất ghi	_ => b.temp_place(e),
-crates/gt-mir/src/build/expr.rs	408	_ =>	AN TOÀN		như dòng 7/8 (Deref/biểu thức giá trị đi qua biến tạm); không bỏ sót ghi vì đích ghi phải là chỗ hợp lệ đã qua M4	_ => b.temp_place(e),
-crates/gt-mir/src/build/expr.rs	457	_ =>	AN TOÀN		ICE: truy cập trường trên kiểu lạ bị từ chối	_ => ice(format!("truy cập trường trên kiểu {ty:?}")),
-crates/gt-mir/src/build/expr.rs	505	_ =>	AN TOÀN	FB-C20	recheck_place: các phép chiếu khác Index/Subslice (Deref/Field/Downcast) không có biên để kiểm lại	_ => {}
-crates/gt-mir/src/build/expr.rs	572	is_some_and	AN TOÀN	FB-C20	may_mutate: chỉ BỎ recheck khi cả hai đầu mút `is_read_only` (hàm bảo thủ có sẵn: mặc định false); không rõ ⇒ recheck	let may_mutate = start.as_ref().is_some_and(|s| !Self::is_read_only(s))
-crates/gt-mir/src/build/expr.rs	573	is_some_and	AN TOÀN	FB-C20	may_mutate: chỉ BỎ recheck khi cả hai đầu mút `is_read_only` (hàm bảo thủ có sẵn: mặc định false); không rõ ⇒ recheck	|| end.as_ref().is_some_and(|e| !Self::is_read_only(e));
-crates/gt-mir/src/build/expr.rs	692	_ =>	AN TOÀN		ICE: literal với kiểu không khớp bị từ chối	_ => return ice(format!("literal với kiểu {ty:?}")),
-crates/gt-mir/src/build/expr.rs	719	_ =>	AN TOÀN		is_read_only mặc định false = coi là có thể ghi ⇒ chụp lại toán hạng (bảo thủ)	_ => false,
-crates/gt-mir/src/build/expr.rs	836	_ =>	AN TOÀN		ICE (GÓI 12, ADR-C15): nút được M4 đánh dấu ép unsize nhưng kiểu nguồn không phải `&[T; N]` ⇒ lỗi nội bộ, không bao giờ chấp nhận	_ => return ice(format!("ép unsize từ kiểu không phải mảng {src:?}")),
-crates/gt-mir/src/build/expr.rs	838	_ =>	AN TOÀN		ICE (GÓI 12, ADR-C15): kiểu nguồn của phép ép unsize không phải tham chiếu ⇒ lỗi nội bộ, không bao giờ chấp nhận	_ => return ice(format!("ép unsize từ kiểu không phải tham chiếu {src:?}")),
-crates/gt-mir/src/build/expr.rs	879	_ =>	AN TOÀN		Path rơi xuống đây (không phải biến/hàm/hằng/assoc) bị ICE ở khối kiểm ngay sau; chỉ biến thể được đi tiếp	_ => {}
-crates/gt-mir/src/build/expr.rs	885	_ =>	AN TOÀN		nhánh không phải đường dẫn: rơi xuống tạo temp và expr_into; không có giả định an toàn	_ => {}
-crates/gt-mir/src/build/expr.rs	923	_ =>	AN TOÀN		def_const None = không phải hằng (biến thể); đường dẫn khác bị ICE ở as_operand	_ => None,
-crates/gt-mir/src/build/expr.rs	947	_ =>	GHI NHẬN		adt_args trả Vec rỗng nếu kiểu kết quả của lời gọi biến thể không phải Adt, trong khi nhánh as_rvalue tương ứng thì ICE; M4 luôn cho Adt nên không với tới, nên đổi thành ICE cho đồng nhất	_ => Vec::new(),
-crates/gt-mir/src/build/expr.rs	970	_ =>	AN TOÀN		Path không phải biến thể đi qua as_operand (có ICE cho đường dẫn không hạ được)	_ => Ok(Rvalue::Use(b.as_operand(e)?)),
-crates/gt-mir/src/build/expr.rs	1074	_ =>	AN TOÀN		biểu thức còn lại đi qua temp+expr_into; duy nhất khả năng đệ quy vô hạn là Range thiếu đầu mút, nhưng M4 từ chối trước (E0301; thử 1.. / ..5 / ∈ 1.. đều ĐỎ)	_ => b.via_temp(e, &ty),
-crates/gt-mir/src/build/expr.rs	1087	_ =>	AN TOÀN		ICE nếu lang item range không đúng hai trường	_ => ice("lang item range cần đúng hai trường `start`, `end`"),
-crates/gt-mir/src/build/expr.rs	1090	_ =>	AN TOÀN		ICE nếu lang item range không phải struct	_ => ice("lang item range phải là struct"),
-crates/gt-mir/src/build/expr.rs	1150	_ =>	AN TOÀN		None = không phải toán tử so sánh; đi tiếp các nhánh khác	_ => None,
-crates/gt-mir/src/build/expr.rs	1170	_ =>	AN TOÀN		nhánh mặc định chỉ nhận MulSat vì match ngoài đã giới hạn sáu toán tử wrap/sat	_ => BinOp::MulSat,
-crates/gt-mir/src/build/expr.rs	1183	_ =>	AN TOÀN		nhánh mặc định chỉ nhận Rem vì match ngoài giới hạn Add/Sub/Mul/Div/Rem; Mul/Div/Rem đều có Assert tràn/chia 0	_ => BinOp::Rem,
-crates/gt-mir/src/build/expr.rs	1208	_ =>	AN TOÀN		nhánh Div/Rem: Assert chia 0 và MIN/-1 được phát; số thực không có nghĩa vụ (đã trả sớm)	_ => {
-crates/gt-mir/src/build/expr.rs	1263	_ =>	AN TOÀN		ICE: toán tử nhị phân lạ bị từ chối	_ => ice("toán tử nhị phân lạ"),
-crates/gt-mir/src/build/expr.rs	1280	_ =>	AN TOÀN		∈ trên vế phải không phải Range literal: ICE nếu không phải Adt/range hai trường; M4 báo E0301 trước (thử ∈ struct start/end ⇒ E0301)	_ => {
-crates/gt-mir/src/build/expr.rs	1290	unwrap_or	AN TOÀN		Ty::Err làm kiểu trường bị validate.rs ('kiểu chưa giải quyết') bắt thành ICE E9901; thực tế Range luôn có đối số	let el = args.first().cloned().unwrap_or(Ty::Err);
-crates/gt-mir/src/build/expr.rs	1366	_ =>	AN TOÀN		nhánh mặc định expr_into hạ qua as_rvalue; không đọc thiếu thành đúng	_ => {
-crates/gt-mir/src/build/expr.rs	1447	_ =>	AN TOÀN		nhánh Implies của short_circuit (a sai ⇒ true); caller chỉ truyền And/Or/Implies	_ => (vec![(0, short_bb)], rhs_bb, true),
-crates/gt-mir/src/build/expr.rs	1484	unwrap_or	AN TOÀN		Ty::Err đi vào kiểu local/trường ⇒ validate.rs ICE; thực tế Option luôn có đối số	let el = args.first().cloned().unwrap_or(Ty::Err);
-crates/gt-mir/src/build/expr.rs	1488	_ =>	AN TOÀN		nhánh mặc định chỉ nhận MulChecked (caller giới hạn ba toán tử +? -? *?)	_ => BinOp::Mul,
-crates/gt-mir/src/build/expr.rs	1532	_ =>	AN TOÀN		ICE nếu lang item option thiếu None/Some	_ => ice("lang item option cần biến thể `None` và `Some`"),
-crates/gt-mir/src/build/expr.rs	1535	_ =>	AN TOÀN		ICE nếu lang item option không phải enum	_ => ice("lang item option phải là enum"),
-crates/gt-mir/src/build/expr.rs	1593	_ =>	GHI NHẬN		phương thức gọi dạng x.m() mà không có self_kind (hàm không có self) bị hạ như nhận theo giá trị, không có khoản mượn; typeck vẫn chấp nhận nhưng downstream từ chối bằng ICE E9901 ở borrowck (đã chạy, exit 2), nên fail-closed; nên báo lỗi rõ ở M4	_ => self.operand_of(recv, &rty),
-crates/gt-mir/src/build/expr.rs	1635	_ =>	AN TOÀN		callee không phải Path có site ⇒ gọi qua giá trị (Callee::Value) có stabilize; Path thiếu site thì fn_item_const ICE	_ => {
-crates/gt-mir/src/build/expr.rs	1719	_ =>	AN TOÀN		None = vòng lặp không phải while nên không có cond; chỉ là siêu dữ liệu vòng	_ => None,
-crates/gt-mir/src/build/expr.rs	1758	_ =>	AN TOÀN		None = điều kiện không phải literal bool; đi nhánh tổng quát	_ => None,
-crates/gt-mir/src/build/expr.rs	1834	_ =>	AN TOÀN		nhánh không với tới (inner đã khớp Slice|Array ở guard) và biến el không được dùng	_ => Ty::Err,
-crates/gt-mir/src/build/expr.rs	1892	let _ =	AN TOÀN		let _ = el chỉ để tắt cảnh báo biến không dùng	let _ = el;
-crates/gt-mir/src/build/expr.rs	1896	unwrap_or	AN TOÀN		Ty::Err không phải Ty::Int ⇒ ICE 'lặp trên range không phải số nguyên'	let el = args.first().cloned().unwrap_or(Ty::Err);
-crates/gt-mir/src/build/expr.rs	1907	_ =>	AN TOÀN		nhánh mặc định lấy range từ place (kể cả không phải literal); range_field_order ICE nếu không đúng hai trường	_ => {
-crates/gt-mir/src/build/expr.rs	1995	_ =>	AN TOÀN		ICE: ⟳ trên kiểu không hỗ trợ	_ => ice(format!("⟳ in trên kiểu {ity:?}")),
-crates/gt-mir/src/build/expr.rs	2031	_ =>	AN TOÀN		miền không phải a..b ⇒ ghi Body.uncheckable và dùng hằng thay thế, nhưng gt-oblig driver.rs:215 đổi mỗi uncheckable thành E0902 (ĐỎ); đã chạy ∀/∃ trên Range<i32> ở ⊳ và ⋈ đều ĐỎ	_ => {
-crates/gt-mir/src/build/expr.rs	2084	let _ =	AN TOÀN		let _ = to_step chỉ để tắt cảnh báo	let _ = to_step;
-crates/gt-mir/src/build/expr.rs	2098	let _ =	AN TOÀN		let _ = to_decided chỉ để tắt cảnh báo	let _ = to_decided;
-crates/gt-mir/src/build/matching.rs	151	_ =>	AN TOÀN		ADR-P2-09 try_into: Option/Result không phải enum ⇒ ICE E9901 (đóng-khi-lỗi)	_ => ice("Option/Result không phải enum"),
-crates/gt-mir/src/build/matching.rs	218	_ =>	AN TOÀN		`destructures` khớp từng chữ với gt-types/check/pat.rs; lệch chế độ tham chiếu ⇒ ICE (hai kiểm chéo trong test_pat).	_ => false,
-crates/gt-mir/src/build/matching.rs	286	_ =>	AN TOÀN		Binding không phải biến thể: bắt buộc có định danh trong resolve.decls, không thì ICE (không tạo binding tuỳ tiện).	_ => {
-crates/gt-mir/src/build/matching.rs	350	_ =>	AN TOÀN		Pattern biến thể không phân giải ⇒ ICE.	_ => ice("pattern biến thể không phân giải được sau M4"),
-crates/gt-mir/src/build/matching.rs	421	_ =>	AN TOÀN		seq_pats: vị trí không sau `..` thì k=i; số thành phần lệch ⇒ M4 báo E0304 (thử), vượt ⇒ ICE.	_ => i,
-crates/gt-mir/src/build/matching.rs	447	_ =>	AN TOÀN		Pattern biến thể trên kiểu khác enum ⇒ ICE.	_ => return ice("pattern biến thể trên kiểu khác enum của nó"),
+crates/gt-mir/src/build/expr.rs	382	_ =>	AN TOÀN		is_place_expr false ⇒ coi là giá trị (tạo biến tạm); static/const là bất biến (D5: ghi/&! vào static bị E0308) và chạy thử static Atomic qua llvm cho kết quả đúng (3)	_ => false,
+crates/gt-mir/src/build/expr.rs	394	_ =>	AN TOÀN		như dòng 7: đường dẫn không phải biến cục bộ đi qua temp_place/Const::Item; static bất biến nên không mất ghi	_ => b.temp_place(e),
+crates/gt-mir/src/build/expr.rs	409	_ =>	AN TOÀN		như dòng 7/8 (Deref/biểu thức giá trị đi qua biến tạm); không bỏ sót ghi vì đích ghi phải là chỗ hợp lệ đã qua M4	_ => b.temp_place(e),
+crates/gt-mir/src/build/expr.rs	458	_ =>	AN TOÀN		ICE: truy cập trường trên kiểu lạ bị từ chối	_ => ice(format!("truy cập trường trên kiểu {ty:?}")),
+crates/gt-mir/src/build/expr.rs	506	_ =>	AN TOÀN	FB-C20	recheck_place: các phép chiếu khác Index/Subslice (Deref/Field/Downcast) không có biên để kiểm lại	_ => {}
+crates/gt-mir/src/build/expr.rs	573	is_some_and	AN TOÀN	FB-C20	may_mutate: chỉ BỎ recheck khi cả hai đầu mút `is_read_only` (hàm bảo thủ có sẵn: mặc định false); không rõ ⇒ recheck	let may_mutate = start.as_ref().is_some_and(|s| !Self::is_read_only(s))
+crates/gt-mir/src/build/expr.rs	574	is_some_and	AN TOÀN	FB-C20	may_mutate: chỉ BỎ recheck khi cả hai đầu mút `is_read_only` (hàm bảo thủ có sẵn: mặc định false); không rõ ⇒ recheck	|| end.as_ref().is_some_and(|e| !Self::is_read_only(e));
+crates/gt-mir/src/build/expr.rs	693	_ =>	AN TOÀN		ICE: literal với kiểu không khớp bị từ chối	_ => return ice(format!("literal với kiểu {ty:?}")),
+crates/gt-mir/src/build/expr.rs	720	_ =>	AN TOÀN		is_read_only mặc định false = coi là có thể ghi ⇒ chụp lại toán hạng (bảo thủ)	_ => false,
+crates/gt-mir/src/build/expr.rs	837	_ =>	AN TOÀN		ICE (GÓI 12, ADR-C15): nút được M4 đánh dấu ép unsize nhưng kiểu nguồn không phải `&[T; N]` ⇒ lỗi nội bộ, không bao giờ chấp nhận	_ => return ice(format!("ép unsize từ kiểu không phải mảng {src:?}")),
+crates/gt-mir/src/build/expr.rs	839	_ =>	AN TOÀN		ICE (GÓI 12, ADR-C15): kiểu nguồn của phép ép unsize không phải tham chiếu ⇒ lỗi nội bộ, không bao giờ chấp nhận	_ => return ice(format!("ép unsize từ kiểu không phải tham chiếu {src:?}")),
+crates/gt-mir/src/build/expr.rs	880	_ =>	AN TOÀN		Path rơi xuống đây (không phải biến/hàm/hằng/assoc) bị ICE ở khối kiểm ngay sau; chỉ biến thể được đi tiếp	_ => {}
+crates/gt-mir/src/build/expr.rs	886	_ =>	AN TOÀN		nhánh không phải đường dẫn: rơi xuống tạo temp và expr_into; không có giả định an toàn	_ => {}
+crates/gt-mir/src/build/expr.rs	924	_ =>	AN TOÀN		def_const None = không phải hằng (biến thể); đường dẫn khác bị ICE ở as_operand	_ => None,
+crates/gt-mir/src/build/expr.rs	948	_ =>	GHI NHẬN		adt_args trả Vec rỗng nếu kiểu kết quả của lời gọi biến thể không phải Adt, trong khi nhánh as_rvalue tương ứng thì ICE; M4 luôn cho Adt nên không với tới, nên đổi thành ICE cho đồng nhất	_ => Vec::new(),
+crates/gt-mir/src/build/expr.rs	971	_ =>	AN TOÀN		Path không phải biến thể đi qua as_operand (có ICE cho đường dẫn không hạ được)	_ => Ok(Rvalue::Use(b.as_operand(e)?)),
+crates/gt-mir/src/build/expr.rs	1075	_ =>	AN TOÀN		biểu thức còn lại đi qua temp+expr_into; duy nhất khả năng đệ quy vô hạn là Range thiếu đầu mút, nhưng M4 từ chối trước (E0301; thử 1.. / ..5 / ∈ 1.. đều ĐỎ)	_ => b.via_temp(e, &ty),
+crates/gt-mir/src/build/expr.rs	1088	_ =>	AN TOÀN		ICE nếu lang item range không đúng hai trường	_ => ice("lang item range cần đúng hai trường `start`, `end`"),
+crates/gt-mir/src/build/expr.rs	1091	_ =>	AN TOÀN		ICE nếu lang item range không phải struct	_ => ice("lang item range phải là struct"),
+crates/gt-mir/src/build/expr.rs	1151	_ =>	AN TOÀN		None = không phải toán tử so sánh; đi tiếp các nhánh khác	_ => None,
+crates/gt-mir/src/build/expr.rs	1171	_ =>	AN TOÀN		nhánh mặc định chỉ nhận MulSat vì match ngoài đã giới hạn sáu toán tử wrap/sat	_ => BinOp::MulSat,
+crates/gt-mir/src/build/expr.rs	1184	_ =>	AN TOÀN		nhánh mặc định chỉ nhận Rem vì match ngoài giới hạn Add/Sub/Mul/Div/Rem; Mul/Div/Rem đều có Assert tràn/chia 0	_ => BinOp::Rem,
+crates/gt-mir/src/build/expr.rs	1209	_ =>	AN TOÀN		nhánh Div/Rem: Assert chia 0 và MIN/-1 được phát; số thực không có nghĩa vụ (đã trả sớm)	_ => {
+crates/gt-mir/src/build/expr.rs	1264	_ =>	AN TOÀN		ICE: toán tử nhị phân lạ bị từ chối	_ => ice("toán tử nhị phân lạ"),
+crates/gt-mir/src/build/expr.rs	1281	_ =>	AN TOÀN		∈ trên vế phải không phải Range literal: ICE nếu không phải Adt/range hai trường; M4 báo E0301 trước (thử ∈ struct start/end ⇒ E0301)	_ => {
+crates/gt-mir/src/build/expr.rs	1291	unwrap_or	AN TOÀN		Ty::Err làm kiểu trường bị validate.rs ('kiểu chưa giải quyết') bắt thành ICE E9901; thực tế Range luôn có đối số	let el = args.first().cloned().unwrap_or(Ty::Err);
+crates/gt-mir/src/build/expr.rs	1367	_ =>	AN TOÀN		nhánh mặc định expr_into hạ qua as_rvalue; không đọc thiếu thành đúng	_ => {
+crates/gt-mir/src/build/expr.rs	1448	_ =>	AN TOÀN		nhánh Implies của short_circuit (a sai ⇒ true); caller chỉ truyền And/Or/Implies	_ => (vec![(0, short_bb)], rhs_bb, true),
+crates/gt-mir/src/build/expr.rs	1485	unwrap_or	AN TOÀN		Ty::Err đi vào kiểu local/trường ⇒ validate.rs ICE; thực tế Option luôn có đối số	let el = args.first().cloned().unwrap_or(Ty::Err);
+crates/gt-mir/src/build/expr.rs	1489	_ =>	AN TOÀN		nhánh mặc định chỉ nhận MulChecked (caller giới hạn ba toán tử +? -? *?)	_ => BinOp::Mul,
+crates/gt-mir/src/build/expr.rs	1533	_ =>	AN TOÀN		ICE nếu lang item option thiếu None/Some	_ => ice("lang item option cần biến thể `None` và `Some`"),
+crates/gt-mir/src/build/expr.rs	1536	_ =>	AN TOÀN		ICE nếu lang item option không phải enum	_ => ice("lang item option phải là enum"),
+crates/gt-mir/src/build/expr.rs	1594	_ =>	GHI NHẬN		phương thức gọi dạng x.m() mà không có self_kind (hàm không có self) bị hạ như nhận theo giá trị, không có khoản mượn; typeck vẫn chấp nhận nhưng downstream từ chối bằng ICE E9901 ở borrowck (đã chạy, exit 2), nên fail-closed; nên báo lỗi rõ ở M4	_ => self.operand_of(recv, &rty),
+crates/gt-mir/src/build/expr.rs	1636	_ =>	AN TOÀN		callee không phải Path có site ⇒ gọi qua giá trị (Callee::Value) có stabilize; Path thiếu site thì fn_item_const ICE	_ => {
+crates/gt-mir/src/build/expr.rs	1720	_ =>	AN TOÀN		None = vòng lặp không phải while nên không có cond; chỉ là siêu dữ liệu vòng	_ => None,
+crates/gt-mir/src/build/expr.rs	1759	_ =>	AN TOÀN		None = điều kiện không phải literal bool; đi nhánh tổng quát	_ => None,
+crates/gt-mir/src/build/expr.rs	1835	_ =>	AN TOÀN		nhánh không với tới (inner đã khớp Slice|Array ở guard) và biến el không được dùng	_ => Ty::Err,
+crates/gt-mir/src/build/expr.rs	1893	let _ =	AN TOÀN		let _ = el chỉ để tắt cảnh báo biến không dùng	let _ = el;
+crates/gt-mir/src/build/expr.rs	1897	unwrap_or	AN TOÀN		Ty::Err không phải Ty::Int ⇒ ICE 'lặp trên range không phải số nguyên'	let el = args.first().cloned().unwrap_or(Ty::Err);
+crates/gt-mir/src/build/expr.rs	1908	_ =>	AN TOÀN		nhánh mặc định lấy range từ place (kể cả không phải literal); range_field_order ICE nếu không đúng hai trường	_ => {
+crates/gt-mir/src/build/expr.rs	1996	_ =>	AN TOÀN		ICE: ⟳ trên kiểu không hỗ trợ	_ => ice(format!("⟳ in trên kiểu {ity:?}")),
+crates/gt-mir/src/build/expr.rs	2032	_ =>	AN TOÀN		miền không phải a..b ⇒ ghi Body.uncheckable và dùng hằng thay thế, nhưng gt-oblig driver.rs:215 đổi mỗi uncheckable thành E0902 (ĐỎ); đã chạy ∀/∃ trên Range<i32> ở ⊳ và ⋈ đều ĐỎ	_ => {
+crates/gt-mir/src/build/expr.rs	2085	let _ =	AN TOÀN		let _ = to_step chỉ để tắt cảnh báo	let _ = to_step;
+crates/gt-mir/src/build/expr.rs	2099	let _ =	AN TOÀN		let _ = to_decided chỉ để tắt cảnh báo	let _ = to_decided;
+crates/gt-mir/src/build/matching.rs	190	_ =>	AN TOÀN		ADR-P2-09 try_into: Option/Result không phải enum ⇒ ICE E9901 (đóng-khi-lỗi)	_ => ice("Option/Result không phải enum"),
+crates/gt-mir/src/build/matching.rs	257	_ =>	AN TOÀN		`destructures` khớp từng chữ với gt-types/check/pat.rs; lệch chế độ tham chiếu ⇒ ICE (hai kiểm chéo trong test_pat).	_ => false,
+crates/gt-mir/src/build/matching.rs	325	_ =>	AN TOÀN		Binding không phải biến thể: bắt buộc có định danh trong resolve.decls, không thì ICE (không tạo binding tuỳ tiện).	_ => {
+crates/gt-mir/src/build/matching.rs	389	_ =>	AN TOÀN		Pattern biến thể không phân giải ⇒ ICE.	_ => ice("pattern biến thể không phân giải được sau M4"),
+crates/gt-mir/src/build/matching.rs	460	_ =>	AN TOÀN		seq_pats: vị trí không sau `..` thì k=i; số thành phần lệch ⇒ M4 báo E0304 (thử), vượt ⇒ ICE.	_ => i,
+crates/gt-mir/src/build/matching.rs	486	_ =>	AN TOÀN		Pattern biến thể trên kiểu khác enum ⇒ ICE.	_ => return ice("pattern biến thể trên kiểu khác enum của nó"),
 crates/gt-mir/src/build/mod.rs	134	unwrap_or	AN TOÀN		u32::MAX chỉ khi >4 tỷ khối cơ bản (hết bộ nhớ trước).	BasicBlock(u32::try_from(self.body.blocks.len() - 1).unwrap_or(u32::MAX))
 crates/gt-mir/src/build/mod.rs	187	unwrap_or	AN TOÀN		u32::MAX chỉ khi >4 tỷ local.	Local(u32::try_from(self.body.locals.len() - 1).unwrap_or(u32::MAX))
 crates/gt-mir/src/build/mod.rs	222	unwrap_or	AN TOÀN		Frame Args luôn được push đầu mỗi thân (start_fn/build_const) ⇒ frames không rỗng; không thấy loại frame thì rơi về frame trên cùng (tạm cấp hàm), vẫn được drop ở exit_to.	.unwrap_or(self.frames.len().saturating_sub(1));
@@ -435,15 +435,16 @@ crates/gt-types/src/check/mod.rs	358	_ =>	AN TOÀN		closure numeric trong mismat
 crates/gt-types/src/check/mod.rs	418	is_none_or	AN TOÀN		is_none_or: thân không tail / tail là `⎇` không else ⇒ checker bỏ E0307 vì giao cho M5; đã kiểm: thân rỗng và `⎇ c { ⏎ 1; }` đều ĐỎ E0307, `⎇ c {1}` ĐỎ E0301.	let open_end = body.tail.as_ref().is_none_or(|t| {
 crates/gt-types/src/check/mod.rs	466	unwrap_or	GHI NHẬN		tham số AST nhiều hơn sig.params ⇒ kiểu Ty::Err (độc, unify với mọi thứ ⇒ không còn kiểm kiểu cho tham số đó) mà không báo lỗi; chỉ khi lower chữ ký lệch (bất nhất nội bộ/ đã có lỗi lower); nên ICE.	let ty = f.sig.params.get(i).cloned().unwrap_or(Ty::Err);
 crates/gt-types/src/check/mod.rs	584	_ =>	GHI NHẬN		has_cap không đi vào trường của Adt người dùng (Adt chứa Cap ở trường không tính là có cap) và `lang(Cap)=None ⇒ false` (tắt E0310): hướng nguồn cap ⇒ chỉ nới nếu tạo được `W{c:Cap}` mà không có cap, nhưng dựng W cần Cap hợp lệ nên chưa tìm được kịch bản; giới hạn thiết kế (cap gốc chỉ qua root_*/main).	_ => false,
-crates/gt-types/src/check/mod.rs	979	_ =>	AN TOÀN		place_name chỉ để dựng thông điệp lỗi D5 ("?" khi không rõ); lỗi vẫn được báo.	_ => "?".to_string(),
-crates/gt-types/src/check/mod.rs	983	_ =>	AN TOÀN		place_name chỉ để dựng thông điệp lỗi; không ảnh hưởng quyết định.	_ => "?".to_string(),
-crates/gt-types/src/check/mod.rs	991	is_none_or	GHI NHẬN		is_none_or: local thiếu LocalInfo ⇒ coi là mutable (cho gán). Chỉ xảy ra khi biến không được khai báo (vd pattern `Self{..}` trên kiểu không phải ADT, xem pat.rs:384) — khi đó MIR ICE chặn; các đường khai báo khác đều qua declare_local; nên đổi thành `is_some_and`/ICE.	Some(Res::Local(l)) => self.locals.get(l).is_none_or(|i| i.mutable),
-crates/gt-types/src/check/mod.rs	993	_ =>	AN TOÀN		Path trỏ tới thứ không phải local/self (hằng, static, hàm) ⇒ không gán được (false = bảo thủ).	_ => false,
-crates/gt-types/src/check/mod.rs	999	_ =>	AN TOÀN		base có kiểu không phải &/&!: kế thừa tính bất biến của base (đệ quy); kiểu Ref xử lý riêng ở nhánh trên. Đã thử g,h,i,j,k,l: chỉ `&!B` qua biến bất biến được phép (đúng).	_ => self.place_mutable(base),
-crates/gt-types/src/check/mod.rs	1008	_ =>	AN TOÀN		deref kiểu không phải con trỏ ⇒ `true` để tránh lỗi dây chuyền vì E0301 đã báo; đã kiểm *i32, *T, *struct, *Infer đều ĐỎ E0301.	_ => true,
-crates/gt-types/src/check/mod.rs	1010	_ =>	AN TOÀN		biểu thức không phải chỗ ⇒ không gán được (false = bảo thủ).	_ => false,
-crates/gt-types/src/check/mod.rs	1021	_ =>	AN TOÀN		is_place false ⇒ coi là tạm thời (rvalue) nên cho `&!`; AST không có Paren (ngoặc không có node) và Path/Field/Index/Deref đã được liệt kê, còn lại đúng là rvalue.	_ => false,
-crates/gt-types/src/check/mod.rs	1026	unwrap_or	AN TOÀN		`self` ngoài `⊏`/`⊐` bị parser chặn (E0101); Ty::Err chỉ xuất hiện khi đã có lỗi.	let st = self.cx.self_ty.clone().unwrap_or(Ty::Err);
+crates/gt-types/src/check/mod.rs	914	_ =>	AN TOÀN		ADR-P2-10: kiểu vét cạn pattern của let phân rã — mặc định giữ kiểu vế phải (như match_expr); chỉ bóc tham chiếu khi pattern phá cấu trúc (ADR-040)	_ => it,
+crates/gt-types/src/check/mod.rs	1012	_ =>	AN TOÀN		place_name chỉ để dựng thông điệp lỗi D5 ("?" khi không rõ); lỗi vẫn được báo.	_ => "?".to_string(),
+crates/gt-types/src/check/mod.rs	1016	_ =>	AN TOÀN		place_name chỉ để dựng thông điệp lỗi; không ảnh hưởng quyết định.	_ => "?".to_string(),
+crates/gt-types/src/check/mod.rs	1024	is_none_or	GHI NHẬN		is_none_or: local thiếu LocalInfo ⇒ coi là mutable (cho gán). Chỉ xảy ra khi biến không được khai báo (vd pattern `Self{..}` trên kiểu không phải ADT, xem pat.rs:384) — khi đó MIR ICE chặn; các đường khai báo khác đều qua declare_local; nên đổi thành `is_some_and`/ICE.	Some(Res::Local(l)) => self.locals.get(l).is_none_or(|i| i.mutable),
+crates/gt-types/src/check/mod.rs	1026	_ =>	AN TOÀN		Path trỏ tới thứ không phải local/self (hằng, static, hàm) ⇒ không gán được (false = bảo thủ).	_ => false,
+crates/gt-types/src/check/mod.rs	1032	_ =>	AN TOÀN		base có kiểu không phải &/&!: kế thừa tính bất biến của base (đệ quy); kiểu Ref xử lý riêng ở nhánh trên. Đã thử g,h,i,j,k,l: chỉ `&!B` qua biến bất biến được phép (đúng).	_ => self.place_mutable(base),
+crates/gt-types/src/check/mod.rs	1041	_ =>	AN TOÀN		deref kiểu không phải con trỏ ⇒ `true` để tránh lỗi dây chuyền vì E0301 đã báo; đã kiểm *i32, *T, *struct, *Infer đều ĐỎ E0301.	_ => true,
+crates/gt-types/src/check/mod.rs	1043	_ =>	AN TOÀN		biểu thức không phải chỗ ⇒ không gán được (false = bảo thủ).	_ => false,
+crates/gt-types/src/check/mod.rs	1054	_ =>	AN TOÀN		is_place false ⇒ coi là tạm thời (rvalue) nên cho `&!`; AST không có Paren (ngoặc không có node) và Path/Field/Index/Deref đã được liệt kê, còn lại đúng là rvalue.	_ => false,
+crates/gt-types/src/check/mod.rs	1059	unwrap_or	AN TOÀN		`self` ngoài `⊏`/`⊐` bị parser chặn (E0101); Ty::Err chỉ xuất hiện khi đã có lỗi.	let st = self.cx.self_ty.clone().unwrap_or(Ty::Err);
 crates/gt-types/src/check/pat.rs	17	_ =>	AN TOÀN		destructures: false = "không phá cấu trúc" ⇒ không khớp qua tham chiếu, pattern sẽ bị so kiểu thường và báo E0301 nếu không khớp; không phải khẳng định "đúng".	_ => false,
 crates/gt-types/src/check/pat.rs	46	let _ =	AN TOÀN		sau khi đã báo E0301 (pattern phá cấu trúc trên tham chiếu lồng); bỏ XPat vì hàm trả XPat::Wild khi đã có lỗi.	let _ = self.pat_inner(p, &Ty::Err);
 crates/gt-types/src/check/pat.rs	67	_ =>	GHI NHẬN		Binding không phải tên biến thể ⇒ khai báo biến mới và coi là Wild (đúng ngữ nghĩa); hệ quả: gõ nhầm tên biến thể (`Emtpy`) thành bắt-tất-cả, xanh và không cảnh báo (kiểu Rust cũng vậy); không gây mất an toàn bộ nhớ nhưng có thể che lỗi logic.	_ => {

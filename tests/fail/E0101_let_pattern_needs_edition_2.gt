@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: edition 1 (mặc định): `let` phân rã chưa có — chỉ từ edition 2 (ADR-P2-10)
+ƒ f(t: (u32, u32)) → u32 ! ∅ { (a, b) ≔ t; a + b }

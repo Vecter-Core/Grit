@@ -258,3 +258,9 @@ gói phụ thuộc có edition lớn hơn gốc bị từ chối. Edition chưa 
 **`e?` (chỉ edition ≥ 2).** Hậu tố, ưu tiên cao nhất (ngang `.`, `()`, `[]`). Trong hàm trả `Option<U>`: `e: Option<T>` ⇒ `⌥ e { Some(x) ↦ x, None ↦ ⏎ None }`; trong hàm trả `Result<U, E>`: `e: Result<T, E>` (CÙNG `E`) ⇒
 `⌥ e { Ok(x) ↦ x, Err(er) ↦ ⏎ Err(er) }`. Kiểu của `e?` là `T`. KHÔNG chuyển đổi lỗi. Khác họ / khác `E` / hàm bao không trả Option/Result ⇒ E0320; toán hạng không phải Option/Result (hoặc chưa biết kiểu) ⇒ E0321.
 Thoát sớm đi qua đúng đường của `⏎`: hậu điều kiện `⊲` được kiểm, giá trị cần drop trong phạm vi bị drop đúng một lần, `Owned`/`Secret` được trả/xoá như thoát bình thường. `?` không thêm hiệu ứng. Ở edition 1, `?` đứng riêng vẫn là E0101.
+
+## 29. `let` phân rã (edition 2, ADR-P2-10)
+`pattern [: kiểu] ≔ biểu_thức;` với `pattern` là tuple `(a, _, c)`, struct `P { x, y: z, .. }` hoặc enum một biến thể, lồng nhau tuỳ ý. Pattern PHẢI không thể bị từ chối: M4 kiểm bằng đúng bộ vét cạn của `⌥` với MỘT nhánh, không vét cạn ⇒ **E0305**.
+Biến của pattern bất biến (muốn sửa: `μn ≔ a;`) và sống tới hết khối. Vế phải là CHỖ (biến, trường) ⇒ chỉ phần được bind bị move/copy khỏi chỗ đó (partial move; phần còn lại ở lại và bị drop khi chỗ đó hết phạm vi); vế phải là giá trị ⇒ qua một tạm,
+phần không được bind (`_`, `..`) bị drop NGAY cuối câu lệnh theo thứ tự trường. Biến bind được khai báo theo thứ tự xuất hiện trong pattern (nên bị drop ngược thứ tự đó). Pattern trên `&U`/`&!U` theo ADR-040 (biến là tham chiếu tới phần tử). Ở edition 1: E0101 như cũ.
+

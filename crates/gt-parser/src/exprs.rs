@@ -724,6 +724,10 @@ impl Parser {
             {
                 self.parse_let(start, false)
             }
+            // `let` phân rã (CHỈ edition ≥ 2, ADR-P2-10): `(a, b) ≔ e;`, `P { x, y } ≔ e;`
+            TokenKind::LParen | TokenKind::Ident(_) if self.pattern_let_ahead() => {
+                self.parse_let_pat(start)
+            }
             TokenKind::KwRet => {
                 self.bump();
                 let value = if self.at(&TokenKind::Semi) {
@@ -797,6 +801,43 @@ impl Parser {
                 }
             }
         }
+    }
+
+    /// Nhìn trước (edition ≥ 2): câu lệnh bắt đầu ở đây là `let` phân rã nếu gặp `≔` ở độ sâu ngoặc 0 trước `;`/`←`/hết khối. Chỉ nhìn token, không tiêu thụ; giới hạn 512 token.
+    fn pattern_let_ahead(&self) -> bool {
+        if self.edition < 2 {
+            return false;
+        }
+        let mut depth = 0i32;
+        for i in 0..512 {
+            match self.peek_kind(i) {
+                TokenKind::LParen | TokenKind::LBrace | TokenKind::LBracket => depth += 1,
+                TokenKind::RParen | TokenKind::RBrace | TokenKind::RBracket => {
+                    depth -= 1;
+                    if depth < 0 {
+                        return false;
+                    }
+                }
+                TokenKind::Walrus if depth == 0 => return true,
+                TokenKind::Semi | TokenKind::Assign if depth == 0 => return false,
+                TokenKind::Eof => return false,
+                _ => {}
+            }
+        }
+        false
+    }
+
+    fn parse_let_pat(&mut self, start: u32) -> PResult<StmtOrTail> {
+        let pat = self.parse_pattern()?;
+        let ty = if self.eat(&TokenKind::Colon) {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+        self.expect(&TokenKind::Walrus, "`≔`")?;
+        let init = self.parse_expr()?;
+        self.expect(&TokenKind::Semi, "`;`")?;
+        Ok(self.mk_stmt(start, StmtKind::LetPat { pat, ty, init }))
     }
 
     fn parse_let(&mut self, start: u32, mutable: bool) -> PResult<StmtOrTail> {

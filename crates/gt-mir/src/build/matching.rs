@@ -125,6 +125,45 @@ impl Builder<'_> {
         Ok(())
     }
 
+    /// `pattern ≔ init;` (ADR-P2-10): pattern đã được M4 chứng minh KHÔNG thể bị từ chối (vét cạn, E0305) ⇒ nhánh "không khớp" là `Unreachable` như nhánh cuối của `⌥`.
+    /// Vế phải là chỗ ⇒ move/copy từng phần khỏi chỗ đó; ngược lại qua một tạm. Biến của pattern được gán NGAY trong phạm vi hiện tại (sống tới hết khối), không lồng.
+    pub(crate) fn let_pat_into(&mut self, pat: &Pattern, init: &Expr) -> R<()> {
+        let sty = self.ty_of(init)?;
+        let sp = if self.is_place_expr(init) {
+            self.as_place(init)?
+        } else {
+            let t = self.temp(sty.clone());
+            self.expr_into(&Place::local(t), init)?;
+            Place::local(t)
+        };
+        self.push(StatementKind::FakeRead(
+            FakeReadCause::MatchScrutinee,
+            sp.clone(),
+        ));
+        let fail = self.new_block();
+        let mut binds: Binds = Vec::new();
+        self.test_pat(pat, &sp, &sty, None, fail, &mut binds)?;
+        let ok = self.cur;
+        // nhánh không khớp: không tới được (M4 đã chứng minh); đóng bằng Unreachable (M10 hạ thành abort)
+        self.cur = fail;
+        self.terminate(TerminatorKind::Unreachable)?;
+        self.cur = ok;
+        for (id, place, ty, span, mode) in binds {
+            let l = self.user_var(id, false, span)?;
+            match mode {
+                Some(k) => {
+                    let rv = self.new_borrow(k, place);
+                    self.assign(Place::local(l), rv);
+                }
+                None => {
+                    let o = self.operand_of(place, &ty);
+                    self.assign(Place::local(l), Rvalue::Use(o));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// `e?` (ADR-P2-09): tương đương `⌥ e { Some(x) ↦ x, None ↦ ⏎ None }` / `⌥ e { Ok(x) ↦ x, Err(er) ↦ ⏎ Err(er) }`, dựng bằng CHÍNH các nguyên thủy của `⌥`/`⏎`
     /// (`Discriminant` + `SwitchInt`, `Downcast`/`Field`, `exit_to(0)` + `Return`) — không thêm loại câu lệnh/terminator MIR. M4 đã bảo đảm hàm bao trả cùng họ (và cùng `E`).
     pub(crate) fn try_into(&mut self, dest: &Place, inner: &Expr) -> R<()> {

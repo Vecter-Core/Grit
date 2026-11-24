@@ -327,6 +327,7 @@
 "crates/gt-types/src/check/expr.rs|unwrap_or|let broke = self.loops.pop().unwrap_or(false);",
 "crates/gt-types/src/check/mod.rs|_ =>|_ => \"?\".to_string(),",
 "crates/gt-types/src/check/mod.rs|_ =>|_ => false,",
+"crates/gt-types/src/check/mod.rs|_ =>|_ => it,",
 "crates/gt-types/src/check/mod.rs|_ =>|_ => return None,",
 "crates/gt-types/src/check/mod.rs|_ =>|_ => self.place_mutable(base),",
 "crates/gt-types/src/check/mod.rs|_ =>|_ => true,",

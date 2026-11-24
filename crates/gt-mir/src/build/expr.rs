@@ -329,6 +329,7 @@ impl Builder<'_> {
                 b.push(StatementKind::FakeRead(FakeReadCause::LetInit, dest));
                 Ok(())
             }),
+            StmtKind::LetPat { pat, init, .. } => self.in_stmt(|b| b.let_pat_into(pat, init)),
             StmtKind::Assign { target, value } => self.in_stmt(|b| {
                 // chỗ trước (kể cả kiểm chỉ số), rồi giá trị, rồi drop giá trị cũ, rồi ghi (semantics §3a)
                 let p = b.as_place(target)?;

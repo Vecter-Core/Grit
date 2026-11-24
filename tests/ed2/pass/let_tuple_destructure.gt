@@ -1,0 +1,4 @@
+// expect: pass
+// note: ADR-P2-10 — let phân rã tuple từ giá trị trả về; biến bất biến, dùng bình thường
+ƒ pair() → (u32, bool) ! ∅ { (7u32, true) }
+ƒ f() → u32 ! ∅ { (n, flag) ≔ pair(); ⎇ flag { n } ⇝ { 0u32 } }

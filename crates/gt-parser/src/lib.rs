@@ -96,6 +96,7 @@ fn ice(file_id: gt_span::FileId, file: &str, source: &str, msg: &str) -> ParseOu
 fn parse_inner(file_id: gt_span::FileId, file: &str, source: &str, edition: u32) -> ParseOutput {
     let lexed = gt_lexer::lex_with_edition(source, edition);
     let mut p = parser::Parser::new(file_id, file, source.len(), lexed.tokens);
+    p.edition = edition;
     for e in &lexed.errors {
         if let Some(d) = convert::lex_error(file, e) {
             p.diags.push(d);

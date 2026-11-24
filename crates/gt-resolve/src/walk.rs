@@ -577,6 +577,15 @@ impl<'t> Walker<'t> {
                 self.expr(init);
                 self.introduce(name, "biến");
             }
+            StmtKind::LetPat { pat, ty, init } => {
+                if let Some(t) = ty {
+                    self.ty(t);
+                }
+                // vế phải phân giải TRƯỚC khi biến của pattern vào phạm vi (như `x ≔ x + 1`)
+                self.expr(init);
+                let mut seen = Vec::new();
+                self.pat(pat, &mut seen);
+            }
             StmtKind::Assign { target, value } => {
                 self.expr(target);
                 self.expr(value);

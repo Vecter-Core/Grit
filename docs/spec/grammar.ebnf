@@ -80,7 +80,8 @@ prim       = "i8"|"i16"|"i32"|"i64"|"i128"|"isize"|"u8"|"u16"|"u32"|"u64"|"u128"
 block      = "{" { stmt } [ expr ] "}" ;            (* biểu thức cuối KHÔNG ";" = giá trị khối; có ";" = câu lệnh, khối trả () (Q8) *)
 stmt       = let_stmt | assign_stmt | expr ";" | block_stmt | "⏎" [ expr ] ";" | "⊠" ";" | "⊡" ";" ;
 block_stmt = if_expr | match_expr | loop_expr | unsafe_expr ;   (* ở vị trí câu lệnh kết thúc tại "}" — KHÔNG cần ";" (Q8 đã duyệt) *)
-let_stmt   = [ "μ" ] ident [ ":" type ] "≔" expr ";" ;  (* Phase 1: chỉ binding một tên; chưa destructure ở let *)
+let_stmt   = [ "μ" ] ident [ ":" type ] "≔" expr ";"
+           | pattern [ ":" type ] "≔" expr ";" ;      (* dạng 2 CHỈ edition >= 2 (ADR-P2-10): pattern tuple/struct/enum-một-biến-thể, KHÔNG thể bị từ chối (E0305), biến bất biến *)
 assign_stmt= place "←" expr ";" ;                       (* KHÔNG có += -= ... (chủ ý, KNOWN_LIMITATIONS) *)
 place      = expr ;   (* đích gán: parse như biểu thức rồi KIỂM SAU: biến một đoạn, hoặc trường/chỉ số/"*" áp lên một vị trí — vd (*p).x, **pp, a.b[0] (Q15i) *)
 

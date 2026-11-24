@@ -889,6 +889,39 @@ impl<'e, 'a> Checker<'e, 'a> {
                 self.declare_binding(name, it, *mutable, true);
                 diverged
             }
+            StmtKind::LetPat { pat, ty, init } => {
+                // ADR-P2-10: kiểu vế phải như `≔` thường; pattern kiểm bằng ĐÚNG bộ `pat` + vét cạn của `⌥` với MỘT nhánh (không vét cạn ⇒ E0305)
+                let annot = ty.as_ref().map(|t| {
+                    let cx = self.cx.clone();
+                    self.env.lower_ty(t, &cx)
+                });
+                let it = match &annot {
+                    Some(a) => {
+                        let a2 = a.clone();
+                        let t = self.expr(init, Some(&a2));
+                        if !self.try_unsize(&t, a, init.id) {
+                            self.coerce(&t, a, init.id, init.span, init.span.end);
+                        }
+                        a.clone()
+                    }
+                    None => self.expr(init, None),
+                };
+                self.sized(&it, init.id, init.span);
+                let diverged = self.infer.shallow(&it) == Ty::Never;
+                let ir = self.pat(pat, &it);
+                let scrut = match self.infer.shallow(&it) {
+                    Ty::Ref(_, inner) if self.destructures(pat) => *inner,
+                    _ => it,
+                };
+                self.matches.push(MatchCheck {
+                    node: s.id,
+                    span: s.span,
+                    scrut,
+                    arms: vec![ir],
+                    insert_at: s.span.end.saturating_sub(1),
+                });
+                diverged
+            }
             StmtKind::Assign { target, value } => {
                 let tt = self.expr(target, None);
                 self.expr_expect(value, &tt);
