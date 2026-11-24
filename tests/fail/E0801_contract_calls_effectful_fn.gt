@@ -1,0 +1,5 @@
+// expect: fail E0801
+// note: FB-C37 (Gemini G-03b) — hợp đồng ⊳ gọi hàm có hiệu ứng io
+ƒ write_it(o: &Cap<Out>) → u32 ! {io} { o.write_str("x"); 99u32 }
+ƒ pure_fn(o: &Cap<Out>) → u32 ! ∅ ⊳ write_it(o) == 99u32 { 0u32 }
+ƒ main() → u32 ! {io} { o ≔ root_out(); pure_fn(&o) }

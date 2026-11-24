@@ -86,6 +86,8 @@ pub struct Interp<'a> {
     heap: Vec<usize>,
     /// số lần xoá Secret (ADR-P2-03)
     secret_wipes: u64,
+    /// đối số kiểu (đã thế) của lời gọi intrinsic hiện tại — để biết `Owned<T>::into_inner`/`spawn<A>` có chứa Secret không (FB-C41)
+    call_generics: Vec<Ty>,
 }
 
 enum Flow {
@@ -109,6 +111,7 @@ impl<'a> Interp<'a> {
             asserts: Vec::new(),
             heap: Vec::new(),
             secret_wipes: 0,
+            call_generics: Vec::new(),
         }
     }
 
@@ -339,6 +342,7 @@ impl<'a> Interp<'a> {
                                 None => return Flow::Bug("len trả về `!`".to_string()),
                             }
                         }
+                        self.call_generics = env.1.clone();
                         match self.lang_ops(&k, &vals) {
                             Ok(Some(v)) => {
                                 if let Err(e) = self.write(dest, v) {
@@ -362,6 +366,10 @@ impl<'a> Interp<'a> {
                             let Some(wb) = self.mir.bodies.iter().find(|x| x.node == *fnode) else {
                                 return Flow::Bug("spawn: không có thân MIR của hàm".to_string());
                             };
+                            // FB-C41 (Gemini G-04): bản sao Secret trong hộp heap của spawn bị xoá sau khi nạp (cùng quy tắc với bước đệm của codegen)
+                            if self.secret_arg() {
+                                self.secret_wipes += 1;
+                            }
                             match self.run(wb, vec![arg.clone()]) {
                                 Outcome::Value(_) => {}
                                 Outcome::Abort(k) => return Flow::Abort(k),
@@ -516,6 +524,18 @@ impl<'a> Interp<'a> {
             return false;
         }
         crate::types::place_ty(b, p).is_some_and(|ty| t.db.contains_secret(&self.sub_env(&ty)))
+    }
+
+    /// đối số kiểu đầu tiên của lời gọi intrinsic hiện tại có chứa `Secret` không
+    fn secret_arg(&self) -> bool {
+        let Some(t) = self.types else {
+            return false;
+        };
+        t.db.secret_used
+            && self
+                .call_generics
+                .first()
+                .is_some_and(|g| t.db.contains_secret(g))
     }
 
     /// Số lần xoá Secret đã thực hiện (để đối chiếu với `gritrt_secret_wipe` của exe).
@@ -857,7 +877,13 @@ impl<'a> Interp<'a> {
                 _ => Err(bug("không phải Owned")),
             },
             ("into_inner", [V::Adt(0, f)]) => match f.first() {
-                Some(V::Ref(0, cell, _)) => self.heap_free(*cell),
+                Some(V::Ref(0, cell, _)) => {
+                    // FB-C41 (Gemini G-04): khối heap chứa Secret bị xoá trước khi trả cho allocator
+                    if self.secret_arg() {
+                        self.secret_wipes += 1;
+                    }
+                    self.heap_free(*cell)
+                }
                 _ => Err(bug("con trỏ lạ")),
             },
             _ => Err(bug("đối số không đúng dạng")),

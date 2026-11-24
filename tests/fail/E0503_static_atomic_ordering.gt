@@ -1,0 +1,5 @@
+// expect: fail E0503
+// note: FB-C37 (Gemini G-03c) — AtomicOrdering sai trong thân ■
+■ A: Atomic<u32> ≔ Atomic::new(0u32);
+■ B: u32 ≔ A.load(AtomicOrdering::Release);
+ƒ main() → u32 ! ∅ { B }

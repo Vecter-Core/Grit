@@ -1,0 +1,4 @@
+// expect: fail E0701
+// note: FB-C38 (Gemini G-03a) — vòng lặp vô hạn trong thân ■ từng không bị gt-term kiểm ⇒ chương trình treo
+■ BAD: u32 ≔ { ⟳ true { } 0u32 };
+ƒ main() → u32 ! ∅ { BAD }

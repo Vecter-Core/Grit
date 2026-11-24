@@ -2184,12 +2184,13 @@ pub fn analyze_body(body: &Body, info: &ProgInfo, prover: &mut dyn Prover) -> Bo
     };
     let pre = states.clone();
     narrow(&cx, &mut states);
-    if check_post_fixpoint(&cx, &states).is_err() {
+    if check_post_fixpoint(&cx, &states, false).is_err() {
         // narrowing không đơn điệu trên siêu dữ liệu: bỏ nó, dùng điểm cố định thuần widening (vẫn phải qua kiểm)
         states = pre;
         rep.narrowing_rejected = true;
     }
-    if let Err(e) = check_post_fixpoint(&cx, &states) {
+    // FB-C40 (Gemini G-06): điểm cố định thuần widening phải thoả CẢ `facts`/`defs`
+    if let Err(e) = check_post_fixpoint(&cx, &states, rep.narrowing_rejected) {
         rep.ice = Some(e);
         return rep;
     }
@@ -2335,7 +2336,11 @@ fn narrow(cx: &Ctx<'_>, states: &mut [Option<AState>]) {
 }
 
 /// Kiểm HẬU-ĐIỂM-CỐ-ĐỊNH độc lập với đường widening/narrowing: mọi cạnh `b → s` phải thoả `out(b → s).env ⊑ state(s).env`.
-fn check_post_fixpoint(cx: &Ctx<'_>, states: &[Option<AState>]) -> Result<(), String> {
+fn check_post_fixpoint(
+    cx: &Ctx<'_>,
+    states: &[Option<AState>],
+    strict_meta: bool,
+) -> Result<(), String> {
     for b in &cx.rpo {
         let bb = b.index();
         let Some(s) = &states[bb] else { continue };
@@ -2344,7 +2349,15 @@ fn check_post_fixpoint(cx: &Ctx<'_>, states: &[Option<AState>]) -> Result<(), St
                 continue;
             }
             match &states[tgt.index()] {
-                Some(t) if out.env.leq(&t.env) => {}
+                // FB-C40 (Gemini G-06): `facts`/`defs` của đích phải được MỌI đường tới bảo đảm (hợp = giao) — nếu không, kernel nhận một giả thiết
+                // mà một cạnh vào không chứng minh. Kiểm độc lập với `join`/`widen`/`narrow`.
+                // `strict_meta` chỉ đặt cho điểm cố định của WIDENING (đúng ý nghĩa hậu-điểm-cố-định); trạng thái đã narrowing có `facts` là GIAO các `out` của
+                // trạng thái cũ (đúng, nhưng không cần là điểm cố định của `facts`) ⇒ chỉ kiểm `env` như trước (siết cả hai làm mất độ chính xác ở std).
+                Some(t)
+                    if out.env.leq(&t.env)
+                        && (!strict_meta
+                            || (t.facts.iter().all(|f| out.facts.contains(f))
+                                && t.defs.iter().all(|(k, d)| out.defs.get(k) == Some(d)))) => {}
                 _ => {
                     return Err(format!(
                         "trạng thái cuối không phải hậu-điểm-cố-định tại cạnh bb{bb} → bb{}",
@@ -2521,10 +2534,12 @@ impl<'a> DomainQuery<'a> {
         let mut states = fixpoint(&cx, &mut steps)?;
         let pre = states.clone();
         narrow(&cx, &mut states);
-        if check_post_fixpoint(&cx, &states).is_err() {
+        let mut rejected = false;
+        if check_post_fixpoint(&cx, &states, false).is_err() {
             states = pre;
+            rejected = true;
         }
-        check_post_fixpoint(&cx, &states).ok()?;
+        check_post_fixpoint(&cx, &states, rejected).ok()?;
         Some(DomainQuery { cx, states })
     }
 

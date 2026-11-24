@@ -1,0 +1,4 @@
+// expect: fail E0701
+// note: FB-C38 (Gemini G-03a) — vòng lặp vô hạn trong thân ⊳
+ƒ main() → u32 ! ∅ { 0u32 }
+ƒ f(x: u32) → u32 ! ∅ ⊳ { ⟳ true { } true } { x }

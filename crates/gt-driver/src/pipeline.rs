@@ -127,6 +127,8 @@ pub struct CheckResult {
     pub verdict: Verdict,
     pub sources: Vec<(String, String)>,
     pub checks: Checks,
+    /// edition đã dùng để biên dịch (FB-C48: nằm trong attestation khi ≠ 1)
+    pub edition: u32,
     /// báo cáo "check còn lại" (chỉ là DỮ LIỆU báo cáo, không phải sản phẩm để ghi/chạy)
     pub checks_report: Option<ChecksReport>,
     /// các `#allow` đã áp dụng (dấu vết kiểm toán)
@@ -353,12 +355,14 @@ fn run_passes(
         std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-mode"),
     );
     // `GRITC_FAULT=mir:pat-field`: biến bind trỏ nhầm trường (chỉ để kiểm bộ so sánh codegen/oracle tự bắt)
+    // FB-C46 (Gemini G-08b): hai chốt này sinh MIR SAI mà vẫn XANH (không chỉ làm gritc từ chối thêm) ⇒ chỉ có trong bản dựng debug, bản release bỏ qua biến môi trường
     gt_mir::set_pat_field_fault_for_test(
-        std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-field"),
+        cfg!(debug_assertions) && std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-field"),
     );
     // `GRITC_FAULT=mir:pat-field-swap`: hoán đổi hai bind cùng kiểu (lệch tinh vi mà M6 vẫn chấp nhận)
     gt_mir::set_pat_swap_fault_for_test(
-        std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-field-swap"),
+        cfg!(debug_assertions)
+            && std::env::var("GRITC_FAULT").as_deref() == Ok("mir:pat-field-swap"),
     );
     // hạ MIR rồi elaboration drop (ADR-C18: cờ drop, drop mở) TRƯỚC M6 để M6 thấy đúng drop nào còn là một lần dùng
     let Some((m, drops)) = run.stage("m5.mir", || {
@@ -452,6 +456,7 @@ fn finish(
         verdict,
         sources,
         checks: run.opts.checks,
+        edition: run.opts.edition,
         checks_report: None,
         allowed: Vec::new(),
         artifacts,
@@ -496,6 +501,10 @@ pub fn attestation(res: &CheckResult, mir_dump: &str) -> String {
             "proven"
         }
     ));
+    // FB-C48 (Gemini G-09b): cùng văn bản biên dịch khác edition có thể khác nghĩa ⇒ edition vào attestation (edition 1 không thêm dòng: băm cũ giữ nguyên)
+    if res.edition != 1 {
+        s.push_str(&format!("edition {}\n", res.edition));
+    }
     for p in &res.passes {
         s.push_str(&format!("pass {} {}\n", p.name, p.status.name()));
     }

@@ -1,0 +1,16 @@
+// expect: fail E0404
+// note: FB-C36 (Gemini G-01) — bản stack: ghi &local vào Cell<&T> sống lâu hơn qua con trỏ hàm
+ƒ id_cell<'a>(c: &'a Cell<&'a u32>) → &'a Cell<&'a u32> ! ∅ { c }
+
+ƒ main() → u32 ! ∅ {
+  outer: u32 ≔ 111u32;
+  c: Cell<&u32> ≔ Cell::new(&outer);
+  fp: ƒ(&Cell<&u32>) → &Cell<&u32> ! ∅ ≔ id_cell;
+  {
+    local: u32 ≔ 999u32;
+    c2 ≔ fp(&c);
+    c2.set(&local);
+  };
+  r ≔ c.get();
+  *r
+}

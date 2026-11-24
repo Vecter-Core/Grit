@@ -1,0 +1,13 @@
+// expect: fail E0702
+// note: FB-C39 (Gemini G-02) — is_ok đọc ■ Atomic nên KHÔNG thuần: kernel không được suy ¬is_ok(x) vô lý từ is_ok(x) rồi chứng minh vòng lặp không chạy
+■ A: Atomic<u32> ≔ Atomic::new(0u32);
+ƒ is_ok(x: u32) → bool ! ∅ { A.fetch_add(1u32, AtomicOrdering::SeqCst) == 0u32 }
+ƒ main() → u32 ! ∅ {
+  x: u32 ≔ 1u32;
+  ⎇ is_ok(x) {
+    ⎇ ¬is_ok(x) {
+      ⟳ true ↓ x { }
+    }
+  };
+  0u32
+}

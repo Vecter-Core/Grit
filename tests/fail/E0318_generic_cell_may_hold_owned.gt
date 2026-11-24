@@ -1,0 +1,4 @@
+// expect: fail E0318
+// note: FB-C42 (Gemini G-05) — Cell<T> trong hàm generic có thể chứa Owned/Secret khi instance hoá: trước đây check XANH rồi ICE lúc chạy
+ƒ hide<T>(x: T) ! ∅ { c ≔ Cell::new(x); }
+ƒ main() → u32 ! {mem} { a ≔ root_alloc(); hide(Owned::new(&a, 42u32)); 0u32 }

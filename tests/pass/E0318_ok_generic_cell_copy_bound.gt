@@ -1,0 +1,4 @@
+// expect: pass
+// note: FB-C42 — Cell<T> trong hàm generic được phép khi T: Copy
+ƒ ok<T: Copy>(x: T) ! ∅ { c ≔ Cell::new(x); }
+ƒ main() → u32 ! ∅ { ok(1u32); 0u32 }

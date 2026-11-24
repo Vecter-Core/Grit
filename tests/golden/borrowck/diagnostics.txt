@@ -117,6 +117,8 @@ E0403_vec_slice_alive_across_push | E0403 | `v.push(2u64)` | [khoản mượn b�
 E0404_fn_value_as_parameter | E0404 | `{ x ≔ 1; r ← ap(id, &x); }` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_fn_value_ref_escapes_scope | E0404 | `{ x ≔ 1; r ← f(&x); }` | [khoản mượn bắt đầu ở đây @ `&x`] | `x` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_fn_value_two_args_pick | E0404 | `{ y ≔ 2; r ← f(&x, &y); }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_fnptr_invariant_cell_heap_uaf | E0404 | `{⏎    o ≔ Owned::new(&a, 999u32);⏎    c2 ≔ fp(&c);⏎    c2.set(o.get())…` | [khoản mượn bắt đầu ở đây @ `o.get()`] | `o` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
+E0404_fnptr_invariant_cell_stack_uaf | E0404 | `{⏎    local: u32 ≔ 999u32;⏎    c2 ≔ fp(&c);⏎    c2.set(&local);⏎  }` | [khoản mượn bắt đầu ở đây @ `&local`] | `local` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_holder_region_mismatch | E0404 | `k` | [] | tham chiếu có region 'b bị dùng ở nơi cần 'a: chữ ký không hứa 'b sống lâu hơn 'a (thêm `'r` tường minh hoặc đổi dữ liệu trả về)
 E0404_outer_option_holds_inner_ref | E0404 | `{ y ≔ 5; o ← Some(&y); }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau
 E0404_outer_ref_to_inner_scope | E0404 | `{ y ≔ 5; p ← &y; }` | [khoản mượn bắt đầu ở đây @ `&y`] | `y` không sống đủ lâu: bị drop/hết phạm vi trong khi còn khoản mượn chung `&` được dùng về sau

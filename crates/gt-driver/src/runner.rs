@@ -20,7 +20,10 @@ pub fn find_main(bodies: &[Body]) -> Result<&Body, String> {
     let cands: Vec<&Body> = bodies
         .iter()
         .filter(|b| {
-            b.key.ends_with("::main") && b.key.matches("::").count() == 1 && b.arg_count == 0
+            b.kind == gt_mir::BodyKind::Fn
+                && b.key.ends_with("::main")
+                && b.key.matches("::").count() == 1
+                && b.arg_count == 0
         })
         .collect();
     match cands.as_slice() {

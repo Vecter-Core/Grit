@@ -1,0 +1,4 @@
+// expect: warn S201
+// note: FB-C37 (Gemini G-03e) — declassify trong thân ■ phải bị cảnh báo như trong hàm
+■ S: u32 ≔ Secret::new(42u32).declassify();
+ƒ main() → u32 ! ∅ { S }

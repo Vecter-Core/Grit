@@ -561,6 +561,8 @@ impl<'a> Gen<'a> {
                 }
                 for x in &d {
                     self.add(*a, *x);
+                    // FB-C36 (Gemini G-01): callee không biết chữ ký ⇒ vị trí bất biến (`&Cell<&T>`, `&!T`) phải ĐẲNG THỨC, không chỉ `a : x`
+                    self.add(*x, *a);
                 }
             }
         }

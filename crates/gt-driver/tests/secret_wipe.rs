@@ -265,3 +265,35 @@ fn hand_written_secret_lifetimes_wipe_exactly_as_specified() {
         }
     }
 }
+
+/// FB-C41 (Gemini G-04, kiểm chéo khác họ): bản sao `Secret` nằm trong khối heap của `Owned::into_inner` và trong hộp heap của `spawn` cũng phải bị xoá.
+/// Trước sửa: `into_inner` trả khối cho allocator KHÔNG xoá; bước đệm của `spawn` không xoá hộp (rò tới cuối tiến trình). Mọi backend phải khớp nhau
+/// VÀ khớp số lần xoá tính tay (ghi ở từng ca).
+#[test]
+fn owned_into_inner_and_spawn_wipe_their_heap_copies() {
+    // (thân main, tổng, số lần xoá kỳ vọng)
+    //  A: `Secret::new(5)` move vào `Owned::new` (tạm nguồn: 1) + `into_inner` xoá khối heap (1) + `s` hết phạm vi (1) = 3
+    //  B: `spawn(w, Secret::new(7))`: tạm nguồn sau move (1) + bước đệm xoá hộp sau khi nạp (1) + `w` nhận `k` tham số theo giá trị, chết khi trả về (1) = 3
+    let cases: [(&str, &str, u64, u64); 2] = [
+        (
+            "ƒ main() → u64 ! {mem} {\n  a ≔ root_alloc();\n  {\n    o ≔ Owned::new(&a, Secret::new(5u64));\n    s ≔ Owned::into_inner(o);\n  };\n  0u64\n}\n",
+            "",
+            0,
+            3,
+        ),
+        (
+            "ƒ main() → u64 ! ∅ {\n  spawn(w, Secret::new(7u64));\n  0u64\n}\n",
+            "ƒ w(k: Secret<u64>) ! ∅ { }\n",
+            0,
+            3,
+        ),
+    ];
+    for (i, (main, pre, sum, wipes)) in cases.iter().enumerate() {
+        let src = format!("{pre}{main}");
+        let outs = run(&src, &format!("heapwipe{i}"));
+        for (backend, got, w) in &outs {
+            assert_eq!(*got, Some(*sum), "ca {i} ({backend})\n{src}");
+            assert_eq!(*w, *wipes, "ca {i} ({backend}): số lần xoá\n{src}");
+        }
+    }
+}

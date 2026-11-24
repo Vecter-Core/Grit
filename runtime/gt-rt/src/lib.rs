@@ -725,8 +725,9 @@ pub extern "C" fn gritrt_arena_reset(h: i32) {
 /// Cấp `size` byte (căn lề 16, KHÔNG khởi tạo) cho hộp tham số của `spawn`; hộp thuộc về luồng mới (không giải phóng: rò rỉ có chủ đích, nhỏ).
 #[unsafe(no_mangle)]
 pub extern "C" fn gritrt_alloc(size: u64) -> *mut u8 {
+    // FB-C47 (Gemini G-08a): `alloc` với Layout cỡ 0 là UB trong Rust ⇒ tối thiểu 1 byte (giống `gritrt_heap_alloc`)
     let Ok(layout) =
-        std::alloc::Layout::from_size_align(usize::try_from(size).unwrap_or(usize::MAX), 16)
+        std::alloc::Layout::from_size_align(usize::try_from(size).unwrap_or(usize::MAX).max(1), 16)
     else {
         gritrt_abort(0)
     };

@@ -16,7 +16,7 @@
 use gt_ast::{AttrArgKind, Item, ItemKind, NodeId};
 use gt_diag::{Code, Diagnostic, Diagnostics, Report};
 use gt_lexer::{TokenKind, TriviaKind, lex};
-use gt_mir::{Body, BodyKind, Callee, Operand, Rvalue, StatementKind, TerminatorKind};
+use gt_mir::{Body, Callee, Operand, Rvalue, StatementKind, TerminatorKind};
 use gt_span::Span;
 use gt_types::{Lang, Ty, TypesOutput};
 use std::collections::BTreeSet;
@@ -420,7 +420,8 @@ fn scan_body(t: &TypesOutput, b: &Body, out: &mut Vec<Finding>) {
 #[must_use]
 pub fn scan_flow(t: &TypesOutput, m: &gt_mir::MirOutput) -> Vec<Finding> {
     let mut out = Vec::new();
-    for b in m.bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
+    // FB-C37 (Gemini G-03): mọi thân (Fn, Static, Const, Pre, Post) đều được chạy thật nên đều phải được kiểm
+    for b in &m.bodies {
         scan_body(t, b, &mut out);
     }
     out.sort_by(|a, b| {
