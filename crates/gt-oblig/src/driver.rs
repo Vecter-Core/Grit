@@ -496,6 +496,121 @@ fn escaped_fns(m: &MirOutput) -> BTreeSet<gt_ast::NodeId> {
     escaped_sites(m).into_iter().map(|(n, _)| n).collect()
 }
 
+/// FB-C39 (Gemini G-02): hàm KHÔNG thuần theo nghĩa vị từ — đọc/ghi trạng thái toàn cục khả biến qua `■` có mutability bên trong (`Atomic`, `Mutex`, `Cell`…),
+/// gọi qua giá trị hàm (không biết đích), có `Drop` (có thể chạy mã người dùng), hoặc gọi (kể cả qua trait) hàm không thuần. `⊢ f(x) == f(x)` chỉ đúng cho hàm thuần,
+/// nên hàm không thuần KHÔNG được làm nguyên tử vị từ (`pure_preds`) cho kernel/M7/M8.
+fn impure_fns(t: &TypesOutput, m: &MirOutput) -> BTreeSet<gt_ast::NodeId> {
+    // `■` có mutability bên trong
+    let mut hot: BTreeSet<gt_ast::NodeId> = BTreeSet::new();
+    for d in t.defs() {
+        if d.kind == gt_resolve::DefKind::Static
+            && m.bodies
+                .iter()
+                .any(|b| b.node == d.node && b.kind == gt_mir::BodyKind::Static)
+        {
+            let ty = m
+                .bodies
+                .iter()
+                .find(|b| b.node == d.node && b.kind == gt_mir::BodyKind::Static)
+                .map(|b| b.locals[0].ty.clone());
+            if let Some(ty) = ty
+                && t.db.may_have_interior_mut(&ty, &[])
+            {
+                hot.insert(d.node);
+            }
+        }
+    }
+    let mut impure: BTreeSet<gt_ast::NodeId> = BTreeSet::new();
+    let mut edges: BTreeMap<gt_ast::NodeId, BTreeSet<gt_ast::NodeId>> = BTreeMap::new();
+    for b in m.bodies.iter().filter(|b| b.kind == gt_mir::BodyKind::Fn) {
+        let mut direct = false;
+        let mut callees: BTreeSet<gt_ast::NodeId> = BTreeSet::new();
+        let mut visit = |o: &Operand| {
+            if let Operand::Const(Const::Item { node, .. }) = o
+                && hot.contains(node)
+            {
+                direct = true;
+            }
+        };
+        let mut calls_value = false;
+        let mut has_drop = false;
+        for bb in &b.blocks {
+            for st in &bb.statements {
+                if let StatementKind::Assign(_, rv) = &st.kind {
+                    match rv {
+                        Rvalue::Use(o)
+                        | Rvalue::Repeat(o, _)
+                        | Rvalue::Cast(o, _)
+                        | Rvalue::CastFits(o, _)
+                        | Rvalue::UnaryOp(_, o) => visit(o),
+                        Rvalue::BinaryOp(_, a, c) | Rvalue::CheckedBinaryOp(_, a, c) => {
+                            visit(a);
+                            visit(c);
+                        }
+                        Rvalue::Aggregate(_, v) => v.iter().for_each(&mut visit),
+                        Rvalue::Ref(..) | Rvalue::Len(_) | Rvalue::Discriminant(_) => {}
+                    }
+                }
+            }
+            if let Some(tm) = &bb.terminator {
+                match &tm.kind {
+                    TerminatorKind::Call { callee, args, .. } => {
+                        args.iter().for_each(&mut visit);
+                        match callee {
+                            Callee::Fn { node, .. } => {
+                                callees.insert(*node);
+                            }
+                            Callee::TraitMethod {
+                                trait_def, member, ..
+                            } => {
+                                let name = t
+                                    .db
+                                    .traits
+                                    .get(trait_def)
+                                    .and_then(|td| td.members.get(*member))
+                                    .map(|mm| mm.name.clone());
+                                for imp in &t.db.impls {
+                                    if imp.trait_ref.as_ref().is_some_and(|r| r.trait_def == *trait_def) {
+                                        for mm in &imp.members {
+                                            if Some(&mm.name) == name.as_ref() {
+                                                callees.insert(mm.node);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Callee::Value(_) => calls_value = true,
+                        }
+                    }
+                    TerminatorKind::SwitchInt { discr, .. } => visit(discr),
+                    TerminatorKind::Assert { cond, .. } => visit(cond),
+                    TerminatorKind::Drop { .. } => has_drop = true,
+                    TerminatorKind::Goto(_)
+                    | TerminatorKind::Return
+                    | TerminatorKind::Unreachable => {}
+                }
+            }
+        }
+        if direct || calls_value || has_drop {
+            impure.insert(b.node);
+        }
+        edges.insert(b.node, callees);
+    }
+    // bao đóng theo đồ thị gọi
+    loop {
+        let before = impure.len();
+        for (n, cs) in &edges {
+            if !impure.contains(n) && cs.iter().any(|c| impure.contains(c)) {
+                impure.insert(*n);
+            }
+        }
+        if impure.len() == before {
+            break;
+        }
+    }
+    impure
+}
+
 /// Gom hợp đồng: trích mệnh đề từng thân `⊳`/`⊲`, chọn hàm có `⊳` được phép làm giả thiết (ADR-025 §6 + §12).
 #[must_use]
 pub fn build_prog_info(t: &TypesOutput, m: &MirOutput) -> ProgInfo {
@@ -506,8 +621,12 @@ pub fn build_prog_info(t: &TypesOutput, m: &MirOutput) -> ProgInfo {
     // khoá → NodeId của MỌI hàm (kể cả prelude, vốn chỉ có hợp đồng được hạ)
     let fn_by_key: BTreeMap<&str, gt_ast::NodeId> =
         m.keys.iter().map(|(n, k)| (k.as_str(), *n)).collect();
+    let impure = impure_fns(t, m);
     // vị từ thuần một đối số trả `bool`, hiệu ứng `∅`, không nhận `&!`: mô hình hoá như nguyên tử không diễn giải
     for node in m.keys.keys() {
+        if impure.contains(node) {
+            continue;
+        }
         if let Some(sig) = t.db.sig_by_node(*node) {
             let n_args = sig.params.len() + usize::from(sig.self_kind.is_some());
             let mut_arg = matches!(sig.self_kind, Some(gt_ast::SelfKind::RefMut))
