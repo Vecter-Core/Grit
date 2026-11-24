@@ -2344,7 +2344,12 @@ fn check_post_fixpoint(cx: &Ctx<'_>, states: &[Option<AState>]) -> Result<(), St
                 continue;
             }
             match &states[tgt.index()] {
-                Some(t) if out.env.leq(&t.env) => {}
+                // FB-C40 (Gemini G-06): `facts`/`defs` của đích phải được MỌI đường tới bảo đảm (hợp = giao) — nếu không, kernel nhận một giả thiết
+                // mà một cạnh vào không chứng minh. Kiểm độc lập với `join`/`widen`/`narrow`.
+                Some(t)
+                    if out.env.leq(&t.env)
+                        && t.facts.iter().all(|f| out.facts.contains(f))
+                        && t.defs.iter().all(|(k, d)| out.defs.get(k) == Some(d)) => {}
                 _ => {
                     return Err(format!(
                         "trạng thái cuối không phải hậu-điểm-cố-định tại cạnh bb{bb} → bb{}",
