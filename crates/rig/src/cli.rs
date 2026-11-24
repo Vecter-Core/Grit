@@ -370,7 +370,7 @@ fn cmd_test_auto(a: &Args) -> i32 {
         fault: None,
         edition: p.root().edition,
     };
-    let ts = autotest::targets(&root_files);
+    let ts = autotest::targets(&root_files, p.root().edition);
     if ts.is_empty() {
         println!("0 hàm công khai để sinh test (cần `◈ ƒ` trong src/ ngoài main.gt)");
         return 0;

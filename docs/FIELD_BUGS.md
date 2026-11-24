@@ -272,3 +272,11 @@ Guard coi mọi tên `llvm.*` là hợp lệ nếu LLVM verifier nhận lời g�
 - **Test ĐỎ trước:** `crates/gt-term/tests/contract_recursion.rs` (4 chương trình bị chấp nhận sai + 1 đối chứng).
 - **Mức:** âm tính giả của kiểm an toàn ⇒ nghiêm trọng nhất theo grit-contract §3.3 ⇒ sửa ngay theo luật đóng băng (rc7, cổng đầy đủ lại).
 - **ĐÃ SỬA (GÓI 11, commit `7c6334c`; rc7 `41ae5e7`):** `gt-term` gộp cạnh gọi của thân `Pre`/`Post` vào nút của hàm sở hữu (cả đồ thị instance và bảo thủ). Test: `contract_recursion` 6 xanh; bộ sinh 5 hình dạng × 32 = 160 chương trình: **tắt bản sửa ⇒ 160/160 bị chấp nhận sai; bật ⇒ 0/160**. Regression: toàn bộ test gt-term xanh; `gritc check` trên 437 tệp tests/pass+samples: 0 đỏ mới. Cổng đầy đủ rc7: xem RUN_REPORTS GÓI 11.
+
+## FB-P2-01 — ICE/fail-open quanh `?` (edition 2) — PHÁT HIỆN BỞI ĐỌC KIỂM OPUS 2026-11-24 (không phải lỗi an toàn bộ nhớ)
+- **F1 (ICE E9901, fail-closed):** `?` ở vế phải `∧ ∨ ⇒`, sau `¬`, hoặc trong điều kiện ghép của `⟳`: temp điều kiện của `cond_branch` không thuộc frame nào ⇒ thoát sớm để `StorageLive` sống ⇒ validator MIR từ chối. Sửa: `cv` vào frame riêng (`gt-mir/src/build/expr.rs`). Mẫu: `tests/ed2/pass/qm_in_short_circuit_condition.gt`.
+- **F2 (ICE, nguy cơ soundness nếu "sửa" bằng cách cho hạ được):** `?` trong hợp đồng `⊳ ⊲ ⋈ ↓`/lượng từ không bị M4 chặn. Sửa: E0320 khi `in_contract > 0`. Mẫu: `tests/ed2/fail/E0320_in_{precondition,postcondition,loop_invariant}.gt`.
+- **F3 (fail-open so với ADR-P2-09):** `?` trong `□`/`■` được chấp nhận. Sửa: E0320 (`Checker.in_const`). Mẫu: `E0320_in_const.gt`.
+- **F4 (công cụ):** `rig test --auto` parse theo edition 1; nay theo edition của gói gốc. KHÔNG tái hiện được lỗi thật (parser hồi phục theo mục) nên chỉ có test khói.
+- **Kiểm "tắt bản sửa":** tắt guard M4 và frame của `cv` ⇒ 4 mẫu fail ra E9901/N0601 (không phải E0320) và mẫu pass ra E9901 (đã chạy). Hai bản sửa nằm CÙNG commit với mẫu (không tách đỏ-trước-xanh-sau).
+- **Còn mở (đã ghi từ báo cáo, CHƯA sửa/CHƯA chạy):** F5 `let` phân rã có chú thích kiểu với vế phải `!` có thể ICE; F6 `(a, b) ≔ &mk();` không kéo dài tạm (fail-closed); F7 `..` làm alternative của or-pattern (ngữ pháp lỏng); F8 phụ thuộc edition 1 dùng cú pháp edition 2.

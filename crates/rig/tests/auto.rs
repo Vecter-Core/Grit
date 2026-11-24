@@ -218,3 +218,27 @@ fn a_callee_precondition_violated_by_a_function_without_its_own_precondition_is_
         "{so}"
     );
 }
+
+/// F4 (Opus review): `targets` từng parse cứng theo edition 1. Parser hồi phục theo từng mục nên hàm vẫn được thấy (kiểm: test này cũng đạt trước sửa) — đây là test khói cho đường edition 2, không phải tái hiện lỗi.
+#[test]
+fn an_edition_2_package_is_parsed_with_its_edition_and_its_functions_are_tested() {
+    let d = project(
+        "ed2",
+        "◈ ƒ nxt(x: u8) → Option<u8> ! ∅ { y ≔ x.checked_add(1u8)?; Some(y) }\n",
+    );
+    let toml = std::fs::read_to_string(d.join("rig.toml")).expect("đọc");
+    write(
+        &d,
+        "rig.toml",
+        &toml.replace("version = \"0.1.0\"", "version = \"0.1.0\"\nedition = 2"),
+    );
+    let l = rig(&d, &["lock"]);
+    assert_eq!(l.status.code(), Some(0), "{}", text(&l.stderr));
+    let o = rig(&d, &["test", "--auto"]);
+    let so = text(&o.stdout);
+    assert!(
+        so.contains("auto lib1::nxt"),
+        "hàm edition 2 phải được sinh test, không bị bỏ im lặng:\n{so}\n{}",
+        text(&o.stderr)
+    );
+}

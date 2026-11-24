@@ -1,0 +1,3 @@
+// expect: fail E0320
+// note: F2 (Opus review) — `?` trong hợp đồng ⊳ phải là lỗi đỏ, không phải ICE
+ƒ f(o: Option<u32>) → Option<u32> ! ∅ ⊳ o? > 0u32 { o }

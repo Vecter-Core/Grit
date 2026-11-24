@@ -1,0 +1,7 @@
+// expect: fail E0320
+// note: F2 — `?` trong bất biến ⋈ của vòng lặp
+ƒ f(o: Option<u32>) → Option<u32> ! ∅ {
+  μi ≔ 0u32;
+  ⟳ i < 10u32 ↓ 10u32 - i ⋈ o? <= 5u32 { i ← i + 1u32; }
+  Some(i)
+}

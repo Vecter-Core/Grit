@@ -1,0 +1,105 @@
+// rpn: máy tính hậu tố (dogfood EDITION 2 — toán tử `?`, `let` phân rã, or-pattern; ADR-P2-09/10/11). Ví dụ: "3 4 + 2 *" ⇒ 14.
+// Mọi lỗi là giá trị `Err(RpnErr)` lan truyền bằng `?`; không có abort ngoài ý muốn (số học đều kiểm tràn bằng `+? -? *?`).
+◈ ⊔ RpnErr {
+  Underflow,
+  StackFull,
+  BadToken,
+  DivZero,
+  Overflow,
+  Leftover,
+  Empty,
+}
+
+// ngăn xếp cố định 16 phần tử
+▢ Stack {
+  items: [u64; 16],
+  n: usize,
+}
+
+ƒ new_stack() → Stack ! ∅ { Stack { items: [0u64; 16], n: 0usize } }
+
+ƒ push(s: &!Stack, v: u64) → Result<(), RpnErr> ! ∅ {
+  ⎇ s.n ≥ 16usize { Err(RpnErr::StackFull) } ⇝ {
+    s.items[s.n] ← v;
+    s.n ← s.n + 1usize;
+    Ok(())
+  }
+}
+
+ƒ pop(s: &!Stack) → Result<u64, RpnErr> ! ∅ {
+  ⎇ s.n == 0usize { Err(RpnErr::Underflow) } ⇝ {
+    s.n ← s.n - 1usize;
+    Ok(s.items[s.n])
+  }
+}
+
+// lấy hai toán hạng (a dưới, b trên) — `?` lan truyền Underflow, `let` phân rã nhận cặp
+ƒ pop2(s: &!Stack) → Result<(u64, u64), RpnErr> ! ∅ {
+  b ≔ pop(s)?;
+  a ≔ pop(s)?;
+  Ok((a, b))
+}
+
+ƒ checked(o: Option<u64>) → Result<u64, RpnErr> ! ∅ {
+  ⌥ o {
+    Some(v) ↦ Ok(v),
+    None ↦ Err(RpnErr::Overflow),
+  }
+}
+
+ƒ apply(op: u8, s: &!Stack) → Result<(), RpnErr> ! ∅ {
+  (a, b) ≔ pop2(s)?;
+  r ≔ ⌥ op {
+    43u8 ↦ checked(a +? b)?,
+    45u8 ↦ checked(a -? b)?,
+    42u8 ↦ checked(a *? b)?,
+    _ ↦ ⎇ b == 0u64 {
+      ⏎ Err(RpnErr::DivZero);
+    } ⇝ { a / b },
+  };
+  push(s, r)
+}
+
+// trạng thái đọc số: (giá trị đang tích luỹ, có chữ số nào chưa)
+ƒ flush(s: &!Stack, cur: u64, have: bool) → Result<(), RpnErr> ! ∅ { ⎇ have { push(s, cur) } ⇝ { Ok(()) } }
+
+◈ ƒ eval(src: &[u8]) → Result<u64, RpnErr> ! ∅ {
+  μs ≔ new_stack();
+  μcur ≔ 0u64;
+  μhave ≔ false;
+  μi ≔ 0usize;
+  ⟳ i < src.len() ↓ src.len() - i {
+    c ≔ src[i];
+    ⌥ c {
+      // khoảng trắng và tab ngăn cách token
+      32u8 | 9u8 ↦ {
+        flush(&!s, cur, have)?;
+        cur ← 0u64;
+        have ← false;
+      },
+      // chữ số
+      48u8..=57u8 ↦ {
+        d ≔ (c - 48u8) as u64;
+        t ≔ checked(cur *? 10u64)?;
+        cur ← checked(t +? d)?;
+        have ← true;
+      },
+      // toán tử
+      43u8 | 45u8 | 42u8 | 47u8 ↦ {
+        flush(&!s, cur, have)?;
+        cur ← 0u64;
+        have ← false;
+        apply(c, &!s)?;
+      },
+      _ ↦ {
+        ⏎ Err(RpnErr::BadToken);
+      },
+    }
+    i ← i + 1usize;
+  }
+  flush(&!s, cur, have)?;
+  ⎇ s.n == 0usize { Err(RpnErr::Empty) } ⇝ {
+    r ≔ pop(&!s)?;
+    ⎇ s.n ≠ 0usize { Err(RpnErr::Leftover) } ⇝ { Ok(r) }
+  }
+}

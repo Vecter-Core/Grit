@@ -28,14 +28,14 @@ pub(crate) fn ice<T>(msg: impl Into<String>) -> R<T> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum FrameKind {
+pub(super) enum FrameKind {
     /// Tham số của hàm: không có `StorageLive/Dead`, chỉ `Drop` khi trả về.
     Args,
     Block,
     Stmt,
 }
 
-struct Frame {
+pub(super) struct Frame {
     kind: FrameKind,
     /// (local, cần drop) theo thứ tự khai báo.
     locals: Vec<(Local, bool)>,
