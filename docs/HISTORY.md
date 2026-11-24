@@ -215,3 +215,4 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
 - Commit cuối `7d26f53`. Cổng đầy đủ trong clone sạch (`tools/gate_clean.sh`, tiếp tục từ điểm lưu của `gate.sh` vì môi trường đám mây khởi động lại hai lần giữa chừng, băm cây KHÔNG đổi `a719f716…`): `GATE_RESULT=GREEN`, `TEST_PASSED=1002 FAILED=0 SUITES=218`, `DOC_TEST: 220 khối, 0 sai`, corpus nhất quán.
 - Nội dung: xem `docs/FIELD_BUGS.md` (FB-P2-01, FB-C36…C51). Bài học: kiểm `facts/defs` chặt ở `check_post_fixpoint` phải chỉ áp cho điểm cố định widening (áp cho narrowing làm mất chứng minh ở `std`).
 - CHƯA KIỂM: fuzz/TSan trên mã đã sửa; Windows; `■ Mutex<Secret<T>>` (chính sách D13 cho static); mẫu E1001 trong `■`/`⊳` (G-03d).
+- **Cổng LIỀN MẠCH xanh trong clone sạch trên `df320a2` (2026-11-24)** — gồm F5, S203, ADR GLIR (hợp đồng đề xuất), sổ fail-open: `GATE_RESULT=GREEN`, một lần chạy không khởi động lại (`tools/gate_clean.sh`, log `gate5`). Số liệu test xem dòng `TEST_PASSED` của lần chạy.
