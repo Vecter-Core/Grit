@@ -99,6 +99,8 @@ pub(crate) struct Checker<'e, 'a> {
     pub locals: BTreeMap<LocalId, LocalInfo>,
     pub loops: Vec<bool>,
     pub scope: Vec<Bound>,
+    /// đã báo E0318 (Cell/Mutex) trong hàm này
+    pub cell_drop_reported: bool,
     /// đã báo E0318 trong hàm này
     pub vec_drop_reported: bool,
     /// nút của biểu thức đang đứng ở vị trí NGƯỜI ĐƯỢC GỌI (`callee` của `Call`): đường dẫn tới intrinsic chỉ được phép ở đây (gọi trực tiếp)
@@ -149,6 +151,7 @@ impl<'e, 'a> Checker<'e, 'a> {
             loops: Vec::new(),
             scope: Vec::new(),
             vec_drop_reported: false,
+            cell_drop_reported: false,
             callee_pos: None,
             eq_deferred: Vec::new(),
             oblig: Vec::new(),
@@ -779,6 +782,25 @@ impl<'e, 'a> Checker<'e, 'a> {
                     c.caller,
                     c.span,
                     format!("`Arena::alloc` với `{shown}`: giá trị có Drop/`Owned` sẽ không bao giờ được drop (Arena không chạy destructor)"),
+                );
+            }
+            return;
+        }
+        if matches!(lang, Some(Lang::Cell | Lang::Mutex)) {
+            // FB-C42 (Gemini G-05): glue không đi vào được Cell/Mutex chứa giá trị có Drop/`Owned` — elaborate chỉ bắt kiểu CỤ THỂ, nên trong hàm
+            // generic phải chặn ở đây: `T` đã biết mà giữ nguồn glue, hoặc còn là tham số không ràng buộc `Copy` (có thể là `Owned`/`Secret` khi instance hoá).
+            if let Some(t) = c.args.first()
+                && (self.env.db.holds_glue_source(t)
+                    || (t.has_param() && !self.env.db.is_copy_resolved(t, scope)))
+                && !self.cell_drop_reported
+            {
+                self.cell_drop_reported = true;
+                let shown = t.render(self.env.defs());
+                self.err(
+                    "E0318",
+                    c.caller,
+                    c.span,
+                    format!("`Cell`/`Mutex` chứa `{shown}`: giá trị có Drop/`Owned` (hoặc tham số kiểu không `Copy`) không drop được qua kiểu lang đục"),
                 );
             }
             return;

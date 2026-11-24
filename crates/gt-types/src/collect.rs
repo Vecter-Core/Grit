@@ -1219,6 +1219,8 @@ impl<'a> Env<'a> {
         let mut members = Vec::new();
         let tkey = self.defs()[d.index()].path.clone();
         for m in &t.members {
+            // FB-C43 (Gemini G-07a): thành viên trait cũng không được dùng `poly`/`detach` ngoài lib/core
+            self.check_marker_effects(&m.sig.effects, m.id, m.span);
             let info = self.sig_info(&m.sig, m.id, &cx);
             let mut lts = tlts.clone();
             lts.extend(self.region_sigs[&m.id].declared.iter().cloned());
@@ -1284,6 +1286,8 @@ impl<'a> Env<'a> {
             None => format!("{mpath}::{sname}"),
         };
         for m in &i.members {
+            // FB-C43 (Gemini G-07a): thành viên impl cũng không được dùng `poly`/`detach` ngoài lib/core
+            self.check_marker_effects(&m.func.sig.effects, m.id, m.span);
             let info = self.sig_info(&m.func.sig, m.id, &cx);
             let mut lts = ilts.clone();
             lts.extend(self.region_sigs[&m.id].declared.iter().cloned());

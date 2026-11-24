@@ -1,0 +1,5 @@
+// expect: fail E1002
+// note: FB-C43 (Gemini G-07a) — `! {detach}` trong thành viên impl ngoài lib/core từng lọt qua E1002
+▢ S {}
+⊐ S { ƒ sneaky() ! {detach} {} ƒ sneaky2() ! {poly} {} }
+ƒ main() ! ∅ {}
