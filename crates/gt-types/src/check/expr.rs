@@ -460,6 +460,16 @@ impl<'e, 'a> Checker<'e, 'a> {
     /// `e?` (ADR-P2-09, edition 2): `e` là `Option<T>` hoặc `Result<T, E>` và hàm bao trả cùng họ (`Result` thì CÙNG `E` — không chuyển đổi lỗi); kiểu của `e?` là `T`.
     /// Toán hạng không phải Option/Result (hoặc chưa biết kiểu tại điểm này) ⇒ E0321; hàm bao trả khác họ/khác `E` ⇒ E0320. Hạ thành `match` + `return` ở M5.
     fn try_expr(&mut self, e: &Expr, inner: &Expr) -> Ty {
+        if self.in_contract > 0 || self.in_const {
+            self.err(
+                "E0320",
+                e.id,
+                e.span,
+                "`?` chỉ dùng trong thân hàm: hợp đồng (`⊳ ⊲ ⋈ ↓`, lượng từ) và `□`/`■` không có chỗ để thoát sớm".to_string(),
+            );
+            let _ = self.expr(inner, None);
+            return Ty::Err;
+        }
         let it = self.expr(inner, None);
         let it = self.infer.shallow(&it);
         if it == Ty::Err {

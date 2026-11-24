@@ -1,5 +1,5 @@
 //! Hạ biểu thức và câu lệnh. Thứ tự đánh giá trái sang phải (semantics §3a); `Assert` cho mọi nghĩa vụ (ADR-020 §9).
-use super::{Builder, R, ice};
+use super::{Builder, Frame, FrameKind, R, ice};
 use crate::mir::*;
 use crate::types::{place_ty, variant_fields};
 use gt_ast::{
@@ -250,11 +250,18 @@ impl Builder<'_> {
                 if scoped {
                     let cv = b.decl_temp_unregistered(Ty::Bool);
                     b.push(StatementKind::StorageLive(cv));
+                    // `cv` vào một frame riêng để thoát sớm (`?`, `⏎`) trong `e` cũng phát StorageDead(cv) (F1, Opus review); đường thường do
+                    // `switch_local` kết thúc `cv` nên gỡ frame KHÔNG phát lại.
+                    b.frames.push(Frame {
+                        kind: FrameKind::Stmt,
+                        locals: vec![(cv, false)],
+                    });
                     b.in_stmt(|b| {
                         let o = b.as_operand(e)?;
                         b.assign(Place::local(cv), Rvalue::Use(o));
                         Ok(())
                     })?;
+                    b.frames.pop();
                     b.switch_local(cv, vec![(0, f)], t)
                 } else {
                     let c = b.as_operand(e)?;

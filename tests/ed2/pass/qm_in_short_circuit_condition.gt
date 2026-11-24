@@ -1,0 +1,11 @@
+// expect: pass
+// note: F1 (Opus review) — `?` ở vế phải ∧/∨/¬ và điều kiện ghép của ⟳ từng gây ICE E9901 (temp điều kiện không thuộc frame)
+ƒ f(a: bool, o: Option<bool>) → Option<u32> ! ∅ { ⎇ a ∧ o? { Some(1u32) } ⇝ { Some(0u32) } }
+ƒ g(a: bool, o: Option<bool>) → Option<u32> ! ∅ { ⎇ a ∨ o? { Some(1u32) } ⇝ { Some(0u32) } }
+ƒ h(o: Option<bool>) → Option<u32> ! ∅ { ⎇ ¬o? { Some(1u32) } ⇝ { Some(0u32) } }
+ƒ more(i: u32) → Option<bool> ! ∅ { Some(i < 2u32) }
+ƒ k() → Option<u32> ! ∅ {
+  μi ≔ 0u32;
+  ⟳ i < 3u32 ∧ more(i)? ↓ 3u32 - i { i ← i + 1u32; }
+  Some(i)
+}

@@ -149,11 +149,15 @@ fn suffix_of(p: PrimType) -> &'static str {
 }
 
 /// Hàm công khai của các tệp gói gốc (`(tên tệp, văn bản)`), kèm lý do nếu không lái được. Tệp không phân tích được ⇒ bỏ qua (gritc sẽ báo ở bước check).
-pub fn targets(files: &[(String, String)]) -> Vec<(Target, Option<String>, Vec<PrimType>)> {
+pub fn targets(
+    files: &[(String, String)],
+    edition: u32,
+) -> Vec<(Target, Option<String>, Vec<PrimType>)> {
     let mut out = Vec::new();
     for (fname, text) in files {
         let module = fname.trim_end_matches(".gt").to_string();
-        let parsed = gt_parser::parse(fname, text);
+        let parsed =
+            gt_parser::parse_file_with_edition(gt_span::FileId::new(0), fname, text, edition);
         for item in &parsed.program.items {
             let ItemKind::Fn(f) = &item.kind else {
                 continue;

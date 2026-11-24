@@ -1,0 +1,4 @@
+// expect: fail E0320
+// note: F3 — ADR-P2-09: `?` ở □/■ ⇒ E0320
+□ A: Option<u32> ≔ Some(1u32);
+□ B: Option<u32> ≔ Some(A? + 1u32);
