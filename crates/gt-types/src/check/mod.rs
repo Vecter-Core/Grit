@@ -895,19 +895,17 @@ impl<'e, 'a> Checker<'e, 'a> {
                     let cx = self.cx.clone();
                     self.env.lower_ty(t, &cx)
                 });
+                // pattern phá cấu trúc không kết hợp được với ép UNSIZE (`&[T; N]` → `&[T]`) hay kiểu `!` nên không có nhánh try_unsize/phân kỳ ở đây (khác `≔` thường)
                 let it = match &annot {
                     Some(a) => {
                         let a2 = a.clone();
                         let t = self.expr(init, Some(&a2));
-                        if !self.try_unsize(&t, a, init.id) {
-                            self.coerce(&t, a, init.id, init.span, init.span.end);
-                        }
+                        self.coerce(&t, a, init.id, init.span, init.span.end);
                         a.clone()
                     }
                     None => self.expr(init, None),
                 };
                 self.sized(&it, init.id, init.span);
-                let diverged = self.infer.shallow(&it) == Ty::Never;
                 let ir = self.pat(pat, &it);
                 let scrut = match self.infer.shallow(&it) {
                     Ty::Ref(_, inner) if self.destructures(pat) => *inner,
@@ -920,7 +918,7 @@ impl<'e, 'a> Checker<'e, 'a> {
                     arms: vec![ir],
                     insert_at: s.span.end.saturating_sub(1),
                 });
-                diverged
+                false
             }
             StmtKind::Assign { target, value } => {
                 let tt = self.expr(target, None);
