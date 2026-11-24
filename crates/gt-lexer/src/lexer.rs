@@ -370,6 +370,8 @@ impl Lexer<'_> {
                         self.op(c, start);
                     } else if c == '?' && self.edition >= 2 {
                         self.single(TokenKind::Question, start);
+                    } else if c == '|' && self.edition >= 2 {
+                        self.single(TokenKind::Pipe, start);
                     } else {
                         self.bump();
                         self.bad(ErrorCode::E0101, "ký tự không thuộc ngôn ngữ Grit", start);

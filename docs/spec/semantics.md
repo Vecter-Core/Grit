@@ -264,3 +264,7 @@ Thoát sớm đi qua đúng đường của `⏎`: hậu điều kiện `⊲` đ
 Biến của pattern bất biến (muốn sửa: `μn ≔ a;`) và sống tới hết khối. Vế phải là CHỖ (biến, trường) ⇒ chỉ phần được bind bị move/copy khỏi chỗ đó (partial move; phần còn lại ở lại và bị drop khi chỗ đó hết phạm vi); vế phải là giá trị ⇒ qua một tạm,
 phần không được bind (`_`, `..`) bị drop NGAY cuối câu lệnh theo thứ tự trường. Biến bind được khai báo theo thứ tự xuất hiện trong pattern (nên bị drop ngược thứ tự đó). Pattern trên `&U`/`&!U` theo ADR-040 (biến là tham chiếu tới phần tử). Ở edition 1: E0101 như cũ.
 
+## 30. Or-pattern `p | q` (edition 2, ADR-P2-11)
+`p | q | …` ở mọi vị trí pattern (nhánh `⌥`, trong biến thể/tuple/struct, trong `let` phân rã). Khớp nếu BẤT KỲ alternative nào khớp, thử theo thứ tự. Mọi alternative kiểm với CÙNG kiểu của vị trí. v1: alternative chỉ kiểm khớp, KHÔNG bind biến (**E0322**).
+Vét cạn (E0305) khai triển `Or` thành mỗi alternative một hàng. Pattern phá cấu trúc trên tham chiếu (ADR-040) áp cho cả `Or` khi có alternative phá cấu trúc. Ở edition 1, `|` đứng riêng là E0101 như cũ.
+

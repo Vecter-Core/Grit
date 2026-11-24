@@ -767,6 +767,13 @@ impl<'t> Walker<'t> {
                     self.pat(x, seen);
                 }
             }
+            // v1 (ADR-P2-11): alternative không bind biến (M4 báo E0322 nếu có); phân giải tên (biến thể, hằng) của từng alternative với `seen` RIÊNG
+            PatternKind::Or(alts) => {
+                for a in alts {
+                    let mut local = seen.clone();
+                    self.pat(a, &mut local);
+                }
+            }
         }
     }
 }

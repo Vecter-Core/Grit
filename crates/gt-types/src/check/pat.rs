@@ -10,6 +10,8 @@ impl<'e, 'a> Checker<'e, 'a> {
             PatternKind::Variant { .. } | PatternKind::Struct { .. } | PatternKind::Tuple(_) => {
                 true
             }
+            // Or phá cấu trúc nếu BẤT KỲ alternative nào phá (khớp qua tham chiếu theo ADR-040 áp cho cả Or)
+            PatternKind::Or(alts) => alts.iter().any(|a| self.destructures(a)),
             PatternKind::Binding(ident) => matches!(
                 self.env.res.uses.get(&ident.id),
                 Some(Res::Def(vd)) if self.env.defs()[vd.index()].kind == DefKind::Variant
@@ -98,6 +100,38 @@ impl<'e, 'a> Checker<'e, 'a> {
                 self.struct_pat(p, path, fields, *rest, ty)
             }
             PatternKind::Tuple(v) => self.tuple_pat(p, v, ty),
+            // ADR-P2-11 (v1): alternative KHÔNG được bind biến — mỗi alternative chỉ kiểm khớp; kiểm cùng kiểu của vị trí, vét cạn khai triển hàng (exhaust.rs)
+            PatternKind::Or(alts) => {
+                if alts.iter().any(|a| self.pat_binds(a)) {
+                    self.err(
+                        "E0322",
+                        p.id,
+                        p.span,
+                        "alternative của or-pattern `p | q` chưa được bind biến (chỉ kiểm khớp): dùng `_` hoặc tách thành các nhánh `⌥`".to_string(),
+                    );
+                    // vẫn kiểm các alternative bình thường (biến khai báo đúng kiểu) để không sinh lỗi dây chuyền
+                }
+                XPat::Or(alts.iter().map(|a| self.pat_inner(a, ty)).collect())
+            }
+        }
+    }
+
+    /// Pattern có bind biến không? (biến thể/hằng không tính; `P { x }` viết tắt có bind)
+    fn pat_binds(&self, p: &Pattern) -> bool {
+        match &p.kind {
+            PatternKind::Wildcard
+            | PatternKind::Rest
+            | PatternKind::Lit(_)
+            | PatternKind::Range { .. } => false,
+            PatternKind::Binding(ident) => !matches!(
+                self.env.res.uses.get(&ident.id),
+                Some(Res::Def(vd)) if self.env.defs()[vd.index()].kind == DefKind::Variant
+            ),
+            PatternKind::Variant { args, .. } => args.iter().any(|a| self.pat_binds(a)),
+            PatternKind::Struct { fields, .. } => fields
+                .iter()
+                .any(|f| f.pattern.as_ref().is_none_or(|s| self.pat_binds(s))),
+            PatternKind::Tuple(v) | PatternKind::Or(v) => v.iter().any(|a| self.pat_binds(a)),
         }
     }
 

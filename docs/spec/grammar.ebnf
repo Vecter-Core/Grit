@@ -94,7 +94,8 @@ loop_expr  = "⟳" [ expr_ns ] [ "↓" expr_ns ] { "⋈" expr_ns } block        
            | "⟳" ident "in" expr_ns [ "↓" expr_ns ] { "⋈" expr_ns } block ;        (* for-in (Q10). Phân biệt với while bằng nhìn trước 2 token: ident rồi "in" *)
 unsafe_expr= "⚠" { "⊢" expr_ns } block ;                   (* expr_ns cho MỌI biểu thức đứng ngay trước một khối: ⊳ ⊲ ↓ ⋈ ⊢ ⎇ ⟳ ⌥ (Q15a) *)
 
-pattern    = "_"                                                 (* wildcard *)
+pattern    = pattern_alt { "|" pattern_alt } ;                   (* or-pattern: CHỈ edition >= 2, alternative KHÔNG bind biến (ADR-P2-11, E0322) *)
+pattern_alt = "_"                                                 (* wildcard *)
            | ident                                               (* gán tên (hoặc variant không đối số — M3 phân giải) *)
            | pat_lit | str_lit | char_lit | "true" | "false"
            | pat_lit ".." pat_lit | pat_lit "..=" pat_lit        (* range pattern đóng: 0..10 (không gồm 10), 0..=9 *)

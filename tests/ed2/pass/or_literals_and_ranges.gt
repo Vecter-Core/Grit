@@ -1,0 +1,3 @@
+// expect: pass
+// note: ADR-P2-11 — or-pattern trên số: gộp nhiều literal/khoảng vào một nhánh
+ƒ f(x: u32) → u32 ! ∅ { ⌥ x { 1 | 2 | 3 ↦ 10u32, 10..=20 | 30 ↦ 20u32, _ ↦ 0u32 } }

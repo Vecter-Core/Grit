@@ -250,6 +250,8 @@ impl Builder<'_> {
             PatternKind::Variant { .. } | PatternKind::Struct { .. } | PatternKind::Tuple(_) => {
                 true
             }
+            // khớp luật của gt-types `destructures`: Or phá cấu trúc nếu bất kỳ alternative nào phá
+            PatternKind::Or(alts) => alts.iter().any(|a| self.destructures(a)),
             PatternKind::Binding(ident) => matches!(
                 self.res_of(ident.id),
                 Some(Res::Def(vd)) if self.t.defs()[vd.index()].kind == DefKind::Variant
@@ -318,6 +320,22 @@ impl Builder<'_> {
     ) -> R<()> {
         match &p.kind {
             PatternKind::Wildcard | PatternKind::Rest => Ok(()),
+            // ADR-P2-11 (v1: alternative không bind biến — M4 đã chặn bằng E0322): thử lần lượt; alternative i hỏng ⇒ thử i+1; alternative cuối hỏng ⇒ `fail` bao ngoài;
+            // alternative nào khớp cũng đi tiếp ở khối chung. `binds` không bị chạm.
+            PatternKind::Or(alts) => {
+                let ok = self.new_block();
+                let (last, init) = alts.split_last().expect("Or có ≥ 2 alternative");
+                for a in init {
+                    let next = self.new_block();
+                    self.test_pat_in(a, place, ty, mode, next, binds)?;
+                    self.terminate(TerminatorKind::Goto(ok))?;
+                    self.cur = next;
+                }
+                self.test_pat_in(last, place, ty, mode, fail, binds)?;
+                self.terminate(TerminatorKind::Goto(ok))?;
+                self.cur = ok;
+                Ok(())
+            }
             PatternKind::Binding(ident) => match self.res_of(ident.id) {
                 Some(Res::Def(vd)) if self.t.defs()[vd.index()].kind == DefKind::Variant => {
                     self.variant_test(vd, &[], place, ty, mode, fail, binds)

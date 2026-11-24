@@ -1,0 +1,3 @@
+// expect: fail E0322
+// note: biến `v` trong `Some(v)` là binding ⇒ không được đặt trong or-pattern (v1)
+ƒ f(o: Option<u32>) → u32 ! ∅ { ⌥ o { Some(v) | None ↦ 1u32 } }

@@ -1,0 +1,3 @@
+// expect: fail E0322
+// note: v1: alternative không được bind biến (`x` là biến mới)
+ƒ f(o: u32) → u32 ! ∅ { ⌥ o { 1 | x ↦ 5u32, _ ↦ 0u32 } }

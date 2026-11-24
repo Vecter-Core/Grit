@@ -463,6 +463,11 @@ impl Fmt {
     fn pat(&mut self, p: &Pattern) -> String {
         match &p.kind {
             PatternKind::Wildcard => "_".to_string(),
+            PatternKind::Or(alts) => alts
+                .iter()
+                .map(|a| self.pat(a))
+                .collect::<Vec<_>>()
+                .join(" | "),
             PatternKind::Rest => "..".to_string(),
             PatternKind::Binding(i) => i.name.clone(),
             PatternKind::Lit(l) => Self::lit(l),
