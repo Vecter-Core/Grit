@@ -1,0 +1,11 @@
+// expect: fail G0402
+// note: phi không ở đầu khối
+glir 1
+fn @f() -> i32 {
+entry:
+  br j
+j:
+  %a = bin add i32 i32 1, i32 1
+  %v = phi i32 [i32 1, entry]
+  ret i32 %v
+}

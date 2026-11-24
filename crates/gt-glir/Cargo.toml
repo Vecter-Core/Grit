@@ -1,0 +1,12 @@
+[package]
+name = "gt-glir"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Grit B1 (ADR-P2-02, bước 2/C1): GLIR — IR cấp thấp tất định của Grit (kiểu, in, đọc, verifier). Rust thuần, KHÔNG phụ thuộc LLVM. Dòng TCB ĐỀ XUẤT; chưa có đường hạ MIR→GLIR."
+
+[dependencies]
+
+[lints]
+workspace = true

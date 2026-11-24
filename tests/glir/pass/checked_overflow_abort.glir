@@ -1,0 +1,16 @@
+// expect: pass
+// note: Assert đã hạ thành nhánh tới Abort có loại (không còn Assert/unreachable trong tập lệnh)
+glir 1
+fn @add_u8(%a: i8, %b: i8) -> i8 {
+entry:
+  %wa = cast zext i8 %a to i16
+  %wb = cast zext i8 %b to i16
+  %s = bin add i16 %wa, %wb
+  %big = icmp ugt i16 %s, i16 255
+  condbr %big, bad, ok
+bad:
+  abort overflow
+ok:
+  %r = cast trunc i16 %s to i8
+  ret i8 %r
+}

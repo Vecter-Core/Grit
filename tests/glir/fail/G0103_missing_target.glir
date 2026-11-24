@@ -1,0 +1,7 @@
+// expect: fail G0103
+// note: nhảy tới khối không tồn tại
+glir 1
+fn @f() -> void {
+entry:
+  br nowhere
+}

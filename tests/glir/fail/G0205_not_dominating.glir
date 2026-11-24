@@ -1,0 +1,14 @@
+// expect: fail G0205
+// note: giá trị định nghĩa ở nhánh không trội chỗ dùng
+glir 1
+fn @f(%c: i1) -> i32 {
+entry:
+  condbr %c, a, b
+a:
+  %x = bin add i32 i32 1, i32 1
+  br join
+b:
+  br join
+join:
+  ret i32 %x
+}

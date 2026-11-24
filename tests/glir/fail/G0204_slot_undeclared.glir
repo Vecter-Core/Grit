@@ -1,0 +1,8 @@
+// expect: fail G0204
+// note: slot chưa khai báo
+glir 1
+fn @f() -> i32 {
+entry:
+  %v = load i32 $nope
+  ret i32 %v
+}

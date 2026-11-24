@@ -1,0 +1,8 @@
+// expect: fail G0307
+// note: fieldptr ngoài struct
+glir 1
+fn @f(%p: ptr) -> void {
+entry:
+  %q = fieldptr {i8}  %p, 3
+  ret void
+}

@@ -1,0 +1,9 @@
+// expect: fail G0201
+// note: định nghĩa SSA hai lần
+glir 1
+fn @f() -> i32 {
+entry:
+  %a = bin add i32 i32 1, i32 2
+  %a = bin add i32 i32 3, i32 4
+  ret i32 %a
+}

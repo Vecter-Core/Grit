@@ -1,0 +1,7 @@
+// expect: fail G0202
+// note: dùng giá trị chưa định nghĩa
+glir 1
+fn @f() -> i32 {
+entry:
+  ret i32 %ghost
+}

@@ -1,0 +1,18 @@
+// expect: pass
+// note: fieldptr trên kiểu struct, select, gọi hàm trong module
+glir 1
+fn @id(%x: i32) -> i32 {
+entry:
+  ret i32 %x
+}
+fn @main() -> i32 {
+slot $p: {i8, i32}
+entry:
+  %f = fieldptr {i8, i32} $p, 1
+  store i32 i32 7, %f
+  %v = load i32 %f
+  %t = icmp eq i32 %v, i32 7
+  %r = select i32 %t, %v, i32 0
+  %q = call i32 @id(%r)
+  ret i32 %q
+}

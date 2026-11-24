@@ -1,0 +1,9 @@
+// expect: fail G0306
+// note: condbr cần i1
+glir 1
+fn @f(%a: i32) -> void {
+entry:
+  condbr %a, x, x
+x:
+  ret void
+}
