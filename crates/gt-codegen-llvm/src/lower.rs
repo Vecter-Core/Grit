@@ -2845,6 +2845,10 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 ))?
                 .into_pointer_value();
                 let v = llvm(self.builder.build_load(self.lower_ty(t)?, p, "own.v"))?;
+                // FB-C41 (Gemini G-04): giá trị đã nạp vào thanh ghi; xoá bản Secret còn trong khối heap trước khi trả cho allocator
+                if self.t.db.secret_used && self.t.db.contains_secret(t) {
+                    self.secret_wipe(p, t)?;
+                }
                 self.heap_free(p, t)?;
                 Ok(Some(v))
             }
@@ -3919,6 +3923,10 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
         let fv = llvm(self.builder.build_load(self.ptr_type(), fp, "f"))?;
         let ap = llvm(self.builder.build_struct_gep(bt, blk, 1, "ba"))?;
         let av = llvm(self.builder.build_load(at, ap, "a"))?;
+        // FB-C41 (Gemini G-04): hộp heap của spawn không được giải phóng trước khi tiến trình kết thúc ⇒ xoá bản Secret ngay sau khi nạp
+        if self.t.db.secret_used && self.t.db.contains_secret(a_ty) {
+            self.secret_wipe(ap, a_ty)?;
+        }
         llvm(
             self.builder
                 .build_indirect_call(ft, fv.into_pointer_value(), &[av.into()], ""),
