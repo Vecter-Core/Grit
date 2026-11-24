@@ -12,6 +12,8 @@ pub enum Pat {
     Bool(bool),
     /// Tuple hoặc struct: một hàm tạo duy nhất, các thành phần theo thứ tự.
     Single(Vec<Pat>),
+    /// `p | q | …` (edition 2, ADR-P2-11): khai triển thành mỗi alternative một hàng ở `missing` trước khi xét ctor.
+    Or(Vec<Pat>),
     /// Khoảng kín `[lo, hi]` trên số nguyên hoặc điểm mã của `char`.
     Range(i128, i128),
     /// Literal thuộc miền vô hạn (`str`, số thực): không bao giờ vét cạn.
@@ -196,6 +198,24 @@ impl Env<'_> {
         let Some((t0, rest_tys)) = tys.split_first() else {
             return rows.is_empty().then(Vec::new);
         };
+        // or-pattern ở đầu cột ⇒ mỗi alternative một hàng (Maranget); alternative lồng sâu được khai triển khi lên đầu cột ở lượt đệ quy sau
+        if rows.iter().any(|r| matches!(r[0], Pat::Or(_))) {
+            let expanded: Vec<Vec<Pat>> = rows
+                .iter()
+                .flat_map(|r| match &r[0] {
+                    Pat::Or(alts) => alts
+                        .iter()
+                        .map(|a| {
+                            let mut n = r.clone();
+                            n[0] = a.clone();
+                            n
+                        })
+                        .collect::<Vec<_>>(),
+                    _ => vec![r.clone()],
+                })
+                .collect();
+            return self.missing(&expanded, tys);
+        }
         let col: Vec<&Pat> = rows.iter().map(|r| &r[0]).collect();
         match self.all_ctors(t0, &col) {
             Some(ctors) => {

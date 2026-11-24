@@ -15,9 +15,23 @@ impl Parser {
 
     pub fn parse_pattern(&mut self) -> PResult<Pattern> {
         self.enter()?;
-        let r = self.parse_pattern_inner(false);
+        let r = self.parse_alts(false);
         self.leave();
         r
+    }
+
+    /// `alt { "|" alt }` — `|` chỉ là token ở edition ≥ 2 (lexer); một alternative ⇒ chính nó, nhiều ⇒ `Or` (ADR-P2-11).
+    fn parse_alts(&mut self, allow_rest: bool) -> PResult<Pattern> {
+        let start = self.start();
+        let first = self.parse_pattern_inner(allow_rest)?;
+        if !self.at(&TokenKind::Pipe) {
+            return Ok(first);
+        }
+        let mut alts = vec![first];
+        while self.eat(&TokenKind::Pipe) {
+            alts.push(self.parse_pattern_inner(allow_rest)?);
+        }
+        Ok(self.mk_pat(start, PatternKind::Or(alts)))
     }
 
     fn starts_pat_lit(&self) -> bool {
@@ -169,7 +183,7 @@ impl Parser {
 
     fn parse_pattern_elem(&mut self) -> PResult<Pattern> {
         self.enter()?;
-        let r = self.parse_pattern_inner(true);
+        let r = self.parse_alts(true);
         self.leave();
         r
     }

@@ -39,6 +39,8 @@ pub(crate) struct Parser {
     pub max_depth: u32,
     last_error_pos: Option<usize>,
     prev_end: u32,
+    /// edition của ngôn ngữ (ADR-P2-01): quyết định các cú pháp chỉ có từ edition ≥ 2 (đặt sau `new`)
+    pub edition: u32,
 }
 
 impl Parser {
@@ -58,6 +60,7 @@ impl Parser {
             max_depth: 0,
             last_error_pos: None,
             prev_end: 0,
+            edition: 1,
         }
     }
 

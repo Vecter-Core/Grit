@@ -66,6 +66,8 @@ pub enum TokenKind {
     PlusChk,
     /// `?` đứng riêng — toán tử lan truyền lỗi (CHỈ edition ≥ 2, ADR-P2-09)
     Question,
+    /// `|` đứng riêng — phân tách alternative của or-pattern (CHỈ edition ≥ 2, ADR-P2-11)
+    Pipe,
     MinusChk,
     StarChk,
     // so sánh, mượn
@@ -175,6 +177,7 @@ impl TokenKind {
             StarSat => "STAR_SAT",
             PlusChk => "PLUS_CHK",
             Question => "QUESTION",
+            Pipe => "PIPE",
             MinusChk => "MINUS_CHK",
             StarChk => "STAR_CHK",
             EqEq => "EQ_EQ",

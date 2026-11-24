@@ -1,0 +1,4 @@
+// expect: fail E0305
+// note: Or được khai triển trong vét cạn: Red | Green thiếu Blue
+⊔ Color { Red, Green, Blue }
+ƒ f(c: Color) → u32 ! ∅ { ⌥ c { Red | Green ↦ 1u32 } }

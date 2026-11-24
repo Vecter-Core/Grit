@@ -1,0 +1,4 @@
+// expect: pass
+// note: ADR-P2-10 — vế phải là CHỖ: move từng phần (partial move), phần còn lại vẫn dùng được
+ƒ f(t: (u32, u32)) → u32 ! ∅ { (a, b) ≔ t; a + b }
+ƒ g() → u32 ! ∅ { p ≔ (1u32, 2u32); (a, _) ≔ p; a + p.1 }

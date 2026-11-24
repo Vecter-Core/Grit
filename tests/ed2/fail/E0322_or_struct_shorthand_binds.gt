@@ -1,0 +1,4 @@
+// expect: fail E0322
+// note: viết tắt `P { x }` bind `x`
+▢ P { x: u32 }
+ƒ f(p: P) → u32 ! ∅ { ⌥ p { P { x } | P { x: 0 } ↦ 1u32 } }

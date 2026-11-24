@@ -1,0 +1,4 @@
+// expect: pass
+// note: ADR-P2-11 — vét cạn khai triển Or: Red | Green + Blue phủ hết enum, không cần `_`
+⊔ Color { Red, Green, Blue }
+ƒ f(c: Color) → u32 ! ∅ { ⌥ c { Red | Green ↦ 1u32, Blue ↦ 2u32 } }

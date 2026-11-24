@@ -577,6 +577,15 @@ impl<'t> Walker<'t> {
                 self.expr(init);
                 self.introduce(name, "biến");
             }
+            StmtKind::LetPat { pat, ty, init } => {
+                if let Some(t) = ty {
+                    self.ty(t);
+                }
+                // vế phải phân giải TRƯỚC khi biến của pattern vào phạm vi (như `x ≔ x + 1`)
+                self.expr(init);
+                let mut seen = Vec::new();
+                self.pat(pat, &mut seen);
+            }
             StmtKind::Assign { target, value } => {
                 self.expr(target);
                 self.expr(value);
@@ -756,6 +765,13 @@ impl<'t> Walker<'t> {
             PatternKind::Tuple(v) => {
                 for x in v {
                     self.pat(x, seen);
+                }
+            }
+            // v1 (ADR-P2-11): alternative không bind biến (M4 báo E0322 nếu có); phân giải tên (biến thể, hằng) của từng alternative với `seen` RIÊNG
+            PatternKind::Or(alts) => {
+                for a in alts {
+                    let mut local = seen.clone();
+                    self.pat(a, &mut local);
                 }
             }
         }

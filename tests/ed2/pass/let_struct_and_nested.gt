@@ -1,0 +1,5 @@
+// expect: pass
+// note: ADR-P2-10 — struct (có đổi tên trường và `..`) và lồng tuple trong struct; `_` bỏ qua
+▢ P { x: u32, y: u32, z: u32 }
+ƒ f(p: P) → u32 ! ∅ { P { x, y: why, .. } ≔ p; x + why }
+ƒ g() → u32 ! ∅ { ((a, _), b) ≔ ((1u32, 2u32), 3u32); a + b }

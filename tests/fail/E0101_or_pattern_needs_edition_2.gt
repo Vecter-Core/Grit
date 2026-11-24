@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: edition 1 (mặc định): `|` đứng riêng chưa có — or-pattern chỉ từ edition 2 (ADR-P2-11)
+ƒ f(x: u32) → u32 ! ∅ { ⌥ x { 1 | 2 ↦ 1u32, _ ↦ 0u32 } }

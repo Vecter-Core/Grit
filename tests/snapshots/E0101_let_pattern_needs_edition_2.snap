@@ -1,0 +1,10 @@
+# tests/fail/E0101_let_pattern_needs_edition_2.gt: 1 chẩn đoán
+
+## [1] human
+error[E0101]: mong đợi `;` hoặc `}`, gặp `≔`
+ --> tests/fail/E0101_let_pattern_needs_edition_2.gt:3:39
+  |
+3 | ƒ f(t: (u32, u32)) → u32 ! ∅ { (a, b) ≔ t; a + b }
+  |                                       ^
+## [1] json
+{"code":"E0101","level":"error","message":"mong đợi `;` hoặc `}`, gặp `≔`","file":"tests/fail/E0101_let_pattern_needs_edition_2.gt","span":{"start":{"offset":164,"line":3,"col":39},"end":{"offset":167,"line":3,"col":40}},"span_label":null,"labels":[],"notes":[],"suggestions":[]}

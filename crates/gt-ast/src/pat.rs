@@ -45,6 +45,8 @@ pub enum PatternKind {
         rest: bool,
     },
     Tuple(Vec<Pattern>),
+    /// `p | q | …` (CHỈ edition ≥ 2, ADR-P2-11; v1: alternative KHÔNG được bind biến — E0322); luôn có ≥ 2 alternative
+    Or(Vec<Pattern>),
 }
 
 impl_node!(Pattern, FieldPat);

@@ -29,6 +29,12 @@ pub enum StmtKind {
         ty: Option<Type>,
         init: Expr,
     },
+    /// `pattern [: kiểu] ≔ giá_trị;` — `let` phân rã (CHỈ edition ≥ 2, ADR-P2-10): pattern PHẢI không thể bị từ chối (M4 kiểm vét cạn, E0305); biến bất biến
+    LetPat {
+        pat: Pattern,
+        ty: Option<Type>,
+        init: Expr,
+    },
     /// `đích ← giá_trị`; đích là biểu thức vị trí (parser đã kiểm dạng).
     Assign {
         target: Expr,
