@@ -1,0 +1,4 @@
+// expect: fail E0322
+// note: struct nhiều trường, chỉ một trường bind bằng viết tắt (`y`)
+▢ P { x: u32, y: u32 }
+ƒ f(p: P) → u32 ! ∅ { ⌥ p { P { x: 0, y } | P { x: 1, y: 2 } ↦ 1u32, _ ↦ 0u32 } }

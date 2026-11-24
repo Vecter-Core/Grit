@@ -1,0 +1,4 @@
+// expect: fail E0322
+// note: biến thể nhiều trường, chỉ một trường bind
+⊔ Pair { Two(u32, u32), Nothing }
+ƒ f(p: Pair) → u32 ! ∅ { ⌥ p { Two(0, v) | Nothing ↦ 1u32, _ ↦ 0u32 } }
