@@ -194,7 +194,7 @@ impl Env<'_> {
     }
 
     /// Có giá trị nào KHÔNG được ma trận phủ? Trả phản ví dụ (mỗi cột một mô tả).
-    fn missing(&self, rows: &[Vec<Pat>], tys: &[Ty]) -> Option<Vec<String>> {
+    fn missing(&self, rows: &[Vec<Pat>], tys: &[Ty], budget: &mut usize) -> Option<Vec<String>> {
         let Some((t0, rest_tys)) = tys.split_first() else {
             return rows.is_empty().then(Vec::new);
         };
@@ -214,7 +214,15 @@ impl Env<'_> {
                     _ => vec![r.clone()],
                 })
                 .collect();
-            return self.missing(&expanded, tys);
+            // FB-C45 (Gemini G-07c): khai triển or-pattern có thể nổ mũ (`(_|_, _|_, …)` 20 cột ⇒ 2^20 hàng); vượt ngân sách ⇒ coi là CHƯA chứng minh
+            // vét cạn (fail-closed: E0305 với ghi chú giới hạn), không treo trình biên dịch.
+            if expanded.len() > *budget {
+                let mut w = vec!["_".to_string(); tys.len()];
+                w[0] = "(or-pattern quá lớn: vượt giới hạn khai triển)".to_string();
+                return Some(w);
+            }
+            *budget -= expanded.len();
+            return self.missing(&expanded, tys, budget);
         }
         let col: Vec<&Pat> = rows.iter().map(|r| &r[0]).collect();
         match self.all_ctors(t0, &col) {
@@ -224,7 +232,7 @@ impl Env<'_> {
                     let spec = Self::specialize(rows, &c, sub.len());
                     let mut next_tys = sub.clone();
                     next_tys.extend(rest_tys.iter().cloned());
-                    if let Some(mut w) = self.missing(&spec, &next_tys) {
+                    if let Some(mut w) = self.missing(&spec, &next_tys, budget) {
                         let rest_w = w.split_off(sub.len());
                         let head = self.describe(t0, &c);
                         let mut out = vec![head];
@@ -241,7 +249,7 @@ impl Env<'_> {
                     .filter(|r| matches!(r[0], Pat::Wild))
                     .map(|r| r[1..].to_vec())
                     .collect();
-                self.missing(&default, rest_tys).map(|mut w| {
+                self.missing(&default, rest_tys, budget).map(|mut w| {
                     w.insert(0, "_".to_string());
                     w
                 })
@@ -252,7 +260,8 @@ impl Env<'_> {
     /// `None` nếu vét cạn; `Some(mô tả)` của một giá trị chưa được phủ.
     pub(crate) fn match_missing(&self, scrut: &Ty, arms: &[Pat]) -> Option<String> {
         let rows: Vec<Vec<Pat>> = arms.iter().map(|p| vec![p.clone()]).collect();
-        self.missing(&rows, std::slice::from_ref(scrut))
+        let mut budget = 20_000usize;
+        self.missing(&rows, std::slice::from_ref(scrut), &mut budget)
             .map(|w| w.join(", "))
     }
 }

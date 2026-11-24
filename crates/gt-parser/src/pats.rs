@@ -31,6 +31,14 @@ impl Parser {
         while self.eat(&TokenKind::Pipe) {
             alts.push(self.parse_pattern_inner(allow_rest)?);
         }
+        // FB-C44 (Gemini G-07b): `..` là phần tử của DANH SÁCH (tuple/biến thể), không phải một alternative: `(1, .. | 2)` mơ hồ ⇒ lỗi cú pháp
+        if let Some(r) = alts.iter().find(|p| matches!(p.kind, PatternKind::Rest)) {
+            let span = r.span;
+            return Err(self.error_at(
+                span,
+                "`..` không được là một alternative của `|`; viết `..` riêng trong danh sách".to_string(),
+            ));
+        }
         Ok(self.mk_pat(start, PatternKind::Or(alts)))
     }
 

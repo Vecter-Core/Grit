@@ -1,0 +1,6 @@
+// expect: pass
+// note: FB-C45 — or-pattern 6 cột (64 hàng) vẫn trong ngân sách khai triển
+ƒ f(t: (bool,bool,bool,bool,bool,bool)) → u32 ! ∅ {
+  ⌥ t { (true|false,true|false,true|false,true|false,true|false,true|false) ↦ 1u32 }
+}
+ƒ main() → u32 ! ∅ { 0u32 }

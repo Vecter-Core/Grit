@@ -1,0 +1,3 @@
+// expect: fail E0101
+// note: FB-C44 (Gemini G-07b) — `..` làm alternative của `|` từng lọt qua parser (check_single_rest chỉ xét cấp ngoài)
+ƒ main() → u32 ! ∅ { t ≔ (1u32, 2u32); ⌥ t { (1u32, .. | 2u32) ↦ 20u32, _ ↦ 0u32 } }

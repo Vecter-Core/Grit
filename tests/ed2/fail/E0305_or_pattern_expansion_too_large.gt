@@ -1,0 +1,6 @@
+// expect: fail E0305
+// note: FB-C45 (Gemini G-07c) — 20 cột `_|_` khai triển 2^20 hàng từng treo gritc check; nay vượt ngân sách ⇒ chưa chứng minh vét cạn (fail-closed), không treo
+ƒ f(t: (bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool)) → u32 ! ∅ {
+  ⌥ t { (_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_,_|_) ↦ 1u32 }
+}
+ƒ main() → u32 ! ∅ { 0u32 }
