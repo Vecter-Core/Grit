@@ -1,0 +1,38 @@
+// rig test: eval trên các biểu thức hậu tố (edition 2). Qua = thoát 0; sai = abort.
+ƒ ok(src: &[u8], want: u64) ! {div} {
+  ⌥ rpn::eval(src) {
+    Ok(v) ↦ { ⎇ v ≠ want { core::abort("sai kết quả") } ⇝ { } },
+    Err(_) ↦ core::abort("lỗi bất ngờ"),
+  }
+}
+
+// mã lỗi: 0 = Ok, 1.. = từng biến thể
+ƒ tag(src: &[u8]) → u32 ! ∅ {
+  ⌥ rpn::eval(src) {
+    Ok(_) ↦ 0u32,
+    Err(e) ↦ ⌥ e {
+      rpn::RpnErr::Underflow ↦ 1u32,
+      rpn::RpnErr::StackFull ↦ 2u32,
+      rpn::RpnErr::BadToken ↦ 3u32,
+      rpn::RpnErr::DivZero ↦ 4u32,
+      rpn::RpnErr::Overflow ↦ 5u32,
+      rpn::RpnErr::Leftover ↦ 6u32,
+      rpn::RpnErr::Empty ↦ 7u32,
+    },
+  }
+}
+
+ƒ bad(src: &[u8], want: u32) ! {div} { ⎇ tag(src) ≠ want { core::abort("sai mã lỗi") } ⇝ { } }
+
+ƒ main() ! {div} {
+  ok("3 4 + 2 *".as_bytes(), 14u64);
+  ok("10 3 -".as_bytes(), 7u64);
+  ok("1 2 3 + +".as_bytes(), 6u64);
+  ok("7 2 /".as_bytes(), 3u64);
+  bad("1 +".as_bytes(), 1u32);
+  bad("1 x".as_bytes(), 3u32);
+  bad("4 0 /".as_bytes(), 4u32);
+  bad("18446744073709551615 1 +".as_bytes(), 5u32);
+  bad("2 3".as_bytes(), 6u32);
+  bad("".as_bytes(), 7u32);
+}

@@ -1,0 +1,35 @@
+// rpn <biểu thức hậu tố>: in kết quả hoặc tên lỗi. Dùng: rpn "3 4 + 2 *"   (edition 2)
+ƒ code(e: rpn::RpnErr) → &str ! ∅ {
+  ⌥ e {
+    rpn::RpnErr::Underflow ↦ "thiếu toán hạng",
+    rpn::RpnErr::StackFull ↦ "ngăn xếp đầy",
+    rpn::RpnErr::BadToken ↦ "ký tự lạ",
+    rpn::RpnErr::DivZero ↦ "chia cho 0",
+    rpn::RpnErr::Overflow ↦ "tràn số",
+    rpn::RpnErr::Leftover ↦ "còn dư toán hạng",
+    rpn::RpnErr::Empty ↦ "biểu thức rỗng",
+  }
+}
+
+ƒ main() ! {io, div} {
+  env ≔ root_env();
+  out ≔ root_out();
+  err ≔ root_err();
+  ⎇ env.arg_count() < 2usize {
+    err.write_str("usage: rpn <expr>\n");
+    core::exit(2u32)
+  } ⇝ {
+    ⌥ rpn::eval(env.arg(1usize).as_bytes()) {
+      Ok(v) ↦ {
+        out.write_u64(v);
+        out.write_str("\n");
+      },
+      Err(e) ↦ {
+        err.write_str("rpn: ");
+        err.write_str(code(e));
+        err.write_str("\n");
+        core::exit(1u32)
+      },
+    }
+  }
+}

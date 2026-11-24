@@ -139,3 +139,8 @@ Mỗi dòng = một khoảng trống/bug gặp khi viết công cụ thật. C�
 - `examples/sortlines` phụ thuộc `std = { path = "../../lib/std" }`; `Ord for Line` nay là `self.b.cmp(o.b)` (impl `Ord for [T]` của std) thay cho `msort::cmp_bytes` tự viết (msort.gt giữ nguyên, còn được `llvm_sort`/`llvm_diff_gtv` dùng). Cả 6 công cụ chạy lại, đối chiếu byte với bản tham chiếu Rust: wc 3, json 6, sha256 5, sortlines 7, stats 3, wordfreq 5 test đạt, 0 lỗi.
 - Hiệu năng sortlines sau khi dùng std (1 lần đo, dev, `perf_report_against_rust_sort_by`): 1 MiB ×2,3; 32 MiB 2,67 s (×1,3; trước 2,43 s, ×1,2); 1e6 dòng ngắn ×1,7; 4 MiB dòng rỗng ×3,7 (trước ×3,8). Chậm hơn khoảng 10 % ở 32 MiB (so sánh qua trait generic thay cho hàm chuyên biệt); một lần đo, chưa lặp.
 - Khoảng trống std còn lại: KNOWN_LIMITATIONS mục "Gói `std`".
+
+## Công cụ 7: rpn (`examples/rpn`, EDITION 2) — 2026-11-24
+- Máy tính hậu tố ~100 dòng Grit, `rig.toml` có `edition = 2`: lỗi là giá trị `Result<_, RpnErr>` lan truyền bằng `?` (ADR-P2-09), `(a, b) ≔ pop2(s)?` là `let` phân rã (ADR-P2-10), `32u8 | 9u8 ↦ …` là or-pattern (ADR-P2-11). `std` giữ edition 1 (đổi sẽ vỡ người dùng edition 1).
+- Kiểm: `rig check/build/test` xanh; `crates/rig/tests/dogfood_rpn.rs` đối chiếu stdout/stderr/mã thoát với bản tham chiếu Rust trên ~130 đầu vào (ngẫu nhiên + tay + ngăn xếp đầy) — ĐẠT. Chưa ghi nhận lỗi trình biên dịch nào từ ví dụ này (`docs/USER_BUGS.md` không đổi).
+- Lưu ý cú pháp: tên kiểu của module khác phải đi kèm đường dẫn (`rpn::RpnErr`); `rig run` không truyền đối số (chạy `target/rpn.exe "<biểu thức>"`).
