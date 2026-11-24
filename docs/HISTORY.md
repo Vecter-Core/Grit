@@ -204,3 +204,9 @@ Thứ tự: A (bảo đảm) → B (độc lập backend) → C (dùng cho AI) �
   (40 chương trình × thông dịch + LLVM 3 hồ sơ, mô hình độc lập về thứ tự drop kể cả partial move; đột biến tay 2/2 bị bắt); fmt `let_pattern.rs`.
 - **Cổng:** clone sạch trên 5e4a9b8 XANH liền mạch 3 lượt: 994 test đạt, 0 lỗi, 214 bộ, `GATE_TREE=7bfc2a6e…`. Lần này chạy bộ `llvm` golden TRƯỚC khi commit (bài học từ lần đổi prelude).
 - **CHƯA:** đột biến tự động parser/M4/M5 của `let` phân rã; `μ` trong pattern, or-pattern, guard, `let … else`, closure; LSP/`std` biết edition; `gritc fix`.
+
+### P2-C2c or-pattern `p | q` (2026-11-24, Claude Sonnet 5.5) — edition 2 (ADR-P2-11, v1: alternative không bind biến)
+- **Đã làm:** token `Pipe` (edition ≥ 2); `PatternKind::Or`; parser `parse_alts`; resolve; fmt; M4 (E0322 mới + khai triển hàng `Or` trong vét cạn Maranget, `destructures` áp cho `Or`); M5 (thử tuần tự alternative); spec §30; 8 mẫu `tests/ed2` + 1 mẫu edition 1;
+  oracle `or_pattern_oracle.rs` (40 chương trình × 120 đầu vào × thông dịch + LLVM 3 hồ sơ, mô hình độc lập chọn nhánh; đột biến tay 2/2 bị bắt); fmt `or_pattern.rs`.
+- **Cổng:** clone sạch trên d1a87c8 XANH liền mạch 3 lượt: 998 test đạt, 0 lỗi, 216 bộ, `GATE_TREE=aec3dca3…`.
+- **CHƯA:** đột biến tự động or-pattern; bind trong or-pattern; guard; `μ` trong pattern; `let … else`; closure; LSP/`std` biết edition; `gritc fix`.
