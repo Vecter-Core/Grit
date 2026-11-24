@@ -374,10 +374,11 @@ crates/gt-secrets/src/lib.rs	279	_ =>	GHI NHẬN		kiểu khác (Param/Fn/Str...)
 crates/gt-secrets/src/lib.rs	299	_ =>	AN TOÀN		cùng place_local_of_rvalue phân hoạch đủ mọi biến thể Rvalue hiện có (Ref/Len/Discriminant xử lý riêng); biến thể mới sẽ bị bỏ lặng lẽ nhưng chỉ ảnh hưởng cảnh báo vàng	_ => Vec::new(),
 crates/gt-secrets/src/lib.rs	306	_ =>	AN TOÀN		phần bù của rvalue_operands; mọi Rvalue hiện có đã được phủ	_ => None,
 crates/gt-secrets/src/lib.rs	339	_ =>	AN TOÀN		Kiểu hàm của Callee::Value không xác định ⇒ unknown() trả hiệu ứng io; đây là giả định bảo thủ làm tăng cảnh báo S202, không bỏ cảnh báo.	_ => unknown(),
-crates/gt-secrets/src/lib.rs	472	_ =>	AN TOÀN		#allow có tham số đầu sai ⇒ E1401 (ĐỎ) và bỏ #allow đó (không tắt được gì)	_ => {
-crates/gt-secrets/src/lib.rs	486	_ =>	AN TOÀN		#allow thiếu lý do hoặc lý do rỗng ⇒ E1401 ĐỎ	_ => {
-crates/gt-secrets/src/lib.rs	511	_ =>	AN TOÀN		#allow ở thành viên impl/hàm không được thu ⇒ cảnh báo vẫn hiện (thêm cảnh báo, không bớt)	_ => {}
-crates/gt-secrets/src/lib.rs	568	let _ =	AN TOÀN		let _ = r.node vô hại	let _ = r.node;
+crates/gt-secrets/src/lib.rs	431	is_some_and	AN TOÀN		S203: thiếu thông tin Secret ⇒ không phát cảnh báo bổ sung (S201/S202 vẫn chạy)	.is_some_and(|l| t.db.secret_used && t.db.contains_secret(&l.ty))
+crates/gt-secrets/src/lib.rs	489	_ =>	AN TOÀN		#allow có tham số đầu sai ⇒ E1401 (ĐỎ) và bỏ #allow đó (không tắt được gì)	_ => {
+crates/gt-secrets/src/lib.rs	503	_ =>	AN TOÀN		#allow thiếu lý do hoặc lý do rỗng ⇒ E1401 ĐỎ	_ => {
+crates/gt-secrets/src/lib.rs	528	_ =>	AN TOÀN		#allow ở thành viên impl/hàm không được thu ⇒ cảnh báo vẫn hiện (thêm cảnh báo, không bớt)	_ => {}
+crates/gt-secrets/src/lib.rs	585	let _ =	AN TOÀN		let _ = r.node vô hại	let _ = r.node;
 crates/gt-term/src/lib.rs	47	_ =>	AN TOÀN		Chỉ lập chỉ mục hàm; item khác không có thân hàm có vòng lặp.	_ => {}
 crates/gt-term/src/lib.rs	71	_ =>	AN TOÀN		Nhánh dự phòng theo tên chỉ cho biến thể ở chữ ký; không khớp ⇒ None ⇒ E0702/E0701 từ chối. Res::Local lạ ⇒ None.	_ => {
 crates/gt-term/src/lib.rs	97	ok()?	AN TOÀN		Số không vừa i128 ⇒ term None ⇒ biến thể không dịch được ⇒ ĐỎ (E0702/E0701).	let v = i128::try_from(v).ok()?;
@@ -439,16 +440,16 @@ crates/gt-types/src/check/mod.rs	364	_ =>	AN TOÀN		closure numeric trong mismat
 crates/gt-types/src/check/mod.rs	424	is_none_or	AN TOÀN		is_none_or: thân không tail / tail là `⎇` không else ⇒ checker bỏ E0307 vì giao cho M5; đã kiểm: thân rỗng và `⎇ c { ⏎ 1; }` đều ĐỎ E0307, `⎇ c {1}` ĐỎ E0301.	let open_end = body.tail.as_ref().is_none_or(|t| {
 crates/gt-types/src/check/mod.rs	472	unwrap_or	GHI NHẬN		tham số AST nhiều hơn sig.params ⇒ kiểu Ty::Err (độc, unify với mọi thứ ⇒ không còn kiểm kiểu cho tham số đó) mà không báo lỗi; chỉ khi lower chữ ký lệch (bất nhất nội bộ/ đã có lỗi lower); nên ICE.	let ty = f.sig.params.get(i).cloned().unwrap_or(Ty::Err);
 crates/gt-types/src/check/mod.rs	591	_ =>	GHI NHẬN		has_cap không đi vào trường của Adt người dùng (Adt chứa Cap ở trường không tính là có cap) và `lang(Cap)=None ⇒ false` (tắt E0310): hướng nguồn cap ⇒ chỉ nới nếu tạo được `W{c:Cap}` mà không có cap, nhưng dựng W cần Cap hợp lệ nên chưa tìm được kịch bản; giới hạn thiết kế (cap gốc chỉ qua root_*/main).	_ => false,
-crates/gt-types/src/check/mod.rs	938	_ =>	AN TOÀN		ADR-P2-10: kiểu vét cạn pattern của let phân rã — mặc định giữ kiểu vế phải (như match_expr); chỉ bóc tham chiếu khi pattern phá cấu trúc (ADR-040)	_ => it,
-crates/gt-types/src/check/mod.rs	1036	_ =>	AN TOÀN		place_name chỉ để dựng thông điệp lỗi D5 ("?" khi không rõ); lỗi vẫn được báo.	_ => "?".to_string(),
-crates/gt-types/src/check/mod.rs	1040	_ =>	AN TOÀN		place_name chỉ để dựng thông điệp lỗi; không ảnh hưởng quyết định.	_ => "?".to_string(),
-crates/gt-types/src/check/mod.rs	1048	is_none_or	GHI NHẬN		is_none_or: local thiếu LocalInfo ⇒ coi là mutable (cho gán). Chỉ xảy ra khi biến không được khai báo (vd pattern `Self{..}` trên kiểu không phải ADT, xem pat.rs:384) — khi đó MIR ICE chặn; các đường khai báo khác đều qua declare_local; nên đổi thành `is_some_and`/ICE.	Some(Res::Local(l)) => self.locals.get(l).is_none_or(|i| i.mutable),
-crates/gt-types/src/check/mod.rs	1050	_ =>	AN TOÀN		Path trỏ tới thứ không phải local/self (hằng, static, hàm) ⇒ không gán được (false = bảo thủ).	_ => false,
-crates/gt-types/src/check/mod.rs	1056	_ =>	AN TOÀN		base có kiểu không phải &/&!: kế thừa tính bất biến của base (đệ quy); kiểu Ref xử lý riêng ở nhánh trên. Đã thử g,h,i,j,k,l: chỉ `&!B` qua biến bất biến được phép (đúng).	_ => self.place_mutable(base),
-crates/gt-types/src/check/mod.rs	1065	_ =>	AN TOÀN		deref kiểu không phải con trỏ ⇒ `true` để tránh lỗi dây chuyền vì E0301 đã báo; đã kiểm *i32, *T, *struct, *Infer đều ĐỎ E0301.	_ => true,
-crates/gt-types/src/check/mod.rs	1067	_ =>	AN TOÀN		biểu thức không phải chỗ ⇒ không gán được (false = bảo thủ).	_ => false,
-crates/gt-types/src/check/mod.rs	1078	_ =>	AN TOÀN		is_place false ⇒ coi là tạm thời (rvalue) nên cho `&!`; AST không có Paren (ngoặc không có node) và Path/Field/Index/Deref đã được liệt kê, còn lại đúng là rvalue.	_ => false,
-crates/gt-types/src/check/mod.rs	1083	unwrap_or	AN TOÀN		`self` ngoài `⊏`/`⊐` bị parser chặn (E0101); Ty::Err chỉ xuất hiện khi đã có lỗi.	let st = self.cx.self_ty.clone().unwrap_or(Ty::Err);
+crates/gt-types/src/check/mod.rs	948	_ =>	AN TOÀN		ADR-P2-10: kiểu vét cạn pattern của let phân rã — mặc định giữ kiểu vế phải (như match_expr); chỉ bóc tham chiếu khi pattern phá cấu trúc (ADR-040)	_ => it,
+crates/gt-types/src/check/mod.rs	1046	_ =>	AN TOÀN		place_name chỉ để dựng thông điệp lỗi D5 ("?" khi không rõ); lỗi vẫn được báo.	_ => "?".to_string(),
+crates/gt-types/src/check/mod.rs	1050	_ =>	AN TOÀN		place_name chỉ để dựng thông điệp lỗi; không ảnh hưởng quyết định.	_ => "?".to_string(),
+crates/gt-types/src/check/mod.rs	1058	is_none_or	GHI NHẬN		is_none_or: local thiếu LocalInfo ⇒ coi là mutable (cho gán). Chỉ xảy ra khi biến không được khai báo (vd pattern `Self{..}` trên kiểu không phải ADT, xem pat.rs:384) — khi đó MIR ICE chặn; các đường khai báo khác đều qua declare_local; nên đổi thành `is_some_and`/ICE.	Some(Res::Local(l)) => self.locals.get(l).is_none_or(|i| i.mutable),
+crates/gt-types/src/check/mod.rs	1060	_ =>	AN TOÀN		Path trỏ tới thứ không phải local/self (hằng, static, hàm) ⇒ không gán được (false = bảo thủ).	_ => false,
+crates/gt-types/src/check/mod.rs	1066	_ =>	AN TOÀN		base có kiểu không phải &/&!: kế thừa tính bất biến của base (đệ quy); kiểu Ref xử lý riêng ở nhánh trên. Đã thử g,h,i,j,k,l: chỉ `&!B` qua biến bất biến được phép (đúng).	_ => self.place_mutable(base),
+crates/gt-types/src/check/mod.rs	1075	_ =>	AN TOÀN		deref kiểu không phải con trỏ ⇒ `true` để tránh lỗi dây chuyền vì E0301 đã báo; đã kiểm *i32, *T, *struct, *Infer đều ĐỎ E0301.	_ => true,
+crates/gt-types/src/check/mod.rs	1077	_ =>	AN TOÀN		biểu thức không phải chỗ ⇒ không gán được (false = bảo thủ).	_ => false,
+crates/gt-types/src/check/mod.rs	1088	_ =>	AN TOÀN		is_place false ⇒ coi là tạm thời (rvalue) nên cho `&!`; AST không có Paren (ngoặc không có node) và Path/Field/Index/Deref đã được liệt kê, còn lại đúng là rvalue.	_ => false,
+crates/gt-types/src/check/mod.rs	1093	unwrap_or	AN TOÀN		`self` ngoài `⊏`/`⊐` bị parser chặn (E0101); Ty::Err chỉ xuất hiện khi đã có lỗi.	let st = self.cx.self_ty.clone().unwrap_or(Ty::Err);
 crates/gt-types/src/check/pat.rs	19	_ =>	AN TOÀN		destructures: false = "không phá cấu trúc" ⇒ không khớp qua tham chiếu, pattern sẽ bị so kiểu thường và báo E0301 nếu không khớp; không phải khẳng định "đúng".	_ => false,
 crates/gt-types/src/check/pat.rs	48	let _ =	AN TOÀN		sau khi đã báo E0301 (pattern phá cấu trúc trên tham chiếu lồng); bỏ XPat vì hàm trả XPat::Wild khi đã có lỗi.	let _ = self.pat_inner(p, &Ty::Err);
 crates/gt-types/src/check/pat.rs	69	_ =>	GHI NHẬN		Binding không phải tên biến thể ⇒ khai báo biến mới và coi là Wild (đúng ngữ nghĩa); hệ quả: gõ nhầm tên biến thể (`Emtpy`) thành bắt-tất-cả, xanh và không cảnh báo (kiểu Rust cũng vậy); không gây mất an toàn bộ nhớ nhưng có thể che lỗi logic.	_ => {

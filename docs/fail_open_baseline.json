@@ -290,6 +290,7 @@
 "crates/gt-secrets/src/lib.rs|_ =>|_ => unknown(),",
 "crates/gt-secrets/src/lib.rs|_ =>|_ => {",
 "crates/gt-secrets/src/lib.rs|_ =>|_ => {}",
+"crates/gt-secrets/src/lib.rs|is_some_and|.is_some_and(|l| t.db.secret_used && t.db.contains_secret(&l.ty))",
 "crates/gt-secrets/src/lib.rs|is_some_and||| t.db.adts.get(d).is_some_and(|adt| match &adt.kind {",
 "crates/gt-secrets/src/lib.rs|let _ =|let _ = r.node;",
 "crates/gt-secrets/src/lib.rs|unwrap_or|.unwrap_or(tok)",
