@@ -50,7 +50,7 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
             lowered += 1;
             let b = fns
                 .iter()
-                .find(|b| b.key.replace(['<', '>', ' ', ':'], "_") == f.name)
+                .find(|b| gt_glirgen::glir_name(&b.key) == f.name)
                 .expect("thân gốc");
             let cover = gt_glirgen::check_abort_cover(b, f);
             assert!(cover.is_empty(), "{}: {cover:?}", b.key);
@@ -283,39 +283,53 @@ fn diff_src(
         {
             continue;
         }
-        let gname = b.key.replace(['<', '>', ' ', ':'], "_");
+        let gname = gt_glirgen::glir_name(&b.key);
         if !module.funcs.iter().any(|f| f.name == gname) {
             continue;
         }
         let ptys: Vec<Ty> = (1..=b.arg_count).map(|i| b.locals[i].ty.clone()).collect();
         let rty = &b.locals[0].ty;
-        if !ptys.iter().all(|t| plain(db, t, 0)) || !plain(db, rty, 0) {
+        if !ptys.iter().all(|t| plain(db, t, 0) || matches!(t, Ty::Ref(_, i) if plain(db, i, 0) && !matches!(**i, Ty::Tuple(ref v) if v.is_empty()))) || !plain(db, rty, 0) {
             continue;
         }
         bodies += 1;
         for _ in 0..iters {
-            let margs: Vec<V> = ptys.iter().map(|t| gen_val(db, t, rnd)).collect();
+            let mut mi = Interp::new(&art.mir, 200_000).with_types(&art.types);
+            let mut margs: Vec<V> = Vec::new();
             let mut gargs: Vec<Arg> = Vec::new();
-            for (t, v) in ptys.iter().zip(&margs) {
+            // (kiểu pointee, tham chiếu MIR) của từng tham số `&T`/`&!T`, theo thứ tự
+            let mut refs: Vec<(Ty, V)> = Vec::new();
+            for t in &ptys {
+                if let Ty::Ref(_, inner) = t {
+                    let v = gen_val(db, inner, rnd);
+                    let n = gt_glir::layout::layout(&glir_ty_of(db, inner)).size as usize;
+                    let mut buf = vec![None; n];
+                    encode(db, inner, &v, &mut buf, 0);
+                    gargs.push(Arg::Ref(buf));
+                    let r = mi.alloc_ref(v);
+                    refs.push(((**inner).clone(), r.clone()));
+                    margs.push(r);
+                    continue;
+                }
+                let v = gen_val(db, t, rnd);
                 match t {
                     Ty::Tuple(ts) if ts.is_empty() => {}
                     Ty::Bool => gargs.push(Arg::Int(u128::from(matches!(v, V::Bool(true))))),
                     Ty::Int(it) => {
-                        let V::Int(x, _) = v else { unreachable!() };
+                        let V::Int(x, _) = &v else { unreachable!() };
                         gargs.push(Arg::Int((*x as u128) & mask(it.bits())));
                     }
                     _ => {
                         let n = gt_glir::layout::layout(&glir_ty_of(db, t)).size as usize;
                         let mut buf = vec![None; n];
-                        encode(db, t, v, &mut buf, 0);
+                        encode(db, t, &v, &mut buf, 0);
                         gargs.push(Arg::Bytes(buf));
                     }
                 }
+                margs.push(v);
             }
-            let g = gt_glir::interp::run_module_args(&module, &gname, &gargs, 200_000);
-            let m = Interp::new(&art.mir, 200_000)
-                .with_types(&art.types)
-                .call_key(&b.key, margs.clone());
+            let (g, fin) = gt_glir::interp::run_module_refs(&module, &gname, &gargs, 200_000);
+            let m = mi.call_key(&b.key, margs.clone());
             let m = match m {
                 MO::Value(v) => Ok(v),
                 MO::Abort(k) => Err(k),
@@ -337,6 +351,7 @@ fn diff_src(
                     })
                 )
             };
+            let finished = matches!(g, GO::Value(_) | GO::Agg(_));
             match (g, m) {
                 (GO::OutOfFuel, _) => {}
                 (GO::Ub(u), m) => panic!(
@@ -358,6 +373,17 @@ fn diff_src(
                     ctx()
                 ),
                 (g, m) => panic!("{}: GLIR {g:?} ≠ MIR {m:?}", ctx()),
+            }
+            // trạng thái sau lời gọi của vùng mà `&T`/`&!T` trỏ tới phải khớp (chỉ khi không abort giữa chừng)
+            if finished {
+                for ((inner, r), bytes) in refs.iter().zip(&fin) {
+                    let fv = mi.read_ref(r).expect("vùng tham chiếu còn đó");
+                    assert!(
+                        decode_eq(db, inner, &fv, bytes, 0),
+                        "{}: trạng thái sau lời gọi của vùng tham chiếu: GLIR {bytes:?}, MIR {fv:?}",
+                        ctx()
+                    );
+                }
             }
         }
     }

@@ -61,6 +61,7 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32) -> bool {
     }
     match t {
         Ty::Tuple(v) => v.iter().all(|x| in_sub(db, x, depth + 1)),
+        Ty::Ref(_, inner) => in_sub(db, inner, depth + 1),
         Ty::Adt(def, args) => {
             plain_struct(db, def)
                 && crate::variant_fields(db, *def, args, 0)
@@ -134,22 +135,39 @@ impl Lw<'_> {
         let mut cur_ty = self.body.locals[l].ty.clone();
         let mut ptr = Opd::Slot(self.slot(l)?);
         for e in &p.projection {
-            let PlaceElem::Field(i, fty) = e else {
-                return un("chỗ có phép chiếu ngoài trường tuple/struct");
-            };
-            if !matches!(cur_ty, Ty::Tuple(_) | Ty::Adt(..)) {
-                return un("trường của kiểu không phải tuple/struct");
+            match e {
+                PlaceElem::Field(i, fty) => {
+                    if !matches!(cur_ty, Ty::Tuple(_) | Ty::Adt(..)) {
+                        return un("trường của kiểu không phải tuple/struct");
+                    }
+                    let gt = gty(self.db, &cur_ty)?;
+                    let d = self.t();
+                    self.push(Inst::FieldPtr {
+                        d: d.clone(),
+                        ty: gt,
+                        ptr,
+                        idx: *i,
+                    });
+                    ptr = Opd::Val(d);
+                    cur_ty = fty.clone();
+                }
+                PlaceElem::Deref => {
+                    let Ty::Ref(_, inner) = &cur_ty else {
+                        return un("Deref của kiểu không phải tham chiếu");
+                    };
+                    let inner = (**inner).clone();
+                    gty(self.db, &inner)?;
+                    let d = self.t();
+                    self.push(Inst::Load {
+                        d: d.clone(),
+                        ty: G::Ptr,
+                        ptr,
+                    });
+                    ptr = Opd::Val(d);
+                    cur_ty = inner;
+                }
+                _ => return un("chỗ có phép chiếu ngoài trường/Deref"),
             }
-            let gt = gty(self.db, &cur_ty)?;
-            let d = self.t();
-            self.push(Inst::FieldPtr {
-                d: d.clone(),
-                ty: gt,
-                ptr,
-                idx: *i,
-            });
-            ptr = Opd::Val(d);
-            cur_ty = fty.clone();
         }
         Ok((ptr, cur_ty))
     }
@@ -360,7 +378,19 @@ impl Lw<'_> {
                 }
                 Ok(())
             }
-            Rvalue::Repeat(..) | Rvalue::Ref(..) | Rvalue::Len(_) | Rvalue::Discriminant(_) => {
+            Rvalue::Ref(_, _, place) => {
+                // địa chỉ của chỗ chính là con trỏ: ghi vào chỗ đích kiểu `&T`
+                let (ptr, _) = self.place(place)?;
+                let (dptr, dty) = self.place(dest)?;
+                gty(self.db, &dty)?;
+                self.push(Inst::Store {
+                    ty: G::Ptr,
+                    val: ptr,
+                    ptr: dptr,
+                });
+                Ok(())
+            }
+            Rvalue::Repeat(..) | Rvalue::Len(_) | Rvalue::Discriminant(_) => {
                 un("Rvalue ngoài tập con")
             }
         }
@@ -574,8 +604,27 @@ pub fn lower_body(db: &TypeDb, body: &Body) -> R<Func> {
     lower_body_with(db, body, &Sigs::new())
 }
 
-fn glir_name(key: &str) -> String {
-    key.replace(['<', '>', ' ', ':'], "_")
+/// Tên hàm GLIR từ khoá thân MIR: ký tự ngoài `[A-Za-z0-9_.]` đổi thành `_`; nếu có đổi thì thêm hậu tố băm khoá để KHÔNG trùng tên.
+#[must_use]
+pub fn glir_name(key: &str) -> String {
+    let clean: String = key
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if clean == key {
+        clean
+    } else {
+        format!(
+            "{clean}.{:06x}",
+            gt_types::fnv1a64(key.as_bytes()) & 0xff_ffff
+        )
+    }
 }
 
 /// Hạ cả tập thân: hàm nào gọi (trực tiếp) hàm cùng tập con thì được hạ kèm lời gọi; hàm gọi tới hàm không hạ được bị loại (lặp tới điểm cố định).
