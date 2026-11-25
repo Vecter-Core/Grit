@@ -3,6 +3,9 @@
 use crate::{Func, Inst, Module, Opd, Term, Ty};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// (ngữ cảnh, toán hạng, khối, chỉ số lệnh, khối tiền nhiệm của phi) → kiểu toán hạng
+type OpdTy<'a> = dyn Fn(&mut Cx, &Opd, usize, isize, Option<usize>) -> Option<Ty> + 'a;
+
 struct Cx<'a> {
     m: &'a Module,
     f: &'a Func,
@@ -238,7 +241,7 @@ fn check_inst(
     i: &Inst,
     bi: usize,
     ii: isize,
-    opd_ty: &dyn Fn(&mut Cx, &Opd, usize, isize, Option<usize>) -> Option<Ty>,
+    opd_ty: &OpdTy,
     f: &Func,
     pred: &[Vec<usize>],
 ) {
