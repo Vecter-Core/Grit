@@ -9,6 +9,7 @@ description = "Grit B1 (ADR-P2-02, bước 1): bố cục bộ nhớ (cỡ/căn 
 [dependencies]
 gt-types = { path = "../gt-types" }
 gt-resolve = { path = "../gt-resolve" }
+gt-glir = { path = "../gt-glir" }
 
 [lints]
 workspace = true

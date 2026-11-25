@@ -29,7 +29,7 @@ pub fn struct_layout(fields: &[Layout]) -> Layout {
     }
 }
 
-fn int_layout(bits: u32) -> Layout {
+pub(crate) fn int_layout(bits: u32) -> Layout {
     let size = u64::from(bits.div_ceil(8));
     // x86-64: iN căn lề tự nhiên tới 64 bit; i128 căn lề 16 (LLVM ≥ 18)
     let align = if bits >= 128 {
@@ -74,6 +74,30 @@ fn fields_of(
             })
         })
         .collect())
+}
+
+/// Bố cục của một kiểu GLIR (cùng quy tắc: struct không đóng gói, mảng liền kề, `ptr` 8/8).
+#[must_use]
+pub fn glir_layout(t: &gt_glir::Ty) -> Layout {
+    use gt_glir::Ty as G;
+    match t {
+        G::I1 => int_layout(1),
+        G::I8 => int_layout(8),
+        G::I16 => int_layout(16),
+        G::I32 => int_layout(32),
+        G::I64 => int_layout(64),
+        G::I128 => int_layout(128),
+        G::F64 | G::Ptr => Layout { size: 8, align: 8 },
+        G::Void => Layout { size: 0, align: 1 },
+        G::Struct(fs) => struct_layout(&fs.iter().map(glir_layout).collect::<Vec<_>>()),
+        G::Array(e, n) => {
+            let el = glir_layout(e);
+            Layout {
+                size: el.size.saturating_mul(*n),
+                align: el.align,
+            }
+        }
+    }
 }
 
 /// Cỡ + căn lề của `ty` (đã cụ thể). `Err` khi kiểu chưa hỗ trợ (cùng tập mà codegen từ chối).

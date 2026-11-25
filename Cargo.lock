@@ -111,8 +111,10 @@ dependencies = [
  "gt-diag",
  "gt-effects",
  "gt-fmt",
+ "gt-glirgen",
  "gt-guard",
  "gt-kernel",
+ "gt-layout",
  "gt-mir",
  "gt-oblig",
  "gt-parser",
@@ -155,6 +157,16 @@ name = "gt-glir"
 version = "0.1.0"
 
 [[package]]
+name = "gt-glirgen"
+version = "0.1.0"
+dependencies = [
+ "gt-glir",
+ "gt-layout",
+ "gt-resolve",
+ "gt-types",
+]
+
+[[package]]
 name = "gt-guard"
 version = "0.1.0"
 dependencies = [
@@ -172,6 +184,7 @@ dependencies = [
 name = "gt-layout"
 version = "0.1.0"
 dependencies = [
+ "gt-glir",
  "gt-resolve",
  "gt-types",
 ]

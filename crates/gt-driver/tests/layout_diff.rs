@@ -67,3 +67,38 @@ fn gt_layout_agrees_with_llvm_datalayout_on_a_zoo_of_types() {
     .unwrap_or_else(|e| panic!("backend (gồm đối chiếu gt-layout): {e}"));
     let _ = std::fs::remove_file(&exe);
 }
+
+/// ADR-P2-02 C2: kiểu GLIR (`gt-glirgen::lower_ty`) có bố cục (cỡ/căn lề, do `glir_layout` tính độc lập) BẰNG `gt-layout::layout_of` của kiểu Grit gốc,
+/// với MỌI kiểu cụ thể của MỌI local MIR của chương trình "zoo" (và prelude/std đi kèm).
+#[test]
+fn glir_types_have_the_same_layout_as_the_grit_types_they_lower_from() {
+    let mut res = check(
+        &[SourceInput {
+            name: "main.gt".to_string(),
+            text: SRC.to_string(),
+        }],
+        &Options::default(),
+    )
+    .expect("check");
+    let art = res.open_gate().expect("cổng");
+    let db = &art.types.db;
+    let (mut n, mut skipped) = (0usize, 0usize);
+    let mut seen = std::collections::BTreeSet::new();
+    for b in &art.mir.bodies {
+        for l in &b.locals {
+            if l.ty.has_param() || l.ty.has_infer() || !seen.insert(format!("{:?}", l.ty)) {
+                continue;
+            }
+            let (Ok(g), Ok(want)) = (
+                gt_glirgen::lower_ty(db, &l.ty),
+                gt_layout::layout_of(db, &l.ty),
+            ) else {
+                skipped += 1;
+                continue;
+            };
+            assert_eq!(gt_layout::glir_layout(&g), want, "{:?} → {g:?}", l.ty);
+            n += 1;
+        }
+    }
+    assert!(n >= 20, "quá ít kiểu được đối chiếu: {n} (bỏ {skipped})");
+}
