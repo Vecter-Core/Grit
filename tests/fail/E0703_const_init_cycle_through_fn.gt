@@ -1,0 +1,5 @@
+// expect: fail E0703
+// note: FB-G2-01 (Gemini R2) — □ A ≔ get_a() với get_a đọc A: mỗi lần đọc A chạy lại get_a ⇒ đệ quy vô hạn (trước đây check XANH, build LLVM thành công, chạy segfault 139)
+□ A: u32 ≔ get_a();
+ƒ get_a() → u32 ! ∅ { A }
+ƒ main() → u32 ! ∅ { A }

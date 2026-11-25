@@ -1,0 +1,10 @@
+// expect: fail E0702
+// note: FB-G2-02 (Gemini R2) — □ TICK chạy A.fetch_add mỗi lần đọc nên is_ok (đọc TICK) KHÔNG thuần: không được làm nguyên tử vị từ (bản FB-C39 chỉ xét thân ƒ)
+■ A: Atomic<u32> ≔ Atomic::new(0u32);
+□ TICK: u32 ≔ A.fetch_add(1u32, AtomicOrdering::SeqCst);
+ƒ is_ok(x: u32) → bool ! ∅ { TICK == 0u32 }
+ƒ main() → u32 ! ∅ {
+  x: u32 ≔ 1u32;
+  ⎇ is_ok(x) { ⎇ ¬is_ok(x) { ⟳ true ↓ x { } } };
+  0u32
+}
