@@ -45,14 +45,26 @@ fn is_int_or_bool(t: &Ty) -> bool {
     }
 }
 
-fn in_subset(t: &Ty) -> bool {
+fn plain_struct(db: &TypeDb, def: &gt_resolve::DefId) -> bool {
+    db.adts
+        .get(def)
+        .is_some_and(|a| matches!(a.kind, gt_types::AdtKind::Struct(_)) && a.lang.is_none())
+}
+
+fn in_subset(db: &TypeDb, t: &Ty) -> bool {
+    in_sub(db, t, 0)
+}
+
+fn in_sub(db: &TypeDb, t: &Ty, depth: u32) -> bool {
+    if depth > 8 {
+        return false;
+    }
     match t {
-        Ty::Tuple(v) => {
-            v.is_empty()
-                || (v.len() == 2
-                    && matches!(v[0], Ty::Int(_))
-                    && v[1] == Ty::Bool
-                    && is_int_or_bool(&v[0]))
+        Ty::Tuple(v) => v.iter().all(|x| in_sub(db, x, depth + 1)),
+        Ty::Adt(def, args) => {
+            plain_struct(db, def)
+                && crate::variant_fields(db, *def, args, 0)
+                    .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)))
         }
         t => is_int_or_bool(t),
     }
@@ -68,7 +80,7 @@ fn gint(it: IntTy) -> G {
 }
 
 fn gty(db: &TypeDb, t: &Ty) -> R<G> {
-    if !in_subset(t) {
+    if !in_subset(db, t) {
         return un(format!("kiểu {}", kind_name(t)));
     }
     lower_ty(db, t).map_err(Unsupported)
@@ -116,26 +128,30 @@ impl Lw<'_> {
         }
         Ok(format!("l{l}"))
     }
-    /// con trỏ tới chỗ (slot hoặc trường tuple) + kiểu Grit của chỗ
+    /// con trỏ tới chỗ (slot, rồi chuỗi trường tuple/struct) + kiểu Grit của chỗ
     fn place(&mut self, p: &Place) -> R<(Opd, Ty)> {
         let l = p.local.index();
-        let base_ty = self.body.locals[l].ty.clone();
-        let s = self.slot(l)?;
-        match p.projection.as_slice() {
-            [] => Ok((Opd::Slot(s), base_ty)),
-            [PlaceElem::Field(i, fty)] if matches!(base_ty, Ty::Tuple(_)) => {
-                let gt = gty(self.db, &base_ty)?;
-                let d = self.t();
-                self.push(Inst::FieldPtr {
-                    d: d.clone(),
-                    ty: gt,
-                    ptr: Opd::Slot(s),
-                    idx: *i,
-                });
-                Ok((Opd::Val(d), fty.clone()))
+        let mut cur_ty = self.body.locals[l].ty.clone();
+        let mut ptr = Opd::Slot(self.slot(l)?);
+        for e in &p.projection {
+            let PlaceElem::Field(i, fty) = e else {
+                return un("chỗ có phép chiếu ngoài trường tuple/struct");
+            };
+            if !matches!(cur_ty, Ty::Tuple(_) | Ty::Adt(..)) {
+                return un("trường của kiểu không phải tuple/struct");
             }
-            _ => un("chỗ có phép chiếu ngoài trường tuple"),
+            let gt = gty(self.db, &cur_ty)?;
+            let d = self.t();
+            self.push(Inst::FieldPtr {
+                d: d.clone(),
+                ty: gt,
+                ptr,
+                idx: *i,
+            });
+            ptr = Opd::Val(d);
+            cur_ty = fty.clone();
         }
+        Ok((ptr, cur_ty))
     }
     fn load(&mut self, p: &Place) -> R<(Opd, Ty)> {
         let (ptr, ty) = self.place(p)?;
@@ -164,7 +180,9 @@ impl Lw<'_> {
                 Ok((Opd::Int(gint(*ty), v), Ty::Int(*ty)))
             }
             Operand::Const(Const::Bool(b)) => Ok((Opd::Int(G::I1, i128::from(*b)), Ty::Bool)),
-            Operand::Const(_) => un("hằng không phải số nguyên/bool"),
+            // `()` không có biểu diễn: mọi chỗ ghi/truyền kiểu `()` đều bị bỏ qua (xem `store`, `Call`, `Aggregate`)
+            Operand::Const(Const::Unit) => Ok((Opd::Int(G::I1, 0), Ty::Tuple(Vec::new()))),
+            Operand::Const(_) => un("hằng không phải số nguyên/bool/()"),
         }
     }
     fn store(&mut self, dest: &Place, v: Opd, ty: &Ty) -> R<()> {
@@ -306,11 +324,45 @@ impl Lw<'_> {
                 self.store(dest, r, to)
             }
             Rvalue::CastFits(..) => un("CastFits"),
-            Rvalue::Repeat(..)
-            | Rvalue::Ref(..)
-            | Rvalue::Len(_)
-            | Rvalue::Discriminant(_)
-            | Rvalue::Aggregate(..) => un("Rvalue ngoài tập con"),
+            Rvalue::Aggregate(kind, ops) => {
+                let (ptr, dty) = self.place(dest)?;
+                let field_tys: Vec<Ty> = match (kind, &dty) {
+                    (gt_mir::AggregateKind::Tuple, Ty::Tuple(v)) => v.clone(),
+                    (gt_mir::AggregateKind::Adt(def, 0, args), Ty::Adt(..))
+                        if plain_struct(self.db, def) =>
+                    {
+                        crate::variant_fields(self.db, *def, args, 0).map_err(Unsupported)?
+                    }
+                    _ => return un("Aggregate ngoài tuple/struct"),
+                };
+                if field_tys.len() != ops.len() {
+                    return un("Aggregate sai số trường");
+                }
+                let gd = gty(self.db, &dty)?;
+                for (i, (o, ft)) in ops.iter().zip(&field_tys).enumerate() {
+                    if is_unit(ft) {
+                        continue;
+                    }
+                    let (v, _) = self.operand(o)?;
+                    let fp = self.t();
+                    self.push(Inst::FieldPtr {
+                        d: fp.clone(),
+                        ty: gd.clone(),
+                        ptr: ptr.clone(),
+                        idx: i as u32,
+                    });
+                    let g = gty(self.db, ft)?;
+                    self.push(Inst::Store {
+                        ty: g,
+                        val: v,
+                        ptr: Opd::Val(fp),
+                    });
+                }
+                Ok(())
+            }
+            Rvalue::Repeat(..) | Rvalue::Ref(..) | Rvalue::Len(_) | Rvalue::Discriminant(_) => {
+                un("Rvalue ngoài tập con")
+            }
         }
     }
 
@@ -531,7 +583,7 @@ fn glir_name(key: &str) -> String {
 pub fn lower_module(db: &TypeDb, bodies: &[Body]) -> (gt_glir::Module, Vec<(String, Unsupported)>) {
     let mut sigs = Sigs::new();
     for b in bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
-        let ok = (0..=b.arg_count).all(|i| in_subset(&b.locals[i].ty));
+        let ok = (0..=b.arg_count).all(|i| in_subset(db, &b.locals[i].ty));
         if ok {
             sigs.insert(b.node, (glir_name(&b.key), b.locals[0].ty.clone()));
         }

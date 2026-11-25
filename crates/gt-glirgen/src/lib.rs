@@ -16,7 +16,7 @@ fn int(bits: u32) -> Result<G, String> {
     })
 }
 
-fn variant_fields(
+pub(crate) fn variant_fields(
     db: &TypeDb,
     def: gt_resolve::DefId,
     args: &[Ty],

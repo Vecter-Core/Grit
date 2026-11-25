@@ -69,146 +69,295 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     assert!(lowered >= 1, "không hạ được thân nào");
 }
 
-/// ORACLE VI SAI (ADR-P2-02 C3): thân hạ được (tham số số nguyên/bool, kết quả số nguyên/bool/`()`) chạy trên GLIR interp (Rust thuần, độc lập) và thông dịch MIR
-/// với đầu vào thiên về BIÊN; kết quả và loại abort phải KHỚP; GLIR `Ub` (bước hạ quên chốt chặn) là LỖI; hết nhiên liệu ⇒ bỏ qua.
-fn diff_src(src: &str, rnd: &mut dyn FnMut() -> u64, main_only: bool) -> (usize, usize, usize) {
+/// ORACLE VI SAI (ADR-P2-02 C3/C2): thân hạ được mà tham số/kết quả là số nguyên/bool/`()`/tuple/struct (lồng nhau) chạy trên GLIR interp (Rust thuần, theo BYTE) và
+/// thông dịch MIR với đầu vào thiên về BIÊN; kết quả (giải mã byte theo kiểu Grit) và loại abort phải KHỚP; GLIR `Ub` (bước hạ quên chốt chặn) là LỖI; hết nhiên liệu ⇒ bỏ qua.
+fn adt_fields(
+    db: &gt_types::TypeDb,
+    def: &gt_resolve::DefId,
+    args: &[gt_types::Ty],
+) -> Option<Vec<gt_types::Ty>> {
+    let adt = db.adts.get(def)?;
+    let gt_types::AdtKind::Struct(fs) = &adt.kind else {
+        return None;
+    };
+    if adt.lang.is_some() {
+        return None;
+    }
+    Some(
+        fs.iter()
+            .map(|f| {
+                f.ty.subst(&|p| {
+                    adt.generics
+                        .iter()
+                        .position(|g| g.id == p)
+                        .and_then(|i| args.get(i).cloned())
+                })
+            })
+            .collect(),
+    )
+}
+
+fn plain(db: &gt_types::TypeDb, t: &gt_types::Ty, d: u32) -> bool {
+    use gt_types::Ty;
+    d <= 6
+        && match t {
+            Ty::Int(it) => it.bits() <= 64,
+            Ty::Bool => true,
+            Ty::Tuple(v) => v.iter().all(|x| plain(db, x, d + 1)),
+            Ty::Adt(def, args) => {
+                adt_fields(db, def, args).is_some_and(|fs| fs.iter().all(|x| plain(db, x, d + 1)))
+            }
+            _ => false,
+        }
+}
+
+fn mask(w: u32) -> u128 {
+    if w >= 128 {
+        u128::MAX
+    } else {
+        (1u128 << w) - 1
+    }
+}
+
+fn gen_val(
+    db: &gt_types::TypeDb,
+    t: &gt_types::Ty,
+    rnd: &mut dyn FnMut() -> u64,
+) -> gt_mir::interp::V {
+    use gt_mir::interp::V;
+    use gt_types::Ty;
+    match t {
+        Ty::Bool => V::Bool(rnd() % 2 == 1),
+        Ty::Int(it) => {
+            let (w, m) = (it.bits(), mask(it.bits()));
+            let top = 1u128 << (w - 1);
+            let pool = [
+                0,
+                1,
+                2,
+                3,
+                7,
+                100,
+                m,
+                m - 1,
+                top,
+                top - 1,
+                top + 1,
+                u128::from(rnd()) & m,
+            ];
+            let bits = pool[(rnd() % pool.len() as u64) as usize] & m;
+            let v = if it.signed() && (bits >> (w - 1)) & 1 == 1 {
+                (bits as i128) - (1i128 << w)
+            } else {
+                bits as i128
+            };
+            V::Int(v, *it)
+        }
+        Ty::Tuple(v) if v.is_empty() => V::Unit,
+        Ty::Tuple(v) => V::Tuple(v.iter().map(|x| gen_val(db, x, rnd)).collect()),
+        Ty::Adt(def, args) => V::Adt(
+            0,
+            adt_fields(db, def, args)
+                .expect("plain")
+                .iter()
+                .map(|x| gen_val(db, x, rnd))
+                .collect(),
+        ),
+        _ => unreachable!(),
+    }
+}
+
+fn glir_ty_of(db: &gt_types::TypeDb, t: &gt_types::Ty) -> gt_glir::Ty {
+    gt_glirgen::lower_ty(db, t).expect("kiểu plain hạ được")
+}
+
+fn encode(
+    db: &gt_types::TypeDb,
+    t: &gt_types::Ty,
+    v: &gt_mir::interp::V,
+    buf: &mut [Option<u8>],
+    base: usize,
+) {
+    use gt_mir::interp::V;
+    use gt_types::Ty;
+    match (t, v) {
+        (Ty::Bool, V::Bool(b)) => buf[base] = Some(u8::from(*b)),
+        (Ty::Int(it), V::Int(x, _)) => {
+            let n = (it.bits() / 8) as usize;
+            for (i, slot) in buf[base..base + n].iter_mut().enumerate() {
+                *slot = Some((((*x as u128) >> (8 * i)) & 0xff) as u8);
+            }
+        }
+        (Ty::Tuple(ts), V::Unit) if ts.is_empty() => {}
+        (Ty::Tuple(_) | Ty::Adt(..), _) => {
+            let (fts, fvs): (Vec<gt_types::Ty>, &Vec<V>) = match (t, v) {
+                (Ty::Tuple(ts), V::Tuple(vs)) => (ts.clone(), vs),
+                (Ty::Adt(def, args), V::Adt(_, vs)) => {
+                    (adt_fields(db, def, args).expect("plain"), vs)
+                }
+                _ => panic!("encode: giá trị không khớp kiểu"),
+            };
+            let g = glir_ty_of(db, t);
+            for (i, (ft, fv)) in fts.iter().zip(fvs).enumerate() {
+                let off = gt_glir::layout::field_offset(&g, i as u32).expect("offset") as usize;
+                encode(db, ft, fv, buf, base + off);
+            }
+        }
+        _ => panic!("encode: kiểu/giá trị lạ {t:?}/{v:?}"),
+    }
+}
+
+fn decode_eq(
+    db: &gt_types::TypeDb,
+    t: &gt_types::Ty,
+    v: &gt_mir::interp::V,
+    bytes: &[Option<u8>],
+    base: usize,
+) -> bool {
+    use gt_mir::interp::V;
+    use gt_types::Ty;
+    match (t, v) {
+        (Ty::Bool, V::Bool(b)) => bytes[base] == Some(u8::from(*b)),
+        (Ty::Int(it), V::Int(x, _)) => {
+            let n = (it.bits() / 8) as usize;
+            (0..n).all(|i| bytes[base + i] == Some((((*x as u128) >> (8 * i)) & 0xff) as u8))
+        }
+        (Ty::Tuple(ts), V::Unit) if ts.is_empty() => true,
+        (Ty::Tuple(ts), V::Tuple(vs)) => {
+            let g = glir_ty_of(db, t);
+            ts.iter().zip(vs).enumerate().all(|(i, (ft, fv))| {
+                decode_eq(
+                    db,
+                    ft,
+                    fv,
+                    bytes,
+                    base + gt_glir::layout::field_offset(&g, i as u32).expect("offset") as usize,
+                )
+            })
+        }
+        (Ty::Adt(def, args), V::Adt(_, vs)) => {
+            let g = glir_ty_of(db, t);
+            let fts = adt_fields(db, def, args).expect("plain");
+            fts.iter().zip(vs).enumerate().all(|(i, (ft, fv))| {
+                decode_eq(
+                    db,
+                    ft,
+                    fv,
+                    bytes,
+                    base + gt_glir::layout::field_offset(&g, i as u32).expect("offset") as usize,
+                )
+            })
+        }
+        _ => false,
+    }
+}
+
+fn diff_src(
+    src: &str,
+    rnd: &mut dyn FnMut() -> u64,
+    main_only: bool,
+    iters: usize,
+) -> (usize, usize, usize) {
+    use gt_glir::interp::{Arg, Outcome as GO};
     use gt_mir::interp::{Interp, Outcome as MO, V};
     use gt_types::Ty;
     let (mut bodies, mut runs, mut aborts) = (0usize, 0usize, 0usize);
-    {
-        let Ok(res) = check(
-            &[SourceInput {
-                name: "main.gt".to_string(),
-                text: src.to_string(),
-            }],
-            &Options::default(),
-        ) else {
-            return (0, 0, 0);
-        };
-        let Some(art) = res.open_gate() else {
-            return (0, 0, 0);
-        };
-        let (module, _) = gt_glirgen::lower_module(&art.types.db, &art.mir.bodies);
-        for b in &art.mir.bodies {
-            if b.kind != gt_mir::BodyKind::Fn
-                || (main_only && !b.key.starts_with("main::"))
-                || !b.key.starts_with("main::")
-            {
-                continue;
+    let Ok(res) = check(
+        &[SourceInput {
+            name: "main.gt".to_string(),
+            text: src.to_string(),
+        }],
+        &Options::default(),
+    ) else {
+        return (0, 0, 0);
+    };
+    let Some(art) = res.open_gate() else {
+        return (0, 0, 0);
+    };
+    let db = &art.types.db;
+    let (module, _) = gt_glirgen::lower_module(db, &art.mir.bodies);
+    for b in &art.mir.bodies {
+        if b.kind != gt_mir::BodyKind::Fn
+            || (main_only && !b.key.starts_with("main::"))
+            || !b.key.starts_with("main::")
+        {
+            continue;
+        }
+        let gname = b.key.replace(['<', '>', ' ', ':'], "_");
+        if !module.funcs.iter().any(|f| f.name == gname) {
+            continue;
+        }
+        let ptys: Vec<Ty> = (1..=b.arg_count).map(|i| b.locals[i].ty.clone()).collect();
+        let rty = &b.locals[0].ty;
+        if !ptys.iter().all(|t| plain(db, t, 0)) || !plain(db, rty, 0) {
+            continue;
+        }
+        bodies += 1;
+        for _ in 0..iters {
+            let margs: Vec<V> = ptys.iter().map(|t| gen_val(db, t, rnd)).collect();
+            let mut gargs: Vec<Arg> = Vec::new();
+            for (t, v) in ptys.iter().zip(&margs) {
+                match t {
+                    Ty::Tuple(ts) if ts.is_empty() => {}
+                    Ty::Bool => gargs.push(Arg::Int(u128::from(matches!(v, V::Bool(true))))),
+                    Ty::Int(it) => {
+                        let V::Int(x, _) = v else { unreachable!() };
+                        gargs.push(Arg::Int((*x as u128) & mask(it.bits())));
+                    }
+                    _ => {
+                        let n = gt_glir::layout::layout(&glir_ty_of(db, t)).size as usize;
+                        let mut buf = vec![None; n];
+                        encode(db, t, v, &mut buf, 0);
+                        gargs.push(Arg::Bytes(buf));
+                    }
+                }
             }
-            let gname = b.key.replace(['<', '>', ' ', ':'], "_");
-            let Some(f) = module.funcs.iter().find(|f| f.name == gname).cloned() else {
-                continue;
+            let g = gt_glir::interp::run_module_args(&module, &gname, &gargs, 200_000);
+            let m = Interp::new(&art.mir, 200_000)
+                .with_types(&art.types)
+                .call_key(&b.key, margs.clone());
+            let m = match m {
+                MO::Value(v) => Ok(v),
+                MO::Abort(k) => Err(k),
+                _ => continue,
             };
-            let ptys: Vec<Ty> = (1..=b.arg_count).map(|i| b.locals[i].ty.clone()).collect();
-            let simple = |t: &Ty| matches!(t, Ty::Int(_) | Ty::Bool);
-            let rty = &b.locals[0].ty;
-            if !ptys.iter().all(simple)
-                || !(simple(rty) || matches!(rty, Ty::Tuple(v) if v.is_empty()))
-            {
-                continue;
-            }
-            bodies += 1;
-            for _ in 0..120 {
-                let mut margs = Vec::new();
-                let mut gargs = Vec::new();
-                for t in &ptys {
-                    let (bits, w, signed) = match t {
-                        Ty::Bool => (u128::from(rnd() % 2 == 1), 1, false),
-                        Ty::Int(it) => {
-                            let w = it.bits();
-                            let m = if w >= 128 {
-                                u128::MAX
-                            } else {
-                                (1u128 << w) - 1
-                            };
-                            let top = 1u128 << (w - 1);
-                            let pool = [
-                                0,
-                                1,
-                                2,
-                                3,
-                                7,
-                                100,
-                                m,
-                                m - 1,
-                                top,
-                                top - 1,
-                                top + 1,
-                                u128::from(rnd()) & m,
-                            ];
-                            (
-                                pool[(rnd() % pool.len() as u64) as usize] & m,
-                                w,
-                                it.signed(),
-                            )
-                        }
-                        _ => unreachable!(),
-                    };
-                    gargs.push(bits);
-                    margs.push(match t {
-                        Ty::Bool => V::Bool(bits == 1),
-                        Ty::Int(it) => {
-                            let v = if signed && (bits >> (w - 1)) & 1 == 1 {
-                                (bits as i128) - (1i128 << w)
-                            } else {
-                                bits as i128
-                            };
-                            V::Int(v, *it)
-                        }
-                        _ => unreachable!(),
-                    });
-                }
-                let g = gt_glir::interp::run_module(&module, &gname, &gargs, 200_000);
-                let m = Interp::new(&art.mir, 200_000)
-                    .with_types(&art.types)
-                    .call_key(&b.key, margs.clone());
-                let norm = |o: MO| -> Option<Result<Option<u128>, String>> {
-                    Some(match o {
-                        MO::Value(V::Unit) => Ok(None),
-                        MO::Value(V::Bool(x)) => Ok(Some(u128::from(x))),
-                        MO::Value(V::Int(v, it)) => Ok(Some(
-                            (v as u128)
-                                & if it.bits() >= 128 {
-                                    u128::MAX
-                                } else {
-                                    (1u128 << it.bits()) - 1
-                                },
-                        )),
-                        MO::Abort(k) => Err(k),
-                        _ => return None,
-                    })
-                };
-                let Some(want) = norm(m) else { continue };
-                runs += 1;
-                let got = match g {
-                    gt_glir::interp::Outcome::Value(v) => Ok(v),
-                    gt_glir::interp::Outcome::Abort(k) => Err(k),
-                    gt_glir::interp::Outcome::OutOfFuel => continue,
-                    gt_glir::interp::Outcome::Ub(u) => panic!(
-                        "{} {:?}: GLIR chạm hành vi không xác định ({u}); MIR cho {want:?}\n{}",
-                        b.key,
-                        gargs,
-                        gt_glir::print(&gt_glir::Module {
-                            decls: vec![],
-                            funcs: vec![f.clone()]
-                        })
-                    ),
-                };
-                if want.is_err() {
-                    aborts += 1;
-                }
-                assert_eq!(
-                    got,
-                    want,
-                    "{} {:?}\n{}",
+            runs += 1;
+            let ctx = || {
+                format!(
+                    "{} {gargs:?}\n{}",
                     b.key,
-                    gargs,
                     gt_glir::print(&gt_glir::Module {
                         decls: vec![],
-                        funcs: vec![f]
+                        funcs: module
+                            .funcs
+                            .iter()
+                            .filter(|f| f.name == gname)
+                            .cloned()
+                            .collect()
                     })
-                );
+                )
+            };
+            match (g, m) {
+                (GO::OutOfFuel, _) => {}
+                (GO::Ub(u), m) => panic!(
+                    "{}: GLIR chạm hành vi không xác định ({u}); MIR cho {m:?}",
+                    ctx()
+                ),
+                (GO::Abort(k), Err(mk)) => {
+                    aborts += 1;
+                    assert_eq!(k, mk, "{}", ctx());
+                }
+                (GO::Value(None), Ok(V::Unit)) => {}
+                (GO::Value(Some(x)), Ok(V::Int(y, it))) => {
+                    assert_eq!(x, (y as u128) & mask(it.bits()), "{}", ctx())
+                }
+                (GO::Value(Some(x)), Ok(V::Bool(y))) => assert_eq!(x, u128::from(y), "{}", ctx()),
+                (GO::Agg(bytes), Ok(v)) => assert!(
+                    decode_eq(db, rty, &v, &bytes, 0),
+                    "{}: GLIR trả {bytes:?}, MIR trả {v:?}",
+                    ctx()
+                ),
+                (g, m) => panic!("{}: GLIR {g:?} ≠ MIR {m:?}", ctx()),
             }
         }
     }
@@ -234,7 +383,7 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_boundary_inputs() {
     let (mut bodies, mut runs, mut aborts) = (0usize, 0usize, 0usize);
     for p in files {
         let src = std::fs::read_to_string(&p).expect("đọc");
-        let (b, r, a) = diff_src(&src, &mut rnd, true);
+        let (b, r, a) = diff_src(&src, &mut rnd, true, 40);
         bodies += b;
         runs += r;
         aborts += a;
@@ -295,7 +444,7 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arithmetic() {
         seed ^= seed << 17;
         seed
     };
-    let (bodies, runs, aborts) = diff_src(&src, &mut rnd, true);
+    let (bodies, runs, aborts) = diff_src(&src, &mut rnd, true, 120);
     eprintln!("GLIR_DIFF_GEN bodies={bodies} runs={runs} aborts={aborts}");
     assert!(
         bodies >= 100 && runs >= 12000 && aborts >= 1000,

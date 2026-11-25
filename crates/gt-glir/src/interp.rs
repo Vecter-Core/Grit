@@ -10,9 +10,18 @@ use std::collections::BTreeMap;
 pub enum Outcome {
     /// giá trị trả về (mẫu bit đã cắt) hoặc `None` nếu `ret void`
     Value(Option<u128>),
+    /// giá trị tổng hợp trả về (struct/mảng) dưới dạng byte (`None` = byte chưa ghi/đệm)
+    Agg(Vec<Option<u8>>),
     Abort(String),
     Ub(String),
     OutOfFuel,
+}
+
+/// Đối số của hàm GLIR: số nguyên (mẫu bit) hoặc giá trị tổng hợp dạng byte.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Arg {
+    Int(u128),
+    Bytes(Vec<Option<u8>>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,16 +222,32 @@ pub fn run(f: &Func, args: &[u128], fuel: u64) -> Outcome {
     run_module(&m, &f.name, args, fuel)
 }
 
-/// Như `run` nhưng gọi được hàm khác trong `m` (đệ quy tới độ sâu 512, quá ⇒ `OutOfFuel`; hàm `declare` ngoài module ⇒ `Ub`).
+/// Như `run` nhưng gọi được hàm khác trong `m` (đệ quy tới độ sâu 128, quá ⇒ `OutOfFuel`; hàm `declare` ngoài module ⇒ `Ub`).
 #[must_use]
-pub fn run_module(m: &Module, name: &str, args: &[u128], mut fuel: u64) -> Outcome {
+pub fn run_module(m: &Module, name: &str, args: &[u128], fuel: u64) -> Outcome {
+    let a: Vec<Arg> = args.iter().map(|x| Arg::Int(*x)).collect();
+    run_module_args(m, name, &a, fuel)
+}
+
+/// Như `run_module` với đối số có thể là giá trị tổng hợp.
+#[must_use]
+pub fn run_module_args(m: &Module, name: &str, args: &[Arg], mut fuel: u64) -> Outcome {
     let Some(f) = m.funcs.iter().find(|f| f.name == name) else {
         return Outcome::Ub(format!("không có hàm @{name}"));
     };
-    exec(m, f, args, &mut fuel, 0)
+    let vals: Vec<Val> = args
+        .iter()
+        .map(|a| match a {
+            Arg::Int(x) => Val::Int(*x),
+            Arg::Bytes(bs) => {
+                Val::Agg(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect())
+            }
+        })
+        .collect();
+    exec(m, f, &vals, &mut fuel, 0)
 }
 
-fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outcome {
+fn exec(m: &Module, f: &Func, args: &[Val], fuel: &mut u64, depth: u32) -> Outcome {
     let mut st = St {
         f,
         env: BTreeMap::new(),
@@ -233,10 +258,14 @@ fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outc
         return Outcome::Ub("sai số đối số".into());
     }
     for ((n, t), a) in f.params.iter().zip(args) {
-        let Some(w) = t.bits() else {
-            return Outcome::Ub("tham số không nguyên".into());
+        let v = match (t, a) {
+            (t, Val::Int(x)) if t.is_int() => Val::Int(x & mask(t.bits().unwrap_or(128))),
+            (Ty::Struct(_) | Ty::Array(..), Val::Agg(bs)) if bs.len() as u64 == layout(t).size => {
+                Val::Agg(bs.clone())
+            }
+            _ => return Outcome::Ub("tham số không khớp kiểu".into()),
         };
-        st.env.insert(n.clone(), Val::Int(a & mask(w)));
+        st.env.insert(n.clone(), v);
     }
     for (n, t) in &f.slots {
         st.slot.insert(n.clone(), st.mem.len());
@@ -278,12 +307,12 @@ fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outc
                 ..
             } = i
             {
-                if depth >= 512 {
+                if depth >= 128 {
                     return Outcome::OutOfFuel;
                 }
                 let mut vals = Vec::new();
                 for a in cargs {
-                    match st.int(a) {
+                    match st.opd(a) {
                         Ok(v) => vals.push(v),
                         Err(e) => return ub(e),
                     }
@@ -295,6 +324,13 @@ fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outc
                     Outcome::Value(v) => {
                         if let (Some(d), Some(v)) = (d, v) {
                             st.env.insert(d.clone(), Val::Int(v));
+                        }
+                    }
+                    Outcome::Agg(bs) => {
+                        if let Some(d) = d {
+                            let bytes =
+                                bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect();
+                            st.env.insert(d.clone(), Val::Agg(bytes));
                         }
                     }
                     other => return other,
@@ -419,6 +455,23 @@ fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outc
             }
             Term::Ret(None) => return Outcome::Value(None),
             Term::Ret(Some((t, v))) => {
+                if matches!(t, Ty::Struct(_) | Ty::Array(..)) {
+                    return match st.opd(v) {
+                        Ok(Val::Agg(bs)) => {
+                            let mut out = Vec::new();
+                            for b in bs {
+                                match b {
+                                    Byte::B(x) => out.push(Some(x)),
+                                    Byte::Uninit => out.push(None),
+                                    Byte::P(..) => return ub("trả về giá trị chứa con trỏ".into()),
+                                }
+                            }
+                            Outcome::Agg(out)
+                        }
+                        Ok(_) => ub("ret tổng hợp không phải giá trị tổng hợp".into()),
+                        Err(e) => ub(e),
+                    };
+                }
                 let w = t.bits().unwrap_or(128);
                 return match st.int(v) {
                     Ok(x) => Outcome::Value(Some(x & mask(w))),
