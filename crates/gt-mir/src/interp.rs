@@ -129,6 +129,23 @@ impl<'a> Interp<'a> {
         self.run(b, args)
     }
 
+    /// Công cụ ĐỐI CHIẾU (test, oracle GLIR theo instance): chạy instance `key<generics>` — môi trường kiểu của khung là tham số của thân
+    /// (`fn_params(sig_node)`) ↦ `generics`. `generics` ≠ [] cần `with_types`.
+    pub fn call_instance(&mut self, key: &str, generics: Vec<Ty>, args: Vec<V>) -> Outcome {
+        let Some(b) = self.mir.body(key) else {
+            return Outcome::Bug(format!("không có thân {key}"));
+        };
+        let env = match self.types {
+            Some(t) => (t.db.fn_params(b.sig_node), generics),
+            None if generics.is_empty() => (Vec::new(), Vec::new()),
+            None => return Outcome::Bug("call_instance generic cần with_types".to_string()),
+        };
+        if env.0.len() != env.1.len() {
+            return Outcome::Bug(format!("{key}: số đối số kiểu không khớp"));
+        }
+        self.run_env(b, args, env)
+    }
+
     fn run(&mut self, b: &'a Body, args: Vec<V>) -> Outcome {
         self.run_env(b, args, (Vec::new(), Vec::new()))
     }

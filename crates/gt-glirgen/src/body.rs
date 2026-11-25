@@ -3,6 +3,8 @@
 //! `Assert` ⇒ `condbr` tới khối đích hoặc một khối riêng chỉ chứa `abort <loại>` (một khối cho MỖI Assert). Mọi thứ ngoài tập con ⇒ `Unsupported(lý do)`.
 //! Tập con: kiểu `Int`(≤ 64 bit)/`Bool`/`()`/tuple `(Int, Bool)`; `Use`, `BinaryOp`(số học bao quanh, so sánh, `BitAnd`, `Div/Rem`), `CheckedBinaryOp`(Add/Sub/Mul),
 //! `UnaryOp`, `Cast` số nguyên/bool→số nguyên; `Goto`/`SwitchInt`/`Return`/`Assert`/`Unreachable`.
+//! Thân generic hạ theo INSTANCE (một hàm GLIR cho mỗi `Instance{node,args}`; thân không generic = instance `args=[]`): `Lw::sub` thế tham số ở mọi
+//! chỗ đọc `Ty` của MIR (KHÔNG sao chép thân); chỗ sót vẫn fail-closed vì `lower_ty` từ chối `Ty::Param`.
 use crate::lower_ty;
 use gt_glir::{BinOp as GB, Block, CastOp, CmpPred, Func, Inst, Opd, Term, Ty as G};
 use gt_mir::{

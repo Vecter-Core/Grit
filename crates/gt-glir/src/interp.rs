@@ -293,7 +293,8 @@ pub fn run_module_refs(
             }
         })
         .collect();
-    let mut out = exec(m, f, &vals, &mut fuel, 0, &mut mem, &Glob { gl, nro });
+    let funcs = m.funcs.iter().map(|g| (g.name.as_str(), g)).collect();
+    let mut out = exec(f, &vals, &mut fuel, 0, &mut mem, &Glob { gl, nro, funcs });
     if let Outcome::Bytes(bs) = out {
         out = if bs.iter().any(|b| matches!(b, Byte::P(..))) {
             Outcome::Ub("trả về giá trị chứa con trỏ ở mức cao nhất".into())
@@ -321,19 +322,20 @@ pub fn run_module_refs(
 }
 
 /// Môi trường chung của một lần chạy: tên global → vùng và số vùng chỉ-đọc đứng đầu.
-struct Glob {
+struct Glob<'m> {
     gl: BTreeMap<String, usize>,
     nro: usize,
+    /// chỉ mục tên hàm → hàm (tra callee không tuyến tính theo số hàm của module)
+    funcs: BTreeMap<&'m str, &'m Func>,
 }
 
 fn exec(
-    m: &Module,
     f: &Func,
     args: &[Val],
     fuel: &mut u64,
     depth: u32,
     mem: &mut Vec<Vec<Byte>>,
-    glob: &Glob,
+    glob: &Glob<'_>,
 ) -> Outcome {
     let mut st = St {
         f,
@@ -407,10 +409,10 @@ fn exec(
                         Err(e) => return ub(e),
                     }
                 }
-                let Some(g) = m.funcs.iter().find(|g| g.name == *callee) else {
+                let Some(g) = glob.funcs.get(callee.as_str()).copied() else {
                     return ub(format!("gọi @{callee} ngoài module"));
                 };
-                match exec(m, g, &vals, fuel, depth + 1, st.mem, glob) {
+                match exec(g, &vals, fuel, depth + 1, st.mem, glob) {
                     Outcome::Value(v) => {
                         if let (Some(d), Some(v)) = (d, v) {
                             st.env.insert(d.clone(), Val::Int(v));
