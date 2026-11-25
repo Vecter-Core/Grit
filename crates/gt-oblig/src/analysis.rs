@@ -2182,17 +2182,15 @@ pub fn analyze_body(body: &Body, info: &ProgInfo, prover: &mut dyn Prover) -> Bo
             }
         }
     };
-    let pre = states.clone();
-    narrow(&cx, &mut states);
-    if check_post_fixpoint(&cx, &states, false).is_err() {
-        // narrowing không đơn điệu trên siêu dữ liệu: bỏ nó, dùng điểm cố định thuần widening (vẫn phải qua kiểm)
-        states = pre;
-        rep.narrowing_rejected = true;
-    }
-    // FB-C40 (Gemini G-06): điểm cố định thuần widening phải thoả CẢ `facts`/`defs`
-    if let Err(e) = check_post_fixpoint(&cx, &states, rep.narrowing_rejected) {
-        rep.ice = Some(e);
-        return rep;
+    match settle(&cx, states) {
+        Ok((s, rejected)) => {
+            states = s;
+            rep.narrowing_rejected = rejected;
+        }
+        Err(e) => {
+            rep.ice = Some(e);
+            return rep;
+        }
     }
     // đầu vòng nào có cạnh lùi KHẢ THI (cùng tiêu chí với việc sinh nghĩa vụ biến thể ở `edges`)?
     let mut live_back: BTreeSet<u32> = BTreeSet::new();
@@ -2305,10 +2303,80 @@ fn fixpoint(cx: &Ctx<'_>, steps: &mut u64) -> Option<Vec<Option<AState>>> {
     }
 }
 
-/// Hai lượt narrowing: thay trạng thái bằng giá trị tính lại từ các cạnh vào nếu mạnh hơn (⊑).
-fn narrow(cx: &Ctx<'_>, states: &mut [Option<AState>]) {
+/// Chốt trạng thái cuối từ điểm cố định widening `pre` (FB-G2-03, Gemini G2-03 — hàng rào độc lập cho MỌI đường, không chỉ khi narrowing bị bác):
+/// 1. `pre` phải là hậu-điểm-cố-định CHẶT (`env`, `facts`, `defs`) — nếu không: ICE (không bao giờ nạp kernel giả thiết không được mọi cạnh vào bảo đảm);
+/// 2. mỗi lượt narrowing `S(k-1) → S(k)` phải là bước GIẢM hợp lệ (`check_descending`): `S(k)[b]` hoặc giữ nguyên `S(k-1)[b]`, hoặc được mọi cạnh vào
+///    tính từ `S(k-1)` bảo đảm (`env ⊑`, `facts ⊆`, `defs ⊆`). Đúng đắn theo quy nạp: `S(k-1)` đúng ⇒ ảnh của nó qua hàm chuyển (đúng) cũng đúng;
+/// 3. như trước, trạng thái narrowing còn phải là hậu-điểm-cố-định trên `env`. Hỏng 2 hoặc 3 ⇒ dùng `pre` (đã qua 1).
+fn settle(cx: &Ctx<'_>, pre: Vec<Option<AState>>) -> Result<(Vec<Option<AState>>, bool), String> {
+    check_post_fixpoint(cx, &pre, true)?;
+    let mut states = pre.clone();
+    let mut ok = true;
+    for _ in 0..NARROW_PASSES {
+        let prev = states.clone();
+        narrow_pass(cx, &mut states);
+        if check_descending(cx, &prev, &states).is_err() {
+            ok = false;
+            break;
+        }
+    }
+    if ok && check_post_fixpoint(cx, &states, false).is_ok() {
+        Ok((states, false))
+    } else {
+        Ok((pre, true))
+    }
+}
+
+const NARROW_PASSES: usize = 2;
+
+/// Kiểm một lượt narrowing độc lập với `narrow_pass`: khối vào giữ nguyên; khối không tới được giữ không tới được; khối đổi trạng thái phải được
+/// MỌI cạnh vào sống (tính từ `prev`) bảo đảm cả `env` lẫn `facts`/`defs`.
+fn check_descending(
+    cx: &Ctx<'_>,
+    prev: &[Option<AState>],
+    next: &[Option<AState>],
+) -> Result<(), String> {
     let n = cx.body.blocks.len();
-    for _ in 0..2 {
+    let mut incoming: Vec<Vec<AState>> = vec![Vec::new(); n];
+    for b in &cx.rpo {
+        let bb = b.index();
+        let Some(s) = &prev[bb] else { continue };
+        for (tgt, out) in cx.block_out(s, bb, None) {
+            if !out.env.is_dead() {
+                incoming[tgt.index()].push(out);
+            }
+        }
+    }
+    for bb in 0..n {
+        match (&prev[bb], &next[bb]) {
+            (_, None) | (None, Some(_)) if prev[bb] != next[bb] => {
+                return Err(format!("narrowing đổi khả năng tới được của bb{bb}"));
+            }
+            (Some(p), Some(t)) if p != t => {
+                if bb == 0 {
+                    return Err("narrowing đổi trạng thái khối vào".into());
+                }
+                for out in &incoming[bb] {
+                    if !(out.env.leq(&t.env)
+                        && t.facts.iter().all(|f| out.facts.contains(f))
+                        && t.defs.iter().all(|(k, d)| out.defs.get(k) == Some(d)))
+                    {
+                        return Err(format!(
+                            "narrowing tại bb{bb} không được một cạnh vào bảo đảm"
+                        ));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Một lượt narrowing: thay trạng thái bằng giá trị tính lại từ các cạnh vào nếu mạnh hơn (⊑).
+fn narrow_pass(cx: &Ctx<'_>, states: &mut [Option<AState>]) {
+    let n = cx.body.blocks.len();
+    {
         let mut incoming: Vec<Option<AState>> = vec![None; n];
         incoming[0] = Some(cx.init());
         for b in &cx.rpo {
@@ -2351,8 +2419,8 @@ fn check_post_fixpoint(
             match &states[tgt.index()] {
                 // FB-C40 (Gemini G-06): `facts`/`defs` của đích phải được MỌI đường tới bảo đảm (hợp = giao) — nếu không, kernel nhận một giả thiết
                 // mà một cạnh vào không chứng minh. Kiểm độc lập với `join`/`widen`/`narrow`.
-                // `strict_meta` chỉ đặt cho điểm cố định của WIDENING (đúng ý nghĩa hậu-điểm-cố-định); trạng thái đã narrowing có `facts` là GIAO các `out` của
-                // trạng thái cũ (đúng, nhưng không cần là điểm cố định của `facts`) ⇒ chỉ kiểm `env` như trước (siết cả hai làm mất độ chính xác ở std).
+                // `strict_meta` chỉ đặt cho điểm cố định của WIDENING (`settle` kiểm nó LUÔN LUÔN); trạng thái đã narrowing có `facts` là GIAO các `out` của
+                // trạng thái cũ (đúng, nhưng không cần là điểm cố định của `facts`) ⇒ ở đây chỉ kiểm `env`; `facts`/`defs` của nó do `check_descending` kiểm.
                 Some(t)
                     if out.env.leq(&t.env)
                         && (!strict_meta
@@ -2531,15 +2599,8 @@ impl<'a> DomainQuery<'a> {
     pub fn new(body: &'a Body, info: &'a ProgInfo) -> Option<DomainQuery<'a>> {
         let cx = Ctx::new(body, info, true);
         let mut steps = 0u64;
-        let mut states = fixpoint(&cx, &mut steps)?;
-        let pre = states.clone();
-        narrow(&cx, &mut states);
-        let mut rejected = false;
-        if check_post_fixpoint(&cx, &states, false).is_err() {
-            states = pre;
-            rejected = true;
-        }
-        check_post_fixpoint(&cx, &states, rejected).ok()?;
+        let states = fixpoint(&cx, &mut steps)?;
+        let (states, _) = settle(&cx, states).ok()?;
         Some(DomainQuery { cx, states })
     }
 
