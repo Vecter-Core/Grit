@@ -1,0 +1,9 @@
+// expect: fail G0105
+// note: global định nghĩa hai lần
+glir 1
+global @s = 00
+global @s = 01
+fn @f() -> void {
+entry:
+  ret void
+}

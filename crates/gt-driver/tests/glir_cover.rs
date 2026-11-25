@@ -421,6 +421,7 @@ fn diff_src(
                     "{} {gargs:?}\n{}",
                     b.key,
                     gt_glir::print(&gt_glir::Module {
+                        globals: vec![],
                         decls: vec![],
                         funcs: module
                             .funcs

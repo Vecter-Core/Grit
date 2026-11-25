@@ -23,6 +23,7 @@ fn opd(o: &Opd) -> String {
     match o {
         Opd::Val(v) => format!("%{v}"),
         Opd::Slot(s) => format!("${s}"),
+        Opd::Global(g) => format!("@{g}"),
         Opd::Int(t, n) => format!("{} {n}", ty(t)),
     }
 }
@@ -174,6 +175,15 @@ fn func(f: &Func, out: &mut String) {
 #[must_use]
 pub fn print(m: &Module) -> String {
     let mut out = String::from("glir 1\n");
+    for g in &m.globals {
+        let hex: String = g.bytes.iter().map(|b| format!("{b:02x}")).collect();
+        let _ = writeln!(
+            out,
+            "global @{} = {}",
+            g.name,
+            if hex.is_empty() { "-" } else { &hex }
+        );
+    }
     for d in &m.decls {
         let _ = writeln!(out, "{}", decl(d));
     }

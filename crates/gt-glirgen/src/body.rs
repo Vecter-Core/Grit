@@ -903,6 +903,7 @@ pub fn lower_module(db: &TypeDb, bodies: &[Body]) -> (gt_glir::Module, Vec<(Stri
     }
     (
         gt_glir::Module {
+            globals: Vec::new(),
             decls: Vec::new(),
             funcs: ok.into_values().collect(),
         },

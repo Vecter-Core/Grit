@@ -57,6 +57,12 @@ fn ret_ty(i: &Inst) -> Option<Ty> {
 
 pub fn verify(m: &Module) -> Vec<String> {
     let mut out = Vec::new();
+    let mut gseen = BTreeSet::new();
+    for g in &m.globals {
+        if !gseen.insert(&g.name) {
+            out.push(format!("G0105: global `@{}` định nghĩa hai lần", g.name));
+        }
+    }
     let mut seen = BTreeSet::new();
     for f in &m.funcs {
         if !seen.insert(&f.name) {
@@ -169,6 +175,14 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
         |cx: &mut Cx, o: &Opd, bi: usize, ii: isize, phi_pred: Option<usize>| -> Option<Ty> {
             match o {
                 Opd::Int(t, _) => Some(t.clone()),
+                Opd::Global(g) => {
+                    if cx.m.globals.iter().any(|x| x.name == *g) {
+                        Some(Ty::Ptr)
+                    } else {
+                        cx.err("G0206", format!("global `@{g}` chưa khai báo"));
+                        None
+                    }
+                }
                 Opd::Slot(s) => {
                     if slots.contains_key(s.as_str()) {
                         Some(Ty::Ptr)

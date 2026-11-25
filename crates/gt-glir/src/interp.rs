@@ -68,6 +68,9 @@ struct St<'a> {
     /// tên slot → vùng
     slot: BTreeMap<String, usize>,
     mem: &'a mut Vec<Vec<Byte>>,
+    /// tên global → vùng (các vùng `< nro` là CHỈ ĐỌC)
+    gl: &'a BTreeMap<String, usize>,
+    nro: usize,
 }
 
 impl St<'_> {
@@ -79,6 +82,7 @@ impl St<'_> {
                 .cloned()
                 .ok_or_else(|| format!("%{v} chưa có giá trị")),
             Opd::Slot(s) => Ok(Val::Ptr(*self.slot.get(s).ok_or("slot lạ")?, 0)),
+            Opd::Global(g) => Ok(Val::Ptr(*self.gl.get(g).ok_or("global lạ")?, 0)),
             Opd::Int(t, n) => Ok(Val::Int(
                 (*n as u128) & mask(t.bits().ok_or("hằng không nguyên")?),
             )),
@@ -109,6 +113,9 @@ impl St<'_> {
         Ok(self.mem[a][r].to_vec())
     }
     fn write(&mut self, a: usize, off: u64, bytes: &[Byte]) -> Result<(), String> {
+        if a < self.nro {
+            return Err("ghi vào vùng chỉ-đọc (global)".into());
+        }
         let r = self.range(a, off, bytes.len() as u64)?;
         self.mem[a][r].copy_from_slice(bytes);
         Ok(())
@@ -220,6 +227,7 @@ fn cmp(p: CmpPred, w: u32, a: u128, b: u128) -> bool {
 #[must_use]
 pub fn run(f: &Func, args: &[u128], fuel: u64) -> Outcome {
     let m = Module {
+        globals: Vec::new(),
         decls: Vec::new(),
         funcs: vec![f.clone()],
     };
@@ -251,6 +259,13 @@ pub fn run_module_refs(
         return (Outcome::Ub(format!("không có hàm @{name}")), Vec::new());
     };
     let mut mem: Vec<Vec<Byte>> = Vec::new();
+    // các global chiếm các vùng đầu (chỉ đọc)
+    let mut gl: BTreeMap<String, usize> = BTreeMap::new();
+    for g in &m.globals {
+        gl.insert(g.name.clone(), mem.len());
+        mem.push(g.bytes.iter().map(|b| Byte::B(*b)).collect());
+    }
+    let nro = mem.len();
     let mut refs: Vec<usize> = Vec::new();
     let vals: Vec<Val> = args
         .iter()
@@ -266,7 +281,7 @@ pub fn run_module_refs(
             }
         })
         .collect();
-    let out = exec(m, f, &vals, &mut fuel, 0, &mut mem);
+    let out = exec(m, f, &vals, &mut fuel, 0, &mut mem, &gl, nro);
     let fin = refs
         .iter()
         .map(|i| {
@@ -289,12 +304,16 @@ fn exec(
     fuel: &mut u64,
     depth: u32,
     mem: &mut Vec<Vec<Byte>>,
+    gl: &BTreeMap<String, usize>,
+    nro: usize,
 ) -> Outcome {
     let mut st = St {
         f,
         env: BTreeMap::new(),
         slot: BTreeMap::new(),
         mem,
+        gl,
+        nro,
     };
     if args.len() != f.params.len() {
         return Outcome::Ub("sai số đối số".into());
@@ -363,7 +382,7 @@ fn exec(
                 let Some(g) = m.funcs.iter().find(|g| g.name == *callee) else {
                     return ub(format!("gọi @{callee} ngoài module"));
                 };
-                match exec(m, g, &vals, fuel, depth + 1, st.mem) {
+                match exec(m, g, &vals, fuel, depth + 1, st.mem, gl, nro) {
                     Outcome::Value(v) => {
                         if let (Some(d), Some(v)) = (d, v) {
                             st.env.insert(d.clone(), Val::Int(v));
