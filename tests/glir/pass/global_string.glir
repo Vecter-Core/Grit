@@ -1,0 +1,9 @@
+// expect: pass
+// note: global chỉ-đọc (chuỗi hằng): đọc byte qua con trỏ global
+glir 1
+global @s0 = 68c3a96c6c6f
+fn @first() -> i8 {
+entry:
+  %v = load i8 @s0
+  ret i8 %v
+}

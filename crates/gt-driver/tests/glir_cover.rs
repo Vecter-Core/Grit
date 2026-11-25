@@ -14,8 +14,11 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
         .filter(|p| p.extension().is_some_and(|x| x == "gt"))
         .collect();
     files.sort();
+    // HAI số (ADR-P2-02, thân generic theo instance): theo THÂN (hạ được ⇔ ≥ 1 instance hạ được) và theo INSTANCE
     let (mut lowered, mut total) = (0usize, 0usize);
+    let (mut inst_ok, mut inst_total) = (0usize, 0usize);
     let mut why: BTreeMap<String, usize> = BTreeMap::new();
+    let mut why_body: BTreeMap<String, usize> = BTreeMap::new();
     for p in files {
         let src = std::fs::read_to_string(&p).expect("đọc");
         let Ok(res) = check(
@@ -35,38 +38,65 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
             .filter(|b| b.kind == gt_mir::BodyKind::Fn)
             .collect();
         total += fns.len();
-        let (m, bad) = gt_glirgen::lower_module(&art.types.db, &art.mir.bodies);
-        for (_, u) in bad {
-            *why.entry(u.0).or_default() += 1;
+        let lo = gt_glirgen::lower_module(&art.types, &art.mir);
+        for (_, _, u) in &lo.bad {
+            *why.entry(u.0.clone()).or_default() += 1;
         }
-        let errs = gt_glir::verify(&m);
+        inst_total += lo.module.funcs.len() + lo.bad.len();
+        let ok_nodes: std::collections::BTreeSet<_> = lo.funcs.values().map(|i| i.node).collect();
+        for b in &fns {
+            if ok_nodes.contains(&b.node) {
+                lowered += 1;
+            } else if let Some((_, _, u)) = lo.bad.iter().find(|(_, i, _)| i.node == b.node) {
+                *why_body.entry(u.0.clone()).or_default() += 1;
+            } else {
+                assert!(
+                    lo.no_instance.contains(&b.key),
+                    "{}: thân không được tính",
+                    b.key
+                );
+                *why_body
+                    .entry("thân generic không có instance".into())
+                    .or_default() += 1;
+            }
+        }
+        let m = &lo.module;
+        let errs = gt_glir::verify(m);
         assert!(
             errs.is_empty(),
             "{}: {errs:?}\n{}",
             p.display(),
-            gt_glir::print(&m)
+            gt_glir::print(m)
         );
         for f in &m.funcs {
-            lowered += 1;
-            let b = fns
-                .iter()
-                .find(|b| gt_glirgen::glir_name(&b.key) == f.name)
-                .expect("thân gốc");
+            inst_ok += 1;
+            let inst = &lo.funcs[&f.name];
+            let b = fns.iter().find(|b| b.node == inst.node).expect("thân gốc");
             let cover = gt_glirgen::check_abort_cover(b, f);
             assert!(cover.is_empty(), "{}: {cover:?}", b.key);
         }
-        let text = gt_glir::print(&m);
+        let text = gt_glir::print(m);
         let back = gt_glir::parse(&text)
             .unwrap_or_else(|e| panic!("{}: in ra không đọc lại được: {e}", p.display()));
-        assert_eq!(back, m, "{}: đọc(in) ≠ gốc", p.display());
+        assert_eq!(&back, m, "{}: đọc(in) ≠ gốc", p.display());
     }
+    eprintln!("GLIR_COVER bodies lowered={lowered} total={total}");
+    let mut by: Vec<_> = why_body.into_iter().collect();
+    by.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+    for (w, n) in by.iter().take(15) {
+        eprintln!("  thân chưa hạ: {n:5}  {w}");
+    }
+    eprintln!("GLIR_COVER instances lowered={inst_ok} total={inst_total}");
     let mut by: Vec<_> = why.into_iter().collect();
     by.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
-    eprintln!("GLIR_COVER lowered={lowered} total={total}");
     for (w, n) in by.iter().take(15) {
-        eprintln!("  chưa hạ: {n:5}  {w}");
+        eprintln!("  instance chưa hạ: {n:5}  {w}");
     }
-    assert!(lowered >= 1, "không hạ được thân nào");
+    // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25
+    assert!(
+        lowered >= 3495 && inst_ok >= 13356,
+        "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
+    );
 }
 
 /// ORACLE VI SAI (ADR-P2-02 C3/C2): thân hạ được mà tham số/kết quả là số nguyên/bool/`()`/tuple/struct (lồng nhau) chạy trên GLIR interp (Rust thuần, theo BYTE) và
@@ -332,16 +362,21 @@ fn decode_eq(
     }
 }
 
+/// Số liệu của một lượt oracle: (instance chạy, lượt so, lượt abort khớp, instance GENERIC (args ≠ []) chạy)
+type DiffStats = (usize, usize, usize, usize);
+
+/// Chạy oracle trên MỌI instance hạ được (thân không generic = instance args=[]) có chữ ký plain SAU KHI THẾ: thông dịch MIR `call_instance` vs GLIR.
 fn diff_src(
     src: &str,
     rnd: &mut dyn FnMut() -> u64,
     main_only: bool,
+    seen: &mut std::collections::BTreeSet<String>,
     iters: usize,
-) -> (usize, usize, usize) {
+) -> DiffStats {
     use gt_glir::interp::{Arg, Outcome as GO};
     use gt_mir::interp::{Interp, Outcome as MO, V};
     use gt_types::Ty;
-    let (mut bodies, mut runs, mut aborts) = (0usize, 0usize, 0usize);
+    let (mut bodies, mut runs, mut aborts, mut generic) = (0usize, 0usize, 0usize, 0usize);
     let Ok(res) = check(
         &[SourceInput {
             name: "main.gt".to_string(),
@@ -349,46 +384,98 @@ fn diff_src(
         }],
         &Options::default(),
     ) else {
-        return (0, 0, 0);
+        return (0, 0, 0, 0);
     };
     let Some(art) = res.open_gate() else {
-        return (0, 0, 0);
+        return (0, 0, 0, 0);
     };
     let db = &art.types.db;
-    let (module, _) = gt_glirgen::lower_module(db, &art.mir.bodies);
-    for b in &art.mir.bodies {
-        if b.kind != gt_mir::BodyKind::Fn
-            || (main_only && !b.key.starts_with("main::"))
-            || !b.key.starts_with("main::")
+    let lo = gt_glirgen::lower_module(&art.types, &art.mir);
+    let module = &lo.module;
+    // tối đa 4 instance generic cho MỖI thân (mẫu bùng nổ instance gần trần E0317 sinh hàng nghìn instance cùng thân)
+    let mut per_body: BTreeMap<gt_ast::NodeId, usize> = BTreeMap::new();
+    for (gname, inst) in &lo.funcs {
+        let Some(b) = art
+            .mir
+            .bodies
+            .iter()
+            .find(|b| b.kind == gt_mir::BodyKind::Fn && b.node == inst.node)
+        else {
+            continue;
+        };
+        if (main_only && !b.key.starts_with("main::"))
+            || !(b.key.starts_with("main::") || b.key.starts_with("$prelude::"))
+            || (!b.key.starts_with("main::") && !seen.insert(gname.clone()))
         {
             continue;
         }
-        let gname = gt_glirgen::glir_name(&b.key);
-        if !module.funcs.iter().any(|f| f.name == gname) {
+        // kiểu tham số/kết quả ĐÃ THẾ theo instance (độc lập với `Lw::sub` của bước hạ: thế bằng `Ty::subst` trực tiếp)
+        let ps = db.fn_params(b.sig_node);
+        let sub = |t: &Ty| {
+            t.subst(&|p| {
+                ps.iter()
+                    .position(|q| *q == p)
+                    .and_then(|i| inst.args.get(i).cloned())
+            })
+        };
+        let ptys: Vec<Ty> = (1..=b.arg_count).map(|i| sub(&b.locals[i].ty)).collect();
+        let rty = &sub(&b.locals[0].ty);
+        if !ptys.iter().all(|t| plain(db, t, 0) || matches!(t, Ty::Ref(_, i) if (plain(db, i, 0) && !matches!(**i, Ty::Tuple(ref v) if v.is_empty())) || matches!(&**i, Ty::Str) || matches!(&**i, Ty::Slice(e) if plain(db, e, 0)))) || !plain(db, rty, 0) {
             continue;
         }
-        let ptys: Vec<Ty> = (1..=b.arg_count).map(|i| b.locals[i].ty.clone()).collect();
-        let rty = &b.locals[0].ty;
-        if !ptys.iter().all(|t| plain(db, t, 0) || matches!(t, Ty::Ref(_, i) if plain(db, i, 0) && !matches!(**i, Ty::Tuple(ref v) if v.is_empty()))) || !plain(db, rty, 0) {
-            continue;
+        if !inst.args.is_empty() {
+            let c = per_body.entry(inst.node).or_default();
+            if *c >= 4 {
+                continue;
+            }
+            *c += 1;
+            generic += 1;
         }
         bodies += 1;
+        // không tham số ⇒ tất định: một lượt là đủ
+        let iters = if ptys.is_empty() { 1 } else { iters };
         for _ in 0..iters {
             let mut mi = Interp::new(&art.mir, 200_000).with_types(&art.types);
             let mut margs: Vec<V> = Vec::new();
             let mut gargs: Vec<Arg> = Vec::new();
-            // (kiểu pointee, tham chiếu MIR) của từng tham số `&T`/`&!T`, theo thứ tự
-            let mut refs: Vec<(Ty, V)> = Vec::new();
+            // (kiểu pointee, tham chiếu MIR, số phần tử nếu là slice/str) của từng tham số tham chiếu, theo thứ tự
+            let mut refs: Vec<(Ty, V, Option<usize>)> = Vec::new();
             for t in &ptys {
                 if let Ty::Ref(_, inner) = t {
-                    let v = gen_val(db, inner, rnd);
-                    let n = gt_glir::layout::layout(&glir_ty_of(db, inner)).size as usize;
-                    let mut buf = vec![None; n];
-                    encode(db, inner, &v, &mut buf, 0);
-                    gargs.push(Arg::Ref(buf));
-                    let r = mi.alloc_ref(v);
-                    refs.push(((**inner).clone(), r.clone()));
-                    margs.push(r);
+                    match &**inner {
+                        Ty::Str => {
+                            let pool = ["", "a", "héllo", "xyz", "日本語", "a\u{0}b", "ab"];
+                            let st = pool[(rnd() % pool.len() as u64) as usize];
+                            let bytes: Vec<Option<u8>> = st.bytes().map(Some).collect();
+                            gargs.push(Arg::Fat(bytes, st.len() as u64));
+                            let r = mi.alloc_ref(V::Str(st.to_string()));
+                            refs.push(((**inner).clone(), r.clone(), Some(st.len())));
+                            margs.push(r);
+                        }
+                        Ty::Slice(e) => {
+                            let n = (rnd() % 5) as usize;
+                            let vals: Vec<V> = (0..n).map(|_| gen_val(db, e, rnd)).collect();
+                            let sz = gt_glir::layout::layout(&glir_ty_of(db, e)).size as usize;
+                            let mut buf = vec![None; n * sz];
+                            for (i, ev) in vals.iter().enumerate() {
+                                encode(db, e, ev, &mut buf, i * sz);
+                            }
+                            gargs.push(Arg::Fat(buf, n as u64));
+                            let r = mi.alloc_ref(V::Array(vals));
+                            refs.push(((**e).clone(), r.clone(), Some(n)));
+                            margs.push(r);
+                        }
+                        _ => {
+                            let v = gen_val(db, inner, rnd);
+                            let n = gt_glir::layout::layout(&glir_ty_of(db, inner)).size as usize;
+                            let mut buf = vec![None; n];
+                            encode(db, inner, &v, &mut buf, 0);
+                            gargs.push(Arg::Ref(buf));
+                            let r = mi.alloc_ref(v);
+                            refs.push(((**inner).clone(), r.clone(), None));
+                            margs.push(r);
+                        }
+                    }
                     continue;
                 }
                 let v = gen_val(db, t, rnd);
@@ -408,8 +495,8 @@ fn diff_src(
                 }
                 margs.push(v);
             }
-            let (g, fin) = gt_glir::interp::run_module_refs(&module, &gname, &gargs, 200_000);
-            let m = mi.call_key(&b.key, margs.clone());
+            let (g, fin) = gt_glir::interp::run_module_refs(module, gname, &gargs, 200_000);
+            let m = mi.call_instance(&b.key, inst.args.clone(), margs.clone());
             let m = match m {
                 MO::Value(v) => Ok(v),
                 MO::Abort(k) => Err(k),
@@ -418,14 +505,16 @@ fn diff_src(
             runs += 1;
             let ctx = || {
                 format!(
-                    "{} {gargs:?}\n{}",
+                    "{} {:?} {gargs:?}\n{}",
                     b.key,
+                    inst.args,
                     gt_glir::print(&gt_glir::Module {
+                        globals: vec![],
                         decls: vec![],
                         funcs: module
                             .funcs
                             .iter()
-                            .filter(|f| f.name == gname)
+                            .filter(|f| &f.name == gname)
                             .cloned()
                             .collect()
                     })
@@ -456,10 +545,24 @@ fn diff_src(
             }
             // trạng thái sau lời gọi của vùng mà `&T`/`&!T` trỏ tới phải khớp (chỉ khi không abort giữa chừng)
             if finished {
-                for ((inner, r), bytes) in refs.iter().zip(&fin) {
+                for ((inner, r, cnt), bytes) in refs.iter().zip(&fin) {
                     let fv = mi.read_ref(r).expect("vùng tham chiếu còn đó");
+                    let ok = match (cnt, &fv) {
+                        (None, _) => decode_eq(db, inner, &fv, bytes, 0),
+                        (Some(_), V::Str(st)) => {
+                            bytes.iter().map(|b| b.unwrap_or(0)).collect::<Vec<u8>>()
+                                == st.as_bytes()
+                        }
+                        (Some(_), V::Array(vs)) => {
+                            let sz = gt_glir::layout::layout(&glir_ty_of(db, inner)).size as usize;
+                            vs.iter()
+                                .enumerate()
+                                .all(|(i, ev)| decode_eq(db, inner, ev, bytes, i * sz))
+                        }
+                        _ => false,
+                    };
                     assert!(
-                        decode_eq(db, inner, &fv, bytes, 0),
+                        ok,
                         "{}: trạng thái sau lời gọi của vùng tham chiếu: GLIR {bytes:?}, MIR {fv:?}",
                         ctx()
                     );
@@ -467,7 +570,7 @@ fn diff_src(
             }
         }
     }
-    (bodies, runs, aborts)
+    (bodies, runs, aborts, generic)
 }
 
 #[test]
@@ -486,18 +589,20 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_boundary_inputs() {
         seed ^= seed << 17;
         seed
     };
-    let (mut bodies, mut runs, mut aborts) = (0usize, 0usize, 0usize);
+    let (mut bodies, mut runs, mut aborts, mut generic) = (0usize, 0usize, 0usize, 0usize);
+    let mut seen = std::collections::BTreeSet::new();
     for p in files {
         let src = std::fs::read_to_string(&p).expect("đọc");
-        let (b, r, a) = diff_src(&src, &mut rnd, true, 40);
+        let (b, r, a, g) = diff_src(&src, &mut rnd, false, &mut seen, 40);
         bodies += b;
         runs += r;
         aborts += a;
+        generic += g;
     }
-    eprintln!("GLIR_DIFF bodies={bodies} runs={runs} aborts={aborts}");
+    eprintln!("GLIR_DIFF instances={bodies} generic={generic} runs={runs} aborts={aborts}");
     assert!(
-        bodies >= 5 && runs >= 300 && aborts >= 5,
-        "oracle quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+        bodies >= 5 && runs >= 300 && aborts >= 5 && generic >= 20,
+        "oracle quá nhỏ: instances={bodies} generic={generic} runs={runs} aborts={aborts}"
     );
 }
 
@@ -550,7 +655,7 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arithmetic() {
         seed ^= seed << 17;
         seed
     };
-    let (bodies, runs, aborts) = diff_src(&src, &mut rnd, true, 120);
+    let (bodies, runs, aborts, _) = diff_src(&src, &mut rnd, true, &mut Default::default(), 120);
     eprintln!("GLIR_DIFF_GEN bodies={bodies} runs={runs} aborts={aborts}");
     assert!(
         bodies >= 100 && runs >= 12000 && aborts >= 1000,
@@ -628,7 +733,7 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_enums() {
         seed ^= seed << 17;
         seed
     };
-    let (bodies, runs, aborts) = diff_src(src, &mut rnd, true, 150);
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
     eprintln!("GLIR_DIFF_ENUM bodies={bodies} runs={runs} aborts={aborts}");
     assert!(
         bodies >= 9 && runs >= 1000,
@@ -658,10 +763,103 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arrays() {
         seed ^= seed << 17;
         seed
     };
-    let (bodies, runs, aborts) = diff_src(src, &mut rnd, true, 150);
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
     eprintln!("GLIR_DIFF_ARR bodies={bodies} runs={runs} aborts={aborts}");
     assert!(
         bodies >= 7 && runs >= 1000 && aborts >= 50,
         "oracle mảng quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH có slice/`&str`: tham số `&[T]`/`&!`-slice/`&str` (con trỏ béo, cấp bởi `Arg::Fat`), chỉ số biến kèm kiểm biên, `Len`, lát con `&s[a..b]`,
+/// chuỗi hằng (global), ép `&[T;N]`→`&[T]`; so kết quả VÀ trạng thái vùng sau lời gọi với thông dịch MIR.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_slices() {
+    let src = "\
+ƒ first(s: &[u32]) → u32 ! ∅ { s[0usize] }
+ƒ at(s: &[u8], i: usize) → u8 ! ∅ { s[i] }
+ƒ count(s: &[u16]) → usize ! ∅ { s.len() }
+ƒ tail_len(s: &[u32]) → usize ! ∅ { t ≔ &s[1usize..]; t.len() }
+ƒ mid(s: &[u8], a: usize, b: usize) → usize ! ∅ { t ≔ &s[a..b]; t.len() }
+ƒ sum_pair(s: &[i32]) → i32 ! ∅ { s[0usize] +% s[1usize] }
+ƒ put(s: &![u32], i: usize, v: u32) ! ∅ { s[i] ← v; }
+ƒ lit_len() → usize ! ∅ { t ≔ \"héllo\"; t.len() }
+ƒ str_len(t: &str) → usize ! ∅ { t.len() }
+ƒ arr_as_slice(a: &[u8; 4]) → usize ! ∅ { s: &[u8] ≔ a; s.len() }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0xFEED_FACE_0BAD_F00Du64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_SLICE bodies={bodies} runs={runs} aborts={aborts}");
+    assert!(
+        bodies >= 7 && runs >= 1000 && aborts >= 100,
+        "oracle slice quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH có GENERIC (ADR-P2-02, thân generic theo instance): hàm generic gọi hàm generic, phương thức trait qua ràng buộc (`T: Score`
+/// ⇒ `Callee::TraitMethod` phân giải theo instance), struct generic + `⊐ <T>`, `Option<T>`, mảng `[T; 3]`, đa hình hai tham số. Oracle chạy TRỰC TIẾP
+/// từng instance generic (`call_instance`) so với hàm GLIR của instance đó. Phương thức trait CÓ generic riêng (`conv<U>`) gọi qua ràng buộc
+/// (`Callee::TraitMethod` với `generics` ≠ []). Ngưỡng `generic` = đúng số instance generic hiện có (mất một instance ⇒ đỏ).
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_generics() {
+    let src = "\
+⊏ Score { ƒ score(&self) → u32 ! ∅; }
+▢ A { x: u8, y: u32 }
+▢ B { k: i16 }
+⊐ Copy for B { }
+⊐ Score for A { ƒ score(&self) → u32 ! ∅ { (self.x as u32) + self.y } }
+⊐ Score for B { ƒ score(&self) → u32 ! ∅ { ⎇ self.k < 0i16 { 7u32 } ⇝ { (self.k as u32) * 3u32 } } }
+ƒ id<T>(x: T) → T ! ∅ { x }
+ƒ pick<T>(c: bool, x: T, y: T) → T ! ∅ { ⎇ c { id(x) } ⇝ { y } }
+ƒ pair<T, U>(x: T, y: U) → (U, T) ! ∅ { (y, x) }
+ƒ sc<T: Score>(a: T) → u32 ! ∅ { s ≔ &a; s.score() }
+ƒ twice<T: Score>(a: &T) → u32 ! ∅ { a.score() + a.score() }
+ƒ via<T: Score>(a: T, b: T, c: bool) → u32 ! ∅ { p ≔ pick(c, a, b); sc(p) }
+▢ Two<T> { a: T, b: T }
+⊐ <T: Copy> Two<T> {
+  ƒ fst(&self) → T ! ∅ { self.a }
+  ƒ swap(&self) → Two<T> ! ∅ { Two { a: self.b, b: self.a } }
+}
+ƒ mk<T>(a: T, b: T) → Two<T> ! ∅ { Two { a: a, b: b } }
+ƒ wrap<T>(x: T) → Option<T> ! ∅ { Some(x) }
+ƒ or_else<T>(o: Option<T>, d: T) → T ! ∅ { ⌥ o { Some(v) ↦ v, None ↦ d } }
+ƒ at<T: Copy>(a: [T; 3], i: usize) → T ! ∅ { a[i] }
+ƒ use1(a: A, b: A, c: bool) → u32 ! ∅ { via(a, b, c) }
+ƒ use2(x: B) → u32 ! ∅ { twice(&x) }
+ƒ use3(x: u8, y: i64) → (i64, u8) ! ∅ { pair(x, y) }
+ƒ use4(a: u16, b: u16) → u16 ! ∅ { m ≔ mk(a, b); n ≔ m.swap(); n.fst() }
+ƒ use5(x: i32, c: bool, d: i32) → i32 ! ∅ { o ≔ ⎇ c { wrap(x) } ⇝ { None }; or_else(o, d) }
+ƒ use6(a: [i8; 3], i: usize) → i8 ! ∅ { at(a, i) }
+ƒ use7(a: [B; 3], i: usize) → u32 ! ∅ { b ≔ at(a, i); sc(b) }
+ƒ use8(x: bool, y: (u8, bool)) → (bool, (u8, bool)) ! ∅ { pair(y, x) }
+ƒ use9(a: B, b: B, c: bool) → u32 ! ∅ { via(a, b, c) }
+ƒ use10(a: Two<u8>) → u8 ! ∅ { a.swap().fst() }
+⊏ Conv { ƒ conv<U: Copy>(&self, u: U) → (U, u32) ! ∅; }
+⊐ Conv for A { ƒ conv<U: Copy>(&self, u: U) → (U, u32) ! ∅ { (u, self.y + 1u32) } }
+ƒ cv<T: Conv, V: Copy>(t: &T, v: V) → (V, u32) ! ∅ { t.conv(v) }
+ƒ use11(a: A, v: i16) → (i16, u32) ! ∅ { cv(&a, v) }
+ƒ use12(a: A, v: bool) → (bool, u32) ! ∅ { a.conv(v) }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0x5EED_6E4E_21C5_0001u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (insts, runs, aborts, generic) =
+        diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_GENERIC instances={insts} generic={generic} runs={runs} aborts={aborts}");
+    assert!(
+        generic >= 23 && runs >= 5000 && aborts >= 100,
+        "oracle generic quá nhỏ: instances={insts} generic={generic} runs={runs} aborts={aborts}"
     );
 }

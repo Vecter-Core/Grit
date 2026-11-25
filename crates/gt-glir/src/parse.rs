@@ -75,6 +75,9 @@ fn parse_opd(s: &str) -> R<Opd> {
     if let Some(v) = s.strip_prefix('$') {
         return Ok(Opd::Slot(ident(v)?));
     }
+    if let Some(v) = s.strip_prefix('@') {
+        return Ok(Opd::Global(ident(v)?));
+    }
     let (t, r) = parse_ty(s, 0)?;
     if !t.is_int() {
         return Err("hằng phải có kiểu số nguyên".into());
@@ -307,7 +310,28 @@ pub fn parse(src: &str) -> R<Module> {
     }
     let wrap = |n: usize, e: String| format!("dòng {n}: {e}");
     while let Some((n, l)) = lines.next() {
-        if let Some(rest) = l.strip_prefix("declare @") {
+        if let Some(rest) = l.strip_prefix("global @") {
+            let (name, hex) = rest
+                .split_once(" = ")
+                .ok_or_else(|| wrap(n, "global cần `@tên = hex`".into()))?;
+            let hex = hex.trim();
+            let mut bytes = Vec::new();
+            if hex != "-" {
+                if hex.len() % 2 != 0 || !hex.is_ascii() {
+                    return Err(wrap(n, "hex của global sai".into()));
+                }
+                for i in (0..hex.len()).step_by(2) {
+                    bytes.push(
+                        u8::from_str_radix(&hex[i..i + 2], 16)
+                            .map_err(|_| wrap(n, "hex của global sai".into()))?,
+                    );
+                }
+            }
+            m.globals.push(crate::Global {
+                name: ident(name).map_err(|e| wrap(n, e))?,
+                bytes,
+            });
+        } else if let Some(rest) = l.strip_prefix("declare @") {
             let (name, r) = rest
                 .split_once('(')
                 .ok_or_else(|| wrap(n, "declare thiếu `(`".into()))?;

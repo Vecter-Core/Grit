@@ -14,6 +14,8 @@ pub enum Outcome {
     Agg(Vec<Option<u8>>),
     /// con trỏ trả về (chỉ có nghĩa trong cùng một lần chạy: `(vùng, offset)`)
     Ptr(usize, u64),
+    /// giá trị tổng hợp trả về GIỮ NGUỒN GỐC con trỏ (chỉ dùng giữa các hàm trong một lần chạy; ở mức cao nhất đổi thành `Agg` hoặc `Ub`)
+    Bytes(Vec<Byte>),
     Abort(String),
     Ub(String),
     OutOfFuel,
@@ -26,10 +28,12 @@ pub enum Arg {
     Bytes(Vec<Option<u8>>),
     /// con trỏ tới một vùng mới có nội dung ban đầu `bytes` (để thử hàm nhận `&T`/`&!T`)
     Ref(Vec<Option<u8>>),
+    /// con trỏ béo `{ptr, len}` tới vùng mới có nội dung `bytes` và độ dài `len` (phần tử) — để thử hàm nhận `&[T]`/`&str`
+    Fat(Vec<Option<u8>>, u64),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Byte {
+pub enum Byte {
     Uninit,
     B(u8),
     /// mảnh `k` (0..8) của con trỏ `(vùng, offset)`
@@ -68,6 +72,9 @@ struct St<'a> {
     /// tên slot → vùng
     slot: BTreeMap<String, usize>,
     mem: &'a mut Vec<Vec<Byte>>,
+    /// tên global → vùng (các vùng `< nro` là CHỈ ĐỌC)
+    gl: &'a BTreeMap<String, usize>,
+    nro: usize,
 }
 
 impl St<'_> {
@@ -79,6 +86,7 @@ impl St<'_> {
                 .cloned()
                 .ok_or_else(|| format!("%{v} chưa có giá trị")),
             Opd::Slot(s) => Ok(Val::Ptr(*self.slot.get(s).ok_or("slot lạ")?, 0)),
+            Opd::Global(g) => Ok(Val::Ptr(*self.gl.get(g).ok_or("global lạ")?, 0)),
             Opd::Int(t, n) => Ok(Val::Int(
                 (*n as u128) & mask(t.bits().ok_or("hằng không nguyên")?),
             )),
@@ -109,6 +117,9 @@ impl St<'_> {
         Ok(self.mem[a][r].to_vec())
     }
     fn write(&mut self, a: usize, off: u64, bytes: &[Byte]) -> Result<(), String> {
+        if a < self.nro {
+            return Err("ghi vào vùng chỉ-đọc (global)".into());
+        }
         let r = self.range(a, off, bytes.len() as u64)?;
         self.mem[a][r].copy_from_slice(bytes);
         Ok(())
@@ -220,6 +231,7 @@ fn cmp(p: CmpPred, w: u32, a: u128, b: u128) -> bool {
 #[must_use]
 pub fn run(f: &Func, args: &[u128], fuel: u64) -> Outcome {
     let m = Module {
+        globals: Vec::new(),
         decls: Vec::new(),
         funcs: vec![f.clone()],
     };
@@ -251,6 +263,13 @@ pub fn run_module_refs(
         return (Outcome::Ub(format!("không có hàm @{name}")), Vec::new());
     };
     let mut mem: Vec<Vec<Byte>> = Vec::new();
+    // các global chiếm các vùng đầu (chỉ đọc)
+    let mut gl: BTreeMap<String, usize> = BTreeMap::new();
+    for g in &m.globals {
+        gl.insert(g.name.clone(), mem.len());
+        mem.push(g.bytes.iter().map(|b| Byte::B(*b)).collect());
+    }
+    let nro = mem.len();
     let mut refs: Vec<usize> = Vec::new();
     let vals: Vec<Val> = args
         .iter()
@@ -259,6 +278,14 @@ pub fn run_module_refs(
             Arg::Bytes(bs) => {
                 Val::Agg(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect())
             }
+            Arg::Fat(bs, len) => {
+                mem.push(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect());
+                let a = mem.len() - 1;
+                refs.push(a);
+                let mut fat: Vec<Byte> = (0..8u8).map(|k| Byte::P(a, 0, k)).collect();
+                fat.extend(int_bytes(u128::from(*len), 8));
+                Val::Agg(fat)
+            }
             Arg::Ref(bs) => {
                 mem.push(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect());
                 refs.push(mem.len() - 1);
@@ -266,7 +293,19 @@ pub fn run_module_refs(
             }
         })
         .collect();
-    let out = exec(m, f, &vals, &mut fuel, 0, &mut mem);
+    let funcs = m.funcs.iter().map(|g| (g.name.as_str(), g)).collect();
+    let mut out = exec(f, &vals, &mut fuel, 0, &mut mem, &Glob { gl, nro, funcs });
+    if let Outcome::Bytes(bs) = out {
+        out = if bs.iter().any(|b| matches!(b, Byte::P(..))) {
+            Outcome::Ub("trả về giá trị chứa con trỏ ở mức cao nhất".into())
+        } else {
+            Outcome::Agg(
+                bs.iter()
+                    .map(|b| if let Byte::B(x) = b { Some(*x) } else { None })
+                    .collect(),
+            )
+        };
+    }
     let fin = refs
         .iter()
         .map(|i| {
@@ -282,19 +321,29 @@ pub fn run_module_refs(
     (out, fin)
 }
 
+/// Môi trường chung của một lần chạy: tên global → vùng và số vùng chỉ-đọc đứng đầu.
+struct Glob<'m> {
+    gl: BTreeMap<String, usize>,
+    nro: usize,
+    /// chỉ mục tên hàm → hàm (tra callee không tuyến tính theo số hàm của module)
+    funcs: BTreeMap<&'m str, &'m Func>,
+}
+
 fn exec(
-    m: &Module,
     f: &Func,
     args: &[Val],
     fuel: &mut u64,
     depth: u32,
     mem: &mut Vec<Vec<Byte>>,
+    glob: &Glob<'_>,
 ) -> Outcome {
     let mut st = St {
         f,
         env: BTreeMap::new(),
         slot: BTreeMap::new(),
         mem,
+        gl: &glob.gl,
+        nro: glob.nro,
     };
     if args.len() != f.params.len() {
         return Outcome::Ub("sai số đối số".into());
@@ -360,10 +409,10 @@ fn exec(
                         Err(e) => return ub(e),
                     }
                 }
-                let Some(g) = m.funcs.iter().find(|g| g.name == *callee) else {
+                let Some(g) = glob.funcs.get(callee.as_str()).copied() else {
                     return ub(format!("gọi @{callee} ngoài module"));
                 };
-                match exec(m, g, &vals, fuel, depth + 1, st.mem) {
+                match exec(g, &vals, fuel, depth + 1, st.mem, glob) {
                     Outcome::Value(v) => {
                         if let (Some(d), Some(v)) = (d, v) {
                             st.env.insert(d.clone(), Val::Int(v));
@@ -372,6 +421,11 @@ fn exec(
                     Outcome::Ptr(a, o) => {
                         if let Some(d) = d {
                             st.env.insert(d.clone(), Val::Ptr(a, o));
+                        }
+                    }
+                    Outcome::Bytes(bs) => {
+                        if let Some(d) = d {
+                            st.env.insert(d.clone(), Val::Agg(bs));
                         }
                     }
                     Outcome::Agg(bs) => {
@@ -512,17 +566,7 @@ fn exec(
                 }
                 if matches!(t, Ty::Struct(_) | Ty::Array(..)) {
                     return match st.opd(v) {
-                        Ok(Val::Agg(bs)) => {
-                            let mut out = Vec::new();
-                            for b in bs {
-                                match b {
-                                    Byte::B(x) => out.push(Some(x)),
-                                    Byte::Uninit => out.push(None),
-                                    Byte::P(..) => return ub("trả về giá trị chứa con trỏ".into()),
-                                }
-                            }
-                            Outcome::Agg(out)
-                        }
+                        Ok(Val::Agg(bs)) => Outcome::Bytes(bs),
                         Ok(_) => ub("ret tổng hợp không phải giá trị tổng hợp".into()),
                         Err(e) => ub(e),
                     };

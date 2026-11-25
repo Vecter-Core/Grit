@@ -50,6 +50,8 @@ pub enum Opd {
     Val(String),
     Slot(String),
     Int(Ty, i128),
+    /// địa chỉ (ptr) của một global bất biến (chuỗi hằng…)
+    Global(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -181,6 +183,13 @@ pub struct Func {
     pub blocks: Vec<Block>,
 }
 
+/// Dữ liệu bất biến trong module (chuỗi hằng): `bytes` đặt ở một vùng chỉ-đọc.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Global {
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
 /// Khai báo hàm ngoài (runtime) mà GLIR được phép gọi.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Decl {
@@ -191,6 +200,7 @@ pub struct Decl {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Module {
+    pub globals: Vec<Global>,
     pub decls: Vec<Decl>,
     pub funcs: Vec<Func>,
 }

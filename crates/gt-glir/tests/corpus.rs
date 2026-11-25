@@ -116,3 +116,23 @@ fn byte_memory_interpreter_runs_hand_checked_samples() {
         Outcome::Ub(_)
     ));
 }
+
+/// Global chỉ-đọc: đọc byte đầu của "héllo" = 0x68 ('h'); GHI vào global ⇒ `Ub`.
+#[test]
+fn globals_are_readable_and_read_only() {
+    use gt_glir::interp::{Outcome, run_module};
+    let src = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/glir/pass/global_string.glir"),
+    )
+    .expect("đọc");
+    let m = gt_glir::parse(&src).expect("parse");
+    assert_eq!(
+        run_module(&m, "first", &[], 100),
+        Outcome::Value(Some(0x68))
+    );
+    let bad =
+        "glir 1\nglobal @s = 41\nfn @w() -> void {\nentry:\n  store i8 i8 1, @s\n  ret void\n}\n";
+    let m = gt_glir::parse(bad).expect("parse");
+    assert!(gt_glir::verify(&m).is_empty());
+    assert!(matches!(run_module(&m, "w", &[], 100), Outcome::Ub(_)));
+}

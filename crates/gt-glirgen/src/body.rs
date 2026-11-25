@@ -3,13 +3,16 @@
 //! `Assert` ⇒ `condbr` tới khối đích hoặc một khối riêng chỉ chứa `abort <loại>` (một khối cho MỖI Assert). Mọi thứ ngoài tập con ⇒ `Unsupported(lý do)`.
 //! Tập con: kiểu `Int`(≤ 64 bit)/`Bool`/`()`/tuple `(Int, Bool)`; `Use`, `BinaryOp`(số học bao quanh, so sánh, `BitAnd`, `Div/Rem`), `CheckedBinaryOp`(Add/Sub/Mul),
 //! `UnaryOp`, `Cast` số nguyên/bool→số nguyên; `Goto`/`SwitchInt`/`Return`/`Assert`/`Unreachable`.
+//! Thân generic hạ theo INSTANCE (một hàm GLIR cho mỗi `Instance{node,args}`; thân không generic = instance `args=[]`): `Lw::sub` thế tham số ở mọi
+//! chỗ đọc `Ty` của MIR (KHÔNG sao chép thân); chỗ sót vẫn fail-closed vì `lower_ty` từ chối `Ty::Param`.
 use crate::lower_ty;
 use gt_glir::{BinOp as GB, Block, CastOp, CmpPred, Func, Inst, Opd, Term, Ty as G};
 use gt_mir::{
     AssertKind, BinOp, Body, BodyKind, Const, Operand, Place, PlaceElem, Rvalue, StatementKind,
     TerminatorKind, UnOp,
 };
-use gt_types::{IntTy, Ty, TypeDb};
+use gt_types::{Instance, IntTy, Ty, TypeDb};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 /// Lý do (ngắn, ổn định) một thân chưa hạ được — dùng để đếm độ phủ.
@@ -22,19 +25,78 @@ fn un<T>(why: impl Into<String>) -> R<T> {
     Err(Unsupported(why.into()))
 }
 
-/// callee (nút) → (tên GLIR, kiểu trả về Grit) của các thân có chữ ký trong tập con (có thể gọi trực tiếp)
-pub type Sigs = BTreeMap<gt_ast::NodeId, (String, Ty)>;
+/// instance → (tên GLIR, kiểu trả về Grit ĐÃ THẾ) nếu chữ ký (đã thế) nằm trong tập con, `None` nếu không — bộ nhớ đệm, điền dần khi gặp lời gọi.
+pub type Sigs = BTreeMap<Instance, Option<(String, Ty)>>;
+
+/// Ngữ cảnh chung khi hạ cả tập thân.
+struct Ctx<'a> {
+    db: &'a TypeDb,
+    keys: &'a BTreeMap<gt_ast::NodeId, String>,
+    defs: &'a [gt_resolve::Def],
+    /// thân `Fn` theo nút
+    bodies: BTreeMap<gt_ast::NodeId, &'a Body>,
+    sigs: RefCell<Sigs>,
+}
+
+impl Ctx<'_> {
+    /// chữ ký của instance nếu có thân MIR và chữ ký nằm trong tập con
+    fn sig(&self, inst: &Instance) -> Option<(String, Ty)> {
+        if let Some(s) = self.sigs.borrow().get(inst) {
+            return s.clone();
+        }
+        let r = self.bodies.get(&inst.node).and_then(|b| {
+            let ps = self.db.fn_params(b.sig_node);
+            if ps.len() != inst.args.len()
+                || inst.args.iter().any(|a| a.has_param() || a.has_infer())
+            {
+                return None;
+            }
+            let sub = |t: &Ty| subst_inst(t, &ps, &inst.args);
+            (0..=b.arg_count)
+                .all(|i| in_subset(self.db, &sub(&b.locals[i].ty)))
+                .then(|| {
+                    (
+                        inst_name(&b.key, &inst.args, self.defs),
+                        sub(&b.locals[0].ty),
+                    )
+                })
+        });
+        self.sigs.borrow_mut().insert(inst.clone(), r.clone());
+        r
+    }
+}
+
+/// Thế tham số kiểu của instance (`params[i]` ↦ `args[i]`) vào `ty` — đúng `subst_inst` của codegen LLVM.
+fn subst_inst(ty: &Ty, params: &[gt_types::ParamId], args: &[Ty]) -> Ty {
+    ty.subst(&|p| {
+        params
+            .iter()
+            .position(|q| *q == p)
+            .and_then(|i| args.get(i).cloned())
+    })
+}
 
 struct Lw<'a> {
-    sigs: &'a Sigs,
+    cx: &'a Ctx<'a>,
     db: &'a TypeDb,
     body: &'a Body,
+    /// tham số kiểu của thân (impl rồi hàm) và đối số của instance đang hạ
+    params: Vec<gt_types::ParamId>,
+    args: Vec<Ty>,
+    /// kiểu ĐÃ THẾ của mọi local
+    local_tys: Vec<Ty>,
     slots: BTreeMap<usize, G>,
     blocks: Vec<Block>,
     cur: Vec<Inst>,
     cur_name: String,
     tmp: u32,
     extra: u32,
+    /// slot phụ (dựng con trỏ béo của chuỗi hằng…)
+    aux_slots: Vec<(String, G)>,
+    /// global (chuỗi hằng) mà thân này dùng
+    globals: Vec<gt_glir::Global>,
+    /// instance mà thân này gọi trực tiếp
+    calls: Vec<Instance>,
 }
 
 fn is_int_or_bool(t: &Ty) -> bool {
@@ -61,7 +123,11 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32) -> bool {
     }
     match t {
         Ty::Tuple(v) => v.iter().all(|x| in_sub(db, x, depth + 1)),
-        Ty::Ref(_, inner) => in_sub(db, inner, depth + 1),
+        Ty::Ref(_, inner) => match &**inner {
+            Ty::Str => true,
+            Ty::Slice(e) => in_sub(db, e, depth + 1),
+            i => in_sub(db, i, depth + 1),
+        },
         Ty::Array(e, n) => *n <= 4096 && in_sub(db, e, depth + 1),
         Ty::Adt(def, args) => {
             if plain_struct(db, def) {
@@ -114,6 +180,10 @@ fn is_unit(t: &Ty) -> bool {
 }
 
 impl Lw<'_> {
+    /// thế tham số của instance vào một kiểu đọc từ MIR — PHẢI gọi ở mọi chỗ đọc `Ty` của thân (chỗ sót vẫn fail-closed: `lower_ty` từ chối `Ty::Param`)
+    fn sub(&self, ty: &Ty) -> Ty {
+        subst_inst(ty, &self.params, &self.args)
+    }
     fn t(&mut self) -> String {
         self.tmp += 1;
         format!("t{}", self.tmp)
@@ -133,15 +203,24 @@ impl Lw<'_> {
     }
     fn slot(&mut self, l: usize) -> R<String> {
         if !self.slots.contains_key(&l) {
-            let ty = gty(self.db, &self.body.locals[l].ty)?;
+            let ty = gty(self.db, &self.local_tys[l])?;
             self.slots.insert(l, ty);
         }
         Ok(format!("l{l}"))
     }
     /// con trỏ tới chỗ (slot, rồi chuỗi trường tuple/struct) + kiểu Grit của chỗ
     fn place(&mut self, p: &Place) -> R<(Opd, Ty)> {
+        let (ptr, ty, meta) = self.place_m(p)?;
+        if meta.is_some() {
+            return un("chỗ không kích thước dùng như chỗ có kích thước");
+        }
+        Ok((ptr, ty))
+    }
+    /// như `place`, thêm `meta` (độ dài, i64) khi chỗ là slice/`str` (đứng sau `Deref` của con trỏ béo hoặc `Subslice`)
+    fn place_m(&mut self, p: &Place) -> R<(Opd, Ty, Option<Opd>)> {
+        let mut meta: Option<Opd> = None;
         let l = p.local.index();
-        let mut cur_ty = self.body.locals[l].ty.clone();
+        let mut cur_ty = self.local_tys[l].clone();
         let mut ptr = Opd::Slot(self.slot(l)?);
         let mut downcast: Option<u32> = None;
         for e in &p.projection {
@@ -175,13 +254,45 @@ impl Lw<'_> {
                         idx: *i,
                     });
                     ptr = Opd::Val(d);
-                    cur_ty = fty.clone();
+                    cur_ty = self.sub(fty);
                 }
                 PlaceElem::Deref => {
                     let Ty::Ref(_, inner) = &cur_ty else {
                         return un("Deref của kiểu không phải tham chiếu");
                     };
                     let inner = (**inner).clone();
+                    if matches!(inner, Ty::Str | Ty::Slice(_)) {
+                        // con trỏ béo `{ptr, i64}`: dữ liệu ở trường 0, độ dài ở trường 1
+                        let fat = gty(self.db, &cur_ty)?;
+                        let (p0, p1) = (self.t(), self.t());
+                        self.push(Inst::FieldPtr {
+                            d: p0.clone(),
+                            ty: fat.clone(),
+                            ptr: ptr.clone(),
+                            idx: 0,
+                        });
+                        self.push(Inst::FieldPtr {
+                            d: p1.clone(),
+                            ty: fat,
+                            ptr,
+                            idx: 1,
+                        });
+                        let (dp, ln) = (self.t(), self.t());
+                        self.push(Inst::Load {
+                            d: dp.clone(),
+                            ty: G::Ptr,
+                            ptr: Opd::Val(p0),
+                        });
+                        self.push(Inst::Load {
+                            d: ln.clone(),
+                            ty: G::I64,
+                            ptr: Opd::Val(p1),
+                        });
+                        ptr = Opd::Val(dp);
+                        meta = Some(Opd::Val(ln));
+                        cur_ty = inner;
+                        continue;
+                    }
                     gty(self.db, &inner)?;
                     let d = self.t();
                     self.push(Inst::Load {
@@ -193,10 +304,10 @@ impl Lw<'_> {
                     cur_ty = inner;
                 }
                 PlaceElem::Index(il) => {
-                    let Ty::Array(elem, _) = &cur_ty else {
-                        return un("Index của kiểu không phải mảng");
+                    let elem = match &cur_ty {
+                        Ty::Array(e, _) | Ty::Slice(e) => (**e).clone(),
+                        _ => return un("Index của kiểu không phải mảng/slice"),
                     };
-                    let elem = (**elem).clone();
                     let ge = gty(self.db, &elem)?;
                     let (iv, _) = self.load(&Place::local(*il))?;
                     let d = self.t();
@@ -208,6 +319,35 @@ impl Lw<'_> {
                     });
                     ptr = Opd::Val(d);
                     cur_ty = elem;
+                    meta = None;
+                }
+                PlaceElem::Subslice { from, to } => {
+                    let (elem, total) = match &cur_ty {
+                        Ty::Array(e, n) => ((**e).clone(), Opd::Int(G::I64, i128::from(*n))),
+                        Ty::Slice(e) => (
+                            (**e).clone(),
+                            meta.clone()
+                                .ok_or(Unsupported("Subslice của slice không có độ dài".into()))?,
+                        ),
+                        _ => return un("Subslice của kiểu không phải mảng/slice"),
+                    };
+                    let ge = gty(self.db, &elem)?;
+                    let (fv, _) = self.load(&Place::local(*from))?;
+                    let end = match to {
+                        Some(t) => self.load(&Place::local(*t))?.0,
+                        None => total,
+                    };
+                    let d = self.t();
+                    self.push(Inst::IndexPtr {
+                        d: d.clone(),
+                        elem: ge,
+                        ptr,
+                        idx: fv.clone(),
+                    });
+                    let len = self.bin(GB::Sub, &G::I64, end, fv);
+                    ptr = Opd::Val(d);
+                    meta = Some(len);
+                    cur_ty = Ty::Slice(Box::new(elem));
                 }
                 PlaceElem::Downcast(v) => {
                     let Ty::Adt(..) = &cur_ty else {
@@ -224,13 +364,12 @@ impl Lw<'_> {
                     ptr = Opd::Val(d);
                     downcast = Some(*v);
                 }
-                _ => return un("chỗ có phép chiếu ngoài trường/Deref/Downcast"),
             }
         }
         if downcast.is_some() {
             return un("Downcast không theo sau bởi Field");
         }
-        Ok((ptr, cur_ty))
+        Ok((ptr, cur_ty, meta))
     }
     fn load(&mut self, p: &Place) -> R<(Opd, Ty)> {
         let (ptr, ty) = self.place(p)?;
@@ -260,6 +399,51 @@ impl Lw<'_> {
             }
             Operand::Const(Const::Bool(b)) => Ok((Opd::Int(G::I1, i128::from(*b)), Ty::Bool)),
             Operand::Const(Const::Char(c)) => Ok((Opd::Int(G::I32, i128::from(*c)), Ty::Char)),
+            Operand::Const(Const::Str(text)) => {
+                // chuỗi hằng ⇒ global bất biến + con trỏ béo `{@global, len}` dựng trong slot phụ
+                let bytes = text.as_bytes().to_vec();
+                let name = format!("s.{:016x}", gt_types::fnv1a64(&bytes));
+                if !self.globals.iter().any(|g| g.name == name) {
+                    self.globals.push(gt_glir::Global {
+                        name: name.clone(),
+                        bytes: bytes.clone(),
+                    });
+                }
+                let fat = G::Struct(vec![G::Ptr, G::I64]);
+                self.extra += 1;
+                let sname = format!("str{}", self.extra);
+                self.aux_slots.push((sname.clone(), fat.clone()));
+                let (p0, p1) = (self.t(), self.t());
+                self.push(Inst::FieldPtr {
+                    d: p0.clone(),
+                    ty: fat.clone(),
+                    ptr: Opd::Slot(sname.clone()),
+                    idx: 0,
+                });
+                self.push(Inst::Store {
+                    ty: G::Ptr,
+                    val: Opd::Global(name),
+                    ptr: Opd::Val(p0),
+                });
+                self.push(Inst::FieldPtr {
+                    d: p1.clone(),
+                    ty: fat.clone(),
+                    ptr: Opd::Slot(sname.clone()),
+                    idx: 1,
+                });
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: Opd::Int(G::I64, bytes.len() as i128),
+                    ptr: Opd::Val(p1),
+                });
+                let d = self.t();
+                self.push(Inst::Load {
+                    d: d.clone(),
+                    ty: fat,
+                    ptr: Opd::Slot(sname),
+                });
+                Ok((Opd::Val(d), Ty::Ref(false, Box::new(Ty::Str))))
+            }
             // `()` không có biểu diễn: mọi chỗ ghi/truyền kiểu `()` đều bị bỏ qua (xem `store`, `Call`, `Aggregate`)
             Operand::Const(Const::Unit) => Ok((Opd::Int(G::I1, 0), Ty::Tuple(Vec::new()))),
             Operand::Const(_) => un("hằng không phải số nguyên/bool/()"),
@@ -373,6 +557,7 @@ impl Lw<'_> {
                 self.store(dest, r, &ty)
             }
             Rvalue::Cast(o, to) => {
+                let to = &self.sub(to);
                 let (v, from) = self.operand(o)?;
                 let (Ty::Int(_) | Ty::Bool | Ty::Char, Ty::Int(_)) = (&from, to) else {
                     return un("Cast ngoài int/bool→int");
@@ -403,7 +588,52 @@ impl Lw<'_> {
                 };
                 self.store(dest, r, to)
             }
-            Rvalue::CastFits(..) => un("CastFits"),
+            Rvalue::CastFits(o, to) => {
+                let to = &self.sub(to);
+                // `ép x as T` không mất thông tin ⇔ (đi-về qua T cho lại x) VÀ (cùng dấu giá trị khi hai kiểu khác dấu); xem `cast_fits` của codegen
+                let (v, from) = self.operand(o)?;
+                let one = Opd::Int(G::I1, 1);
+                if matches!(from, Ty::Bool) || matches!((&from, to), (Ty::Int(IntTy::U8), Ty::Char))
+                {
+                    return self.store(dest, one, &Ty::Bool);
+                }
+                let (Ty::Int(fi), Ty::Int(ti)) = (&from, to) else {
+                    return un("CastFits ngoài int→int");
+                };
+                if fi.bits() > 64 || ti.bits() > 64 {
+                    return un("CastFits 128 bit");
+                }
+                let (gf, gt) = (gint(*fi), gint(*ti));
+                let ext = |s: bool| if s { CastOp::SExt } else { CastOp::ZExt };
+                let conv = |lw: &mut Self, v: Opd, a: &G, sa: bool, b: &G| -> Opd {
+                    let (ba, bb) = (a.bits().unwrap_or(0), b.bits().unwrap_or(0));
+                    if ba == bb {
+                        v
+                    } else if bb < ba {
+                        lw.cast(CastOp::Trunc, a, v, b)
+                    } else {
+                        lw.cast(ext(sa), a, v, b)
+                    }
+                };
+                let y = conv(self, v.clone(), &gf, fi.signed(), &gt);
+                let z = conv(self, y.clone(), &gt, ti.signed(), &gf);
+                let mut ok = self.cmp(CmpPred::Eq, &gf, v.clone(), z);
+                if fi.signed() != ti.signed() {
+                    let negx = if fi.signed() {
+                        self.cmp(CmpPred::Slt, &gf, v, Opd::Int(gf.clone(), 0))
+                    } else {
+                        Opd::Int(G::I1, 0)
+                    };
+                    let negy = if ti.signed() {
+                        self.cmp(CmpPred::Slt, &gt, y, Opd::Int(gt.clone(), 0))
+                    } else {
+                        Opd::Int(G::I1, 0)
+                    };
+                    let same = self.cmp(CmpPred::Eq, &G::I1, negx, negy);
+                    ok = self.bin(GB::And, &G::I1, ok, same);
+                }
+                self.store(dest, ok, &Ty::Bool)
+            }
             Rvalue::Aggregate(gt_mir::AggregateKind::Array(_), ops) => {
                 let (ptr, dty) = self.place(dest)?;
                 let Ty::Array(elem, _) = &dty else {
@@ -432,6 +662,14 @@ impl Lw<'_> {
                 Ok(())
             }
             Rvalue::Aggregate(kind, ops) => {
+                let kind = &match kind {
+                    gt_mir::AggregateKind::Adt(def, v, args) => gt_mir::AggregateKind::Adt(
+                        *def,
+                        *v,
+                        args.iter().map(|a| self.sub(a)).collect(),
+                    ),
+                    k => k.clone(),
+                };
                 let (ptr, dty) = self.place(dest)?;
                 let (field_tys, tag): (Vec<Ty>, Option<u32>) = match (kind, &dty) {
                     (gt_mir::AggregateKind::Tuple, Ty::Tuple(v)) => (v.clone(), None),
@@ -509,10 +747,41 @@ impl Lw<'_> {
                 Ok(())
             }
             Rvalue::Ref(_, _, place) => {
-                // địa chỉ của chỗ chính là con trỏ: ghi vào chỗ đích kiểu `&T`
-                let (ptr, _) = self.place(place)?;
+                let (ptr, pty, meta) = self.place_m(place)?;
                 let (dptr, dty) = self.place(dest)?;
                 gty(self.db, &dty)?;
+                if matches!(pty, Ty::Str | Ty::Slice(_)) {
+                    // tham chiếu tới chỗ không kích thước ⇒ con trỏ béo `{ptr, len}`
+                    let Some(len) = meta else {
+                        return un("Ref tới slice không có độ dài");
+                    };
+                    let fat = gty(self.db, &dty)?;
+                    let (p0, p1) = (self.t(), self.t());
+                    self.push(Inst::FieldPtr {
+                        d: p0.clone(),
+                        ty: fat.clone(),
+                        ptr: dptr.clone(),
+                        idx: 0,
+                    });
+                    self.push(Inst::Store {
+                        ty: G::Ptr,
+                        val: ptr,
+                        ptr: Opd::Val(p0),
+                    });
+                    self.push(Inst::FieldPtr {
+                        d: p1.clone(),
+                        ty: fat,
+                        ptr: dptr,
+                        idx: 1,
+                    });
+                    self.push(Inst::Store {
+                        ty: G::I64,
+                        val: len,
+                        ptr: Opd::Val(p1),
+                    });
+                    return Ok(());
+                }
+                // địa chỉ của chỗ chính là con trỏ: ghi vào chỗ đích kiểu `&T`
                 self.push(Inst::Store {
                     ty: G::Ptr,
                     val: ptr,
@@ -542,15 +811,13 @@ impl Lw<'_> {
                 self.store(dest, Opd::Val(d), &Ty::Int(IntTy::Usize))
             }
             Rvalue::Len(place) => {
-                let (_, ty) = self.place(place)?;
-                let Ty::Array(_, n) = ty else {
-                    return un("Len của kiểu không phải mảng");
+                let (_, ty, meta) = self.place_m(place)?;
+                let len = match (ty, meta) {
+                    (Ty::Array(_, n), _) => Opd::Int(G::I64, i128::from(n)),
+                    (Ty::Slice(_) | Ty::Str, Some(m)) => m,
+                    _ => return un("Len của kiểu không phải mảng/slice"),
                 };
-                self.store(
-                    dest,
-                    Opd::Int(G::I64, i128::from(n)),
-                    &Ty::Int(IntTy::Usize),
-                )
+                self.store(dest, len, &Ty::Int(IntTy::Usize))
             }
             Rvalue::Repeat(o, n) => {
                 let (ptr, dty) = self.place(dest)?;
@@ -683,7 +950,7 @@ impl Lw<'_> {
         match t {
             TerminatorKind::Goto(b) => self.finish(Term::Br(Self::block_name(b.index())), None),
             TerminatorKind::Return => {
-                let rty = self.body.locals[0].ty.clone();
+                let rty = self.local_tys[0].clone();
                 if is_unit(&rty) {
                     self.finish(Term::Ret(None), None);
                 } else {
@@ -743,19 +1010,78 @@ impl Lw<'_> {
                 target,
                 ..
             } => {
-                let gt_mir::Callee::Fn { node, generics } = callee else {
-                    return un("Call không phải hàm trực tiếp");
-                };
-                if !generics.is_empty() {
-                    return un("Call hàm generic");
+                // intrinsic `len` của slice/`str`: đọc trường độ dài của con trỏ béo (không có thân MIR)
+                if let gt_mir::Callee::Fn { node, .. } = callee
+                    && matches!(
+                        self.cx.keys.get(node).map(String::as_str),
+                        Some("$prelude::[T0]::len" | "$prelude::str::len")
+                    )
+                    && args.len() == 1
+                    && let Some(tg) = target
+                {
+                    let (v, _) = self.operand(&args[0])?;
+                    let fat = G::Struct(vec![G::Ptr, G::I64]);
+                    self.extra += 1;
+                    let sname = format!("len{}", self.extra);
+                    self.aux_slots.push((sname.clone(), fat.clone()));
+                    self.push(Inst::Store {
+                        ty: fat.clone(),
+                        val: v,
+                        ptr: Opd::Slot(sname.clone()),
+                    });
+                    let f1 = self.t();
+                    self.push(Inst::FieldPtr {
+                        d: f1.clone(),
+                        ty: fat,
+                        ptr: Opd::Slot(sname),
+                        idx: 1,
+                    });
+                    let l = self.t();
+                    self.push(Inst::Load {
+                        d: l.clone(),
+                        ty: G::I64,
+                        ptr: Opd::Val(f1),
+                    });
+                    self.store(dest, Opd::Val(l), &Ty::Int(IntTy::Usize))?;
+                    self.finish(Term::Br(Self::block_name(tg.index())), None);
+                    return Ok(());
                 }
+                let inst = match callee {
+                    gt_mir::Callee::Fn { node, generics } => Instance {
+                        node: *node,
+                        args: generics.iter().map(|g| self.sub(g)).collect(),
+                    },
+                    gt_mir::Callee::TraitMethod {
+                        trait_def,
+                        member,
+                        self_ty,
+                        generics,
+                    } => {
+                        // đơn hình hoá: thế tham số của instance đang hạ rồi phân giải NGAY bằng bảng impl (một nguồn với codegen/thông dịch MIR)
+                        let st = self.sub(self_ty);
+                        let ga: Vec<Ty> = generics.iter().map(|g| self.sub(g)).collect();
+                        if st.has_param() || st.has_infer() {
+                            return un("TraitMethod trên kiểu chưa thế");
+                        }
+                        let Some((node, all)) =
+                            self.db.resolve_trait_method(*trait_def, *member, &st, &ga)
+                        else {
+                            return un("TraitMethod không phân giải được");
+                        };
+                        Instance { node, args: all }
+                    }
+                    gt_mir::Callee::Value(_) => return un("Call không phải hàm trực tiếp"),
+                };
                 let Some(tg) = target else {
                     return un("Call không trở về");
                 };
-                let Some((name, rty)) = self.sigs.get(node) else {
-                    return un("Call tới hàm ngoài tập con");
+                let Some((name, rty)) = self.cx.sig(&inst) else {
+                    return un(format!(
+                        "Call tới hàm ngoài tập con: {}",
+                        self.cx.keys.get(&inst.node).map_or("?", |k| k.as_str())
+                    ));
                 };
-                let (name, rty) = (name.clone(), rty.clone());
+                self.calls.push(inst);
                 let mut vals = Vec::new();
                 for a in args {
                     let (v, t) = self.operand(a)?;
@@ -783,7 +1109,22 @@ impl Lw<'_> {
                 }
                 self.finish(Term::Br(Self::block_name(tg.index())), None);
             }
-            TerminatorKind::Drop { .. } => return un("Drop"),
+            TerminatorKind::Drop { place, target } => {
+                // drop glue: MỘT nguồn sự thật `TypeDb::drop_glue` (như codegen LLVM và thông dịch MIR); glue rỗng (vd `T` thế bằng kiểu số) ⇒ chỉ nhảy
+                let Some(pty) = gt_mir::types::place_ty(self.body, place) else {
+                    return un("Drop: không biết kiểu chỗ");
+                };
+                let ty = self.sub(&pty);
+                if ty.has_param() || ty.has_infer() {
+                    return un("Drop trên kiểu chưa thế");
+                }
+                match self.db.drop_glue(&ty) {
+                    Ok(g) if g.is_nothing() => {
+                        self.finish(Term::Br(Self::block_name(target.index())), None)
+                    }
+                    _ => return un("Drop có glue"),
+                }
+            }
         }
         Ok(())
     }
@@ -791,7 +1132,23 @@ impl Lw<'_> {
 
 /// Hạ một thân `Fn` không generic. Trả hàm GLIR (chưa verify) hoặc lý do chưa hạ được.
 pub fn lower_body(db: &TypeDb, body: &Body) -> R<Func> {
-    lower_body_with(db, body, &Sigs::new())
+    let keys = BTreeMap::new();
+    let cx = Ctx {
+        db,
+        keys: &keys,
+        defs: &[],
+        bodies: BTreeMap::new(),
+        sigs: RefCell::new(Sigs::new()),
+    };
+    let inst = Instance {
+        node: body.node,
+        args: Vec::new(),
+    };
+    let (f, globals, _) = lower_inst(&cx, body, &inst)?;
+    if !globals.is_empty() {
+        return un("thân dùng chuỗi hằng: cần lower_module");
+    }
+    Ok(f)
 }
 
 /// Tên hàm GLIR từ khoá thân MIR: ký tự ngoài `[A-Za-z0-9_.]` đổi thành `_`; nếu có đổi thì thêm hậu tố băm khoá để KHÔNG trùng tên.
@@ -817,74 +1174,202 @@ pub fn glir_name(key: &str) -> String {
     }
 }
 
+/// Tên hàm GLIR của một instance: không đối số kiểu ⇒ `glir_name(key)`; có ⇒ `glir_name(key)` + `.` + băm 64 bit của khoá CHUẨN
+/// (đúng phần băm của `gt_types::instance_name`, nên hai instance khác nhau không trùng tên).
+#[must_use]
+pub fn inst_name(key: &str, args: &[Ty], defs: &[gt_resolve::Def]) -> String {
+    if args.is_empty() {
+        return glir_name(key);
+    }
+    let (sym, _) = gt_types::instance_name(key, args, defs);
+    let hash = sym.rsplit('.').next().unwrap_or_default();
+    format!("{}.{hash}", glir_name(key))
+}
+
+/// Kết quả hạ cả tập thân.
+pub struct Lowered {
+    pub module: gt_glir::Module,
+    /// tên hàm GLIR → instance, cho MỌI hàm trong `module`
+    pub funcs: BTreeMap<String, Instance>,
+    /// instance không hạ được: (khoá thân, instance, lý do)
+    pub bad: Vec<(String, Instance, Unsupported)>,
+    /// khoá các thân `Fn` generic không có instance nào (không hạ)
+    pub no_instance: Vec<String>,
+}
+
 /// Hạ cả tập thân: hàm nào gọi (trực tiếp) hàm cùng tập con thì được hạ kèm lời gọi; hàm gọi tới hàm không hạ được bị loại (lặp tới điểm cố định).
 #[must_use]
-pub fn lower_module(db: &TypeDb, bodies: &[Body]) -> (gt_glir::Module, Vec<(String, Unsupported)>) {
-    let mut sigs = Sigs::new();
-    for b in bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
-        let ok = (0..=b.arg_count).all(|i| in_subset(db, &b.locals[i].ty));
-        if ok {
-            sigs.insert(b.node, (glir_name(&b.key), b.locals[0].ty.clone()));
+pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lowered {
+    let db = &t.db;
+    let fns: Vec<&Body> = mir
+        .bodies
+        .iter()
+        .filter(|b| b.kind == BodyKind::Fn)
+        .collect();
+    let cx = Ctx {
+        db,
+        keys: &mir.keys,
+        defs: &t.resolve.defs,
+        bodies: fns.iter().map(|b| (b.node, *b)).collect(),
+        sigs: RefCell::new(Sigs::new()),
+    };
+    let mut ok: BTreeMap<String, (Instance, Func)> = BTreeMap::new();
+    let mut bad: Vec<(String, Instance, Unsupported)> = Vec::new();
+    let mut globals: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    // gốc: thân không generic (instance args=[]) và mọi instance của bảng M4; thêm theo nhu cầu các instance được gọi (vd hàm generic của
+    // prelude — không có trong bảng M4), như hàng đợi `pending` của codegen LLVM
+    let mut seen: std::collections::BTreeSet<Instance> = std::collections::BTreeSet::new();
+    let mut queue: std::collections::VecDeque<Instance> = std::collections::VecDeque::new();
+    for b in &fns {
+        if db.fn_params(b.sig_node).is_empty() {
+            queue.push_back(Instance {
+                node: b.node,
+                args: Vec::new(),
+            });
         }
     }
-    let mut ok: BTreeMap<String, Func> = BTreeMap::new();
-    let mut bad: Vec<(String, Unsupported)> = Vec::new();
-    for b in bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
-        match lower_body_with(db, b, &sigs) {
-            Ok(f) => {
-                ok.insert(f.name.clone(), f);
+    queue.extend(
+        t.instances
+            .iter()
+            .filter(|i| !i.args.is_empty() && cx.bodies.contains_key(&i.node))
+            .cloned(),
+    );
+    while let Some(inst) = queue.pop_front() {
+        if !seen.insert(inst.clone()) {
+            continue;
+        }
+        let Some(b) = cx.bodies.get(&inst.node).copied() else {
+            continue;
+        };
+        if seen.len() > 2 * gt_types::MAX_PROGRAM_INSTANCES {
+            bad.push((
+                b.key.clone(),
+                inst,
+                Unsupported("quá nhiều instance".into()),
+            ));
+            continue;
+        }
+        if inst
+            .args
+            .iter()
+            .any(|a| a.depth() > gt_types::MAX_INSTANCE_DEPTH)
+        {
+            bad.push((
+                b.key.clone(),
+                inst,
+                Unsupported("instance lồng quá sâu".into()),
+            ));
+            continue;
+        }
+        match lower_inst(&cx, b, &inst) {
+            Ok((f, gs, calls)) => {
+                queue.extend(calls.into_iter().filter(|c| !seen.contains(c)));
+                let conflict = gs
+                    .iter()
+                    .any(|g| globals.get(&g.name).is_some_and(|x| *x != g.bytes));
+                if conflict {
+                    bad.push((
+                        b.key.clone(),
+                        inst,
+                        Unsupported("global trùng tên khác nội dung".into()),
+                    ));
+                    continue;
+                }
+                for g in gs {
+                    globals.insert(g.name, g.bytes);
+                }
+                ok.insert(f.name.clone(), (inst, f));
             }
-            Err(u) => bad.push((b.key.clone(), u)),
+            Err(u) => bad.push((b.key.clone(), inst, u)),
         }
     }
     loop {
         let names: std::collections::BTreeSet<String> = ok.keys().cloned().collect();
         let drop: Vec<String> = ok
             .values()
-            .filter(|f| {
+            .filter(|(_, f)| {
                 f.blocks
                     .iter()
                     .flat_map(|b| &b.insts)
                     .any(|i| matches!(i, Inst::Call { callee, .. } if !names.contains(callee)))
             })
-            .map(|f| f.name.clone())
+            .map(|(_, f)| f.name.clone())
             .collect();
         if drop.is_empty() {
             break;
         }
         for n in drop {
-            ok.remove(&n);
-            bad.push((n, Unsupported("callee không hạ được".into())));
+            if let Some((inst, _)) = ok.remove(&n) {
+                let key = cx.bodies.get(&inst.node).map_or(n, |b| b.key.clone());
+                bad.push((key, inst, Unsupported("callee không hạ được".into())));
+            }
         }
     }
-    (
-        gt_glir::Module {
+    let seen_nodes: std::collections::BTreeSet<gt_ast::NodeId> =
+        seen.iter().map(|i| i.node).collect();
+    let funcs = ok
+        .iter()
+        .map(|(n, (i, _))| (n.clone(), i.clone()))
+        .collect();
+    Lowered {
+        module: gt_glir::Module {
+            globals: globals
+                .into_iter()
+                .map(|(name, bytes)| gt_glir::Global { name, bytes })
+                .collect(),
             decls: Vec::new(),
-            funcs: ok.into_values().collect(),
+            funcs: ok.into_values().map(|(_, f)| f).collect(),
         },
+        funcs,
         bad,
-    )
+        no_instance: fns
+            .iter()
+            .filter(|b| !seen_nodes.contains(&b.node))
+            .map(|b| b.key.clone())
+            .collect(),
+    }
 }
 
-fn lower_body_with(db: &TypeDb, body: &Body, sigs: &Sigs) -> R<Func> {
+/// Hạ thân `body` theo instance `inst`: (hàm, global dùng tới, instance được gọi trực tiếp).
+fn lower_inst(
+    cx: &Ctx<'_>,
+    body: &Body,
+    inst: &Instance,
+) -> R<(Func, Vec<gt_glir::Global>, Vec<Instance>)> {
+    let db = cx.db;
     if body.kind != BodyKind::Fn {
         return un("không phải thân Fn");
     }
+    let params = db.fn_params(body.sig_node);
+    if params.len() != inst.args.len() {
+        return un("số đối số kiểu của instance không khớp số tham số");
+    }
+    let local_tys: Vec<Ty> = body
+        .locals
+        .iter()
+        .map(|l| subst_inst(&l.ty, &params, &inst.args))
+        .collect();
     let mut lw = Lw {
-        sigs,
+        cx,
         db,
         body,
+        params,
+        args: inst.args.clone(),
+        local_tys,
         slots: BTreeMap::new(),
         blocks: Vec::new(),
         cur: Vec::new(),
         cur_name: "entry".into(),
         tmp: 0,
         extra: 0,
+        aux_slots: Vec::new(),
+        globals: Vec::new(),
+        calls: Vec::new(),
     };
     // tham số: store vào slot ở khối vào
     let mut params = Vec::new();
     for i in 1..=body.arg_count {
-        let ty = body.locals[i].ty.clone();
+        let ty = lw.local_tys[i].clone();
         if is_unit(&ty) {
             continue;
         }
@@ -897,10 +1382,10 @@ fn lower_body_with(db: &TypeDb, body: &Body, sigs: &Sigs) -> R<Func> {
             ptr: Opd::Slot(s),
         });
     }
-    let ret = if is_unit(&body.locals[0].ty) {
+    let ret = if is_unit(&lw.local_tys[0]) {
         G::Void
     } else {
-        gty(db, &body.locals[0].ty)?
+        gty(db, &lw.local_tys[0])?
     };
     lw.finish(Term::Br("bb0".into()), Some("bb0".into()));
     for (bi, bd) in body.blocks.iter().enumerate() {
@@ -928,13 +1413,19 @@ fn lower_body_with(db: &TypeDb, body: &Body, sigs: &Sigs) -> R<Func> {
         .map(|(l, t)| (format!("l{l}"), t.clone()))
         .collect();
     slots.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok(Func {
-        name: glir_name(&body.key),
-        params,
-        ret,
-        slots,
-        blocks: lw.blocks,
-    })
+    slots.extend(lw.aux_slots.iter().cloned());
+    slots.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok((
+        Func {
+            name: inst_name(&body.key, &inst.args, cx.defs),
+            params,
+            ret,
+            slots,
+            blocks: lw.blocks,
+        },
+        lw.globals,
+        lw.calls,
+    ))
 }
 
 /// Kiểm (d) của ADR-P2-02 (cố vấn Opus): với mỗi loại abort `k`, số khối `Abort(k)` TỚI ĐƯỢC trong GLIR ≥ số `Assert` loại `k` (cộng `Unreachable`
