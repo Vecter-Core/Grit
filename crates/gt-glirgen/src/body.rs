@@ -43,11 +43,19 @@ impl Ctx<'_> {
             return s.clone();
         }
         let r = self.bodies.get(&inst.node).and_then(|b| {
-            (inst.args.is_empty() && (0..=b.arg_count).all(|i| in_subset(self.db, &b.locals[i].ty)))
+            let ps = self.db.fn_params(b.sig_node);
+            if ps.len() != inst.args.len()
+                || inst.args.iter().any(|a| a.has_param() || a.has_infer())
+            {
+                return None;
+            }
+            let sub = |t: &Ty| subst_inst(t, &ps, &inst.args);
+            (0..=b.arg_count)
+                .all(|i| in_subset(self.db, &sub(&b.locals[i].ty)))
                 .then(|| {
                     (
                         inst_name(&b.key, &inst.args, self.defs),
-                        b.locals[0].ty.clone(),
+                        sub(&b.locals[0].ty),
                     )
                 })
         });
@@ -56,10 +64,25 @@ impl Ctx<'_> {
     }
 }
 
+/// Thế tham số kiểu của instance (`params[i]` ↦ `args[i]`) vào `ty` — đúng `subst_inst` của codegen LLVM.
+fn subst_inst(ty: &Ty, params: &[gt_types::ParamId], args: &[Ty]) -> Ty {
+    ty.subst(&|p| {
+        params
+            .iter()
+            .position(|q| *q == p)
+            .and_then(|i| args.get(i).cloned())
+    })
+}
+
 struct Lw<'a> {
     cx: &'a Ctx<'a>,
     db: &'a TypeDb,
     body: &'a Body,
+    /// tham số kiểu của thân (impl rồi hàm) và đối số của instance đang hạ
+    params: Vec<gt_types::ParamId>,
+    args: Vec<Ty>,
+    /// kiểu ĐÃ THẾ của mọi local
+    local_tys: Vec<Ty>,
     slots: BTreeMap<usize, G>,
     blocks: Vec<Block>,
     cur: Vec<Inst>,
@@ -155,6 +178,10 @@ fn is_unit(t: &Ty) -> bool {
 }
 
 impl Lw<'_> {
+    /// thế tham số của instance vào một kiểu đọc từ MIR — PHẢI gọi ở mọi chỗ đọc `Ty` của thân (chỗ sót vẫn fail-closed: `lower_ty` từ chối `Ty::Param`)
+    fn sub(&self, ty: &Ty) -> Ty {
+        subst_inst(ty, &self.params, &self.args)
+    }
     fn t(&mut self) -> String {
         self.tmp += 1;
         format!("t{}", self.tmp)
@@ -174,7 +201,7 @@ impl Lw<'_> {
     }
     fn slot(&mut self, l: usize) -> R<String> {
         if !self.slots.contains_key(&l) {
-            let ty = gty(self.db, &self.body.locals[l].ty)?;
+            let ty = gty(self.db, &self.local_tys[l])?;
             self.slots.insert(l, ty);
         }
         Ok(format!("l{l}"))
@@ -191,7 +218,7 @@ impl Lw<'_> {
     fn place_m(&mut self, p: &Place) -> R<(Opd, Ty, Option<Opd>)> {
         let mut meta: Option<Opd> = None;
         let l = p.local.index();
-        let mut cur_ty = self.body.locals[l].ty.clone();
+        let mut cur_ty = self.local_tys[l].clone();
         let mut ptr = Opd::Slot(self.slot(l)?);
         let mut downcast: Option<u32> = None;
         for e in &p.projection {
@@ -225,7 +252,7 @@ impl Lw<'_> {
                         idx: *i,
                     });
                     ptr = Opd::Val(d);
-                    cur_ty = fty.clone();
+                    cur_ty = self.sub(fty);
                 }
                 PlaceElem::Deref => {
                     let Ty::Ref(_, inner) = &cur_ty else {
@@ -528,6 +555,7 @@ impl Lw<'_> {
                 self.store(dest, r, &ty)
             }
             Rvalue::Cast(o, to) => {
+                let to = &self.sub(to);
                 let (v, from) = self.operand(o)?;
                 let (Ty::Int(_) | Ty::Bool | Ty::Char, Ty::Int(_)) = (&from, to) else {
                     return un("Cast ngoài int/bool→int");
@@ -559,6 +587,7 @@ impl Lw<'_> {
                 self.store(dest, r, to)
             }
             Rvalue::CastFits(o, to) => {
+                let to = &self.sub(to);
                 // `ép x as T` không mất thông tin ⇔ (đi-về qua T cho lại x) VÀ (cùng dấu giá trị khi hai kiểu khác dấu); xem `cast_fits` của codegen
                 let (v, from) = self.operand(o)?;
                 let one = Opd::Int(G::I1, 1);
@@ -631,6 +660,14 @@ impl Lw<'_> {
                 Ok(())
             }
             Rvalue::Aggregate(kind, ops) => {
+                let kind = &match kind {
+                    gt_mir::AggregateKind::Adt(def, v, args) => gt_mir::AggregateKind::Adt(
+                        *def,
+                        *v,
+                        args.iter().map(|a| self.sub(a)).collect(),
+                    ),
+                    k => k.clone(),
+                };
                 let (ptr, dty) = self.place(dest)?;
                 let (field_tys, tag): (Vec<Ty>, Option<u32>) = match (kind, &dty) {
                     (gt_mir::AggregateKind::Tuple, Ty::Tuple(v)) => (v.clone(), None),
@@ -911,7 +948,7 @@ impl Lw<'_> {
         match t {
             TerminatorKind::Goto(b) => self.finish(Term::Br(Self::block_name(b.index())), None),
             TerminatorKind::Return => {
-                let rty = self.body.locals[0].ty.clone();
+                let rty = self.local_tys[0].clone();
                 if is_unit(&rty) {
                     self.finish(Term::Ret(None), None);
                 } else {
@@ -1010,15 +1047,12 @@ impl Lw<'_> {
                 let gt_mir::Callee::Fn { node, generics } = callee else {
                     return un("Call không phải hàm trực tiếp");
                 };
-                if !generics.is_empty() {
-                    return un("Call hàm generic");
-                }
                 let Some(tg) = target else {
                     return un("Call không trở về");
                 };
                 let inst = Instance {
                     node: *node,
-                    args: generics.clone(),
+                    args: generics.iter().map(|g| self.sub(g)).collect(),
                 };
                 let Some((name, rty)) = self.cx.sig(&inst) else {
                     return un(format!(
@@ -1054,7 +1088,22 @@ impl Lw<'_> {
                 }
                 self.finish(Term::Br(Self::block_name(tg.index())), None);
             }
-            TerminatorKind::Drop { .. } => return un("Drop"),
+            TerminatorKind::Drop { place, target } => {
+                // drop glue: MỘT nguồn sự thật `TypeDb::drop_glue` (như codegen LLVM và thông dịch MIR); glue rỗng (vd `T` thế bằng kiểu số) ⇒ chỉ nhảy
+                let Some(pty) = gt_mir::types::place_ty(self.body, place) else {
+                    return un("Drop: không biết kiểu chỗ");
+                };
+                let ty = self.sub(&pty);
+                if ty.has_param() || ty.has_infer() {
+                    return un("Drop trên kiểu chưa thế");
+                }
+                match self.db.drop_glue(&ty) {
+                    Ok(g) if g.is_nothing() => {
+                        self.finish(Term::Br(Self::block_name(target.index())), None)
+                    }
+                    _ => return un("Drop có glue"),
+                }
+            }
         }
         Ok(())
     }
@@ -1146,13 +1195,54 @@ pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lower
     let mut ok: BTreeMap<String, (Instance, Func)> = BTreeMap::new();
     let mut bad: Vec<(String, Instance, Unsupported)> = Vec::new();
     let mut globals: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    // gốc: thân không generic (instance args=[]) và mọi instance của bảng M4; thêm theo nhu cầu các instance được gọi (vd hàm generic của
+    // prelude — không có trong bảng M4), như hàng đợi `pending` của codegen LLVM
+    let mut seen: std::collections::BTreeSet<Instance> = std::collections::BTreeSet::new();
+    let mut queue: std::collections::VecDeque<Instance> = std::collections::VecDeque::new();
     for b in &fns {
-        let inst = Instance {
-            node: b.node,
-            args: Vec::new(),
+        if db.fn_params(b.sig_node).is_empty() {
+            queue.push_back(Instance {
+                node: b.node,
+                args: Vec::new(),
+            });
+        }
+    }
+    queue.extend(
+        t.instances
+            .iter()
+            .filter(|i| !i.args.is_empty() && cx.bodies.contains_key(&i.node))
+            .cloned(),
+    );
+    while let Some(inst) = queue.pop_front() {
+        if !seen.insert(inst.clone()) {
+            continue;
+        }
+        let Some(b) = cx.bodies.get(&inst.node).copied() else {
+            continue;
         };
+        if seen.len() > 2 * gt_types::MAX_PROGRAM_INSTANCES {
+            bad.push((
+                b.key.clone(),
+                inst,
+                Unsupported("quá nhiều instance".into()),
+            ));
+            continue;
+        }
+        if inst
+            .args
+            .iter()
+            .any(|a| a.depth() > gt_types::MAX_INSTANCE_DEPTH)
+        {
+            bad.push((
+                b.key.clone(),
+                inst,
+                Unsupported("instance lồng quá sâu".into()),
+            ));
+            continue;
+        }
         match lower_inst(&cx, b, &inst) {
-            Ok((f, gs, _)) => {
+            Ok((f, gs, calls)) => {
+                queue.extend(calls.into_iter().filter(|c| !seen.contains(c)));
                 let conflict = gs
                     .iter()
                     .any(|g| globals.get(&g.name).is_some_and(|x| *x != g.bytes));
@@ -1194,6 +1284,8 @@ pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lower
             }
         }
     }
+    let seen_nodes: std::collections::BTreeSet<gt_ast::NodeId> =
+        seen.iter().map(|i| i.node).collect();
     let funcs = ok
         .iter()
         .map(|(n, (i, _))| (n.clone(), i.clone()))
@@ -1209,7 +1301,11 @@ pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lower
         },
         funcs,
         bad,
-        no_instance: Vec::new(),
+        no_instance: fns
+            .iter()
+            .filter(|b| !seen_nodes.contains(&b.node))
+            .map(|b| b.key.clone())
+            .collect(),
     }
 }
 
@@ -1223,10 +1319,22 @@ fn lower_inst(
     if body.kind != BodyKind::Fn {
         return un("không phải thân Fn");
     }
+    let params = db.fn_params(body.sig_node);
+    if params.len() != inst.args.len() {
+        return un("số đối số kiểu của instance không khớp số tham số");
+    }
+    let local_tys: Vec<Ty> = body
+        .locals
+        .iter()
+        .map(|l| subst_inst(&l.ty, &params, &inst.args))
+        .collect();
     let mut lw = Lw {
         cx,
         db,
         body,
+        params,
+        args: inst.args.clone(),
+        local_tys,
         slots: BTreeMap::new(),
         blocks: Vec::new(),
         cur: Vec::new(),
@@ -1240,7 +1348,7 @@ fn lower_inst(
     // tham số: store vào slot ở khối vào
     let mut params = Vec::new();
     for i in 1..=body.arg_count {
-        let ty = body.locals[i].ty.clone();
+        let ty = lw.local_tys[i].clone();
         if is_unit(&ty) {
             continue;
         }
@@ -1253,10 +1361,10 @@ fn lower_inst(
             ptr: Opd::Slot(s),
         });
     }
-    let ret = if is_unit(&body.locals[0].ty) {
+    let ret = if is_unit(&lw.local_tys[0]) {
         G::Void
     } else {
-        gty(db, &body.locals[0].ty)?
+        gty(db, &lw.local_tys[0])?
     };
     lw.finish(Term::Br("bb0".into()), Some("bb0".into()));
     for (bi, bd) in body.blocks.iter().enumerate() {

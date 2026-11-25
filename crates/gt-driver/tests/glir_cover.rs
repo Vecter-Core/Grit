@@ -14,8 +14,11 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
         .filter(|p| p.extension().is_some_and(|x| x == "gt"))
         .collect();
     files.sort();
+    // HAI số (ADR-P2-02, thân generic theo instance): theo THÂN (hạ được ⇔ ≥ 1 instance hạ được) và theo INSTANCE
     let (mut lowered, mut total) = (0usize, 0usize);
+    let (mut inst_ok, mut inst_total) = (0usize, 0usize);
     let mut why: BTreeMap<String, usize> = BTreeMap::new();
+    let mut why_body: BTreeMap<String, usize> = BTreeMap::new();
     for p in files {
         let src = std::fs::read_to_string(&p).expect("đọc");
         let Ok(res) = check(
@@ -39,6 +42,24 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
         for (_, _, u) in &lo.bad {
             *why.entry(u.0.clone()).or_default() += 1;
         }
+        inst_total += lo.module.funcs.len() + lo.bad.len();
+        let ok_nodes: std::collections::BTreeSet<_> = lo.funcs.values().map(|i| i.node).collect();
+        for b in &fns {
+            if ok_nodes.contains(&b.node) {
+                lowered += 1;
+            } else if let Some((_, _, u)) = lo.bad.iter().find(|(_, i, _)| i.node == b.node) {
+                *why_body.entry(u.0.clone()).or_default() += 1;
+            } else {
+                assert!(
+                    lo.no_instance.contains(&b.key),
+                    "{}: thân không được tính",
+                    b.key
+                );
+                *why_body
+                    .entry("thân generic không có instance".into())
+                    .or_default() += 1;
+            }
+        }
         let m = &lo.module;
         let errs = gt_glir::verify(m);
         assert!(
@@ -48,7 +69,7 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
             gt_glir::print(m)
         );
         for f in &m.funcs {
-            lowered += 1;
+            inst_ok += 1;
             let inst = &lo.funcs[&f.name];
             let b = fns.iter().find(|b| b.node == inst.node).expect("thân gốc");
             let cover = gt_glirgen::check_abort_cover(b, f);
@@ -59,11 +80,17 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
             .unwrap_or_else(|e| panic!("{}: in ra không đọc lại được: {e}", p.display()));
         assert_eq!(&back, m, "{}: đọc(in) ≠ gốc", p.display());
     }
+    eprintln!("GLIR_COVER bodies lowered={lowered} total={total}");
+    let mut by: Vec<_> = why_body.into_iter().collect();
+    by.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+    for (w, n) in by.iter().take(15) {
+        eprintln!("  thân chưa hạ: {n:5}  {w}");
+    }
+    eprintln!("GLIR_COVER instances lowered={inst_ok} total={inst_total}");
     let mut by: Vec<_> = why.into_iter().collect();
     by.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
-    eprintln!("GLIR_COVER lowered={lowered} total={total}");
     for (w, n) in by.iter().take(15) {
-        eprintln!("  chưa hạ: {n:5}  {w}");
+        eprintln!("  instance chưa hạ: {n:5}  {w}");
     }
     assert!(lowered >= 1, "không hạ được thân nào");
 }
