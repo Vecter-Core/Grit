@@ -537,3 +537,61 @@ pub fn lower_body(db: &TypeDb, body: &Body) -> R<Func> {
         blocks: lw.blocks,
     })
 }
+
+/// Kiểm (d) của ADR-P2-02 (cố vấn Opus): với mỗi loại abort `k`, số khối `Abort(k)` TỚI ĐƯỢC trong GLIR ≥ số `Assert` loại `k` (cộng `Unreachable`
+/// ⇒ `unreachable`) TỚI ĐƯỢC trong MIR. Đóng giới hạn Guard "không đếm được Assert đã bị xoá khi hạ". Trả lỗi dạng `G0501: …`.
+#[must_use]
+pub fn check_abort_cover(body: &Body, f: &Func) -> Vec<String> {
+    let mut mir: BTreeMap<String, usize> = BTreeMap::new();
+    let n = body.blocks.len();
+    let mut seen = vec![false; n];
+    let mut stack = vec![0usize];
+    while let Some(i) = stack.pop() {
+        if i >= n || std::mem::replace(&mut seen[i], true) {
+            continue;
+        }
+        let Some(t) = &body.blocks[i].terminator else {
+            continue;
+        };
+        match &t.kind {
+            TerminatorKind::Assert { kind, .. } => {
+                *mir.entry(kind.name().to_string()).or_default() += 1
+            }
+            TerminatorKind::Unreachable => *mir.entry("unreachable".to_string()).or_default() += 1,
+            _ => {}
+        }
+        stack.extend(t.kind.successors().iter().map(|b| b.index()));
+    }
+    let idx: BTreeMap<&str, usize> = f
+        .blocks
+        .iter()
+        .enumerate()
+        .map(|(i, b)| (b.name.as_str(), i))
+        .collect();
+    let mut glir: BTreeMap<String, usize> = BTreeMap::new();
+    let mut seen = vec![false; f.blocks.len()];
+    let mut stack = vec![0usize];
+    while let Some(i) = stack.pop() {
+        if i >= f.blocks.len() || std::mem::replace(&mut seen[i], true) {
+            continue;
+        }
+        match &f.blocks[i].term {
+            Term::Abort(k) => *glir.entry(k.clone()).or_default() += 1,
+            Term::Br(t) => stack.extend(idx.get(t.as_str()).copied()),
+            Term::CondBr(_, a, b) => {
+                stack.extend([a, b].iter().filter_map(|t| idx.get(t.as_str()).copied()))
+            }
+            Term::Ret(_) => {}
+        }
+    }
+    mir.iter()
+        .filter(|(k, c)| glir.get(*k).copied().unwrap_or(0) < **c)
+        .map(|(k, c)| {
+            format!(
+                "G0501: @{}: loại abort `{k}`: MIR có {c} Assert tới được, GLIR chỉ {} khối Abort",
+                f.name,
+                glir.get(k).copied().unwrap_or(0)
+            )
+        })
+        .collect()
+}

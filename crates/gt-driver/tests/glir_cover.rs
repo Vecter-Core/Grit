@@ -298,3 +298,44 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arithmetic() {
         "oracle sinh quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
+
+/// Kiểm (d) phải BẮT được một khối Abort bị làm mất: lấy một thân có `Assert`, thay khối `Abort` đầu tiên bằng `Ret`/`Br` ⇒ `G0501`.
+#[test]
+fn abort_cover_check_catches_a_dropped_abort_block() {
+    let src = "ƒ add(a: u8, b: u8) → u8 ! ∅ { a + b }\nƒ main() → i32 ! ∅ { 0 }\n";
+    let res = check(
+        &[SourceInput {
+            name: "main.gt".to_string(),
+            text: src.to_string(),
+        }],
+        &Options::default(),
+    )
+    .expect("check");
+    let art = res.open_gate().expect("cổng");
+    let b = art
+        .mir
+        .bodies
+        .iter()
+        .find(|b| b.key == "main::add")
+        .expect("thân add");
+    let f = gt_glirgen::lower_body(&art.types.db, b).expect("hạ được");
+    assert!(
+        gt_glirgen::check_abort_cover(b, &f).is_empty(),
+        "bản gốc phải đủ"
+    );
+    let mut broken = f.clone();
+    let i = broken
+        .blocks
+        .iter()
+        .position(|x| matches!(x.term, gt_glir::Term::Abort(_)))
+        .expect("có khối Abort");
+    broken.blocks[i].term = gt_glir::Term::Ret(Some((
+        gt_glir::Ty::I8,
+        gt_glir::Opd::Int(gt_glir::Ty::I8, 0),
+    )));
+    let errs = gt_glirgen::check_abort_cover(b, &broken);
+    assert!(
+        errs.iter().any(|e| e.starts_with("G0501")),
+        "phải báo G0501, có {errs:?}"
+    );
+}
