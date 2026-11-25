@@ -1,6 +1,7 @@
 //! GLIR (ADR-P2-02, thiết kế dạng LAI theo cố vấn Opus 2026-11-24): giá trị tạm là SSA `%v`, bộ nhớ là slot có kiểu `$s` (tương ứng `alloca`).
 //! C1: kiểu dữ liệu + in + đọc + verifier. CHƯA có đường hạ MIR→GLIR và GLIR→LLVM. Không có `Unreachable`/`Assert` trong tập lệnh:
 //! mọi thất bại là `Abort(loại)` (terminator) ⇒ bất biến "không còn Assert/unreachable" đúng DO CẤU TẠO.
+pub mod interp;
 pub mod parse;
 pub mod print;
 pub mod verify;
