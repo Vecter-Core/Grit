@@ -188,6 +188,20 @@ impl<'a> Interp<'a> {
         V::Ref(0, l, Vec::new())
     }
 
+    /// Công cụ ĐỐI CHIẾU (test): đặt `v` vào kho khung 0 và trả tham chiếu tới nó, để truyền `&T`/`&!T` cho `call_key`.
+    pub fn alloc_ref(&mut self, v: V) -> V {
+        self.leak(v)
+    }
+
+    /// Công cụ ĐỐI CHIẾU (test): giá trị hiện tại mà tham chiếu `V::Ref(0, ô, [])` do `alloc_ref` trả đang trỏ tới (sau lời gọi).
+    #[must_use]
+    pub fn read_ref(&self, r: &V) -> Option<V> {
+        match r {
+            V::Ref(0, l, path) if path.is_empty() => self.frames[0].locals.get(*l).cloned(),
+            _ => None,
+        }
+    }
+
     fn top(&self) -> usize {
         self.frames.len() - 1
     }

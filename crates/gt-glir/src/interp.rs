@@ -12,6 +12,8 @@ pub enum Outcome {
     Value(Option<u128>),
     /// giá trị tổng hợp trả về (struct/mảng) dưới dạng byte (`None` = byte chưa ghi/đệm)
     Agg(Vec<Option<u8>>),
+    /// con trỏ trả về (chỉ có nghĩa trong cùng một lần chạy: `(vùng, offset)`)
+    Ptr(usize, u64),
     Abort(String),
     Ub(String),
     OutOfFuel,
@@ -22,6 +24,8 @@ pub enum Outcome {
 pub enum Arg {
     Int(u128),
     Bytes(Vec<Option<u8>>),
+    /// con trỏ tới một vùng mới có nội dung ban đầu `bytes` (để thử hàm nhận `&T`/`&!T`)
+    Ref(Vec<Option<u8>>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,7 +67,7 @@ struct St<'a> {
     env: BTreeMap<String, Val>,
     /// tên slot → vùng
     slot: BTreeMap<String, usize>,
-    mem: Vec<Vec<Byte>>,
+    mem: &'a mut Vec<Vec<Byte>>,
 }
 
 impl St<'_> {
@@ -229,12 +233,25 @@ pub fn run_module(m: &Module, name: &str, args: &[u128], fuel: u64) -> Outcome {
     run_module_args(m, name, &a, fuel)
 }
 
-/// Như `run_module` với đối số có thể là giá trị tổng hợp.
+/// Như `run_module` với đối số có thể là giá trị tổng hợp (không có `Arg::Ref`).
 #[must_use]
-pub fn run_module_args(m: &Module, name: &str, args: &[Arg], mut fuel: u64) -> Outcome {
+pub fn run_module_args(m: &Module, name: &str, args: &[Arg], fuel: u64) -> Outcome {
+    run_module_refs(m, name, args, fuel).0
+}
+
+/// Như `run_module_args`, thêm: với mỗi `Arg::Ref` (theo thứ tự) trả NỘI DUNG cuối của vùng nó trỏ tới (để so với giá trị sau lời gọi của thông dịch MIR).
+#[must_use]
+pub fn run_module_refs(
+    m: &Module,
+    name: &str,
+    args: &[Arg],
+    mut fuel: u64,
+) -> (Outcome, Vec<Vec<Option<u8>>>) {
     let Some(f) = m.funcs.iter().find(|f| f.name == name) else {
-        return Outcome::Ub(format!("không có hàm @{name}"));
+        return (Outcome::Ub(format!("không có hàm @{name}")), Vec::new());
     };
+    let mut mem: Vec<Vec<Byte>> = Vec::new();
+    let mut refs: Vec<usize> = Vec::new();
     let vals: Vec<Val> = args
         .iter()
         .map(|a| match a {
@@ -242,17 +259,42 @@ pub fn run_module_args(m: &Module, name: &str, args: &[Arg], mut fuel: u64) -> O
             Arg::Bytes(bs) => {
                 Val::Agg(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect())
             }
+            Arg::Ref(bs) => {
+                mem.push(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect());
+                refs.push(mem.len() - 1);
+                Val::Ptr(mem.len() - 1, 0)
+            }
         })
         .collect();
-    exec(m, f, &vals, &mut fuel, 0)
+    let out = exec(m, f, &vals, &mut fuel, 0, &mut mem);
+    let fin = refs
+        .iter()
+        .map(|i| {
+            mem[*i]
+                .iter()
+                .map(|b| match b {
+                    Byte::B(x) => Some(*x),
+                    _ => None,
+                })
+                .collect()
+        })
+        .collect();
+    (out, fin)
 }
 
-fn exec(m: &Module, f: &Func, args: &[Val], fuel: &mut u64, depth: u32) -> Outcome {
+fn exec(
+    m: &Module,
+    f: &Func,
+    args: &[Val],
+    fuel: &mut u64,
+    depth: u32,
+    mem: &mut Vec<Vec<Byte>>,
+) -> Outcome {
     let mut st = St {
         f,
         env: BTreeMap::new(),
         slot: BTreeMap::new(),
-        mem: Vec::new(),
+        mem,
     };
     if args.len() != f.params.len() {
         return Outcome::Ub("sai số đối số".into());
@@ -263,6 +305,7 @@ fn exec(m: &Module, f: &Func, args: &[Val], fuel: &mut u64, depth: u32) -> Outco
             (Ty::Struct(_) | Ty::Array(..), Val::Agg(bs)) if bs.len() as u64 == layout(t).size => {
                 Val::Agg(bs.clone())
             }
+            (Ty::Ptr, Val::Ptr(a, o)) => Val::Ptr(*a, *o),
             _ => return Outcome::Ub("tham số không khớp kiểu".into()),
         };
         st.env.insert(n.clone(), v);
@@ -320,10 +363,15 @@ fn exec(m: &Module, f: &Func, args: &[Val], fuel: &mut u64, depth: u32) -> Outco
                 let Some(g) = m.funcs.iter().find(|g| g.name == *callee) else {
                     return ub(format!("gọi @{callee} ngoài module"));
                 };
-                match exec(m, g, &vals, fuel, depth + 1) {
+                match exec(m, g, &vals, fuel, depth + 1, st.mem) {
                     Outcome::Value(v) => {
                         if let (Some(d), Some(v)) = (d, v) {
                             st.env.insert(d.clone(), Val::Int(v));
+                        }
+                    }
+                    Outcome::Ptr(a, o) => {
+                        if let Some(d) = d {
+                            st.env.insert(d.clone(), Val::Ptr(a, o));
                         }
                     }
                     Outcome::Agg(bs) => {
@@ -455,6 +503,13 @@ fn exec(m: &Module, f: &Func, args: &[Val], fuel: &mut u64, depth: u32) -> Outco
             }
             Term::Ret(None) => return Outcome::Value(None),
             Term::Ret(Some((t, v))) => {
+                if *t == Ty::Ptr {
+                    return match st.opd(v) {
+                        Ok(Val::Ptr(a, o)) => Outcome::Ptr(a, o),
+                        Ok(_) => ub("ret ptr không phải con trỏ".into()),
+                        Err(e) => ub(e),
+                    };
+                }
                 if matches!(t, Ty::Struct(_) | Ty::Array(..)) {
                     return match st.opd(v) {
                         Ok(Val::Agg(bs)) => {

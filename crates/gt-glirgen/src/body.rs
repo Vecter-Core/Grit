@@ -40,7 +40,7 @@ struct Lw<'a> {
 fn is_int_or_bool(t: &Ty) -> bool {
     match t {
         Ty::Int(it) => it.bits() <= 64,
-        Ty::Bool => true,
+        Ty::Bool | Ty::Char | Ty::Never => true,
         _ => false,
     }
 }
@@ -61,10 +61,20 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32) -> bool {
     }
     match t {
         Ty::Tuple(v) => v.iter().all(|x| in_sub(db, x, depth + 1)),
+        Ty::Ref(_, inner) => in_sub(db, inner, depth + 1),
+        Ty::Array(e, n) => *n <= 4096 && in_sub(db, e, depth + 1),
         Ty::Adt(def, args) => {
-            plain_struct(db, def)
-                && crate::variant_fields(db, *def, args, 0)
-                    .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)))
+            if plain_struct(db, def) {
+                return crate::variant_fields(db, *def, args, 0)
+                    .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)));
+            }
+            match db.adts.get(def).map(|a| &a.kind) {
+                Some(gt_types::AdtKind::Enum(vs)) => (0..vs.len()).all(|v| {
+                    crate::variant_fields(db, *def, args, v)
+                        .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)))
+                }),
+                _ => false,
+            }
         }
         t => is_int_or_bool(t),
     }
@@ -100,7 +110,7 @@ fn kind_name(t: &Ty) -> &'static str {
 }
 
 fn is_unit(t: &Ty) -> bool {
-    matches!(t, Ty::Tuple(v) if v.is_empty())
+    matches!(t, Ty::Tuple(v) if v.is_empty()) || matches!(t, Ty::Never)
 }
 
 impl Lw<'_> {
@@ -133,23 +143,92 @@ impl Lw<'_> {
         let l = p.local.index();
         let mut cur_ty = self.body.locals[l].ty.clone();
         let mut ptr = Opd::Slot(self.slot(l)?);
+        let mut downcast: Option<u32> = None;
         for e in &p.projection {
-            let PlaceElem::Field(i, fty) = e else {
-                return un("chỗ có phép chiếu ngoài trường tuple/struct");
-            };
-            if !matches!(cur_ty, Ty::Tuple(_) | Ty::Adt(..)) {
-                return un("trường của kiểu không phải tuple/struct");
+            match e {
+                PlaceElem::Field(i, fty) => {
+                    let gt = if let Some(v) = downcast.take() {
+                        // trường của biến thể `v`: nhìn vùng payload `[k × i64]` như struct của biến thể (đúng cách codegen LLVM làm)
+                        let Ty::Adt(def, args) = &cur_ty else {
+                            return un("Downcast+Field trên kiểu không phải enum");
+                        };
+                        let fs = crate::variant_fields(self.db, *def, args, v as usize)
+                            .map_err(Unsupported)?;
+                        let gfs = fs.iter().map(|t| gty(self.db, t)).collect::<R<Vec<_>>>()?;
+                        G::Struct(gfs)
+                    } else {
+                        if !matches!(cur_ty, Ty::Tuple(_) | Ty::Adt(..)) {
+                            return un("trường của kiểu không phải tuple/struct");
+                        }
+                        if let Ty::Adt(def, _) = &cur_ty
+                            && !plain_struct(self.db, def)
+                        {
+                            return un("trường của enum không qua Downcast");
+                        }
+                        gty(self.db, &cur_ty)?
+                    };
+                    let d = self.t();
+                    self.push(Inst::FieldPtr {
+                        d: d.clone(),
+                        ty: gt,
+                        ptr,
+                        idx: *i,
+                    });
+                    ptr = Opd::Val(d);
+                    cur_ty = fty.clone();
+                }
+                PlaceElem::Deref => {
+                    let Ty::Ref(_, inner) = &cur_ty else {
+                        return un("Deref của kiểu không phải tham chiếu");
+                    };
+                    let inner = (**inner).clone();
+                    gty(self.db, &inner)?;
+                    let d = self.t();
+                    self.push(Inst::Load {
+                        d: d.clone(),
+                        ty: G::Ptr,
+                        ptr,
+                    });
+                    ptr = Opd::Val(d);
+                    cur_ty = inner;
+                }
+                PlaceElem::Index(il) => {
+                    let Ty::Array(elem, _) = &cur_ty else {
+                        return un("Index của kiểu không phải mảng");
+                    };
+                    let elem = (**elem).clone();
+                    let ge = gty(self.db, &elem)?;
+                    let (iv, _) = self.load(&Place::local(*il))?;
+                    let d = self.t();
+                    self.push(Inst::IndexPtr {
+                        d: d.clone(),
+                        elem: ge,
+                        ptr,
+                        idx: iv,
+                    });
+                    ptr = Opd::Val(d);
+                    cur_ty = elem;
+                }
+                PlaceElem::Downcast(v) => {
+                    let Ty::Adt(..) = &cur_ty else {
+                        return un("Downcast của kiểu không phải enum");
+                    };
+                    let ge = gty(self.db, &cur_ty)?;
+                    let d = self.t();
+                    self.push(Inst::FieldPtr {
+                        d: d.clone(),
+                        ty: ge,
+                        ptr,
+                        idx: 1,
+                    });
+                    ptr = Opd::Val(d);
+                    downcast = Some(*v);
+                }
+                _ => return un("chỗ có phép chiếu ngoài trường/Deref/Downcast"),
             }
-            let gt = gty(self.db, &cur_ty)?;
-            let d = self.t();
-            self.push(Inst::FieldPtr {
-                d: d.clone(),
-                ty: gt,
-                ptr,
-                idx: *i,
-            });
-            ptr = Opd::Val(d);
-            cur_ty = fty.clone();
+        }
+        if downcast.is_some() {
+            return un("Downcast không theo sau bởi Field");
         }
         Ok((ptr, cur_ty))
     }
@@ -180,6 +259,7 @@ impl Lw<'_> {
                 Ok((Opd::Int(gint(*ty), v), Ty::Int(*ty)))
             }
             Operand::Const(Const::Bool(b)) => Ok((Opd::Int(G::I1, i128::from(*b)), Ty::Bool)),
+            Operand::Const(Const::Char(c)) => Ok((Opd::Int(G::I32, i128::from(*c)), Ty::Char)),
             // `()` không có biểu diễn: mọi chỗ ghi/truyền kiểu `()` đều bị bỏ qua (xem `store`, `Call`, `Aggregate`)
             Operand::Const(Const::Unit) => Ok((Opd::Int(G::I1, 0), Ty::Tuple(Vec::new()))),
             Operand::Const(_) => un("hằng không phải số nguyên/bool/()"),
@@ -294,7 +374,7 @@ impl Lw<'_> {
             }
             Rvalue::Cast(o, to) => {
                 let (v, from) = self.operand(o)?;
-                let (Ty::Int(_) | Ty::Bool, Ty::Int(_)) = (&from, to) else {
+                let (Ty::Int(_) | Ty::Bool | Ty::Char, Ty::Int(_)) = (&from, to) else {
                     return un("Cast ngoài int/bool→int");
                 };
                 if let Ty::Int(it) = to
@@ -324,21 +404,89 @@ impl Lw<'_> {
                 self.store(dest, r, to)
             }
             Rvalue::CastFits(..) => un("CastFits"),
+            Rvalue::Aggregate(gt_mir::AggregateKind::Array(_), ops) => {
+                let (ptr, dty) = self.place(dest)?;
+                let Ty::Array(elem, _) = &dty else {
+                    return un("Aggregate mảng vào kiểu không phải mảng");
+                };
+                let elem = (**elem).clone();
+                let ge = gty(self.db, &elem)?;
+                for (i, o) in ops.iter().enumerate() {
+                    let (v, _) = self.operand(o)?;
+                    if is_unit(&elem) {
+                        continue;
+                    }
+                    let p = self.t();
+                    self.push(Inst::IndexPtr {
+                        d: p.clone(),
+                        elem: ge.clone(),
+                        ptr: ptr.clone(),
+                        idx: Opd::Int(G::I64, i as i128),
+                    });
+                    self.push(Inst::Store {
+                        ty: ge.clone(),
+                        val: v,
+                        ptr: Opd::Val(p),
+                    });
+                }
+                Ok(())
+            }
             Rvalue::Aggregate(kind, ops) => {
                 let (ptr, dty) = self.place(dest)?;
-                let field_tys: Vec<Ty> = match (kind, &dty) {
-                    (gt_mir::AggregateKind::Tuple, Ty::Tuple(v)) => v.clone(),
+                let (field_tys, tag): (Vec<Ty>, Option<u32>) = match (kind, &dty) {
+                    (gt_mir::AggregateKind::Tuple, Ty::Tuple(v)) => (v.clone(), None),
                     (gt_mir::AggregateKind::Adt(def, 0, args), Ty::Adt(..))
                         if plain_struct(self.db, def) =>
                     {
-                        crate::variant_fields(self.db, *def, args, 0).map_err(Unsupported)?
+                        (
+                            crate::variant_fields(self.db, *def, args, 0).map_err(Unsupported)?,
+                            None,
+                        )
                     }
-                    _ => return un("Aggregate ngoài tuple/struct"),
+                    (gt_mir::AggregateKind::Adt(def, v, args), Ty::Adt(..))
+                        if !plain_struct(self.db, def) =>
+                    {
+                        (
+                            crate::variant_fields(self.db, *def, args, *v as usize)
+                                .map_err(Unsupported)?,
+                            Some(*v),
+                        )
+                    }
+                    _ => return un("Aggregate ngoài tuple/struct/enum"),
                 };
                 if field_tys.len() != ops.len() {
                     return un("Aggregate sai số trường");
                 }
-                let gd = gty(self.db, &dty)?;
+                // enum: ghi tag `i64` rồi nhìn vùng payload như struct của biến thể; struct/tuple: chính chỗ đích
+                let (cptr, cty) = if let Some(v) = tag {
+                    let ge = gty(self.db, &dty)?;
+                    let tp = self.t();
+                    self.push(Inst::FieldPtr {
+                        d: tp.clone(),
+                        ty: ge.clone(),
+                        ptr: ptr.clone(),
+                        idx: 0,
+                    });
+                    self.push(Inst::Store {
+                        ty: G::I64,
+                        val: Opd::Int(G::I64, i128::from(v)),
+                        ptr: Opd::Val(tp),
+                    });
+                    let pp = self.t();
+                    self.push(Inst::FieldPtr {
+                        d: pp.clone(),
+                        ty: ge,
+                        ptr,
+                        idx: 1,
+                    });
+                    let gfs = field_tys
+                        .iter()
+                        .map(|t| gty(self.db, t))
+                        .collect::<R<Vec<_>>>()?;
+                    (Opd::Val(pp), G::Struct(gfs))
+                } else {
+                    (ptr, gty(self.db, &dty)?)
+                };
                 for (i, (o, ft)) in ops.iter().zip(&field_tys).enumerate() {
                     if is_unit(ft) {
                         continue;
@@ -347,8 +495,8 @@ impl Lw<'_> {
                     let fp = self.t();
                     self.push(Inst::FieldPtr {
                         d: fp.clone(),
-                        ty: gd.clone(),
-                        ptr: ptr.clone(),
+                        ty: cty.clone(),
+                        ptr: cptr.clone(),
                         idx: i as u32,
                     });
                     let g = gty(self.db, ft)?;
@@ -360,8 +508,79 @@ impl Lw<'_> {
                 }
                 Ok(())
             }
-            Rvalue::Repeat(..) | Rvalue::Ref(..) | Rvalue::Len(_) | Rvalue::Discriminant(_) => {
-                un("Rvalue ngoài tập con")
+            Rvalue::Ref(_, _, place) => {
+                // địa chỉ của chỗ chính là con trỏ: ghi vào chỗ đích kiểu `&T`
+                let (ptr, _) = self.place(place)?;
+                let (dptr, dty) = self.place(dest)?;
+                gty(self.db, &dty)?;
+                self.push(Inst::Store {
+                    ty: G::Ptr,
+                    val: ptr,
+                    ptr: dptr,
+                });
+                Ok(())
+            }
+            Rvalue::Discriminant(place) => {
+                let (ptr, ty) = self.place(place)?;
+                let Ty::Adt(..) = &ty else {
+                    return un("Discriminant của kiểu không phải enum");
+                };
+                let ge = gty(self.db, &ty)?;
+                let f = self.t();
+                self.push(Inst::FieldPtr {
+                    d: f.clone(),
+                    ty: ge,
+                    ptr,
+                    idx: 0,
+                });
+                let d = self.t();
+                self.push(Inst::Load {
+                    d: d.clone(),
+                    ty: G::I64,
+                    ptr: Opd::Val(f),
+                });
+                self.store(dest, Opd::Val(d), &Ty::Int(IntTy::Usize))
+            }
+            Rvalue::Len(place) => {
+                let (_, ty) = self.place(place)?;
+                let Ty::Array(_, n) = ty else {
+                    return un("Len của kiểu không phải mảng");
+                };
+                self.store(
+                    dest,
+                    Opd::Int(G::I64, i128::from(n)),
+                    &Ty::Int(IntTy::Usize),
+                )
+            }
+            Rvalue::Repeat(o, n) => {
+                let (ptr, dty) = self.place(dest)?;
+                let Ty::Array(elem, _) = &dty else {
+                    return un("Repeat vào kiểu không phải mảng");
+                };
+                if *n > 64 {
+                    return un("Repeat lớn");
+                }
+                let elem = (**elem).clone();
+                let (v, _) = self.operand(o)?;
+                if is_unit(&elem) {
+                    return Ok(());
+                }
+                let ge = gty(self.db, &elem)?;
+                for i in 0..*n {
+                    let p = self.t();
+                    self.push(Inst::IndexPtr {
+                        d: p.clone(),
+                        elem: ge.clone(),
+                        ptr: ptr.clone(),
+                        idx: Opd::Int(G::I64, i128::from(i)),
+                    });
+                    self.push(Inst::Store {
+                        ty: ge.clone(),
+                        val: v.clone(),
+                        ptr: Opd::Val(p),
+                    });
+                }
+                Ok(())
             }
         }
     }
@@ -370,6 +589,7 @@ impl Lw<'_> {
         let (g, signed) = match ta {
             Ty::Int(it) => (gint(*it), it.signed()),
             Ty::Bool => (G::I1, false),
+            Ty::Char => (G::I32, false),
             _ => return un("BinaryOp trên kiểu không nguyên"),
         };
         let pick = |s: CmpPred, u: CmpPred| if signed { s } else { u };
@@ -574,8 +794,27 @@ pub fn lower_body(db: &TypeDb, body: &Body) -> R<Func> {
     lower_body_with(db, body, &Sigs::new())
 }
 
-fn glir_name(key: &str) -> String {
-    key.replace(['<', '>', ' ', ':'], "_")
+/// Tên hàm GLIR từ khoá thân MIR: ký tự ngoài `[A-Za-z0-9_.]` đổi thành `_`; nếu có đổi thì thêm hậu tố băm khoá để KHÔNG trùng tên.
+#[must_use]
+pub fn glir_name(key: &str) -> String {
+    let clean: String = key
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if clean == key {
+        clean
+    } else {
+        format!(
+            "{clean}.{:06x}",
+            gt_types::fnv1a64(key.as_bytes()) & 0xff_ffff
+        )
+    }
 }
 
 /// Hạ cả tập thân: hàm nào gọi (trực tiếp) hàm cùng tập con thì được hạ kèm lời gọi; hàm gọi tới hàm không hạ được bị loại (lặp tới điểm cố định).
