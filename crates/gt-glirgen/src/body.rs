@@ -1044,20 +1044,39 @@ impl Lw<'_> {
                     self.finish(Term::Br(Self::block_name(tg.index())), None);
                     return Ok(());
                 }
-                let gt_mir::Callee::Fn { node, generics } = callee else {
-                    return un("Call không phải hàm trực tiếp");
+                let inst = match callee {
+                    gt_mir::Callee::Fn { node, generics } => Instance {
+                        node: *node,
+                        args: generics.iter().map(|g| self.sub(g)).collect(),
+                    },
+                    gt_mir::Callee::TraitMethod {
+                        trait_def,
+                        member,
+                        self_ty,
+                        generics,
+                    } => {
+                        // đơn hình hoá: thế tham số của instance đang hạ rồi phân giải NGAY bằng bảng impl (một nguồn với codegen/thông dịch MIR)
+                        let st = self.sub(self_ty);
+                        let ga: Vec<Ty> = generics.iter().map(|g| self.sub(g)).collect();
+                        if st.has_param() || st.has_infer() {
+                            return un("TraitMethod trên kiểu chưa thế");
+                        }
+                        let Some((node, all)) =
+                            self.db.resolve_trait_method(*trait_def, *member, &st, &ga)
+                        else {
+                            return un("TraitMethod không phân giải được");
+                        };
+                        Instance { node, args: all }
+                    }
+                    gt_mir::Callee::Value(_) => return un("Call không phải hàm trực tiếp"),
                 };
                 let Some(tg) = target else {
                     return un("Call không trở về");
                 };
-                let inst = Instance {
-                    node: *node,
-                    args: generics.iter().map(|g| self.sub(g)).collect(),
-                };
                 let Some((name, rty)) = self.cx.sig(&inst) else {
                     return un(format!(
                         "Call tới hàm ngoài tập con: {}",
-                        self.cx.keys.get(node).map_or("?", |k| k.as_str())
+                        self.cx.keys.get(&inst.node).map_or("?", |k| k.as_str())
                     ));
                 };
                 self.calls.push(inst);
