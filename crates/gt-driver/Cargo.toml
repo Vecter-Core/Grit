@@ -42,6 +42,8 @@ default = ["llvm"]
 llvm = ["dep:gt-codegen-llvm", "dep:gt-guard", "dep:find-msvc-tools"]
 
 [dev-dependencies]
+gt-glirgen = { path = "../gt-glirgen" }
+gt-layout = { path = "../gt-layout" }
 gt-parser = { path = "../gt-parser" }
 
 [lints]

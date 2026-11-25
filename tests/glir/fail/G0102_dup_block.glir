@@ -1,0 +1,11 @@
+// expect: fail G0102
+// note: tên khối trùng trong một hàm
+glir 1
+fn @f(%c: i1) -> void {
+a:
+  condbr %c, b, b
+b:
+  br a
+b:
+  ret void
+}

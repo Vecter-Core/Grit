@@ -323,7 +323,18 @@ impl Builder<'_> {
                             BorrowKind::Unique
                         };
                         let rv = b.new_borrow(k, Place::local(t));
-                        b.assign(dest.clone(), rv);
+                        // F-unsize (phát hiện khi viết test layout, 2026-11-24): `sl: &[u32] ≔ &[1, 2, 3]` — nhánh kéo dài tạm này đi trước phép ép unsize ⇒ MIR sai kiểu (ICE)
+                        match b.unsize_target(init) {
+                            Some(unique) => {
+                                let src = b.ty_of(init)?;
+                                let r = b.temp(src.clone());
+                                b.assign(Place::local(r), rv);
+                                let o = b.operand_of(Place::local(r), &src);
+                                let un = b.unsize_from(o, src, unique)?;
+                                b.assign(dest.clone(), Rvalue::Use(un));
+                            }
+                            None => b.assign(dest.clone(), rv),
+                        }
                         Ok(())
                     })?,
                     // reborrow ngầm (ADR-023 §0.1): `y: &!T ≔ r;` với `r` là CHỖ kiểu `&!T`
@@ -838,6 +849,11 @@ impl Builder<'_> {
         self.unsize_busy.remove(&e.id);
         let o = inner?;
         let src = self.ty_of(e)?;
+        self.unsize_from(o, src, unique)
+    }
+
+    /// Phần ép `&[T; N]` → `&[T]` của `unsize_of`, tách ra để dùng cả khi toán hạng đã được hạ sẵn (luật kéo dài tạm của `x: &[T] ≔ &[…]`).
+    fn unsize_from(&mut self, o: Operand, src: Ty, unique: bool) -> R<Operand> {
         let elem = match &src {
             Ty::Ref(_, a) => match a.as_ref() {
                 Ty::Array(t, _) => (**t).clone(),

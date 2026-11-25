@@ -1,0 +1,15 @@
+[package]
+name = "gt-layout"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Grit B1 (ADR-P2-02, bước 1): bố cục bộ nhớ (cỡ/căn lề) của một kiểu ĐÃ CỤ THỂ, thuần Rust, KHÔNG phụ thuộc LLVM. Dòng TCB ĐỀ XUẤT (hợp đồng: docs/PHASE2_ADR_DRAFTS.md); hiện chỉ ĐỐI CHIẾU với DataLayout của LLVM trong codegen, chưa quyết định bố cục."
+
+[dependencies]
+gt-types = { path = "../gt-types" }
+gt-resolve = { path = "../gt-resolve" }
+gt-glir = { path = "../gt-glir" }
+
+[lints]
+workspace = true

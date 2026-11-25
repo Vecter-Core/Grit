@@ -1,0 +1,8 @@
+// expect: fail G0205
+// note: dùng chính giá trị đang định nghĩa (cùng chỉ số)
+glir 1
+fn @f() -> i32 {
+entry:
+  %x = bin add i32 %x, i32 1
+  ret i32 %x
+}

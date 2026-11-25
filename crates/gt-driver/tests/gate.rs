@@ -532,7 +532,7 @@ fn n1401_samples_emit_their_note_and_s_pass_samples_stay_silent() {
             );
             assert_eq!(res.verdict, Verdict::Green, "{name}");
         }
-        for c in ["S101", "S102", "S201", "S202"] {
+        for c in ["S101", "S102", "S201", "S202", "S203"] {
             if name.starts_with(&format!("{c}_ok_")) {
                 assert!(
                     !codes.contains(&c),

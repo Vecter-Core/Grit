@@ -1,0 +1,14 @@
+// expect: fail G0401
+// note: phi thiếu một khối tiền nhiệm
+glir 1
+fn @f(%c: i1) -> i32 {
+entry:
+  condbr %c, a, b
+a:
+  br j
+b:
+  br j
+j:
+  %v = phi i32 [i32 1, a]
+  ret i32 %v
+}

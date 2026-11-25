@@ -1,0 +1,5 @@
+// expect: fail G0101
+// note: hàm không có khối
+glir 1
+fn @f() -> void {
+}

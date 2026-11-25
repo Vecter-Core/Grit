@@ -1,0 +1,13 @@
+// expect: pass
+// note: khối không tới được (không có tiền nhiệm) dùng giá trị của khối không tới được khác: không bị kiểm trội
+glir 1
+fn @f() -> i32 {
+entry:
+  ret i32 i32 0
+dead:
+  %z = bin add i32 %q, i32 1
+  ret i32 %z
+dead3:
+  %q = bin add i32 i32 1, i32 1
+  ret i32 %q
+}

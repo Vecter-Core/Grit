@@ -1,0 +1,9 @@
+// expect: fail G0302
+// note: sai số đối số
+glir 1
+declare @rt(i32) -> void
+fn @f() -> void {
+entry:
+  call void @rt()
+  ret void
+}

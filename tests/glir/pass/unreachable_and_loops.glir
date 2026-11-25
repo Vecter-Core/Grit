@@ -1,0 +1,27 @@
+// expect: pass
+// note: khối không tới được dùng giá trị không trội vẫn hợp lệ; hai vòng lồng nhau (dominator cần nhiều lượt lặp)
+glir 1
+fn @f(%n: i32) -> i32 {
+entry:
+  br outer
+outer:
+  %i = phi i32 [i32 0, entry], [%i2, olatch]
+  %c = icmp slt i32 %i, %n
+  condbr %c, inner, done
+inner:
+  %j = phi i32 [i32 0, outer], [%j2, inner]
+  %j2 = bin add i32 %j, i32 1
+  %cj = icmp slt i32 %j2, %n
+  condbr %cj, inner, olatch
+olatch:
+  %i2 = bin add i32 %i, i32 1
+  br outer
+done:
+  ret i32 %i
+dead:
+  %z = bin add i32 %q, i32 1
+  br dead2
+dead2:
+  %q = bin add i32 i32 1, i32 1
+  br dead
+}

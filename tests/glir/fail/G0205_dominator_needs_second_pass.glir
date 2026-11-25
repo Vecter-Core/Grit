@@ -1,0 +1,14 @@
+// expect: fail G0205
+// note: khối nối đứng TRƯỚC các tiền nhiệm trong danh sách ⇒ bộ dominator cần lặp tới điểm cố định (một lượt chưa đủ); giá trị của nhánh trái không trội khối nối
+glir 1
+fn @f(%c: i1) -> i32 {
+entry:
+  condbr %c, left, right
+join:
+  ret i32 %x
+left:
+  %x = bin add i32 i32 1, i32 1
+  br join
+right:
+  br join
+}

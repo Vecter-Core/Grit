@@ -1,0 +1,9 @@
+// expect: fail G0205
+// note: dùng trước khi định nghĩa trong cùng khối
+glir 1
+fn @f() -> i32 {
+entry:
+  %y = bin add i32 %x, i32 1
+  %x = bin add i32 i32 1, i32 1
+  ret i32 %y
+}

@@ -1,0 +1,4 @@
+// expect: pass
+// note: ■ không chứa Secret ⇒ không có S203
+■ A: Atomic<u32> ≔ Atomic::new(0u32);
+ƒ main() → u32 ! ∅ { 0u32 }

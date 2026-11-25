@@ -1,0 +1,9 @@
+// expect: fail G0302
+// note: lời gọi ghi kiểu trả về khác khai báo
+glir 1
+declare @rt(i32) -> i32
+fn @f() -> void {
+entry:
+  %v = call i64 @rt(i32 1)
+  ret void
+}

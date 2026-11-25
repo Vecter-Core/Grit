@@ -1,0 +1,23 @@
+// expect: pass
+// note: vòng đếm với phi, slot và lời gọi runtime
+glir 1
+declare @gritrt_abort(i32) -> void
+fn @sum(%n: i64) -> i64 {
+slot $acc: i64
+entry:
+  store i64 i64 0, $acc
+  br head
+head:
+  %i = phi i64 [i64 0, entry], [%inext, body]
+  %c = icmp ult i64 %i, %n
+  condbr %c, body, done
+body:
+  %a = load i64 $acc
+  %a2 = bin add i64 %a, %i
+  store i64 %a2, $acc
+  %inext = bin add i64 %i, i64 1
+  br head
+done:
+  %r = load i64 $acc
+  ret i64 %r
+}

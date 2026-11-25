@@ -69,6 +69,7 @@ Cột "Test mẫu" là file trong `tests/fail|warn` đã có từ M0.
 | S102 | Literal chuỗi entropy cao gán cho tên gợi ý secret | M9 | S102_api_key_entropy, S102_password_with_digit, S102_const_token |
 | S201 | `declassify` trên `Secret<T>` | M9 | S201_declassify, S201_declassify_branch, S201_declassify_in_method, S201_static_declassify |
 | S202 | Giá trị nhạy cảm chảy tới sink `io` | M9 | S202_secret_to_io, S202_declassified_to_log, S202_derived_value |
+| S203 | `■` chứa `Secret`: sống bằng tiến trình, không bao giờ bị xoá | M9 | S203_static_holds_secret, pass/S203_ok_static_plain |
 | N0601 | Check tràn hạ thành runtime | M7 | pass/02_sum_loop |
 | N0602 | Check biên mảng hạ thành runtime | M7 | — |
 | N0603 | Check chia/% (mẫu số ≠ 0, `MIN / -1`) hạ thành runtime | M7 | — |

@@ -1,0 +1,8 @@
+// expect: fail G0305
+// note: zext thu hẹp
+glir 1
+fn @f(%a: i64) -> i32 {
+entry:
+  %r = cast zext i64 %a to i32
+  ret i32 %r
+}

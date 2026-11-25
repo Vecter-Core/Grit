@@ -1,0 +1,7 @@
+// expect: fail G0303
+// note: ret sai kiểu
+glir 1
+fn @f() -> i32 {
+entry:
+  ret i64 i64 1
+}
