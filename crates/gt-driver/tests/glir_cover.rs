@@ -805,7 +805,8 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_slices() {
 
 /// Chương trình SINH có GENERIC (ADR-P2-02, thân generic theo instance): hàm generic gọi hàm generic, phương thức trait qua ràng buộc (`T: Score`
 /// ⇒ `Callee::TraitMethod` phân giải theo instance), struct generic + `⊐ <T>`, `Option<T>`, mảng `[T; 3]`, đa hình hai tham số. Oracle chạy TRỰC TIẾP
-/// từng instance generic (`call_instance`) so với hàm GLIR của instance đó.
+/// từng instance generic (`call_instance`) so với hàm GLIR của instance đó. Phương thức trait CÓ generic riêng (`conv<U>`) gọi qua ràng buộc
+/// (`Callee::TraitMethod` với `generics` ≠ []). Ngưỡng `generic` = đúng số instance generic hiện có (mất một instance ⇒ đỏ).
 #[test]
 fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_generics() {
     let src = "\
@@ -840,6 +841,11 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_generics() {
 ƒ use8(x: bool, y: (u8, bool)) → (bool, (u8, bool)) ! ∅ { pair(y, x) }
 ƒ use9(a: B, b: B, c: bool) → u32 ! ∅ { via(a, b, c) }
 ƒ use10(a: Two<u8>) → u8 ! ∅ { a.swap().fst() }
+⊏ Conv { ƒ conv<U: Copy>(&self, u: U) → (U, u32) ! ∅; }
+⊐ Conv for A { ƒ conv<U: Copy>(&self, u: U) → (U, u32) ! ∅ { (u, self.y + 1u32) } }
+ƒ cv<T: Conv, V: Copy>(t: &T, v: V) → (V, u32) ! ∅ { t.conv(v) }
+ƒ use11(a: A, v: i16) → (i16, u32) ! ∅ { cv(&a, v) }
+ƒ use12(a: A, v: bool) → (bool, u32) ! ∅ { a.conv(v) }
 ƒ main() → i32 ! ∅ { 0 }
 ";
     let mut seed = 0x5EED_6E4E_21C5_0001u64;
@@ -853,7 +859,7 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_generics() {
         diff_src(src, &mut rnd, true, &mut Default::default(), 150);
     eprintln!("GLIR_DIFF_GENERIC instances={insts} generic={generic} runs={runs} aborts={aborts}");
     assert!(
-        generic >= 15 && runs >= 3000 && aborts >= 50,
+        generic >= 23 && runs >= 5000 && aborts >= 100,
         "oracle generic quá nhỏ: instances={insts} generic={generic} runs={runs} aborts={aborts}"
     );
 }
