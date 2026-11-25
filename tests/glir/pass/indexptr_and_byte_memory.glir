@@ -1,0 +1,13 @@
+// expect: pass
+// note: IndexPtr trên mảng slot + fieldptr; bộ nhớ theo byte
+glir 1
+fn @f(%i: i64) -> i32 {
+slot $a: [4 x i32]
+entry:
+  %p = indexptr i32 $a, i64 2
+  store i32 i32 7, %p
+  %q = indexptr i32 $a, %i
+  store i32 i32 9, %q
+  %v = load i32 %p
+  ret i32 %v
+}

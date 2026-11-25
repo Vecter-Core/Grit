@@ -221,6 +221,18 @@ fn parse_inst(line: &str) -> R<Inst> {
                 idx: i.trim().parse().map_err(|_| "chỉ số trường sai")?,
             })
         }
+        "indexptr" => {
+            let (t, r) = ty_then(rest)?;
+            let [p, i] = split_top(r)[..] else {
+                return Err("indexptr cần 2 toán hạng".into());
+            };
+            Ok(Inst::IndexPtr {
+                d: need(d)?,
+                elem: t,
+                ptr: parse_opd(p)?,
+                idx: parse_opd(i)?,
+            })
+        }
         "call" => {
             let (ret, r) = ty_then(rest)?;
             let r = r

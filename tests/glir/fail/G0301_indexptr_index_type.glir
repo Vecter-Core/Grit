@@ -1,0 +1,9 @@
+// expect: fail G0301
+// note: chỉ số indexptr phải là i64
+glir 1
+fn @f(%i: i32) -> void {
+slot $a: [4 x i32]
+entry:
+  %q = indexptr i32 $a, %i
+  ret void
+}

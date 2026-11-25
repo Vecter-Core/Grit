@@ -34,6 +34,7 @@ fn inst_def(i: &Inst) -> Option<&str> {
         | Inst::Cast { d, .. }
         | Inst::Load { d, .. }
         | Inst::FieldPtr { d, .. }
+        | Inst::IndexPtr { d, .. }
         | Inst::Phi { d, .. } => Some(d),
         Inst::Call { d, .. } => d.as_deref(),
         Inst::Store { .. } => None,
@@ -48,7 +49,7 @@ fn ret_ty(i: &Inst) -> Option<Ty> {
         | Inst::Phi { ty, .. } => Some(ty.clone()),
         Inst::ICmp { .. } => Some(Ty::I1),
         Inst::Cast { to, .. } => Some(to.clone()),
-        Inst::FieldPtr { .. } => Some(Ty::Ptr),
+        Inst::FieldPtr { .. } | Inst::IndexPtr { .. } => Some(Ty::Ptr),
         Inst::Call { ret, .. } => Some(ret.clone()),
         Inst::Store { .. } => None,
     }
@@ -293,6 +294,10 @@ fn check_inst(
         Inst::Store { ty, val, ptr } => {
             expect(cx, val, ty);
             expect(cx, ptr, &Ty::Ptr);
+        }
+        Inst::IndexPtr { ptr, idx, .. } => {
+            expect(cx, ptr, &Ty::Ptr);
+            expect(cx, idx, &Ty::I64);
         }
         Inst::FieldPtr { ty, ptr, idx, .. } => {
             expect(cx, ptr, &Ty::Ptr);

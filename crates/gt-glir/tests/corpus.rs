@@ -87,3 +87,32 @@ fn the_parser_never_panics_on_truncated_or_mangled_input() {
         let _ = run(&m.iter().collect::<String>());
     }
 }
+
+/// Thông dịch theo byte: kết quả tính tay của các mẫu bộ nhớ (E2E: chạy `pass/*.glir` có tên cố định).
+#[test]
+fn byte_memory_interpreter_runs_hand_checked_samples() {
+    use gt_glir::interp::{Outcome, run};
+    let load = |name: &str| {
+        gt_glir::parse(
+            &std::fs::read_to_string(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../tests/glir/pass")
+                    .join(name),
+            )
+            .expect("đọc"),
+        )
+        .expect("parse")
+    };
+    let m = load("aggregate_copy.glir");
+    assert_eq!(run(&m.funcs[0], &[41], 1000), Outcome::Value(Some(41)));
+    let m = load("indexptr_and_byte_memory.glir");
+    // i=2 ghi đè phần tử 2 bằng 9 ⇒ đọc lại 9; i=0 ⇒ phần tử 2 vẫn là 7
+    assert_eq!(run(&m.funcs[0], &[2], 1000), Outcome::Value(Some(9)));
+    assert_eq!(run(&m.funcs[0], &[0], 1000), Outcome::Value(Some(7)));
+    // chỉ số ngoài vùng ⇒ Ub (không phải Abort)
+    assert!(matches!(run(&m.funcs[0], &[9], 1000), Outcome::Ub(_)));
+    assert!(matches!(
+        run(&m.funcs[0], &[u64::MAX as u128], 1000),
+        Outcome::Ub(_)
+    ));
+}

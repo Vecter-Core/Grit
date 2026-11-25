@@ -16,7 +16,7 @@ fn int(bits: u32) -> Result<G, String> {
     })
 }
 
-fn variant_fields(
+pub(crate) fn variant_fields(
     db: &TypeDb,
     def: gt_resolve::DefId,
     args: &[Ty],
@@ -115,3 +115,6 @@ fn lower_inner(db: &TypeDb, ty: &Ty, depth: u32) -> Result<G, String> {
         Ty::Err => return Err("Ty::Err sau cổng".into()),
     })
 }
+
+pub mod body;
+pub use body::{Sigs, Unsupported, check_abort_cover, lower_body, lower_module};

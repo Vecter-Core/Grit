@@ -111,6 +111,7 @@ dependencies = [
  "gt-diag",
  "gt-effects",
  "gt-fmt",
+ "gt-glir",
  "gt-glirgen",
  "gt-guard",
  "gt-kernel",
@@ -160,8 +161,10 @@ version = "0.1.0"
 name = "gt-glirgen"
 version = "0.1.0"
 dependencies = [
+ "gt-ast",
  "gt-glir",
  "gt-layout",
+ "gt-mir",
  "gt-resolve",
  "gt-types",
 ]

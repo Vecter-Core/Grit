@@ -76,27 +76,13 @@ fn fields_of(
         .collect())
 }
 
-/// Bố cục của một kiểu GLIR (cùng quy tắc: struct không đóng gói, mảng liền kề, `ptr` 8/8).
+/// Bố cục của một kiểu GLIR: dùng chung quy tắc với `gt_glir::layout` (nguồn duy nhất của offset/cỡ GLIR).
 #[must_use]
 pub fn glir_layout(t: &gt_glir::Ty) -> Layout {
-    use gt_glir::Ty as G;
-    match t {
-        G::I1 => int_layout(1),
-        G::I8 => int_layout(8),
-        G::I16 => int_layout(16),
-        G::I32 => int_layout(32),
-        G::I64 => int_layout(64),
-        G::I128 => int_layout(128),
-        G::F64 | G::Ptr => Layout { size: 8, align: 8 },
-        G::Void => Layout { size: 0, align: 1 },
-        G::Struct(fs) => struct_layout(&fs.iter().map(glir_layout).collect::<Vec<_>>()),
-        G::Array(e, n) => {
-            let el = glir_layout(e);
-            Layout {
-                size: el.size.saturating_mul(*n),
-                align: el.align,
-            }
-        }
+    let l = gt_glir::layout::layout(t);
+    Layout {
+        size: l.size,
+        align: l.align,
     }
 }
 
