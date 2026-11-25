@@ -1,6 +1,6 @@
 # FAIL_OPEN_AUDIT — rà soát "im lặng chấp nhận" ở các crate quyết định (2026-10-17)
 
-<!-- FOS:BEGIN -->**Đã rà / tổng chỗ khớp = 1292 / 1292** (CHƯA RÀ 0; `python tools/fail_open_scan.py stats`; dấu vân tay ở `docs/FAIL_OPEN_LEDGER.jsonl`). "Đọc mã" KHÁC "chứng minh".<!-- FOS:END -->
+<!-- FOS:BEGIN -->**Đã rà / tổng chỗ khớp = 1459 / 1667** (CHƯA RÀ 208; `python tools/fail_open_scan.py stats`; dấu vân tay ở `docs/FAIL_OPEN_LEDGER.jsonl`). "Đọc mã" KHÁC "chứng minh".<!-- FOS:END -->
 
 KẾT QUẢ TÓM TẮT (cập nhật R3, 2026-10-18): đợt 1 sửa 6 chỗ (G1, S1, B1, B2, B3, D1); đợt 2 sửa thêm (mục 7.1); R3 rà NỐT 1292/1292 chỗ khớp bằng sổ cái và tìm thêm 3 lỗi thật (FB-17, FB-18, FB-19, mục 8) cùng 6 sửa phòng thủ; phần còn lại AN TOÀN/GHI NHẬN theo ĐỌC mã (không phải chứng minh). Bảng "cách kiểm chứng" ở mục 0.
 
