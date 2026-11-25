@@ -281,7 +281,7 @@ pub fn run_module_refs(
             }
         })
         .collect();
-    let out = exec(m, f, &vals, &mut fuel, 0, &mut mem, &gl, nro);
+    let out = exec(m, f, &vals, &mut fuel, 0, &mut mem, &Glob { gl, nro });
     let fin = refs
         .iter()
         .map(|i| {
@@ -297,6 +297,12 @@ pub fn run_module_refs(
     (out, fin)
 }
 
+/// Môi trường chung của một lần chạy: tên global → vùng và số vùng chỉ-đọc đứng đầu.
+struct Glob {
+    gl: BTreeMap<String, usize>,
+    nro: usize,
+}
+
 fn exec(
     m: &Module,
     f: &Func,
@@ -304,16 +310,15 @@ fn exec(
     fuel: &mut u64,
     depth: u32,
     mem: &mut Vec<Vec<Byte>>,
-    gl: &BTreeMap<String, usize>,
-    nro: usize,
+    glob: &Glob,
 ) -> Outcome {
     let mut st = St {
         f,
         env: BTreeMap::new(),
         slot: BTreeMap::new(),
         mem,
-        gl,
-        nro,
+        gl: &glob.gl,
+        nro: glob.nro,
     };
     if args.len() != f.params.len() {
         return Outcome::Ub("sai số đối số".into());
@@ -382,7 +387,7 @@ fn exec(
                 let Some(g) = m.funcs.iter().find(|g| g.name == *callee) else {
                     return ub(format!("gọi @{callee} ngoài module"));
                 };
-                match exec(m, g, &vals, fuel, depth + 1, st.mem, gl, nro) {
+                match exec(m, g, &vals, fuel, depth + 1, st.mem, glob) {
                     Outcome::Value(v) => {
                         if let (Some(d), Some(v)) = (d, v) {
                             st.env.insert(d.clone(), Val::Int(v));
