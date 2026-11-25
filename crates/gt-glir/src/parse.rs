@@ -202,6 +202,10 @@ fn parse_inst(line: &str) -> R<Inst> {
             })
         }
         "store" => {
+            // FB-G2-04: `%x = store …` không được nuốt im lặng `%x`
+            if d.is_some() {
+                return Err("`store` không định nghĩa giá trị (`%d =` thừa)".into());
+            }
             let (t, r) = ty_then(rest)?;
             let [v, p] = split_top(r)[..] else {
                 return Err("store cần 2 toán hạng".into());
@@ -390,6 +394,10 @@ pub fn parse(src: &str) -> R<Module> {
                     break;
                 }
                 if let Some(s) = l.strip_prefix("slot $") {
+                    // FB-G2-04: slot thuộc hàm, chỉ đứng TRƯỚC khối đầu tiên (đúng dạng `print`)
+                    if cur.is_some() || !f.blocks.is_empty() {
+                        return Err(wrap(n, "`slot` phải đứng trước khối đầu tiên".into()));
+                    }
                     let (sn, st) = s
                         .split_once(':')
                         .ok_or_else(|| wrap(n, "slot cần `$tên: kiểu`".into()))?;

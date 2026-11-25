@@ -1,0 +1,8 @@
+// expect: fail G0308
+// note: FB-G2-04: `void` lồng trong struct của slot
+glir 1
+fn @f() -> i32 {
+slot $s: {i32, void}
+entry:
+  ret i32 i32 0
+}

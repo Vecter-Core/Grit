@@ -4,7 +4,11 @@
 //! đọc con trỏ từ byte không phải mảnh con trỏ nguyên vẹn, gọi hàm ngoài module. Chương trình hạ đúng không bao giờ chạm `Ub`.
 use crate::layout::{field_offset, layout};
 use crate::{BinOp, CastOp, CmpPred, Func, Inst, Module, Opd, Term, Ty};
-use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Cỡ tối đa (byte) của MỘT slot mà thông dịch chịu cấp; lớn hơn ⇒ `OutOfFuel` (giới hạn tài nguyên của oracle, không phải phán quyết).
+pub const MAX_SLOT_BYTES: u64 = 1 << 22;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
@@ -75,6 +79,8 @@ struct St<'a> {
     /// tên global → vùng (các vùng `< nro` là CHỈ ĐỌC)
     gl: &'a BTreeMap<String, usize>,
     nro: usize,
+    /// vùng slot của các khung đã trả về (FB-G2-04): mọi truy cập/tính địa chỉ qua chúng là `Ub` (con trỏ treo vào ngăn xếp)
+    freed: &'a RefCell<BTreeSet<usize>>,
 }
 
 impl St<'_> {
@@ -104,7 +110,14 @@ impl St<'_> {
             Val::Int(_) | Val::Agg(_) => Err("cần con trỏ".into()),
         }
     }
+    fn live(&self, a: usize) -> Result<(), String> {
+        if self.freed.borrow().contains(&a) {
+            return Err("dùng slot của khung đã trả về (con trỏ treo)".into());
+        }
+        Ok(())
+    }
     fn range(&self, a: usize, off: u64, n: u64) -> Result<std::ops::Range<usize>, String> {
+        self.live(a)?;
         let len = self.mem[a].len() as u64;
         if off.checked_add(n).is_none_or(|e| e > len) {
             return Err(format!("truy cập [{off}, {off}+{n}) ngoài vùng cỡ {len}"));
@@ -294,7 +307,18 @@ pub fn run_module_refs(
         })
         .collect();
     let funcs = m.funcs.iter().map(|g| (g.name.as_str(), g)).collect();
-    let mut out = exec(f, &vals, &mut fuel, 0, &mut mem, &Glob { gl, nro, funcs });
+    let glob = Glob {
+        gl,
+        nro,
+        funcs,
+        freed: RefCell::new(BTreeSet::new()),
+    };
+    let mut out = exec(f, &vals, &mut fuel, 0, &mut mem, &glob);
+    if let Outcome::Ptr(a, _) = out
+        && glob.freed.borrow().contains(&a)
+    {
+        out = Outcome::Ub("trả về con trỏ tới slot của khung đã trả về".into());
+    }
     if let Outcome::Bytes(bs) = out {
         out = if bs.iter().any(|b| matches!(b, Byte::P(..))) {
             Outcome::Ub("trả về giá trị chứa con trỏ ở mức cao nhất".into())
@@ -327,9 +351,27 @@ struct Glob<'m> {
     nro: usize,
     /// chỉ mục tên hàm → hàm (tra callee không tuyến tính theo số hàm của module)
     funcs: BTreeMap<&'m str, &'m Func>,
+    freed: RefCell<BTreeSet<usize>>,
 }
 
+/// Chạy một khung; khi khung kết thúc (bất kể kết quả) các vùng slot của nó bị đánh dấu đã giải phóng (FB-G2-04).
 fn exec(
+    f: &Func,
+    args: &[Val],
+    fuel: &mut u64,
+    depth: u32,
+    mem: &mut Vec<Vec<Byte>>,
+    glob: &Glob<'_>,
+) -> Outcome {
+    let base = mem.len();
+    let out = exec_frame(f, args, fuel, depth, mem, glob);
+    // `exec_frame` cấp slot của khung NGAY SAU `base` (trước mọi lời gọi con)
+    let end = (base + f.slots.len()).min(mem.len());
+    glob.freed.borrow_mut().extend(base..end);
+    out
+}
+
+fn exec_frame(
     f: &Func,
     args: &[Val],
     fuel: &mut u64,
@@ -344,6 +386,7 @@ fn exec(
         mem,
         gl: &glob.gl,
         nro: glob.nro,
+        freed: &glob.freed,
     };
     if args.len() != f.params.len() {
         return Outcome::Ub("sai số đối số".into());
@@ -360,8 +403,12 @@ fn exec(
         st.env.insert(n.clone(), v);
     }
     for (n, t) in &f.slots {
+        let size = layout(t).size;
+        if size > MAX_SLOT_BYTES {
+            return Outcome::OutOfFuel;
+        }
         st.slot.insert(n.clone(), st.mem.len());
-        st.mem.push(vec![Byte::Uninit; layout(t).size as usize]);
+        st.mem.push(vec![Byte::Uninit; size as usize]);
     }
     let ub = |m: String| Outcome::Ub(m);
     let mut cur = 0usize;
@@ -511,15 +558,20 @@ fn exec(
                     }
                     Inst::FieldPtr { d, ty, ptr, idx } => {
                         let (a, off) = st.ptr(ptr)?;
+                        st.live(a)?;
                         let fo = field_offset(ty, *idx).ok_or("fieldptr ngoài struct")?;
                         let total = layout(ty).size;
-                        if off + total > st.mem[a].len() as u64 {
+                        if off
+                            .checked_add(total)
+                            .is_none_or(|e| e > st.mem[a].len() as u64)
+                        {
                             return Err("fieldptr: struct vượt vùng".into());
                         }
                         st.env.insert(d.clone(), Val::Ptr(a, off + fo));
                     }
                     Inst::IndexPtr { d, elem, ptr, idx } => {
                         let (a, off) = st.ptr(ptr)?;
+                        st.live(a)?;
                         let i = sext(st.int(idx)?, 64);
                         let n = i128::from(layout(elem).size) * i;
                         let no = i128::from(off) + n;

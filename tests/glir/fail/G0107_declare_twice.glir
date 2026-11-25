@@ -1,0 +1,10 @@
+// expect: fail G0107
+// note: FB-G2-04: hai `declare` cùng tên khác chữ ký — verifier chỉ thấy cái đầu
+glir 1
+declare @g(i32) -> i32
+declare @g(i64) -> i64
+fn @f() -> i32 {
+entry:
+  %v = call i32 @g(i32 1)
+  ret i32 %v
+}

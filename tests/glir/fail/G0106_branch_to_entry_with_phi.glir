@@ -1,0 +1,12 @@
+// expect: fail G0106
+// note: FB-G2-04 (Gemini G2-04): cạnh lùi về khối vào làm phi ở khối vào qua verifier, nhưng khi vào hàm phi không có nguồn (thông dịch: Ub)
+glir 1
+fn @f(%n: i32) -> i32 {
+entry:
+  %i = phi i32 [%j, entry]
+  %j = bin add i32 %i, i32 1
+  %c = icmp ult i32 %j, %n
+  condbr %c, entry, done
+done:
+  ret i32 %j
+}

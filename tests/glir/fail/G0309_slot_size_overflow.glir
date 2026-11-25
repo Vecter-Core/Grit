@@ -1,0 +1,8 @@
+// expect: fail G0309
+// note: FB-G2-04: cỡ mảng tràn u64 (trước đây `saturating_mul` bão hoà im lặng, `round_up`/`+` của struct có thể tràn)
+glir 1
+fn @f() -> i32 {
+slot $s: {i8, [18446744073709551615 x i64]}
+entry:
+  ret i32 i32 0
+}

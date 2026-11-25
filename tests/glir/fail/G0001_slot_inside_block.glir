@@ -1,0 +1,10 @@
+// expect: fail G0001
+// note: FB-G2-04: `slot` giữa khối từng được nhận (slot thuộc hàm, chỉ đứng trước khối đầu)
+glir 1
+fn @f() -> i32 {
+entry:
+  slot $s: i32
+  store i32 i32 1, $s
+  %v = load i32 $s
+  ret i32 %v
+}

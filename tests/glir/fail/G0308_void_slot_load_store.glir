@@ -1,0 +1,9 @@
+// expect: fail G0308
+// note: FB-G2-04: slot/load/store kiểu `void`
+glir 1
+fn @f() -> void {
+slot $s: void
+entry:
+  %v = load void $s
+  ret void
+}

@@ -8,8 +8,13 @@ pub struct Layout {
     pub align: u64,
 }
 
+/// Làm tròn lên bội của `a`; `None` nếu tràn `u64` (FB-G2-04: không bao giờ panic/quấn).
+fn checked_round_up(n: u64, a: u64) -> Option<u64> {
+    n.div_ceil(a.max(1)).checked_mul(a.max(1))
+}
+
 fn round_up(n: u64, a: u64) -> u64 {
-    n.div_ceil(a) * a
+    checked_round_up(n, a).unwrap_or(u64::MAX)
 }
 
 #[must_use]
@@ -31,7 +36,7 @@ pub fn struct_layout(fields: &[Layout]) -> (Layout, Vec<u64>) {
     for f in fields {
         off = round_up(off, f.align);
         offs.push(off);
-        off += f.size;
+        off = off.saturating_add(f.size);
         align = align.max(f.align);
     }
     (
@@ -62,6 +67,34 @@ pub fn layout(t: &Ty) -> Layout {
                 align: el.align,
             }
         }
+    }
+}
+
+/// Bố cục với số học KIỂM TRÀN (FB-G2-04): `None` nếu cỡ/offset của `t` (hoặc kiểu con) vượt `u64`. `layout` bão hoà (không panic) nên
+/// chỉ dùng được cho kiểu đã qua kiểm này — verifier (G0309) đòi mọi kiểu của module qua đây và cỡ ≤ `isize::MAX` (giới hạn đối tượng của LLVM).
+#[must_use]
+pub fn checked_layout(t: &Ty) -> Option<Layout> {
+    match t {
+        Ty::Struct(fs) => {
+            let (mut off, mut align) = (0u64, 1u64);
+            for f in fs {
+                let l = checked_layout(f)?;
+                off = checked_round_up(off, l.align)?.checked_add(l.size)?;
+                align = align.max(l.align);
+            }
+            Some(Layout {
+                size: checked_round_up(off, align)?,
+                align,
+            })
+        }
+        Ty::Array(e, n) => {
+            let el = checked_layout(e)?;
+            Some(Layout {
+                size: el.size.checked_mul(*n)?,
+                align: el.align,
+            })
+        }
+        _ => Some(layout(t)),
     }
 }
 

@@ -1,0 +1,12 @@
+// expect: fail G0302
+// note: FB-G2-04: gán kết quả lời gọi `void` cho `%x` rồi dùng `%x`
+glir 1
+fn @g() -> void {
+entry:
+  ret void
+}
+fn @f() -> void {
+entry:
+  %x = call void @g()
+  ret void
+}

@@ -1216,6 +1216,9 @@ pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lower
     let mut ok: BTreeMap<String, (Instance, Func)> = BTreeMap::new();
     let mut bad: Vec<(String, Instance, Unsupported)> = Vec::new();
     let mut globals: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    // FB-G2-04: tên GLIR trùng giữa hai instance khác nhau (va chạm băm 24 bit của `glir_name`) ⇒ loại CẢ HAI (fail-closed; lời gọi theo tên
+    // sẽ trỏ nhầm thân), không ghi đè im lặng
+    let mut clash: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     // gốc: thân không generic (instance args=[]) và mọi instance của bảng M4; thêm theo nhu cầu các instance được gọi (vd hàm generic của
     // prelude — không có trong bảng M4), như hàng đợi `pending` của codegen LLVM
     let mut seen: std::collections::BTreeSet<Instance> = std::collections::BTreeSet::new();
@@ -1273,6 +1276,18 @@ pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lower
                         inst,
                         Unsupported("global trùng tên khác nội dung".into()),
                     ));
+                    continue;
+                }
+                if clash.contains(&f.name) || ok.contains_key(&f.name) {
+                    if let Some((pi, _)) = ok.remove(&f.name) {
+                        let key = cx
+                            .bodies
+                            .get(&pi.node)
+                            .map_or(f.name.clone(), |b| b.key.clone());
+                        bad.push((key, pi, Unsupported("tên GLIR trùng".into())));
+                    }
+                    clash.insert(f.name.clone());
+                    bad.push((b.key.clone(), inst, Unsupported("tên GLIR trùng".into())));
                     continue;
                 }
                 for g in gs {
@@ -1468,6 +1483,10 @@ pub fn check_abort_cover(body: &Body, f: &Func) -> Vec<String> {
         match &f.blocks[i].term {
             Term::Abort(k) => *glir.entry(k.clone()).or_default() += 1,
             Term::Br(t) => stack.extend(idx.get(t.as_str()).copied()),
+            // FB-G2-04: điều kiện HẰNG chỉ đi một nhánh (một `Assert` hạ thành `condbr i1 1, ok, abort` không được tính là còn chốt)
+            Term::CondBr(Opd::Int(_, v), a, b) => {
+                stack.extend(idx.get(if v & 1 == 1 { a } else { b }.as_str()).copied())
+            }
             Term::CondBr(_, a, b) => {
                 stack.extend([a, b].iter().filter_map(|t| idx.get(t.as_str()).copied()))
             }

@@ -1,5 +1,7 @@
 //! Verifier GLIR (Rust thuần, không phụ thuộc LLVM). Trả danh sách lỗi `Gxxxx: …` (rỗng ⇒ hợp lệ). Mã:
 //! G01xx cấu trúc khối · G02xx định nghĩa/dùng SSA, slot · G03xx kiểu · G04xx phi.
+//! FB-G2-04 (Gemini G2-04): G0106 cạnh vào khối vào; G0107 trùng tên `declare`/`fn`; G0302 `%x = call void`; G0308 `void` ở chỗ giá trị,
+//! hằng không nguyên; G0309 kiểu có cỡ tràn `u64` hoặc > `isize::MAX`.
 use crate::{Func, Inst, Module, Opd, Term, Ty};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -55,8 +57,84 @@ fn ret_ty(i: &Inst) -> Option<Ty> {
     }
 }
 
+/// `void` xuất hiện ở đâu đó trong `t` (kể cả trường struct/phần tử mảng).
+fn has_void(t: &Ty) -> bool {
+    match t {
+        Ty::Void => true,
+        Ty::Struct(fs) => fs.iter().any(has_void),
+        Ty::Array(e, _) => has_void(e),
+        _ => false,
+    }
+}
+
+/// Cỡ của `t` biểu diễn được (không tràn `u64`) và ≤ `isize::MAX`.
+fn size_ok(t: &Ty) -> bool {
+    crate::layout::checked_layout(t).is_some_and(|l| l.size <= isize::MAX as u64)
+}
+
+/// Các kiểu GIÁ TRỊ một lệnh nhắc tới (phải không chứa `void`, cỡ hợp lệ). `Call.ret` riêng: `void` được khi không gán.
+fn inst_value_tys(i: &Inst) -> Vec<&Ty> {
+    match i {
+        Inst::Bin { ty, .. }
+        | Inst::ICmp { ty, .. }
+        | Inst::Select { ty, .. }
+        | Inst::Load { ty, .. }
+        | Inst::Store { ty, .. }
+        | Inst::FieldPtr { ty, .. }
+        | Inst::Phi { ty, .. } => vec![ty],
+        Inst::Cast { from, to, .. } => vec![from, to],
+        Inst::IndexPtr { elem, .. } => vec![elem],
+        Inst::Call {
+            d: Some(_), ret, ..
+        } => vec![ret],
+        Inst::Call { d: None, .. } => vec![],
+    }
+}
+
+fn inst_opds(i: &Inst) -> Vec<&Opd> {
+    match i {
+        Inst::Bin { a, b, .. } | Inst::ICmp { a, b, .. } => vec![a, b],
+        Inst::Select { c, a, b, .. } => vec![c, a, b],
+        Inst::Cast { v, .. } => vec![v],
+        Inst::Load { ptr, .. } => vec![ptr],
+        Inst::Store { val, ptr, .. } => vec![val, ptr],
+        Inst::FieldPtr { ptr, .. } => vec![ptr],
+        Inst::IndexPtr { ptr, idx, .. } => vec![ptr, idx],
+        Inst::Call { args, .. } => args.iter().collect(),
+        Inst::Phi { ins, .. } => ins.iter().map(|(v, _)| v).collect(),
+    }
+}
+
+fn check_value_ty(cx: &mut Cx, what: &str, t: &Ty) {
+    if has_void(t) {
+        cx.err("G0308", format!("{what}: kiểu {t:?} chứa `void`"));
+    } else if !size_ok(t) {
+        cx.err("G0309", format!("{what}: kiểu {t:?} quá lớn"));
+    }
+}
+
 pub fn verify(m: &Module) -> Vec<String> {
     let mut out = Vec::new();
+    let mut dseen = BTreeSet::new();
+    for d in &m.decls {
+        if !dseen.insert(&d.name) {
+            out.push(format!("G0107: `declare @{}` hai lần", d.name));
+        }
+        if m.funcs.iter().any(|f| f.name == d.name) {
+            out.push(format!("G0107: `@{}` vừa `declare` vừa `fn`", d.name));
+        }
+        for t in d.params.iter().chain(std::iter::once(&d.ret)) {
+            let void_ok = std::ptr::eq(t, &d.ret) && *t == Ty::Void;
+            if !void_ok && has_void(t) {
+                out.push(format!(
+                    "G0308: `declare @{}`: kiểu {t:?} chứa `void`",
+                    d.name
+                ));
+            } else if !size_ok(t) {
+                out.push(format!("G0309: `declare @{}`: kiểu {t:?} quá lớn", d.name));
+            }
+        }
+    }
     let mut gseen = BTreeSet::new();
     for g in &m.globals {
         if !gseen.insert(&g.name) {
@@ -94,6 +172,13 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
         if slots.insert(n, t).is_some() {
             cx.err("G0203", format!("slot `${n}` khai báo hai lần"));
         }
+        check_value_ty(&mut cx, &format!("slot `${n}`"), t);
+    }
+    for (p, t) in &f.params {
+        check_value_ty(&mut cx, &format!("tham số `%{p}`"), t);
+    }
+    if f.ret != Ty::Void {
+        check_value_ty(&mut cx, "kiểu trả về", &f.ret);
     }
     // cạnh
     let n = f.blocks.len();
@@ -112,6 +197,14 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
                 ),
             }
         }
+    }
+    // FB-G2-04: khối vào không có tiền nhiệm (như LLVM: "Entry block to function must not have predecessors") — nếu không, phi ở khối vào
+    // qua verifier nhưng không có nghĩa khi vào hàm
+    if !pred[0].is_empty() {
+        cx.err(
+            "G0106",
+            format!("khối vào `{}` là đích của một cạnh", f.blocks[0].name),
+        );
     }
     // tới được + dominator (tập, lặp tới điểm cố định; hàm nhỏ)
     let mut reach = vec![false; n];
@@ -218,13 +311,43 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
         for (ii, i) in b.insts.iter().enumerate() {
             let ii = ii as isize;
             if matches!(i, Inst::Phi { .. }) {
+                if bi == 0 {
+                    cx.err("G0401", "phi ở khối vào (không có tiền nhiệm)".into());
+                }
                 if past_phi {
                     cx.err("G0402", format!("phi không ở đầu khối `{}`", b.name));
                 }
             } else {
                 past_phi = true;
             }
+            for t in inst_value_tys(i) {
+                check_value_ty(&mut cx, "lệnh", t);
+            }
+            if let Inst::Call {
+                d: Some(d),
+                ret: Ty::Void,
+                ..
+            } = i
+            {
+                cx.err("G0302", format!("`%{d}` gán kết quả của lời gọi `void`"));
+            }
+            for o in inst_opds(i) {
+                if let Opd::Int(t, _) = o
+                    && !t.is_int()
+                {
+                    cx.err("G0308", format!("hằng kiểu không nguyên {t:?}"));
+                }
+            }
             check_inst(&mut cx, i, bi, ii, &opd_ty, f, &pred);
+        }
+        match &b.term {
+            Term::CondBr(Opd::Int(t, _), ..) | Term::Ret(Some((_, Opd::Int(t, _))))
+                if !t.is_int() =>
+            {
+                cx.err("G0308", format!("hằng kiểu không nguyên {t:?}"));
+            }
+            Term::Ret(Some((Ty::Void, _))) => cx.err("G0308", "`ret void <giá trị>`".into()),
+            _ => {}
         }
         match &b.term {
             Term::CondBr(c, ..) => {

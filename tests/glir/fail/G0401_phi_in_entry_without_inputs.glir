@@ -1,0 +1,8 @@
+// expect: fail G0401
+// note: FB-G2-04: phi không nguồn ở khối vào (không có tiền nhiệm) — tập nguồn rỗng = tập tiền nhiệm rỗng nên trước đây lọt
+glir 1
+fn @f() -> i32 {
+entry:
+  %x = phi i32
+  ret i32 %x
+}
