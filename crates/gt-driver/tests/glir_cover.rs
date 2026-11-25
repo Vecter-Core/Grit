@@ -77,16 +77,31 @@ fn adt_fields(
     args: &[gt_types::Ty],
 ) -> Option<Vec<gt_types::Ty>> {
     let adt = db.adts.get(def)?;
-    let gt_types::AdtKind::Struct(fs) = &adt.kind else {
+    let gt_types::AdtKind::Struct(_) = &adt.kind else {
         return None;
     };
     if adt.lang.is_some() {
         return None;
     }
+    adt_variant_fields(db, def, args, 0)
+}
+
+/// kiểu các trường của biến thể `v` (struct: biến thể 0); `None` nếu không có
+fn adt_variant_fields(
+    db: &gt_types::TypeDb,
+    def: &gt_resolve::DefId,
+    args: &[gt_types::Ty],
+    v: usize,
+) -> Option<Vec<gt_types::Ty>> {
+    let adt = db.adts.get(def)?;
+    let raw: Vec<&gt_types::Ty> = match &adt.kind {
+        gt_types::AdtKind::Struct(fs) => fs.iter().map(|f| &f.ty).collect(),
+        gt_types::AdtKind::Enum(vs) => vs.get(v)?.fields.iter().collect(),
+    };
     Some(
-        fs.iter()
-            .map(|f| {
-                f.ty.subst(&|p| {
+        raw.iter()
+            .map(|t| {
+                t.subst(&|p| {
                     adt.generics
                         .iter()
                         .position(|g| g.id == p)
@@ -97,6 +112,13 @@ fn adt_fields(
     )
 }
 
+fn n_variants(db: &gt_types::TypeDb, def: &gt_resolve::DefId) -> Option<usize> {
+    match &db.adts.get(def)?.kind {
+        gt_types::AdtKind::Enum(vs) => Some(vs.len()),
+        gt_types::AdtKind::Struct(_) => None,
+    }
+}
+
 fn plain(db: &gt_types::TypeDb, t: &gt_types::Ty, d: u32) -> bool {
     use gt_types::Ty;
     d <= 6
@@ -104,9 +126,14 @@ fn plain(db: &gt_types::TypeDb, t: &gt_types::Ty, d: u32) -> bool {
             Ty::Int(it) => it.bits() <= 64,
             Ty::Bool => true,
             Ty::Tuple(v) => v.iter().all(|x| plain(db, x, d + 1)),
-            Ty::Adt(def, args) => {
-                adt_fields(db, def, args).is_some_and(|fs| fs.iter().all(|x| plain(db, x, d + 1)))
-            }
+            Ty::Adt(def, args) => match n_variants(db, def) {
+                Some(n) => (0..n).all(|v| {
+                    adt_variant_fields(db, def, args, v)
+                        .is_some_and(|fs| fs.iter().all(|x| plain(db, x, d + 1)))
+                }),
+                None => adt_fields(db, def, args)
+                    .is_some_and(|fs| fs.iter().all(|x| plain(db, x, d + 1))),
+            },
             _ => false,
         }
 }
@@ -155,20 +182,41 @@ fn gen_val(
         }
         Ty::Tuple(v) if v.is_empty() => V::Unit,
         Ty::Tuple(v) => V::Tuple(v.iter().map(|x| gen_val(db, x, rnd)).collect()),
-        Ty::Adt(def, args) => V::Adt(
-            0,
-            adt_fields(db, def, args)
-                .expect("plain")
-                .iter()
-                .map(|x| gen_val(db, x, rnd))
-                .collect(),
-        ),
+        Ty::Adt(def, args) => {
+            let v = n_variants(db, def).map_or(0, |n| (rnd() % n as u64) as usize);
+            V::Adt(
+                v as u32,
+                adt_variant_fields(db, def, args, v)
+                    .expect("plain")
+                    .iter()
+                    .map(|x| gen_val(db, x, rnd))
+                    .collect(),
+            )
+        }
         _ => unreachable!(),
     }
 }
 
 fn glir_ty_of(db: &gt_types::TypeDb, t: &gt_types::Ty) -> gt_glir::Ty {
     gt_glirgen::lower_ty(db, t).expect("kiểu plain hạ được")
+}
+
+/// (kiểu trường, offset tuyệt đối-tương-đối-`base` từng trường) của biến thể `v` của enum `t`: tag i64 ở 0, payload bắt đầu ở offset trường 1 của struct enum
+fn enum_payload(
+    db: &gt_types::TypeDb,
+    t: &gt_types::Ty,
+    def: &gt_resolve::DefId,
+    args: &[gt_types::Ty],
+    v: usize,
+) -> (Vec<gt_types::Ty>, Vec<usize>) {
+    let ge = glir_ty_of(db, t);
+    let pbase = gt_glir::layout::field_offset(&ge, 1).expect("payload") as usize;
+    let fts = adt_variant_fields(db, def, args, v).expect("plain");
+    let vs = gt_glir::Ty::Struct(fts.iter().map(|x| glir_ty_of(db, x)).collect());
+    let offs = (0..fts.len())
+        .map(|i| pbase + gt_glir::layout::field_offset(&vs, i as u32).expect("offset") as usize)
+        .collect();
+    (fts, offs)
 }
 
 fn encode(
@@ -189,6 +237,15 @@ fn encode(
             }
         }
         (Ty::Tuple(ts), V::Unit) if ts.is_empty() => {}
+        (Ty::Adt(def, args), V::Adt(vi, vs)) if n_variants(db, def).is_some() => {
+            for i in 0..8 {
+                buf[base + i] = Some((u64::from(*vi) >> (8 * i)) as u8);
+            }
+            let (fts, off) = enum_payload(db, t, def, args, *vi as usize);
+            for (i, (ft, fv)) in fts.iter().zip(vs).enumerate() {
+                encode(db, ft, fv, buf, base + off[i]);
+            }
+        }
         (Ty::Tuple(_) | Ty::Adt(..), _) => {
             let (fts, fvs): (Vec<gt_types::Ty>, &Vec<V>) = match (t, v) {
                 (Ty::Tuple(ts), V::Tuple(vs)) => (ts.clone(), vs),
@@ -223,6 +280,15 @@ fn decode_eq(
             (0..n).all(|i| bytes[base + i] == Some((((*x as u128) >> (8 * i)) & 0xff) as u8))
         }
         (Ty::Tuple(ts), V::Unit) if ts.is_empty() => true,
+        (Ty::Adt(def, args), V::Adt(vi, vs)) if n_variants(db, def).is_some() => {
+            (0..8).all(|i| bytes[base + i] == Some((u64::from(*vi) >> (8 * i)) as u8)) && {
+                let (fts, off) = enum_payload(db, t, def, args, *vi as usize);
+                fts.iter()
+                    .zip(vs)
+                    .enumerate()
+                    .all(|(i, (ft, fv))| decode_eq(db, ft, fv, bytes, base + off[i]))
+            }
+        }
         (Ty::Tuple(ts), V::Tuple(vs)) => {
             let g = glir_ty_of(db, t);
             ts.iter().zip(vs).enumerate().all(|(i, (ft, fv))| {
@@ -516,5 +582,42 @@ fn abort_cover_check_catches_a_dropped_abort_block() {
     assert!(
         errs.iter().any(|e| e.starts_with("G0501")),
         "phải báo G0501, có {errs:?}"
+    );
+}
+
+/// Chương trình SINH có enum: tag + payload hẹp/rộng/lồng, `⌥` đọc payload, sao chép qua hàm, `Option`/`Result` bọc enum. Kiểm GLIR (tag `i64` + payload `[k × i64]` nhìn như
+/// struct biến thể) ≡ thông dịch MIR, gồm cả byte payload chưa ghi lúc sao chép.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_enums() {
+    let src = "\
+▢ P { a: u8, b: u32 }
+⊔ E { A, B(u8), C(u32, u8), D(bool, i16), F(P) }
+ƒ id_e(e: E) → E ! ∅ { e }
+ƒ mk_b(x: u8) → E ! ∅ { E::B(x) }
+ƒ mk_c(x: u32, y: u8) → E ! ∅ { E::C(x, y) }
+ƒ mk_f(a: u8, b: u32) → E ! ∅ { E::F(P { a: a, b: b }) }
+ƒ pick(e: E) → u32 ! ∅ {
+  ⌥ e { E::A ↦ 1u32, E::B(x) ↦ x as u32, E::C(x, y) ↦ x +% (y as u32), E::D(f, z) ↦ ⎇ f { z as u32 } ⇝ { 7u32 }, E::F(p) ↦ p.b +% (p.a as u32) }
+}
+ƒ twice(e: E) → u32 ! ∅ { f ≔ id_e(e); g ≔ id_e(f); pick(g) }
+ƒ wrap(e: E) → Option<E> ! ∅ { Some(e) }
+ƒ unwrap_or_a(o: Option<E>) → E ! ∅ { ⌥ o { Some(x) ↦ x, None ↦ E::A } }
+ƒ opt_u8(x: u8, b: bool) → Option<u8> ! ∅ { ⎇ b { Some(x) } ⇝ { None } }
+ƒ res(x: u8) → Result<u8, bool> ! ∅ { ⎇ x > 100u8 { Err(true) } ⇝ { Ok(x) } }
+ƒ chain(o: Option<u8>) → u8 ! ∅ { ⌥ o { Some(x) ↦ x +% 1u8, None ↦ 0u8 } }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0xA5A5_1234_DEAD_BEEFu64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts) = diff_src(src, &mut rnd, true, 150);
+    eprintln!("GLIR_DIFF_ENUM bodies={bodies} runs={runs} aborts={aborts}");
+    assert!(
+        bodies >= 9 && runs >= 1000,
+        "oracle enum quá nhỏ: bodies={bodies} runs={runs}"
     );
 }
