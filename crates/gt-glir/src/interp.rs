@@ -26,6 +26,8 @@ pub enum Arg {
     Bytes(Vec<Option<u8>>),
     /// con trỏ tới một vùng mới có nội dung ban đầu `bytes` (để thử hàm nhận `&T`/`&!T`)
     Ref(Vec<Option<u8>>),
+    /// con trỏ béo `{ptr, len}` tới vùng mới có nội dung `bytes` và độ dài `len` (phần tử) — để thử hàm nhận `&[T]`/`&str`
+    Fat(Vec<Option<u8>>, u64),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -273,6 +275,14 @@ pub fn run_module_refs(
             Arg::Int(x) => Val::Int(*x),
             Arg::Bytes(bs) => {
                 Val::Agg(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect())
+            }
+            Arg::Fat(bs, len) => {
+                mem.push(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect());
+                let a = mem.len() - 1;
+                refs.push(a);
+                let mut fat: Vec<Byte> = (0..8u8).map(|k| Byte::P(a, 0, k)).collect();
+                fat.extend(int_bytes(u128::from(*len), 8));
+                Val::Agg(fat)
             }
             Arg::Ref(bs) => {
                 mem.push(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect());

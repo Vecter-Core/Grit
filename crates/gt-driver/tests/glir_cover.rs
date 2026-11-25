@@ -35,7 +35,7 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
             .filter(|b| b.kind == gt_mir::BodyKind::Fn)
             .collect();
         total += fns.len();
-        let (m, bad) = gt_glirgen::lower_module(&art.types.db, &art.mir.bodies);
+        let (m, bad) = gt_glirgen::lower_module(&art.types.db, &art.mir);
         for (_, u) in bad {
             *why.entry(u.0).or_default() += 1;
         }
@@ -336,6 +336,7 @@ fn diff_src(
     src: &str,
     rnd: &mut dyn FnMut() -> u64,
     main_only: bool,
+    seen: &mut std::collections::BTreeSet<String>,
     iters: usize,
 ) -> (usize, usize, usize) {
     use gt_glir::interp::{Arg, Outcome as GO};
@@ -355,11 +356,12 @@ fn diff_src(
         return (0, 0, 0);
     };
     let db = &art.types.db;
-    let (module, _) = gt_glirgen::lower_module(db, &art.mir.bodies);
+    let (module, _) = gt_glirgen::lower_module(db, &art.mir);
     for b in &art.mir.bodies {
         if b.kind != gt_mir::BodyKind::Fn
             || (main_only && !b.key.starts_with("main::"))
-            || !b.key.starts_with("main::")
+            || !(b.key.starts_with("main::") || b.key.starts_with("$prelude::"))
+            || (!b.key.starts_with("main::") && !seen.insert(b.key.clone()))
         {
             continue;
         }
@@ -369,7 +371,7 @@ fn diff_src(
         }
         let ptys: Vec<Ty> = (1..=b.arg_count).map(|i| b.locals[i].ty.clone()).collect();
         let rty = &b.locals[0].ty;
-        if !ptys.iter().all(|t| plain(db, t, 0) || matches!(t, Ty::Ref(_, i) if plain(db, i, 0) && !matches!(**i, Ty::Tuple(ref v) if v.is_empty()))) || !plain(db, rty, 0) {
+        if !ptys.iter().all(|t| plain(db, t, 0) || matches!(t, Ty::Ref(_, i) if (plain(db, i, 0) && !matches!(**i, Ty::Tuple(ref v) if v.is_empty())) || matches!(&**i, Ty::Str) || matches!(&**i, Ty::Slice(e) if plain(db, e, 0)))) || !plain(db, rty, 0) {
             continue;
         }
         bodies += 1;
@@ -377,18 +379,44 @@ fn diff_src(
             let mut mi = Interp::new(&art.mir, 200_000).with_types(&art.types);
             let mut margs: Vec<V> = Vec::new();
             let mut gargs: Vec<Arg> = Vec::new();
-            // (kiểu pointee, tham chiếu MIR) của từng tham số `&T`/`&!T`, theo thứ tự
-            let mut refs: Vec<(Ty, V)> = Vec::new();
+            // (kiểu pointee, tham chiếu MIR, số phần tử nếu là slice/str) của từng tham số tham chiếu, theo thứ tự
+            let mut refs: Vec<(Ty, V, Option<usize>)> = Vec::new();
             for t in &ptys {
                 if let Ty::Ref(_, inner) = t {
-                    let v = gen_val(db, inner, rnd);
-                    let n = gt_glir::layout::layout(&glir_ty_of(db, inner)).size as usize;
-                    let mut buf = vec![None; n];
-                    encode(db, inner, &v, &mut buf, 0);
-                    gargs.push(Arg::Ref(buf));
-                    let r = mi.alloc_ref(v);
-                    refs.push(((**inner).clone(), r.clone()));
-                    margs.push(r);
+                    match &**inner {
+                        Ty::Str => {
+                            let pool = ["", "a", "héllo", "xyz", "日本語", "a\u{0}b", "ab"];
+                            let st = pool[(rnd() % pool.len() as u64) as usize];
+                            let bytes: Vec<Option<u8>> = st.bytes().map(Some).collect();
+                            gargs.push(Arg::Fat(bytes, st.len() as u64));
+                            let r = mi.alloc_ref(V::Str(st.to_string()));
+                            refs.push(((**inner).clone(), r.clone(), Some(st.len())));
+                            margs.push(r);
+                        }
+                        Ty::Slice(e) => {
+                            let n = (rnd() % 5) as usize;
+                            let vals: Vec<V> = (0..n).map(|_| gen_val(db, e, rnd)).collect();
+                            let sz = gt_glir::layout::layout(&glir_ty_of(db, e)).size as usize;
+                            let mut buf = vec![None; n * sz];
+                            for (i, ev) in vals.iter().enumerate() {
+                                encode(db, e, ev, &mut buf, i * sz);
+                            }
+                            gargs.push(Arg::Fat(buf, n as u64));
+                            let r = mi.alloc_ref(V::Array(vals));
+                            refs.push(((**e).clone(), r.clone(), Some(n)));
+                            margs.push(r);
+                        }
+                        _ => {
+                            let v = gen_val(db, inner, rnd);
+                            let n = gt_glir::layout::layout(&glir_ty_of(db, inner)).size as usize;
+                            let mut buf = vec![None; n];
+                            encode(db, inner, &v, &mut buf, 0);
+                            gargs.push(Arg::Ref(buf));
+                            let r = mi.alloc_ref(v);
+                            refs.push(((**inner).clone(), r.clone(), None));
+                            margs.push(r);
+                        }
+                    }
                     continue;
                 }
                 let v = gen_val(db, t, rnd);
@@ -457,10 +485,24 @@ fn diff_src(
             }
             // trạng thái sau lời gọi của vùng mà `&T`/`&!T` trỏ tới phải khớp (chỉ khi không abort giữa chừng)
             if finished {
-                for ((inner, r), bytes) in refs.iter().zip(&fin) {
+                for ((inner, r, cnt), bytes) in refs.iter().zip(&fin) {
                     let fv = mi.read_ref(r).expect("vùng tham chiếu còn đó");
+                    let ok = match (cnt, &fv) {
+                        (None, _) => decode_eq(db, inner, &fv, bytes, 0),
+                        (Some(_), V::Str(st)) => {
+                            bytes.iter().map(|b| b.unwrap_or(0)).collect::<Vec<u8>>()
+                                == st.as_bytes()
+                        }
+                        (Some(_), V::Array(vs)) => {
+                            let sz = gt_glir::layout::layout(&glir_ty_of(db, inner)).size as usize;
+                            vs.iter()
+                                .enumerate()
+                                .all(|(i, ev)| decode_eq(db, inner, ev, bytes, i * sz))
+                        }
+                        _ => false,
+                    };
                     assert!(
-                        decode_eq(db, inner, &fv, bytes, 0),
+                        ok,
                         "{}: trạng thái sau lời gọi của vùng tham chiếu: GLIR {bytes:?}, MIR {fv:?}",
                         ctx()
                     );
@@ -488,9 +530,10 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_boundary_inputs() {
         seed
     };
     let (mut bodies, mut runs, mut aborts) = (0usize, 0usize, 0usize);
+    let mut seen = std::collections::BTreeSet::new();
     for p in files {
         let src = std::fs::read_to_string(&p).expect("đọc");
-        let (b, r, a) = diff_src(&src, &mut rnd, true, 40);
+        let (b, r, a) = diff_src(&src, &mut rnd, false, &mut seen, 40);
         bodies += b;
         runs += r;
         aborts += a;
@@ -551,7 +594,7 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arithmetic() {
         seed ^= seed << 17;
         seed
     };
-    let (bodies, runs, aborts) = diff_src(&src, &mut rnd, true, 120);
+    let (bodies, runs, aborts) = diff_src(&src, &mut rnd, true, &mut Default::default(), 120);
     eprintln!("GLIR_DIFF_GEN bodies={bodies} runs={runs} aborts={aborts}");
     assert!(
         bodies >= 100 && runs >= 12000 && aborts >= 1000,
@@ -629,7 +672,7 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_enums() {
         seed ^= seed << 17;
         seed
     };
-    let (bodies, runs, aborts) = diff_src(src, &mut rnd, true, 150);
+    let (bodies, runs, aborts) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
     eprintln!("GLIR_DIFF_ENUM bodies={bodies} runs={runs} aborts={aborts}");
     assert!(
         bodies >= 9 && runs >= 1000,
@@ -659,10 +702,42 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arrays() {
         seed ^= seed << 17;
         seed
     };
-    let (bodies, runs, aborts) = diff_src(src, &mut rnd, true, 150);
+    let (bodies, runs, aborts) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
     eprintln!("GLIR_DIFF_ARR bodies={bodies} runs={runs} aborts={aborts}");
     assert!(
         bodies >= 7 && runs >= 1000 && aborts >= 50,
         "oracle mảng quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH có slice/`&str`: tham số `&[T]`/`&!`-slice/`&str` (con trỏ béo, cấp bởi `Arg::Fat`), chỉ số biến kèm kiểm biên, `Len`, lát con `&s[a..b]`,
+/// chuỗi hằng (global), ép `&[T;N]`→`&[T]`; so kết quả VÀ trạng thái vùng sau lời gọi với thông dịch MIR.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_slices() {
+    let src = "\
+ƒ first(s: &[u32]) → u32 ! ∅ { s[0usize] }
+ƒ at(s: &[u8], i: usize) → u8 ! ∅ { s[i] }
+ƒ count(s: &[u16]) → usize ! ∅ { s.len() }
+ƒ tail_len(s: &[u32]) → usize ! ∅ { t ≔ &s[1usize..]; t.len() }
+ƒ mid(s: &[u8], a: usize, b: usize) → usize ! ∅ { t ≔ &s[a..b]; t.len() }
+ƒ sum_pair(s: &[i32]) → i32 ! ∅ { s[0usize] +% s[1usize] }
+ƒ put(s: &![u32], i: usize, v: u32) ! ∅ { s[i] ← v; }
+ƒ lit_len() → usize ! ∅ { t ≔ \"héllo\"; t.len() }
+ƒ str_len(t: &str) → usize ! ∅ { t.len() }
+ƒ arr_as_slice(a: &[u8; 4]) → usize ! ∅ { s: &[u8] ≔ a; s.len() }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0xFEED_FACE_0BAD_F00Du64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_SLICE bodies={bodies} runs={runs} aborts={aborts}");
+    assert!(
+        bodies >= 7 && runs >= 1000 && aborts >= 100,
+        "oracle slice quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
