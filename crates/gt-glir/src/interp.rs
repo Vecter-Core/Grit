@@ -1,6 +1,8 @@
-//! Thông dịch GLIR (Rust thuần, ĐỘC LẬP với gt-mir/gt-glirgen): oracle ngữ nghĩa cho đường hạ MIR→GLIR (ADR-P2-02 C3; thiết kế cố vấn Opus).
-//! Giá trị nguyên là mẫu bit không dấu cắt theo độ rộng (u128). Hành vi KHÔNG xác định trong GLIR (chia 0, `MIN/-1`, dịch ≥ độ rộng, đọc slot chưa ghi,
-//! gọi hàm) trả `Ub` — KHÔNG phải `Abort` — để một bước hạ quên chốt chặn lộ ra ngay (chương trình hạ đúng không bao giờ chạm `Ub`).
+//! Thông dịch GLIR theo mô hình BYTE (Rust thuần, ĐỘC LẬP với gt-mir/gt-glirgen): oracle ngữ nghĩa cho đường hạ MIR→GLIR (ADR-P2-02; thiết kế cố vấn Opus 2026-11-25).
+//! Mỗi slot là một vùng byte có cỡ do `layout` (bố cục GLIR) quyết định; con trỏ là `(vùng, offset)` và mang NGUỒN GỐC (provenance) khi nằm trong bộ nhớ.
+//! Hành vi KHÔNG xác định trả `Ub` (KHÔNG phải `Abort`) để một bước hạ quên chốt chặn lộ ra: chia 0, `MIN/-1`, dịch ≥ độ rộng, đọc byte chưa ghi, con trỏ ngoài vùng,
+//! đọc con trỏ từ byte không phải mảnh con trỏ nguyên vẹn, gọi hàm ngoài module. Chương trình hạ đúng không bao giờ chạm `Ub`.
+use crate::layout::{field_offset, layout};
 use crate::{BinOp, CastOp, CmpPred, Func, Inst, Module, Opd, Term, Ty};
 use std::collections::BTreeMap;
 
@@ -13,17 +15,20 @@ pub enum Outcome {
     OutOfFuel,
 }
 
-#[derive(Clone, Debug)]
-enum Mem {
-    Int(u128),
-    Agg(Vec<Option<Mem>>),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Byte {
+    Uninit,
+    B(u8),
+    /// mảnh `k` (0..8) của con trỏ `(vùng, offset)`
+    P(usize, u64, u8),
 }
 
 #[derive(Clone, Debug)]
 enum Val {
     Int(u128),
-    /// (slot, đường trường)
-    Ptr(String, Vec<u32>),
+    Ptr(usize, u64),
+    /// giá trị tổng hợp (struct/mảng) dưới dạng byte, kể cả byte chưa ghi
+    Agg(Vec<Byte>),
 }
 
 fn mask(w: u32) -> u128 {
@@ -44,22 +49,12 @@ fn sext(v: u128, w: u32) -> i128 {
     }
 }
 
-fn width(t: &Ty) -> Option<u32> {
-    t.bits()
-}
-
-fn empty(t: &Ty) -> Option<Mem> {
-    match t {
-        Ty::Struct(fs) => Some(Mem::Agg(fs.iter().map(empty).collect())),
-        Ty::Array(e, n) if *n <= 64 => Some(Mem::Agg((0..*n).map(|_| empty(e)).collect())),
-        _ => None,
-    }
-}
-
 struct St<'a> {
     f: &'a Func,
     env: BTreeMap<String, Val>,
-    slots: BTreeMap<String, Option<Mem>>,
+    /// tên slot → vùng
+    slot: BTreeMap<String, usize>,
+    mem: Vec<Vec<Byte>>,
 }
 
 impl St<'_> {
@@ -70,31 +65,73 @@ impl St<'_> {
                 .get(v)
                 .cloned()
                 .ok_or_else(|| format!("%{v} chưa có giá trị")),
-            Opd::Slot(s) => Ok(Val::Ptr(s.clone(), Vec::new())),
+            Opd::Slot(s) => Ok(Val::Ptr(*self.slot.get(s).ok_or("slot lạ")?, 0)),
             Opd::Int(t, n) => Ok(Val::Int(
-                (*n as u128) & mask(width(t).ok_or("hằng không nguyên")?),
+                (*n as u128) & mask(t.bits().ok_or("hằng không nguyên")?),
             )),
         }
     }
     fn int(&self, o: &Opd) -> Result<u128, String> {
         match self.opd(o)? {
             Val::Int(v) => Ok(v),
-            Val::Ptr(..) => Err("cần số nguyên, có con trỏ".into()),
+            Val::Ptr(..) | Val::Agg(_) => Err("cần số nguyên".into()),
         }
     }
-    fn cell(&mut self, p: &Val) -> Result<&mut Option<Mem>, String> {
-        let Val::Ptr(s, path) = p else {
-            return Err("không phải con trỏ".into());
-        };
-        let mut cur = self.slots.get_mut(s).ok_or("slot lạ")?;
-        for i in path {
-            let Some(Mem::Agg(fs)) = cur else {
-                return Err("truy cập trường của ô chưa khởi tạo/không phải struct".into());
-            };
-            cur = fs.get_mut(*i as usize).ok_or("trường ngoài phạm vi")?;
+    fn ptr(&self, o: &Opd) -> Result<(usize, u64), String> {
+        match self.opd(o)? {
+            Val::Ptr(a, off) => Ok((a, off)),
+            Val::Int(_) | Val::Agg(_) => Err("cần con trỏ".into()),
         }
-        Ok(cur)
     }
+    fn range(&self, a: usize, off: u64, n: u64) -> Result<std::ops::Range<usize>, String> {
+        let len = self.mem[a].len() as u64;
+        if off.checked_add(n).is_none_or(|e| e > len) {
+            return Err(format!("truy cập [{off}, {off}+{n}) ngoài vùng cỡ {len}"));
+        }
+        Ok(off as usize..(off + n) as usize)
+    }
+    fn read(&self, a: usize, off: u64, t: &Ty) -> Result<Vec<Byte>, String> {
+        let n = layout(t).size;
+        let r = self.range(a, off, n)?;
+        Ok(self.mem[a][r].to_vec())
+    }
+    fn write(&mut self, a: usize, off: u64, bytes: &[Byte]) -> Result<(), String> {
+        let r = self.range(a, off, bytes.len() as u64)?;
+        self.mem[a][r].copy_from_slice(bytes);
+        Ok(())
+    }
+}
+
+fn int_bytes(v: u128, n: u64) -> Vec<Byte> {
+    (0..n)
+        .map(|i| Byte::B(((v >> (8 * i)) & 0xff) as u8))
+        .collect()
+}
+
+fn decode_int(bs: &[Byte], w: u32) -> Result<u128, String> {
+    let mut v = 0u128;
+    for (i, b) in bs.iter().enumerate() {
+        match b {
+            Byte::B(x) => v |= u128::from(*x) << (8 * i),
+            Byte::Uninit => return Err("đọc byte chưa ghi".into()),
+            Byte::P(..) => return Err("đọc số nguyên từ mảnh con trỏ".into()),
+        }
+    }
+    Ok(v & mask(w))
+}
+
+fn decode_ptr(bs: &[Byte]) -> Result<(usize, u64), String> {
+    let mut first = None;
+    for (i, b) in bs.iter().enumerate() {
+        match b {
+            Byte::P(a, off, k) if usize::from(*k) == i && first.is_none_or(|f| f == (*a, *off)) => {
+                first = Some((*a, *off))
+            }
+            Byte::Uninit => return Err("đọc con trỏ từ byte chưa ghi".into()),
+            _ => return Err("đọc con trỏ từ byte không phải mảnh con trỏ nguyên vẹn".into()),
+        }
+    }
+    first.ok_or_else(|| "con trỏ rỗng".into())
 }
 
 fn binop(op: BinOp, w: u32, a: u128, b: u128) -> Result<u128, String> {
@@ -176,7 +213,7 @@ pub fn run(f: &Func, args: &[u128], fuel: u64) -> Outcome {
     run_module(&m, &f.name, args, fuel)
 }
 
-/// Như `run` nhưng gọi được hàm khác trong `m` (đệ quy tới độ sâu 512 (quá ⇒ `OutOfFuel`); hàm khai báo `declare` ngoài module ⇒ `Ub`).
+/// Như `run` nhưng gọi được hàm khác trong `m` (đệ quy tới độ sâu 512, quá ⇒ `OutOfFuel`; hàm `declare` ngoài module ⇒ `Ub`).
 #[must_use]
 pub fn run_module(m: &Module, name: &str, args: &[u128], mut fuel: u64) -> Outcome {
     let Some(f) = m.funcs.iter().find(|f| f.name == name) else {
@@ -189,19 +226,21 @@ fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outc
     let mut st = St {
         f,
         env: BTreeMap::new(),
-        slots: BTreeMap::new(),
+        slot: BTreeMap::new(),
+        mem: Vec::new(),
     };
     if args.len() != f.params.len() {
         return Outcome::Ub("sai số đối số".into());
     }
     for ((n, t), a) in f.params.iter().zip(args) {
-        let Some(w) = width(t) else {
+        let Some(w) = t.bits() else {
             return Outcome::Ub("tham số không nguyên".into());
         };
         st.env.insert(n.clone(), Val::Int(a & mask(w)));
     }
     for (n, t) in &f.slots {
-        st.slots.insert(n.clone(), empty(t));
+        st.slot.insert(n.clone(), st.mem.len());
+        st.mem.push(vec![Byte::Uninit; layout(t).size as usize]);
     }
     let ub = |m: String| Outcome::Ub(m);
     let mut cur = 0usize;
@@ -264,15 +303,24 @@ fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outc
             }
             let r: Result<(), String> = (|| {
                 match i {
-                    Inst::Phi { .. } => {}
+                    Inst::Phi { .. } | Inst::Call { .. } => {}
                     Inst::Bin { d, op, ty, a, b } => {
-                        let w = width(ty).ok_or("bin không nguyên")?;
+                        let w = ty.bits().ok_or("bin không nguyên")?;
                         let v = binop(*op, w, st.int(a)?, st.int(b)?)?;
                         st.env.insert(d.clone(), Val::Int(v));
                     }
                     Inst::ICmp { d, pred, ty, a, b } => {
-                        let w = width(ty).ok_or("icmp không nguyên")?;
-                        let v = cmp(*pred, w, st.int(a)?, st.int(b)?);
+                        let v = if *ty == Ty::Ptr {
+                            let (pa, pb) = (st.ptr(a)?, st.ptr(b)?);
+                            match pred {
+                                CmpPred::Eq => pa == pb,
+                                CmpPred::Ne => pa != pb,
+                                _ => return Err("so sánh thứ tự trên con trỏ".into()),
+                            }
+                        } else {
+                            let w = ty.bits().ok_or("icmp không nguyên")?;
+                            cmp(*pred, w, st.int(a)?, st.int(b)?)
+                        };
                         st.env.insert(d.clone(), Val::Int(u128::from(v)));
                     }
                     Inst::Select { d, c, a, b, .. } => {
@@ -284,7 +332,7 @@ fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outc
                         st.env.insert(d.clone(), v);
                     }
                     Inst::Cast { d, op, from, v, to } => {
-                        let (wf, wt) = (width(from).ok_or("cast")?, width(to).ok_or("cast")?);
+                        let (wf, wt) = (from.bits().ok_or("cast")?, to.bits().ok_or("cast")?);
                         let x = st.int(v)? & mask(wf);
                         let r = match op {
                             CastOp::Trunc => x & mask(wt),
@@ -293,29 +341,55 @@ fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outc
                         };
                         st.env.insert(d.clone(), Val::Int(r));
                     }
-                    Inst::Load { d, ptr, .. } => {
-                        let p = st.opd(ptr)?;
-                        match st.cell(&p)? {
-                            Some(Mem::Int(v)) => {
-                                let v = *v;
-                                st.env.insert(d.clone(), Val::Int(v));
+                    Inst::Load { d, ty, ptr } => {
+                        let (a, off) = st.ptr(ptr)?;
+                        let bs = st.read(a, off, ty)?;
+                        let v = match ty {
+                            Ty::Ptr => {
+                                let (pa, po) = decode_ptr(&bs)?;
+                                Val::Ptr(pa, po)
                             }
-                            _ => return Err("đọc ô chưa ghi hoặc không phải số nguyên".into()),
-                        }
-                    }
-                    Inst::Store { val, ptr, .. } => {
-                        let v = st.int(val)?;
-                        let p = st.opd(ptr)?;
-                        *st.cell(&p)? = Some(Mem::Int(v));
-                    }
-                    Inst::FieldPtr { d, ptr, idx, .. } => {
-                        let Val::Ptr(s, mut path) = st.opd(ptr)? else {
-                            return Err("fieldptr trên giá trị không phải con trỏ".into());
+                            t if t.is_int() => Val::Int(decode_int(&bs, t.bits().unwrap_or(128))?),
+                            Ty::Struct(_) | Ty::Array(..) => Val::Agg(bs),
+                            _ => return Err("load kiểu không hỗ trợ".into()),
                         };
-                        path.push(*idx);
-                        st.env.insert(d.clone(), Val::Ptr(s, path));
+                        st.env.insert(d.clone(), v);
                     }
-                    Inst::Call { .. } => return Err("gọi hàm: GLIR interp chưa hỗ trợ".into()),
+                    Inst::Store { ty, val, ptr } => {
+                        let (a, off) = st.ptr(ptr)?;
+                        let bytes = match (ty, st.opd(val)?) {
+                            (Ty::Ptr, Val::Ptr(pa, po)) => {
+                                (0..8u8).map(|k| Byte::P(pa, po, k)).collect()
+                            }
+                            (t, Val::Int(v)) if t.is_int() => int_bytes(v, layout(t).size),
+                            (Ty::Struct(_) | Ty::Array(..), Val::Agg(bs))
+                                if bs.len() as u64 == layout(ty).size =>
+                            {
+                                bs
+                            }
+                            _ => return Err("store: kiểu/giá trị không khớp".into()),
+                        };
+                        st.write(a, off, &bytes)?;
+                    }
+                    Inst::FieldPtr { d, ty, ptr, idx } => {
+                        let (a, off) = st.ptr(ptr)?;
+                        let fo = field_offset(ty, *idx).ok_or("fieldptr ngoài struct")?;
+                        let total = layout(ty).size;
+                        if off + total > st.mem[a].len() as u64 {
+                            return Err("fieldptr: struct vượt vùng".into());
+                        }
+                        st.env.insert(d.clone(), Val::Ptr(a, off + fo));
+                    }
+                    Inst::IndexPtr { d, elem, ptr, idx } => {
+                        let (a, off) = st.ptr(ptr)?;
+                        let i = sext(st.int(idx)?, 64);
+                        let n = i128::from(layout(elem).size) * i;
+                        let no = i128::from(off) + n;
+                        if no < 0 || no > st.mem[a].len() as i128 {
+                            return Err("indexptr ra ngoài vùng".into());
+                        }
+                        st.env.insert(d.clone(), Val::Ptr(a, no as u64));
+                    }
                 }
                 Ok(())
             })();
@@ -345,7 +419,7 @@ fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outc
             }
             Term::Ret(None) => return Outcome::Value(None),
             Term::Ret(Some((t, v))) => {
-                let w = width(t).unwrap_or(128);
+                let w = t.bits().unwrap_or(128);
                 return match st.int(v) {
                     Ok(x) => Outcome::Value(Some(x & mask(w))),
                     Err(e) => ub(e),

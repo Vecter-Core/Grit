@@ -1,0 +1,17 @@
+// expect: pass
+// note: load/store cả struct (move/copy tổng hợp) — chép nguyên byte
+glir 1
+fn @f(%x: i32) -> i32 {
+slot $a: {i8, i32}
+slot $b: {i8, i32}
+entry:
+  %f1 = fieldptr {i8, i32} $a, 1
+  store i32 %x, %f1
+  %f0 = fieldptr {i8, i32} $a, 0
+  store i8 i8 1, %f0
+  %agg = load {i8, i32} $a
+  store {i8, i32} %agg, $b
+  %g1 = fieldptr {i8, i32} $b, 1
+  %r = load i32 %g1
+  ret i32 %r
+}

@@ -98,6 +98,9 @@ fn inst(i: &Inst) -> String {
         ),
         Inst::Load { d, ty: t, ptr } => format!("%{d} = load {} {}", ty(t), opd(ptr)),
         Inst::Store { ty: t, val, ptr } => format!("store {} {}, {}", ty(t), opd(val), opd(ptr)),
+        Inst::IndexPtr { d, elem, ptr, idx } => {
+            format!("%{d} = indexptr {} {}, {}", ty(elem), opd(ptr), opd(idx))
+        }
         Inst::FieldPtr { d, ty: t, ptr, idx } => {
             format!("%{d} = fieldptr {} {}, {idx}", ty(t), opd(ptr))
         }

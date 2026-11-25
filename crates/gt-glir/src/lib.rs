@@ -2,6 +2,7 @@
 //! C1: kiểu dữ liệu + in + đọc + verifier. CHƯA có đường hạ MIR→GLIR và GLIR→LLVM. Không có `Unreachable`/`Assert` trong tập lệnh:
 //! mọi thất bại là `Abort(loại)` (terminator) ⇒ bất biến "không còn Assert/unreachable" đúng DO CẤU TẠO.
 pub mod interp;
+pub mod layout;
 pub mod parse;
 pub mod print;
 pub mod verify;
@@ -134,6 +135,13 @@ pub enum Inst {
         ty: Ty,
         ptr: Opd,
         idx: u32,
+    },
+    /// `ptr + idx × cỡ(elem)` (idx: i64); kiểm biên do `Assert` của MIR đảm nhận (tương ứng `inbounds gep`)
+    IndexPtr {
+        d: String,
+        elem: Ty,
+        ptr: Opd,
+        idx: Opd,
     },
     Call {
         d: Option<String>,
