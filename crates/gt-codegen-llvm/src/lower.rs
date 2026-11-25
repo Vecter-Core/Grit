@@ -1577,10 +1577,6 @@ impl<'ctx, 'a> Cg<'ctx, 'a> {
                 ))?,
                 _ => return internal("Aggregate trên kiểu không khớp"),
             };
-            let v = match (kind, v) {
-                (AggregateKind::Adt(..), BasicValueEnum::IntValue(iv)) if iv.get_type().get_bit_width() == 8 && st.is_some() && base != dp => iv.get_type().const_zero().into(),
-                _ => v,
-            };
             llvm(self.builder.build_store(slot, v))?;
         }
         Ok(())
