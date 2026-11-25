@@ -161,6 +161,7 @@ version = "0.1.0"
 name = "gt-glirgen"
 version = "0.1.0"
 dependencies = [
+ "gt-ast",
  "gt-glir",
  "gt-layout",
  "gt-mir",

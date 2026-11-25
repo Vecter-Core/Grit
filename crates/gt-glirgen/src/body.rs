@@ -22,7 +22,11 @@ fn un<T>(why: impl Into<String>) -> R<T> {
     Err(Unsupported(why.into()))
 }
 
+/// callee (nút) → (tên GLIR, kiểu trả về Grit) của các thân có chữ ký trong tập con (có thể gọi trực tiếp)
+pub type Sigs = BTreeMap<gt_ast::NodeId, (String, Ty)>;
+
 struct Lw<'a> {
+    sigs: &'a Sigs,
     db: &'a TypeDb,
     body: &'a Body,
     slots: BTreeMap<usize, G>,
@@ -460,7 +464,53 @@ impl Lw<'_> {
                 self.finish(term, Some(bad));
                 self.finish(Term::Abort(kind.name().to_string()), None);
             }
-            TerminatorKind::Call { .. } => return un("Call"),
+            TerminatorKind::Call {
+                callee,
+                args,
+                dest,
+                target,
+                ..
+            } => {
+                let gt_mir::Callee::Fn { node, generics } = callee else {
+                    return un("Call không phải hàm trực tiếp");
+                };
+                if !generics.is_empty() {
+                    return un("Call hàm generic");
+                }
+                let Some(tg) = target else {
+                    return un("Call không trở về");
+                };
+                let Some((name, rty)) = self.sigs.get(node) else {
+                    return un("Call tới hàm ngoài tập con");
+                };
+                let (name, rty) = (name.clone(), rty.clone());
+                let mut vals = Vec::new();
+                for a in args {
+                    let (v, t) = self.operand(a)?;
+                    if !is_unit(&t) {
+                        vals.push(v);
+                    }
+                }
+                if is_unit(&rty) {
+                    self.push(Inst::Call {
+                        d: None,
+                        ret: G::Void,
+                        callee: name,
+                        args: vals,
+                    });
+                } else {
+                    let d = self.t();
+                    let g = gty(self.db, &rty)?;
+                    self.push(Inst::Call {
+                        d: Some(d.clone()),
+                        ret: g,
+                        callee: name,
+                        args: vals,
+                    });
+                    self.store(dest, Opd::Val(d), &rty)?;
+                }
+                self.finish(Term::Br(Self::block_name(tg.index())), None);
+            }
             TerminatorKind::Drop { .. } => return un("Drop"),
         }
         Ok(())
@@ -469,10 +519,68 @@ impl Lw<'_> {
 
 /// Hạ một thân `Fn` không generic. Trả hàm GLIR (chưa verify) hoặc lý do chưa hạ được.
 pub fn lower_body(db: &TypeDb, body: &Body) -> R<Func> {
+    lower_body_with(db, body, &Sigs::new())
+}
+
+fn glir_name(key: &str) -> String {
+    key.replace(['<', '>', ' ', ':'], "_")
+}
+
+/// Hạ cả tập thân: hàm nào gọi (trực tiếp) hàm cùng tập con thì được hạ kèm lời gọi; hàm gọi tới hàm không hạ được bị loại (lặp tới điểm cố định).
+#[must_use]
+pub fn lower_module(db: &TypeDb, bodies: &[Body]) -> (gt_glir::Module, Vec<(String, Unsupported)>) {
+    let mut sigs = Sigs::new();
+    for b in bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
+        let ok = (0..=b.arg_count).all(|i| in_subset(&b.locals[i].ty));
+        if ok {
+            sigs.insert(b.node, (glir_name(&b.key), b.locals[0].ty.clone()));
+        }
+    }
+    let mut ok: BTreeMap<String, Func> = BTreeMap::new();
+    let mut bad: Vec<(String, Unsupported)> = Vec::new();
+    for b in bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
+        match lower_body_with(db, b, &sigs) {
+            Ok(f) => {
+                ok.insert(f.name.clone(), f);
+            }
+            Err(u) => bad.push((b.key.clone(), u)),
+        }
+    }
+    loop {
+        let names: std::collections::BTreeSet<String> = ok.keys().cloned().collect();
+        let drop: Vec<String> = ok
+            .values()
+            .filter(|f| {
+                f.blocks
+                    .iter()
+                    .flat_map(|b| &b.insts)
+                    .any(|i| matches!(i, Inst::Call { callee, .. } if !names.contains(callee)))
+            })
+            .map(|f| f.name.clone())
+            .collect();
+        if drop.is_empty() {
+            break;
+        }
+        for n in drop {
+            ok.remove(&n);
+            bad.push((n, Unsupported("callee không hạ được".into())));
+        }
+    }
+    (
+        gt_glir::Module {
+            decls: Vec::new(),
+            funcs: ok.into_values().collect(),
+        },
+        bad,
+    )
+}
+
+fn lower_body_with(db: &TypeDb, body: &Body, sigs: &Sigs) -> R<Func> {
     if body.kind != BodyKind::Fn {
         return un("không phải thân Fn");
     }
     let mut lw = Lw {
+        sigs,
         db,
         body,
         slots: BTreeMap::new(),
@@ -530,7 +638,7 @@ pub fn lower_body(db: &TypeDb, body: &Body) -> R<Func> {
         .collect();
     slots.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(Func {
-        name: body.key.replace(['<', '>', ' ', ':'], "_"),
+        name: glir_name(&body.key),
         params,
         ret,
         slots,

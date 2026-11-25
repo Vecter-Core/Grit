@@ -28,35 +28,37 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
             continue;
         };
         let Some(art) = res.open_gate() else { continue };
-        for b in &art.mir.bodies {
-            if b.kind != gt_mir::BodyKind::Fn {
-                continue;
-            }
-            total += 1;
-            match gt_glirgen::lower_body(&art.types.db, b) {
-                Ok(f) => {
-                    lowered += 1;
-                    let m = gt_glir::Module {
-                        decls: Vec::new(),
-                        funcs: vec![f],
-                    };
-                    let errs = gt_glir::verify(&m);
-                    assert!(
-                        errs.is_empty(),
-                        "{} :: {}: {errs:?}\n{}",
-                        p.display(),
-                        b.key,
-                        gt_glir::print(&m)
-                    );
-                    let text = gt_glir::print(&m);
-                    let back = gt_glir::parse(&text).unwrap_or_else(|e| {
-                        panic!("{}: in ra không đọc lại được: {e}\n{text}", b.key)
-                    });
-                    assert_eq!(back, m, "{}: đọc(in) ≠ gốc", b.key);
-                }
-                Err(u) => *why.entry(u.0).or_default() += 1,
-            }
+        let fns: Vec<&gt_mir::Body> = art
+            .mir
+            .bodies
+            .iter()
+            .filter(|b| b.kind == gt_mir::BodyKind::Fn)
+            .collect();
+        total += fns.len();
+        let (m, bad) = gt_glirgen::lower_module(&art.types.db, &art.mir.bodies);
+        for (_, u) in bad {
+            *why.entry(u.0).or_default() += 1;
         }
+        let errs = gt_glir::verify(&m);
+        assert!(
+            errs.is_empty(),
+            "{}: {errs:?}\n{}",
+            p.display(),
+            gt_glir::print(&m)
+        );
+        for f in &m.funcs {
+            lowered += 1;
+            let b = fns
+                .iter()
+                .find(|b| b.key.replace(['<', '>', ' ', ':'], "_") == f.name)
+                .expect("thân gốc");
+            let cover = gt_glirgen::check_abort_cover(b, f);
+            assert!(cover.is_empty(), "{}: {cover:?}", b.key);
+        }
+        let text = gt_glir::print(&m);
+        let back = gt_glir::parse(&text)
+            .unwrap_or_else(|e| panic!("{}: in ra không đọc lại được: {e}", p.display()));
+        assert_eq!(back, m, "{}: đọc(in) ≠ gốc", p.display());
     }
     let mut by: Vec<_> = why.into_iter().collect();
     by.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
@@ -86,6 +88,7 @@ fn diff_src(src: &str, rnd: &mut dyn FnMut() -> u64, main_only: bool) -> (usize,
         let Some(art) = res.open_gate() else {
             return (0, 0, 0);
         };
+        let (module, _) = gt_glirgen::lower_module(&art.types.db, &art.mir.bodies);
         for b in &art.mir.bodies {
             if b.kind != gt_mir::BodyKind::Fn
                 || (main_only && !b.key.starts_with("main::"))
@@ -93,7 +96,8 @@ fn diff_src(src: &str, rnd: &mut dyn FnMut() -> u64, main_only: bool) -> (usize,
             {
                 continue;
             }
-            let Ok(f) = gt_glirgen::lower_body(&art.types.db, b) else {
+            let gname = b.key.replace(['<', '>', ' ', ':'], "_");
+            let Some(f) = module.funcs.iter().find(|f| f.name == gname).cloned() else {
                 continue;
             };
             let ptys: Vec<Ty> = (1..=b.arg_count).map(|i| b.locals[i].ty.clone()).collect();
@@ -155,7 +159,7 @@ fn diff_src(src: &str, rnd: &mut dyn FnMut() -> u64, main_only: bool) -> (usize,
                         _ => unreachable!(),
                     });
                 }
-                let g = gt_glir::interp::run(&f, &gargs, 200_000);
+                let g = gt_glir::interp::run_module(&module, &gname, &gargs, 200_000);
                 let m = Interp::new(&art.mir, 200_000)
                     .with_types(&art.types)
                     .call_key(&b.key, margs.clone());

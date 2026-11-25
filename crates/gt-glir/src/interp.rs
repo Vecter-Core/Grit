@@ -1,7 +1,7 @@
 //! Thông dịch GLIR (Rust thuần, ĐỘC LẬP với gt-mir/gt-glirgen): oracle ngữ nghĩa cho đường hạ MIR→GLIR (ADR-P2-02 C3; thiết kế cố vấn Opus).
 //! Giá trị nguyên là mẫu bit không dấu cắt theo độ rộng (u128). Hành vi KHÔNG xác định trong GLIR (chia 0, `MIN/-1`, dịch ≥ độ rộng, đọc slot chưa ghi,
 //! gọi hàm) trả `Ub` — KHÔNG phải `Abort` — để một bước hạ quên chốt chặn lộ ra ngay (chương trình hạ đúng không bao giờ chạm `Ub`).
-use crate::{BinOp, CastOp, CmpPred, Func, Inst, Opd, Term, Ty};
+use crate::{BinOp, CastOp, CmpPred, Func, Inst, Module, Opd, Term, Ty};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -168,7 +168,24 @@ fn cmp(p: CmpPred, w: u32, a: u128, b: u128) -> bool {
 
 /// Chạy `f` với đối số nguyên `args` (mẫu bit; sẽ được cắt theo kiểu tham số). `fuel` = số lệnh tối đa.
 #[must_use]
-pub fn run(f: &Func, args: &[u128], mut fuel: u64) -> Outcome {
+pub fn run(f: &Func, args: &[u128], fuel: u64) -> Outcome {
+    let m = Module {
+        decls: Vec::new(),
+        funcs: vec![f.clone()],
+    };
+    run_module(&m, &f.name, args, fuel)
+}
+
+/// Như `run` nhưng gọi được hàm khác trong `m` (đệ quy tới độ sâu 512 (quá ⇒ `OutOfFuel`); hàm khai báo `declare` ngoài module ⇒ `Ub`).
+#[must_use]
+pub fn run_module(m: &Module, name: &str, args: &[u128], mut fuel: u64) -> Outcome {
+    let Some(f) = m.funcs.iter().find(|f| f.name == name) else {
+        return Outcome::Ub(format!("không có hàm @{name}"));
+    };
+    exec(m, f, args, &mut fuel, 0)
+}
+
+fn exec(m: &Module, f: &Func, args: &[u128], fuel: &mut u64, depth: u32) -> Outcome {
     let mut st = St {
         f,
         env: BTreeMap::new(),
@@ -211,10 +228,40 @@ pub fn run(f: &Func, args: &[u128], mut fuel: u64) -> Outcome {
             st.env.insert(d, v);
         }
         for i in &b.insts {
-            if fuel == 0 {
+            if *fuel == 0 {
                 return Outcome::OutOfFuel;
             }
-            fuel -= 1;
+            *fuel -= 1;
+            if let Inst::Call {
+                d,
+                callee,
+                args: cargs,
+                ..
+            } = i
+            {
+                if depth >= 512 {
+                    return Outcome::OutOfFuel;
+                }
+                let mut vals = Vec::new();
+                for a in cargs {
+                    match st.int(a) {
+                        Ok(v) => vals.push(v),
+                        Err(e) => return ub(e),
+                    }
+                }
+                let Some(g) = m.funcs.iter().find(|g| g.name == *callee) else {
+                    return ub(format!("gọi @{callee} ngoài module"));
+                };
+                match exec(m, g, &vals, fuel, depth + 1) {
+                    Outcome::Value(v) => {
+                        if let (Some(d), Some(v)) = (d, v) {
+                            st.env.insert(d.clone(), Val::Int(v));
+                        }
+                    }
+                    other => return other,
+                }
+                continue;
+            }
             let r: Result<(), String> = (|| {
                 match i {
                     Inst::Phi { .. } => {}
@@ -306,9 +353,9 @@ pub fn run(f: &Func, args: &[u128], mut fuel: u64) -> Outcome {
             }
             Term::Abort(k) => return Outcome::Abort(k.clone()),
         }
-        if fuel == 0 {
+        if *fuel == 0 {
             return Outcome::OutOfFuel;
         }
-        fuel -= 1;
+        *fuel -= 1;
     }
 }

@@ -10,6 +10,7 @@ description = "Grit B1 (ADR-P2-02, C2/C3): hạ MIR/kiểu Grit sang GLIR (đư�
 gt-types = { path = "../gt-types" }
 gt-resolve = { path = "../gt-resolve" }
 gt-mir = { path = "../gt-mir" }
+gt-ast = { path = "../gt-ast" }
 gt-glir = { path = "../gt-glir" }
 gt-layout = { path = "../gt-layout" }
 
