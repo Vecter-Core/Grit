@@ -403,7 +403,51 @@ impl Lw<'_> {
                 };
                 self.store(dest, r, to)
             }
-            Rvalue::CastFits(..) => un("CastFits"),
+            Rvalue::CastFits(o, to) => {
+                // `ép x as T` không mất thông tin ⇔ (đi-về qua T cho lại x) VÀ (cùng dấu giá trị khi hai kiểu khác dấu); xem `cast_fits` của codegen
+                let (v, from) = self.operand(o)?;
+                let one = Opd::Int(G::I1, 1);
+                if matches!(from, Ty::Bool) || matches!((&from, to), (Ty::Int(IntTy::U8), Ty::Char))
+                {
+                    return self.store(dest, one, &Ty::Bool);
+                }
+                let (Ty::Int(fi), Ty::Int(ti)) = (&from, to) else {
+                    return un("CastFits ngoài int→int");
+                };
+                if fi.bits() > 64 || ti.bits() > 64 {
+                    return un("CastFits 128 bit");
+                }
+                let (gf, gt) = (gint(*fi), gint(*ti));
+                let ext = |s: bool| if s { CastOp::SExt } else { CastOp::ZExt };
+                let conv = |lw: &mut Self, v: Opd, a: &G, sa: bool, b: &G| -> Opd {
+                    let (ba, bb) = (a.bits().unwrap_or(0), b.bits().unwrap_or(0));
+                    if ba == bb {
+                        v
+                    } else if bb < ba {
+                        lw.cast(CastOp::Trunc, a, v, b)
+                    } else {
+                        lw.cast(ext(sa), a, v, b)
+                    }
+                };
+                let y = conv(self, v.clone(), &gf, fi.signed(), &gt);
+                let z = conv(self, y.clone(), &gt, ti.signed(), &gf);
+                let mut ok = self.cmp(CmpPred::Eq, &gf, v.clone(), z);
+                if fi.signed() != ti.signed() {
+                    let negx = if fi.signed() {
+                        self.cmp(CmpPred::Slt, &gf, v, Opd::Int(gf.clone(), 0))
+                    } else {
+                        Opd::Int(G::I1, 0)
+                    };
+                    let negy = if ti.signed() {
+                        self.cmp(CmpPred::Slt, &gt, y, Opd::Int(gt.clone(), 0))
+                    } else {
+                        Opd::Int(G::I1, 0)
+                    };
+                    let same = self.cmp(CmpPred::Eq, &G::I1, negx, negy);
+                    ok = self.bin(GB::And, &G::I1, ok, same);
+                }
+                self.store(dest, ok, &Ty::Bool)
+            }
             Rvalue::Aggregate(gt_mir::AggregateKind::Array(_), ops) => {
                 let (ptr, dty) = self.place(dest)?;
                 let Ty::Array(elem, _) = &dty else {
