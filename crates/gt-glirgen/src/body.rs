@@ -62,6 +62,7 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32) -> bool {
     match t {
         Ty::Tuple(v) => v.iter().all(|x| in_sub(db, x, depth + 1)),
         Ty::Ref(_, inner) => in_sub(db, inner, depth + 1),
+        Ty::Array(e, n) => *n <= 4096 && in_sub(db, e, depth + 1),
         Ty::Adt(def, args) => {
             if plain_struct(db, def) {
                 return crate::variant_fields(db, *def, args, 0)
@@ -190,6 +191,23 @@ impl Lw<'_> {
                     });
                     ptr = Opd::Val(d);
                     cur_ty = inner;
+                }
+                PlaceElem::Index(il) => {
+                    let Ty::Array(elem, _) = &cur_ty else {
+                        return un("Index của kiểu không phải mảng");
+                    };
+                    let elem = (**elem).clone();
+                    let ge = gty(self.db, &elem)?;
+                    let (iv, _) = self.load(&Place::local(*il))?;
+                    let d = self.t();
+                    self.push(Inst::IndexPtr {
+                        d: d.clone(),
+                        elem: ge,
+                        ptr,
+                        idx: iv,
+                    });
+                    ptr = Opd::Val(d);
+                    cur_ty = elem;
                 }
                 PlaceElem::Downcast(v) => {
                     let Ty::Adt(..) = &cur_ty else {
@@ -385,6 +403,33 @@ impl Lw<'_> {
                 self.store(dest, r, to)
             }
             Rvalue::CastFits(..) => un("CastFits"),
+            Rvalue::Aggregate(gt_mir::AggregateKind::Array(_), ops) => {
+                let (ptr, dty) = self.place(dest)?;
+                let Ty::Array(elem, _) = &dty else {
+                    return un("Aggregate mảng vào kiểu không phải mảng");
+                };
+                let elem = (**elem).clone();
+                let ge = gty(self.db, &elem)?;
+                for (i, o) in ops.iter().enumerate() {
+                    let (v, _) = self.operand(o)?;
+                    if is_unit(&elem) {
+                        continue;
+                    }
+                    let p = self.t();
+                    self.push(Inst::IndexPtr {
+                        d: p.clone(),
+                        elem: ge.clone(),
+                        ptr: ptr.clone(),
+                        idx: Opd::Int(G::I64, i as i128),
+                    });
+                    self.push(Inst::Store {
+                        ty: ge.clone(),
+                        val: v,
+                        ptr: Opd::Val(p),
+                    });
+                }
+                Ok(())
+            }
             Rvalue::Aggregate(kind, ops) => {
                 let (ptr, dty) = self.place(dest)?;
                 let (field_tys, tag): (Vec<Ty>, Option<u32>) = match (kind, &dty) {
@@ -495,7 +540,47 @@ impl Lw<'_> {
                 });
                 self.store(dest, Opd::Val(d), &Ty::Int(IntTy::Usize))
             }
-            Rvalue::Repeat(..) | Rvalue::Len(_) => un("Rvalue ngoài tập con"),
+            Rvalue::Len(place) => {
+                let (_, ty) = self.place(place)?;
+                let Ty::Array(_, n) = ty else {
+                    return un("Len của kiểu không phải mảng");
+                };
+                self.store(
+                    dest,
+                    Opd::Int(G::I64, i128::from(n)),
+                    &Ty::Int(IntTy::Usize),
+                )
+            }
+            Rvalue::Repeat(o, n) => {
+                let (ptr, dty) = self.place(dest)?;
+                let Ty::Array(elem, _) = &dty else {
+                    return un("Repeat vào kiểu không phải mảng");
+                };
+                if *n > 64 {
+                    return un("Repeat lớn");
+                }
+                let elem = (**elem).clone();
+                let (v, _) = self.operand(o)?;
+                if is_unit(&elem) {
+                    return Ok(());
+                }
+                let ge = gty(self.db, &elem)?;
+                for i in 0..*n {
+                    let p = self.t();
+                    self.push(Inst::IndexPtr {
+                        d: p.clone(),
+                        elem: ge.clone(),
+                        ptr: ptr.clone(),
+                        idx: Opd::Int(G::I64, i128::from(i)),
+                    });
+                    self.push(Inst::Store {
+                        ty: ge.clone(),
+                        val: v.clone(),
+                        ptr: Opd::Val(p),
+                    });
+                }
+                Ok(())
+            }
         }
     }
 

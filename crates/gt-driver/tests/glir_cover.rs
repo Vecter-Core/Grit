@@ -126,6 +126,7 @@ fn plain(db: &gt_types::TypeDb, t: &gt_types::Ty, d: u32) -> bool {
             Ty::Int(it) => it.bits() <= 64,
             Ty::Bool => true,
             Ty::Tuple(v) => v.iter().all(|x| plain(db, x, d + 1)),
+            Ty::Array(e, n) => *n <= 8 && plain(db, e, d + 1),
             Ty::Adt(def, args) => match n_variants(db, def) {
                 Some(n) => (0..n).all(|v| {
                     adt_variant_fields(db, def, args, v)
@@ -181,6 +182,7 @@ fn gen_val(
             V::Int(v, *it)
         }
         Ty::Tuple(v) if v.is_empty() => V::Unit,
+        Ty::Array(e, n) => V::Array((0..*n).map(|_| gen_val(db, e, rnd)).collect()),
         Ty::Tuple(v) => V::Tuple(v.iter().map(|x| gen_val(db, x, rnd)).collect()),
         Ty::Adt(def, args) => {
             let v = n_variants(db, def).map_or(0, |n| (rnd() % n as u64) as usize);
@@ -237,6 +239,12 @@ fn encode(
             }
         }
         (Ty::Tuple(ts), V::Unit) if ts.is_empty() => {}
+        (Ty::Array(e, _), V::Array(vs)) => {
+            let sz = gt_glir::layout::layout(&glir_ty_of(db, e)).size as usize;
+            for (i, ev) in vs.iter().enumerate() {
+                encode(db, e, ev, buf, base + i * sz);
+            }
+        }
         (Ty::Adt(def, args), V::Adt(vi, vs)) if n_variants(db, def).is_some() => {
             for i in 0..8 {
                 buf[base + i] = Some((u64::from(*vi) >> (8 * i)) as u8);
@@ -280,6 +288,12 @@ fn decode_eq(
             (0..n).all(|i| bytes[base + i] == Some((((*x as u128) >> (8 * i)) & 0xff) as u8))
         }
         (Ty::Tuple(ts), V::Unit) if ts.is_empty() => true,
+        (Ty::Array(e, _), V::Array(vs)) => {
+            let sz = gt_glir::layout::layout(&glir_ty_of(db, e)).size as usize;
+            vs.iter()
+                .enumerate()
+                .all(|(i, ev)| decode_eq(db, e, ev, bytes, base + i * sz))
+        }
         (Ty::Adt(def, args), V::Adt(vi, vs)) if n_variants(db, def).is_some() => {
             (0..8).all(|i| bytes[base + i] == Some((u64::from(*vi) >> (8 * i)) as u8)) && {
                 let (fts, off) = enum_payload(db, t, def, args, *vi as usize);
@@ -619,5 +633,35 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_enums() {
     assert!(
         bodies >= 9 && runs >= 1000,
         "oracle enum quá nhỏ: bodies={bodies} runs={runs}"
+    );
+}
+
+/// Chương trình SINH có mảng cố định: chỉ số biến (kèm kiểm biên ⇒ abort `index_out_of_bounds`), `Len`, `Repeat`, mảng chứa tuple/enum, ghi qua `&!`.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arrays() {
+    let src = "\
+ƒ get4(a: [u32; 4], i: usize) → u32 ! ∅ { a[i] }
+ƒ get3b(a: [u8; 3], i: usize) → u8 ! ∅ { a[i] }
+ƒ len_of(a: &[u16; 5]) → usize ! ∅ { s: &[u16] ≔ a; s.len() }
+ƒ rep(x: u32) → [u32; 4] ! ∅ { [x; 4] }
+ƒ lit(x: u8, y: u8) → [u8; 3] ! ∅ { [x, y, x] }
+ƒ pairs(a: [(u8, u32); 2], i: usize) → u32 ! ∅ { a[i].1 }
+ƒ set(a: &![u32; 3], i: usize, v: u32) ! ∅ { a[i] ← v; }
+ƒ sum3(a: [i16; 3]) → i16 ! ∅ { a[0] +% a[1] +% a[2] }
+ƒ opt_arr(a: [Option<u8>; 2], i: usize) → u8 ! ∅ { ⌥ a[i] { Some(x) ↦ x, None ↦ 0u8 } }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0x0123_4567_89AB_CDEFu64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts) = diff_src(src, &mut rnd, true, 150);
+    eprintln!("GLIR_DIFF_ARR bodies={bodies} runs={runs} aborts={aborts}");
+    assert!(
+        bodies >= 7 && runs >= 1000 && aborts >= 50,
+        "oracle mảng quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
