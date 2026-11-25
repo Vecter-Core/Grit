@@ -72,7 +72,7 @@ fn gt_layout_agrees_with_llvm_datalayout_on_a_zoo_of_types() {
 /// với MỌI kiểu cụ thể của MỌI local MIR của chương trình "zoo" (và prelude/std đi kèm).
 #[test]
 fn glir_types_have_the_same_layout_as_the_grit_types_they_lower_from() {
-    let mut res = check(
+    let res = check(
         &[SourceInput {
             name: "main.gt".to_string(),
             text: SRC.to_string(),
