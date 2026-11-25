@@ -124,18 +124,17 @@ fn model_field(defs: &[EnumDef], t: FTy, x: u64) -> u64 {
         }
         FTy::Enum(j) => model_enum(defs, j, x),
         FTy::OptU8 => {
-            if x % 3 == 0 {
+            if x.is_multiple_of(3) {
                 5
             } else {
                 6u64.wrapping_mul(P).wrapping_add(x % 256)
             }
         }
         FTy::OptEnum(j) => {
-            if x % 3 == 0 {
+            if x.is_multiple_of(3) {
                 5
             } else {
-                6u64.wrapping_mul(P)
-                    .wrapping_add(model_enum(defs, j, x))
+                6u64.wrapping_mul(P).wrapping_add(model_enum(defs, j, x))
             }
         }
     }
@@ -223,7 +222,10 @@ fn program(seed: u64) -> (String, u64) {
             .collect();
         src.push_str(&format!("⊔ E{k} {{ {} }}\n", vs.join(", ")));
         // dựng
-        src.push_str(&format!("ƒ mk{k}(s: u64) → E{k} ! ∅ {{\n  ⌥ s % {}u64 {{\n", e.variants.len()));
+        src.push_str(&format!(
+            "ƒ mk{k}(s: u64) → E{k} ! ∅ {{\n  ⌥ s % {}u64 {{\n",
+            e.variants.len()
+        ));
         for (vi, v) in e.variants.iter().enumerate() {
             let pat = if vi + 1 == e.variants.len() {
                 "_".to_string()
@@ -409,7 +411,12 @@ fn run(src: &str, tag: &str) -> Vec<(String, Option<u64>)> {
 #[test]
 fn narrow_enum_payloads_survive_moves_on_every_backend_and_match_an_independent_model() {
     let mut narrow = 0usize;
-    for seed in 1..=30u64 {
+    // `GRIT_ENUMPAY_SEEDS=<n>`: chạy sâu hơn bằng tay (mặc định 30)
+    let n: u64 = std::env::var("GRIT_ENUMPAY_SEEDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(30);
+    for seed in 1..=n {
         let (src, want) = program(seed);
         narrow += ["u8", "u16", "bool", "i8", "i16"]
             .iter()
@@ -424,7 +431,7 @@ fn narrow_enum_payloads_survive_moves_on_every_backend_and_match_an_independent_
         }
     }
     // bộ sinh không rỗng: nhiều trường hẹp trong khai báo biến thể
-    assert!(narrow >= 60, "quá ít trường hẹp: {narrow}");
+    assert!(n < 30 || narrow >= 60, "quá ít trường hẹp: {narrow}");
 }
 
 /// Ca cố định nhắm thẳng nghi vấn: biến thể hẹp ghi đè TẠI CHỖ lên biến thể rộng và ngược lại, chuyển qua nhiều hàm/biến,
@@ -462,5 +469,66 @@ fn narrow_variant_overwriting_wide_variant_in_place_reads_back_exactly() {
     }
     for (backend, got) in run(src, "fixed") {
         assert_eq!(got, Some(want), "({backend}): payload enum sai\n{src}");
+    }
+}
+
+/// Ca cố định: enum payload hẹp nằm TRONG struct (`s.e`) và mảng (`arr[i]`), ghi đè tại chỗ bằng biến thể khác, sửa từng byte payload
+/// qua `&!` + `⌥` (ghi `u8`/`u16` vào payload đã có), sao chép struct/mảng qua hàm. Không có mô hình độc lập: thông dịch MIR là chuẩn,
+/// mọi hồ sơ LLVM phải khớp nó (giá trị cũng được chốt để phát hiện cả lệch chung).
+#[test]
+fn narrow_payload_inside_struct_and_array_mutated_through_ref_agrees_across_backends() {
+    let src = r#"⊔ E { A(u8), B(bool, u8, u16), C(u64, u64), D }
+▢ S { k: u8, e: E, t: bool }
+ƒ bump(r: &!E, d: u8) → u64 ! ∅ {
+  ⌥ r {
+    E::A(x) ↦ { *x ← *x +% d; *x as u64 },
+    E::B(p, x, y) ↦ { *x ← *x +% d; *y ← *y +% 1u16; ⎇ *p { 1u64 } ⇝ { 2u64 } },
+    E::C(x, y) ↦ { *x ← *x +% 1u64; 3u64 },
+    E::D ↦ 4u64,
+  }
+}
+ƒ rd(e: &E) → u64 ! ∅ {
+  ⌥ e {
+    E::A(x) ↦ 10u64 +% *x as u64,
+    E::B(p, x, y) ↦ ⎇ *p { 1000u64 +% *x as u64 *% 7u64 +% *y as u64 } ⇝ { 5000u64 +% *x as u64 +% *y as u64 *% 3u64 },
+    E::C(x, y) ↦ *x +% *y,
+    E::D ↦ 99u64,
+  }
+}
+ƒ mk(i: u64) → E ! ∅ {
+  ⌥ i % 4u64 {
+    0u64 ↦ E::A((i % 256u64) as u8),
+    1u64 ↦ E::B(i % 8u64 == 1u64, ((i *% 37u64) % 256u64) as u8, ((i *% 1234u64) % 65536u64) as u16),
+    2u64 ↦ E::C(i *% 1000000007u64, 18446744073709551615u64 - i),
+    _ ↦ E::D,
+  }
+}
+ƒ pass(s: S) → S ! ∅ { s }
+ƒ main() → u64 ! ∅ {
+  μacc ≔ 0u64;
+  μi ≔ 0u64;
+  ⟳ i < 40u64 ↓ 40u64 - i {
+    μs ≔ S { k: 3u8, e: mk(i *% 3u64 +% 2u64), t: i % 2u64 == 0u64 };
+    s ← pass(s);
+    s.e ← mk(i);
+    aa ≔ bump(&!s.e, (i % 200u64) as u8);
+    s ← pass(pass(s));
+    μarr ≔ [mk(i +% 1u64), mk(i +% 2u64), mk(i +% 3u64)];
+    arr[1] ← mk(i +% 5u64);
+    bb ≔ bump(&!arr[(i % 3u64) as usize], 77u8);
+    cc ≔ rd(&arr[0]) +% rd(&arr[1]) *% 3u64 +% rd(&arr[2]) *% 5u64;
+    acc ← acc *% 31u64 +% aa +% bb *% 7u64 +% rd(&s.e) *% 11u64 +% cc *% 13u64 +% s.k as u64;
+    i ← i + 1u64;
+  }
+  acc
+}
+"#;
+    let out = run(src, "nested");
+    for (backend, got) in &out {
+        assert_eq!(
+            *got,
+            Some(15_457_300_751_181_112_113),
+            "({backend}): payload enum sai\n{src}"
+        );
     }
 }
