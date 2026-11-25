@@ -1,0 +1,8 @@
+// expect: fail G0305
+// note: trunc cùng độ rộng
+glir 1
+fn @f(%a: i32) -> i32 {
+entry:
+  %r = cast trunc i32 %a to i32
+  ret i32 %r
+}

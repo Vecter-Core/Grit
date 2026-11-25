@@ -3,14 +3,24 @@
 use std::path::Path;
 
 fn files(sub: &str) -> Vec<std::path::PathBuf> {
-    let d = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/glir").join(sub);
-    let mut v: Vec<_> = std::fs::read_dir(d).expect("thư mục").map(|e| e.expect("mục").path()).filter(|p| p.extension().is_some_and(|x| x == "glir")).collect();
+    let d = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/glir")
+        .join(sub);
+    let mut v: Vec<_> = std::fs::read_dir(d)
+        .expect("thư mục")
+        .map(|e| e.expect("mục").path())
+        .filter(|p| p.extension().is_some_and(|x| x == "glir"))
+        .collect();
     v.sort();
     v
 }
 
 fn expectation(src: &str) -> String {
-    src.lines().find_map(|l| l.strip_prefix("// expect: ")).expect("thiếu `// expect:`").trim().to_string()
+    src.lines()
+        .find_map(|l| l.strip_prefix("// expect: "))
+        .expect("thiếu `// expect:`")
+        .trim()
+        .to_string()
 }
 
 fn run(src: &str) -> Vec<String> {
@@ -32,7 +42,10 @@ fn every_glir_sample_gets_exactly_its_expected_verdict() {
             if let Some(code) = want.strip_prefix("fail ") {
                 nf += 1;
                 assert_eq!(sub, "fail", "{name}");
-                assert!(errs.iter().any(|e| e.starts_with(code)), "{name}: kỳ vọng {code}, có {errs:?}");
+                assert!(
+                    errs.iter().any(|e| e.starts_with(code)),
+                    "{name}: kỳ vọng {code}, có {errs:?}"
+                );
             } else {
                 np += 1;
                 assert_eq!(want, "pass", "{name}");
@@ -49,9 +62,13 @@ fn print_parse_print_is_a_fixed_point_on_every_readable_sample() {
     for sub in ["pass", "fail"] {
         for p in files(sub) {
             let src = std::fs::read_to_string(&p).expect("đọc");
-            let Ok(m) = gt_glir::parse(&src) else { continue };
+            let Ok(m) = gt_glir::parse(&src) else {
+                continue;
+            };
             let once = gt_glir::print(&m);
-            let m2 = gt_glir::parse(&once).unwrap_or_else(|e| panic!("{}: in ra không đọc lại được: {e}\n{once}", p.display()));
+            let m2 = gt_glir::parse(&once).unwrap_or_else(|e| {
+                panic!("{}: in ra không đọc lại được: {e}\n{once}", p.display())
+            });
             assert_eq!(m, m2, "{}: đọc(in(m)) ≠ m", p.display());
             assert_eq!(gt_glir::print(&m2), once, "{}", p.display());
         }

@@ -1,0 +1,8 @@
+// expect: fail G0304
+// note: bin trên ptr
+glir 1
+fn @f(%p: ptr) -> ptr {
+entry:
+  %q = bin add ptr %p, %p
+  ret ptr %q
+}

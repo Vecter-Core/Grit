@@ -51,7 +51,9 @@ fn parse_ty(s: &str, depth: u32) -> R<(Ty, &str)> {
         let r = r.trim_start().strip_prefix(']').ok_or("thiếu `]`")?;
         return Ok((Ty::Array(Box::new(t), n), r));
     }
-    let end = s.find(|c: char| !c.is_ascii_alphanumeric()).unwrap_or(s.len());
+    let end = s
+        .find(|c: char| !c.is_ascii_alphanumeric())
+        .unwrap_or(s.len());
     let t = tyname(&s[..end]).ok_or_else(|| format!("kiểu lạ `{}`", &s[..end]))?;
     Ok((t, &s[end..]))
 }
@@ -77,12 +79,18 @@ fn parse_opd(s: &str) -> R<Opd> {
     if !t.is_int() {
         return Err("hằng phải có kiểu số nguyên".into());
     }
-    let n: i128 = r.trim().parse().map_err(|_| format!("hằng sai `{}`", r.trim()))?;
+    let n: i128 = r
+        .trim()
+        .parse()
+        .map_err(|_| format!("hằng sai `{}`", r.trim()))?;
     Ok(Opd::Int(t, n))
 }
 
 fn ident(s: &str) -> R<String> {
-    if !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.') {
+    if !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+    {
         Ok(s.to_string())
     } else {
         Err(format!("tên sai `{s}`"))
@@ -110,7 +118,10 @@ fn split_top(s: &str) -> Vec<&str> {
 }
 
 fn lookup<T: Copy>(tbl: &[(T, &str)], s: &str) -> R<T> {
-    tbl.iter().find(|(_, n)| *n == s).map(|(k, _)| *k).ok_or_else(|| format!("từ khoá lạ `{s}`"))
+    tbl.iter()
+        .find(|(_, n)| *n == s)
+        .map(|(k, _)| *k)
+        .ok_or_else(|| format!("từ khoá lạ `{s}`"))
 }
 
 /// `<ty> <rest>` với kiểu ở đầu.
@@ -129,57 +140,123 @@ fn parse_inst(line: &str) -> R<Inst> {
         "bin" => {
             let (o, r) = rest.split_once(' ').ok_or("bin thiếu toán tử")?;
             let (t, r) = ty_then(r)?;
-            let [a, b] = split_top(r)[..] else { return Err("bin cần 2 toán hạng".into()) };
-            Ok(Inst::Bin { d: need(d)?, op: lookup(&BINOPS, o)?, ty: t, a: parse_opd(a)?, b: parse_opd(b)? })
+            let [a, b] = split_top(r)[..] else {
+                return Err("bin cần 2 toán hạng".into());
+            };
+            Ok(Inst::Bin {
+                d: need(d)?,
+                op: lookup(&BINOPS, o)?,
+                ty: t,
+                a: parse_opd(a)?,
+                b: parse_opd(b)?,
+            })
         }
         "icmp" => {
             let (o, r) = rest.split_once(' ').ok_or("icmp thiếu vị từ")?;
             let (t, r) = ty_then(r)?;
-            let [a, b] = split_top(r)[..] else { return Err("icmp cần 2 toán hạng".into()) };
-            Ok(Inst::ICmp { d: need(d)?, pred: lookup(&PREDS, o)?, ty: t, a: parse_opd(a)?, b: parse_opd(b)? })
+            let [a, b] = split_top(r)[..] else {
+                return Err("icmp cần 2 toán hạng".into());
+            };
+            Ok(Inst::ICmp {
+                d: need(d)?,
+                pred: lookup(&PREDS, o)?,
+                ty: t,
+                a: parse_opd(a)?,
+                b: parse_opd(b)?,
+            })
         }
         "select" => {
             let (t, r) = ty_then(rest)?;
-            let [c, a, b] = split_top(r)[..] else { return Err("select cần 3 toán hạng".into()) };
-            Ok(Inst::Select { d: need(d)?, ty: t, c: parse_opd(c)?, a: parse_opd(a)?, b: parse_opd(b)? })
+            let [c, a, b] = split_top(r)[..] else {
+                return Err("select cần 3 toán hạng".into());
+            };
+            Ok(Inst::Select {
+                d: need(d)?,
+                ty: t,
+                c: parse_opd(c)?,
+                a: parse_opd(a)?,
+                b: parse_opd(b)?,
+            })
         }
         "cast" => {
             let (o, r) = rest.split_once(' ').ok_or("cast thiếu toán tử")?;
             let (from, r) = ty_then(r)?;
             let (v, to) = r.rsplit_once(" to ").ok_or("cast thiếu `to`")?;
-            Ok(Inst::Cast { d: need(d)?, op: lookup(&CASTS, o)?, from, v: parse_opd(v)?, to: only_ty(to)? })
+            Ok(Inst::Cast {
+                d: need(d)?,
+                op: lookup(&CASTS, o)?,
+                from,
+                v: parse_opd(v)?,
+                to: only_ty(to)?,
+            })
         }
         "load" => {
             let (t, r) = ty_then(rest)?;
-            Ok(Inst::Load { d: need(d)?, ty: t, ptr: parse_opd(r)? })
+            Ok(Inst::Load {
+                d: need(d)?,
+                ty: t,
+                ptr: parse_opd(r)?,
+            })
         }
         "store" => {
             let (t, r) = ty_then(rest)?;
-            let [v, p] = split_top(r)[..] else { return Err("store cần 2 toán hạng".into()) };
-            Ok(Inst::Store { ty: t, val: parse_opd(v)?, ptr: parse_opd(p)? })
+            let [v, p] = split_top(r)[..] else {
+                return Err("store cần 2 toán hạng".into());
+            };
+            Ok(Inst::Store {
+                ty: t,
+                val: parse_opd(v)?,
+                ptr: parse_opd(p)?,
+            })
         }
         "fieldptr" => {
             let (t, r) = ty_then(rest)?;
-            let [p, i] = split_top(r)[..] else { return Err("fieldptr cần 2 toán hạng".into()) };
-            Ok(Inst::FieldPtr { d: need(d)?, ty: t, ptr: parse_opd(p)?, idx: i.trim().parse().map_err(|_| "chỉ số trường sai")? })
+            let [p, i] = split_top(r)[..] else {
+                return Err("fieldptr cần 2 toán hạng".into());
+            };
+            Ok(Inst::FieldPtr {
+                d: need(d)?,
+                ty: t,
+                ptr: parse_opd(p)?,
+                idx: i.trim().parse().map_err(|_| "chỉ số trường sai")?,
+            })
         }
         "call" => {
             let (ret, r) = ty_then(rest)?;
-            let r = r.trim_start().strip_prefix('@').ok_or("call thiếu `@tên`")?;
+            let r = r
+                .trim_start()
+                .strip_prefix('@')
+                .ok_or("call thiếu `@tên`")?;
             let (callee, r) = r.split_once('(').ok_or("call thiếu `(`")?;
             let args = r.trim_end().strip_suffix(')').ok_or("call thiếu `)`")?;
-            let args = split_top(args).into_iter().map(parse_opd).collect::<R<Vec<_>>>()?;
-            Ok(Inst::Call { d, ret, callee: ident(callee)?, args })
+            let args = split_top(args)
+                .into_iter()
+                .map(parse_opd)
+                .collect::<R<Vec<_>>>()?;
+            Ok(Inst::Call {
+                d,
+                ret,
+                callee: ident(callee)?,
+                args,
+            })
         }
         "phi" => {
             let (t, r) = ty_then(rest)?;
             let mut ins = Vec::new();
             for part in split_top(r) {
-                let p = part.trim().strip_prefix('[').and_then(|p| p.strip_suffix(']')).ok_or("phi cần `[v, bb]`")?;
+                let p = part
+                    .trim()
+                    .strip_prefix('[')
+                    .and_then(|p| p.strip_suffix(']'))
+                    .ok_or("phi cần `[v, bb]`")?;
                 let (v, b) = p.rsplit_once(',').ok_or("phi cần `[v, bb]`")?;
                 ins.push((parse_opd(v)?, ident(b.trim())?));
             }
-            Ok(Inst::Phi { d: need(d)?, ty: t, ins })
+            Ok(Inst::Phi {
+                d: need(d)?,
+                ty: t,
+                ins,
+            })
         }
         other => Err(format!("lệnh lạ `{other}`")),
     }
@@ -190,7 +267,9 @@ fn parse_term(line: &str) -> R<Option<Term>> {
     Ok(Some(match op {
         "br" => Term::Br(ident(rest.trim())?),
         "condbr" => {
-            let [c, a, b] = split_top(rest)[..] else { return Err("condbr cần 3 phần".into()) };
+            let [c, a, b] = split_top(rest)[..] else {
+                return Err("condbr cần 3 phần".into());
+            };
             Term::CondBr(parse_opd(c)?, ident(a.trim())?, ident(b.trim())?)
         }
         "ret" if rest.trim() == "void" => Term::Ret(None),
@@ -205,7 +284,11 @@ fn parse_term(line: &str) -> R<Option<Term>> {
 
 pub fn parse(src: &str) -> R<Module> {
     let mut m = Module::default();
-    let mut lines = src.lines().enumerate().map(|(i, l)| (i + 1, l.trim())).filter(|(_, l)| !l.is_empty() && !l.starts_with("//"));
+    let mut lines = src
+        .lines()
+        .enumerate()
+        .map(|(i, l)| (i + 1, l.trim()))
+        .filter(|(_, l)| !l.is_empty() && !l.starts_with("//"));
     let (n0, first) = lines.next().ok_or("rỗng")?;
     if first != "glir 1" {
         return Err(format!("dòng {n0}: cần `glir 1`"));
@@ -213,23 +296,57 @@ pub fn parse(src: &str) -> R<Module> {
     let wrap = |n: usize, e: String| format!("dòng {n}: {e}");
     while let Some((n, l)) = lines.next() {
         if let Some(rest) = l.strip_prefix("declare @") {
-            let (name, r) = rest.split_once('(').ok_or_else(|| wrap(n, "declare thiếu `(`".into()))?;
-            let (ps, ret) = r.rsplit_once(") -> ").ok_or_else(|| wrap(n, "declare thiếu `) ->`".into()))?;
-            let params = split_top(ps).into_iter().map(only_ty).collect::<R<Vec<_>>>().map_err(|e| wrap(n, e))?;
-            m.decls.push(Decl { name: ident(name).map_err(|e| wrap(n, e))?, params, ret: only_ty(ret).map_err(|e| wrap(n, e))? });
+            let (name, r) = rest
+                .split_once('(')
+                .ok_or_else(|| wrap(n, "declare thiếu `(`".into()))?;
+            let (ps, ret) = r
+                .rsplit_once(") -> ")
+                .ok_or_else(|| wrap(n, "declare thiếu `) ->`".into()))?;
+            let params = split_top(ps)
+                .into_iter()
+                .map(only_ty)
+                .collect::<R<Vec<_>>>()
+                .map_err(|e| wrap(n, e))?;
+            m.decls.push(Decl {
+                name: ident(name).map_err(|e| wrap(n, e))?,
+                params,
+                ret: only_ty(ret).map_err(|e| wrap(n, e))?,
+            });
         } else if let Some(rest) = l.strip_prefix("fn @") {
-            let (name, r) = rest.split_once('(').ok_or_else(|| wrap(n, "fn thiếu `(`".into()))?;
-            let (ps, ret) = r.rsplit_once(") -> ").ok_or_else(|| wrap(n, "fn thiếu `) ->`".into()))?;
-            let ret = ret.trim().strip_suffix('{').ok_or_else(|| wrap(n, "fn thiếu `{`".into()))?;
+            let (name, r) = rest
+                .split_once('(')
+                .ok_or_else(|| wrap(n, "fn thiếu `(`".into()))?;
+            let (ps, ret) = r
+                .rsplit_once(") -> ")
+                .ok_or_else(|| wrap(n, "fn thiếu `) ->`".into()))?;
+            let ret = ret
+                .trim()
+                .strip_suffix('{')
+                .ok_or_else(|| wrap(n, "fn thiếu `{`".into()))?;
             let mut params = Vec::new();
             for p in split_top(ps) {
-                let (pn, pt) = p.trim().strip_prefix('%').and_then(|p| p.split_once(':')).ok_or_else(|| wrap(n, "tham số cần `%tên: kiểu`".into()))?;
-                params.push((ident(pn.trim()).map_err(|e| wrap(n, e))?, only_ty(pt).map_err(|e| wrap(n, e))?));
+                let (pn, pt) = p
+                    .trim()
+                    .strip_prefix('%')
+                    .and_then(|p| p.split_once(':'))
+                    .ok_or_else(|| wrap(n, "tham số cần `%tên: kiểu`".into()))?;
+                params.push((
+                    ident(pn.trim()).map_err(|e| wrap(n, e))?,
+                    only_ty(pt).map_err(|e| wrap(n, e))?,
+                ));
             }
-            let mut f = Func { name: ident(name).map_err(|e| wrap(n, e))?, params, ret: only_ty(ret).map_err(|e| wrap(n, e))?, slots: Vec::new(), blocks: Vec::new() };
+            let mut f = Func {
+                name: ident(name).map_err(|e| wrap(n, e))?,
+                params,
+                ret: only_ty(ret).map_err(|e| wrap(n, e))?,
+                slots: Vec::new(),
+                blocks: Vec::new(),
+            };
             let mut cur: Option<(String, Vec<Inst>)> = None;
             loop {
-                let Some((n, l)) = lines.next() else { return Err(wrap(n, "hàm không đóng `}`".into())) };
+                let Some((n, l)) = lines.next() else {
+                    return Err(wrap(n, "hàm không đóng `}`".into()));
+                };
                 if l == "}" {
                     if cur.is_some() {
                         return Err(wrap(n, "khối cuối thiếu terminator".into()));
@@ -237,8 +354,13 @@ pub fn parse(src: &str) -> R<Module> {
                     break;
                 }
                 if let Some(s) = l.strip_prefix("slot $") {
-                    let (sn, st) = s.split_once(':').ok_or_else(|| wrap(n, "slot cần `$tên: kiểu`".into()))?;
-                    f.slots.push((ident(sn.trim()).map_err(|e| wrap(n, e))?, only_ty(st).map_err(|e| wrap(n, e))?));
+                    let (sn, st) = s
+                        .split_once(':')
+                        .ok_or_else(|| wrap(n, "slot cần `$tên: kiểu`".into()))?;
+                    f.slots.push((
+                        ident(sn.trim()).map_err(|e| wrap(n, e))?,
+                        only_ty(st).map_err(|e| wrap(n, e))?,
+                    ));
                     continue;
                 }
                 if let Some(label) = l.strip_suffix(':') {
@@ -248,9 +370,15 @@ pub fn parse(src: &str) -> R<Module> {
                     cur = Some((ident(label).map_err(|e| wrap(n, e))?, Vec::new()));
                     continue;
                 }
-                let Some((name, insts)) = cur.as_mut() else { return Err(wrap(n, "lệnh ngoài khối".into())) };
+                let Some((name, insts)) = cur.as_mut() else {
+                    return Err(wrap(n, "lệnh ngoài khối".into()));
+                };
                 if let Some(t) = parse_term(l).map_err(|e| wrap(n, e))? {
-                    f.blocks.push(Block { name: std::mem::take(name), insts: std::mem::take(insts), term: t });
+                    f.blocks.push(Block {
+                        name: std::mem::take(name),
+                        insts: std::mem::take(insts),
+                        term: t,
+                    });
                     cur = None;
                 } else {
                     insts.push(parse_inst(l).map_err(|e| wrap(n, e))?);

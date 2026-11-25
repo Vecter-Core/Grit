@@ -66,14 +66,47 @@ fn name<T: Copy + PartialEq>(tbl: &[(T, &'static str)], v: T) -> &'static str {
 
 fn inst(i: &Inst) -> String {
     match i {
-        Inst::Bin { d, op, ty: t, a, b } => format!("%{d} = bin {} {} {}, {}", name(&BINOPS, *op), ty(t), opd(a), opd(b)),
-        Inst::ICmp { d, pred, ty: t, a, b } => format!("%{d} = icmp {} {} {}, {}", name(&PREDS, *pred), ty(t), opd(a), opd(b)),
-        Inst::Select { d, ty: t, c, a, b } => format!("%{d} = select {} {}, {}, {}", ty(t), opd(c), opd(a), opd(b)),
-        Inst::Cast { d, op, from, v, to } => format!("%{d} = cast {} {} {} to {}", name(&CASTS, *op), ty(from), opd(v), ty(to)),
+        Inst::Bin { d, op, ty: t, a, b } => format!(
+            "%{d} = bin {} {} {}, {}",
+            name(&BINOPS, *op),
+            ty(t),
+            opd(a),
+            opd(b)
+        ),
+        Inst::ICmp {
+            d,
+            pred,
+            ty: t,
+            a,
+            b,
+        } => format!(
+            "%{d} = icmp {} {} {}, {}",
+            name(&PREDS, *pred),
+            ty(t),
+            opd(a),
+            opd(b)
+        ),
+        Inst::Select { d, ty: t, c, a, b } => {
+            format!("%{d} = select {} {}, {}, {}", ty(t), opd(c), opd(a), opd(b))
+        }
+        Inst::Cast { d, op, from, v, to } => format!(
+            "%{d} = cast {} {} {} to {}",
+            name(&CASTS, *op),
+            ty(from),
+            opd(v),
+            ty(to)
+        ),
         Inst::Load { d, ty: t, ptr } => format!("%{d} = load {} {}", ty(t), opd(ptr)),
         Inst::Store { ty: t, val, ptr } => format!("store {} {}, {}", ty(t), opd(val), opd(ptr)),
-        Inst::FieldPtr { d, ty: t, ptr, idx } => format!("%{d} = fieldptr {} {}, {idx}", ty(t), opd(ptr)),
-        Inst::Call { d, ret, callee, args } => {
+        Inst::FieldPtr { d, ty: t, ptr, idx } => {
+            format!("%{d} = fieldptr {} {}, {idx}", ty(t), opd(ptr))
+        }
+        Inst::Call {
+            d,
+            ret,
+            callee,
+            args,
+        } => {
             let a = args.iter().map(opd).collect::<Vec<_>>().join(", ");
             match d {
                 Some(d) => format!("%{d} = call {} @{callee}({a})", ty(ret)),
@@ -83,7 +116,10 @@ fn inst(i: &Inst) -> String {
         Inst::Phi { d, ty: t, ins } => format!(
             "%{d} = phi {} {}",
             ty(t),
-            ins.iter().map(|(v, b)| format!("[{}, {b}]", opd(v))).collect::<Vec<_>>().join(", ")
+            ins.iter()
+                .map(|(v, b)| format!("[{}, {b}]", opd(v)))
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     }
 }
@@ -107,11 +143,21 @@ fn block(b: &Block, out: &mut String) {
 }
 
 fn decl(d: &Decl) -> String {
-    format!("declare @{}({}) -> {}", d.name, d.params.iter().map(ty).collect::<Vec<_>>().join(", "), ty(&d.ret))
+    format!(
+        "declare @{}({}) -> {}",
+        d.name,
+        d.params.iter().map(ty).collect::<Vec<_>>().join(", "),
+        ty(&d.ret)
+    )
 }
 
 fn func(f: &Func, out: &mut String) {
-    let ps = f.params.iter().map(|(n, t)| format!("%{n}: {}", ty(t))).collect::<Vec<_>>().join(", ");
+    let ps = f
+        .params
+        .iter()
+        .map(|(n, t)| format!("%{n}: {}", ty(t)))
+        .collect::<Vec<_>>()
+        .join(", ");
     let _ = writeln!(out, "fn @{}({ps}) -> {} {{", f.name, ty(&f.ret));
     for (n, t) in &f.slots {
         let _ = writeln!(out, "slot ${n}: {}", ty(t));

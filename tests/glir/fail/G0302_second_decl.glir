@@ -1,0 +1,10 @@
+// expect: fail G0302
+// note: tìm callee đúng tên (không phải tên đầu tiên)
+glir 1
+declare @a() -> i32
+declare @b(i32) -> i32
+fn @f() -> i32 {
+entry:
+  %v = call i32 @b()
+  ret i32 %v
+}

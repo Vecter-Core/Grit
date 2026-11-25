@@ -1,0 +1,5 @@
+# Đột biến verifier GLIR (`crates/gt-glir/src/verify.rs`) — ADR-P2-02 C1, 2026-11-25
+Nguồn kết quả: **tự động** (`tools/mut.py`, 114 đột biến, lệnh test `cargo test -q -p gt-glir`; sổ `docs/MUT_GLIR_C1.jsonl`); không có đột biến tay.
+Lượt 1: 89 giết / 17 sống / 8 không hợp lệ. Sau khi thêm mẫu E2E (`tests/glir/fail/G0104_*, G0101_*, G0102_*, G0205_use_self/dominator_needs_second_pass, G0304_*, G0305_*_same_width, G0307_field_equal_len, G0302_*` và `tests/glir/pass/unreachable_*`) chạy lại 17 đột biến sống: 15 giết thêm.
+**Còn sống (2), tương đương có lập luận:** `verify.rs:103` (`if !reach[i] { continue }` → `if false`) và `:104` (`continue → break`) chỉ đổi tập dominator của khối KHÔNG TỚI ĐƯỢC; mọi chỗ truy vấn dominator đều bỏ qua khối không tới được (`!reach[bi]`) và tiền nhiệm không tới được bị lọc khi tính ⇒ không quan sát được từ ngoài.
+Giới hạn: đột biến chỉ trên `verify.rs` (114/168 đột biến của `verify.rs` + `parse.rs`); `parse.rs` CHƯA chạy đột biến. Verifier mới kiểm cấu trúc/SSA/kiểu cục bộ — CHƯA có kiểm (d) "số Abort ≥ số Assert" (cần đường hạ MIR→GLIR).

@@ -1,0 +1,11 @@
+// expect: fail G0104
+// note: hàm định nghĩa hai lần
+glir 1
+fn @f() -> void {
+entry:
+  ret void
+}
+fn @f() -> void {
+entry:
+  ret void
+}

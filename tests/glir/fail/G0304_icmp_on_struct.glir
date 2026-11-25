@@ -1,0 +1,9 @@
+// expect: fail G0304
+// note: icmp trên struct
+glir 1
+fn @f() -> void {
+slot $s: {i32}
+entry:
+  %c = icmp eq {i32} $s, $s
+  ret void
+}

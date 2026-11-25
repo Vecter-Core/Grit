@@ -25,7 +25,13 @@ fn term_targets(t: &Term) -> Vec<&str> {
 
 fn inst_def(i: &Inst) -> Option<&str> {
     match i {
-        Inst::Bin { d, .. } | Inst::ICmp { d, .. } | Inst::Select { d, .. } | Inst::Cast { d, .. } | Inst::Load { d, .. } | Inst::FieldPtr { d, .. } | Inst::Phi { d, .. } => Some(d),
+        Inst::Bin { d, .. }
+        | Inst::ICmp { d, .. }
+        | Inst::Select { d, .. }
+        | Inst::Cast { d, .. }
+        | Inst::Load { d, .. }
+        | Inst::FieldPtr { d, .. }
+        | Inst::Phi { d, .. } => Some(d),
         Inst::Call { d, .. } => d.as_deref(),
         Inst::Store { .. } => None,
     }
@@ -33,7 +39,10 @@ fn inst_def(i: &Inst) -> Option<&str> {
 
 fn ret_ty(i: &Inst) -> Option<Ty> {
     match i {
-        Inst::Bin { ty, .. } | Inst::Select { ty, .. } | Inst::Load { ty, .. } | Inst::Phi { ty, .. } => Some(ty.clone()),
+        Inst::Bin { ty, .. }
+        | Inst::Select { ty, .. }
+        | Inst::Load { ty, .. }
+        | Inst::Phi { ty, .. } => Some(ty.clone()),
         Inst::ICmp { .. } => Some(Ty::I1),
         Inst::Cast { to, .. } => Some(to.clone()),
         Inst::FieldPtr { .. } => Some(Ty::Ptr),
@@ -55,7 +64,11 @@ pub fn verify(m: &Module) -> Vec<String> {
 }
 
 fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
-    let mut cx = Cx { m, f, errs: Vec::new() };
+    let mut cx = Cx {
+        m,
+        f,
+        errs: Vec::new(),
+    };
     if f.blocks.is_empty() {
         cx.err("G0101", "hàm không có khối nào".into());
         return cx.errs;
@@ -83,7 +96,10 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
                     succ[i].push(j);
                     pred[j].push(i);
                 }
-                None => cx.err("G0103", format!("khối `{}` nhảy tới `{t}` không tồn tại", b.name)),
+                None => cx.err(
+                    "G0103",
+                    format!("khối `{}` nhảy tới `{t}` không tồn tại", b.name),
+                ),
             }
         }
     }
@@ -96,7 +112,15 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
         }
     }
     let all: BTreeSet<usize> = (0..n).filter(|i| reach[*i]).collect();
-    let mut dom: Vec<BTreeSet<usize>> = (0..n).map(|i| if i == 0 { BTreeSet::from([0]) } else { all.clone() }).collect();
+    let mut dom: Vec<BTreeSet<usize>> = (0..n)
+        .map(|i| {
+            if i == 0 {
+                BTreeSet::from([0])
+            } else {
+                all.clone()
+            }
+        })
+        .collect();
     loop {
         let mut changed = false;
         for i in 1..n {
@@ -137,35 +161,40 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
             }
         }
     }
-    let opd_ty = |cx: &mut Cx, o: &Opd, bi: usize, ii: isize, phi_pred: Option<usize>| -> Option<Ty> {
-        match o {
-            Opd::Int(t, _) => Some(t.clone()),
-            Opd::Slot(s) => {
-                if slots.contains_key(s.as_str()) {
-                    Some(Ty::Ptr)
-                } else {
-                    cx.err("G0204", format!("slot `${s}` chưa khai báo"));
-                    None
-                }
-            }
-            Opd::Val(v) => match def.get(v) {
-                None => {
-                    cx.err("G0202", format!("`%{v}` chưa định nghĩa"));
-                    None
-                }
-                Some((db, di, t)) => {
-                    let ok = match phi_pred {
-                        Some(p) => !reach[p] || dom[p].contains(db),
-                        None => !reach[bi] || (*db == bi && *di < ii) || (*db != bi && dom[bi].contains(db)),
-                    };
-                    if !ok {
-                        cx.err("G0205", format!("`%{v}` không trội (dominate) chỗ dùng"));
+    let opd_ty =
+        |cx: &mut Cx, o: &Opd, bi: usize, ii: isize, phi_pred: Option<usize>| -> Option<Ty> {
+            match o {
+                Opd::Int(t, _) => Some(t.clone()),
+                Opd::Slot(s) => {
+                    if slots.contains_key(s.as_str()) {
+                        Some(Ty::Ptr)
+                    } else {
+                        cx.err("G0204", format!("slot `${s}` chưa khai báo"));
+                        None
                     }
-                    Some(t.clone())
                 }
-            },
-        }
-    };
+                Opd::Val(v) => match def.get(v) {
+                    None => {
+                        cx.err("G0202", format!("`%{v}` chưa định nghĩa"));
+                        None
+                    }
+                    Some((db, di, t)) => {
+                        let ok = match phi_pred {
+                            Some(p) => !reach[p] || dom[p].contains(db),
+                            None => {
+                                !reach[bi]
+                                    || (*db == bi && *di < ii)
+                                    || (*db != bi && dom[bi].contains(db))
+                            }
+                        };
+                        if !ok {
+                            cx.err("G0205", format!("`%{v}` không trội (dominate) chỗ dùng"));
+                        }
+                        Some(t.clone())
+                    }
+                },
+            }
+        };
     for (bi, b) in f.blocks.iter().enumerate() {
         let mut past_phi = false;
         for (ii, i) in b.insts.iter().enumerate() {
@@ -240,7 +269,9 @@ fn check_inst(
             expect(cx, a, ty);
             expect(cx, b, ty);
         }
-        Inst::Cast { op, from, v, to, .. } => {
+        Inst::Cast {
+            op, from, v, to, ..
+        } => {
             expect(cx, v, from);
             match (from.bits(), to.bits()) {
                 (Some(x), Some(y)) => {
@@ -267,22 +298,36 @@ fn check_inst(
                 _ => cx.err("G0307", format!("fieldptr {idx} ngoài struct {ty:?}")),
             }
         }
-        Inst::Call { ret, callee, args, .. } => {
-            let sig = cx
-                .m
-                .decls
-                .iter()
-                .find(|d| d.name == *callee)
-                .map(|d| (d.params.clone(), d.ret.clone()))
-                .or_else(|| cx.m.funcs.iter().find(|g| g.name == *callee).map(|g| (g.params.iter().map(|p| p.1.clone()).collect(), g.ret.clone())));
+        Inst::Call {
+            ret, callee, args, ..
+        } => {
+            let sig =
+                cx.m.decls
+                    .iter()
+                    .find(|d| d.name == *callee)
+                    .map(|d| (d.params.clone(), d.ret.clone()))
+                    .or_else(|| {
+                        cx.m.funcs.iter().find(|g| g.name == *callee).map(|g| {
+                            (
+                                g.params.iter().map(|p| p.1.clone()).collect(),
+                                g.ret.clone(),
+                            )
+                        })
+                    });
             match sig {
                 None => cx.err("G0302", format!("gọi `@{callee}` không khai báo")),
                 Some((ps, r)) => {
                     if r != *ret {
-                        cx.err("G0302", format!("`@{callee}` trả {r:?}, lời gọi ghi {ret:?}"));
+                        cx.err(
+                            "G0302",
+                            format!("`@{callee}` trả {r:?}, lời gọi ghi {ret:?}"),
+                        );
                     }
                     if ps.len() != args.len() {
-                        cx.err("G0302", format!("`@{callee}` nhận {} đối số, có {}", ps.len(), args.len()));
+                        cx.err(
+                            "G0302",
+                            format!("`@{callee}` nhận {} đối số, có {}", ps.len(), args.len()),
+                        );
                     } else {
                         for (a, p) in args.iter().zip(&ps) {
                             expect(cx, a, p);
@@ -293,9 +338,15 @@ fn check_inst(
         }
         Inst::Phi { ty, ins, .. } => {
             let names: BTreeSet<&str> = ins.iter().map(|(_, b)| b.as_str()).collect();
-            let want: BTreeSet<&str> = pred[bi].iter().map(|p| f.blocks[*p].name.as_str()).collect();
+            let want: BTreeSet<&str> = pred[bi]
+                .iter()
+                .map(|p| f.blocks[*p].name.as_str())
+                .collect();
             if names != want || names.len() != ins.len() {
-                cx.err("G0401", format!("phi: khối vào {names:?} ≠ khối tiền nhiệm {want:?}"));
+                cx.err(
+                    "G0401",
+                    format!("phi: khối vào {names:?} ≠ khối tiền nhiệm {want:?}"),
+                );
             }
             for (v, b) in ins {
                 if let Some(p) = f.blocks.iter().position(|x| x.name == *b)

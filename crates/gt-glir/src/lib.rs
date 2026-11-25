@@ -23,7 +23,10 @@ pub enum Ty {
 impl Ty {
     #[must_use]
     pub fn is_int(&self) -> bool {
-        matches!(self, Ty::I1 | Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::I128)
+        matches!(
+            self,
+            Ty::I1 | Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::I128
+        )
     }
     #[must_use]
     pub fn bits(&self) -> Option<u32> {
@@ -87,15 +90,61 @@ pub enum CastOp {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Inst {
-    Bin { d: String, op: BinOp, ty: Ty, a: Opd, b: Opd },
-    ICmp { d: String, pred: CmpPred, ty: Ty, a: Opd, b: Opd },
-    Select { d: String, ty: Ty, c: Opd, a: Opd, b: Opd },
-    Cast { d: String, op: CastOp, from: Ty, v: Opd, to: Ty },
-    Load { d: String, ty: Ty, ptr: Opd },
-    Store { ty: Ty, val: Opd, ptr: Opd },
-    FieldPtr { d: String, ty: Ty, ptr: Opd, idx: u32 },
-    Call { d: Option<String>, ret: Ty, callee: String, args: Vec<Opd> },
-    Phi { d: String, ty: Ty, ins: Vec<(Opd, String)> },
+    Bin {
+        d: String,
+        op: BinOp,
+        ty: Ty,
+        a: Opd,
+        b: Opd,
+    },
+    ICmp {
+        d: String,
+        pred: CmpPred,
+        ty: Ty,
+        a: Opd,
+        b: Opd,
+    },
+    Select {
+        d: String,
+        ty: Ty,
+        c: Opd,
+        a: Opd,
+        b: Opd,
+    },
+    Cast {
+        d: String,
+        op: CastOp,
+        from: Ty,
+        v: Opd,
+        to: Ty,
+    },
+    Load {
+        d: String,
+        ty: Ty,
+        ptr: Opd,
+    },
+    Store {
+        ty: Ty,
+        val: Opd,
+        ptr: Opd,
+    },
+    FieldPtr {
+        d: String,
+        ty: Ty,
+        ptr: Opd,
+        idx: u32,
+    },
+    Call {
+        d: Option<String>,
+        ret: Ty,
+        callee: String,
+        args: Vec<Opd>,
+    },
+    Phi {
+        d: String,
+        ty: Ty,
+        ins: Vec<(Opd, String)>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
