@@ -14,6 +14,8 @@ pub enum Outcome {
     Agg(Vec<Option<u8>>),
     /// con trỏ trả về (chỉ có nghĩa trong cùng một lần chạy: `(vùng, offset)`)
     Ptr(usize, u64),
+    /// giá trị tổng hợp trả về GIỮ NGUỒN GỐC con trỏ (chỉ dùng giữa các hàm trong một lần chạy; ở mức cao nhất đổi thành `Agg` hoặc `Ub`)
+    Bytes(Vec<Byte>),
     Abort(String),
     Ub(String),
     OutOfFuel,
@@ -31,7 +33,7 @@ pub enum Arg {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Byte {
+pub enum Byte {
     Uninit,
     B(u8),
     /// mảnh `k` (0..8) của con trỏ `(vùng, offset)`
@@ -291,7 +293,18 @@ pub fn run_module_refs(
             }
         })
         .collect();
-    let out = exec(m, f, &vals, &mut fuel, 0, &mut mem, &Glob { gl, nro });
+    let mut out = exec(m, f, &vals, &mut fuel, 0, &mut mem, &Glob { gl, nro });
+    if let Outcome::Bytes(bs) = out {
+        out = if bs.iter().any(|b| matches!(b, Byte::P(..))) {
+            Outcome::Ub("trả về giá trị chứa con trỏ ở mức cao nhất".into())
+        } else {
+            Outcome::Agg(
+                bs.iter()
+                    .map(|b| if let Byte::B(x) = b { Some(*x) } else { None })
+                    .collect(),
+            )
+        };
+    }
     let fin = refs
         .iter()
         .map(|i| {
@@ -406,6 +419,11 @@ fn exec(
                     Outcome::Ptr(a, o) => {
                         if let Some(d) = d {
                             st.env.insert(d.clone(), Val::Ptr(a, o));
+                        }
+                    }
+                    Outcome::Bytes(bs) => {
+                        if let Some(d) = d {
+                            st.env.insert(d.clone(), Val::Agg(bs));
                         }
                     }
                     Outcome::Agg(bs) => {
@@ -546,17 +564,7 @@ fn exec(
                 }
                 if matches!(t, Ty::Struct(_) | Ty::Array(..)) {
                     return match st.opd(v) {
-                        Ok(Val::Agg(bs)) => {
-                            let mut out = Vec::new();
-                            for b in bs {
-                                match b {
-                                    Byte::B(x) => out.push(Some(x)),
-                                    Byte::Uninit => out.push(None),
-                                    Byte::P(..) => return ub("trả về giá trị chứa con trỏ".into()),
-                                }
-                            }
-                            Outcome::Agg(out)
-                        }
+                        Ok(Val::Agg(bs)) => Outcome::Bytes(bs),
                         Ok(_) => ub("ret tổng hợp không phải giá trị tổng hợp".into()),
                         Err(e) => ub(e),
                     };
