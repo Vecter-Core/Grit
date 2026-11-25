@@ -115,3 +115,6 @@ fn lower_inner(db: &TypeDb, ty: &Ty, depth: u32) -> Result<G, String> {
         Ty::Err => return Err("Ty::Err sau cổng".into()),
     })
 }
+
+pub mod body;
+pub use body::{Unsupported, lower_body};
