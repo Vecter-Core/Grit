@@ -522,14 +522,29 @@ fn impure_fns(t: &TypesOutput, m: &MirOutput) -> BTreeSet<gt_ast::NodeId> {
     }
     let mut impure: BTreeSet<gt_ast::NodeId> = BTreeSet::new();
     let mut edges: BTreeMap<gt_ast::NodeId, BTreeSet<gt_ast::NodeId>> = BTreeMap::new();
-    for b in m.bodies.iter().filter(|b| b.kind == gt_mir::BodyKind::Fn) {
+    // FB-G2-02 (Gemini R2): thân `□` cũng CHẠY mã mỗi lần đọc (được hạ thành lời gọi) ⇒ là nút của đồ thị; đọc `□` là cạnh gọi tới thân của nó.
+    let const_nodes: BTreeSet<gt_ast::NodeId> = m
+        .bodies
+        .iter()
+        .filter(|b| b.kind == gt_mir::BodyKind::Const)
+        .map(|b| b.node)
+        .collect();
+    for b in m
+        .bodies
+        .iter()
+        .filter(|b| matches!(b.kind, gt_mir::BodyKind::Fn | gt_mir::BodyKind::Const))
+    {
         let mut direct = false;
         let mut callees: BTreeSet<gt_ast::NodeId> = BTreeSet::new();
+        let mut const_reads: Vec<gt_ast::NodeId> = Vec::new();
         let mut visit = |o: &Operand| {
-            if let Operand::Const(Const::Item { node, .. }) = o
-                && hot.contains(node)
-            {
-                direct = true;
+            if let Operand::Const(Const::Item { node, .. }) = o {
+                if hot.contains(node) {
+                    direct = true;
+                }
+                if const_nodes.contains(node) {
+                    const_reads.push(*node);
+                }
             }
         };
         let mut calls_value = false;
@@ -594,6 +609,7 @@ fn impure_fns(t: &TypesOutput, m: &MirOutput) -> BTreeSet<gt_ast::NodeId> {
                 }
             }
         }
+        callees.extend(const_reads);
         if direct || calls_value || has_drop {
             impure.insert(b.node);
         }

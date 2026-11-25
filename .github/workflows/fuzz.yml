@@ -60,7 +60,7 @@ jobs:
           for d in pass fail warn lexer; do cp tests/$d/*.gt "$DIR/fuzz/corpus/$TARGET/" 2>/dev/null || true; done
           T0=$(date +%s)
           set +e
-          (cd "$DIR" && cargo fuzz run "$TARGET" -- -max_total_time=$((MINUTES * 60)) -max_len=$MAXLEN $EXTRA -print_final_stats=1) > out/fuzz.log 2>&1
+          (cd "$DIR" && cargo +nightly-2026-10-04 fuzz run "$TARGET" -- -max_total_time=$((MINUTES * 60)) -max_len=$MAXLEN $EXTRA -print_final_stats=1) > out/fuzz.log 2>&1
           CODE=$?
           set -e
           T1=$(date +%s)

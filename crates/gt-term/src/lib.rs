@@ -183,6 +183,138 @@ fn mk(t: &TypesOutput, code: &str, node: NodeId, span: Span, msg: String) -> Dia
     Diagnostic::new(c, &t.file_name(node), span, msg)
 }
 
+/// FB-G2-01 (Gemini R2): chu trình KHỞI TẠO/ĐỌC qua `□`/`■`. Thân `□` chạy lại MỖI lần đọc (được hạ thành lời gọi), thân `■` chạy một lần lúc khởi tạo:
+/// nếu từ thân của nó tới được chính nó (qua lời gọi hàm, đọc `□`/`■` khác, hàm dùng như giá trị) thì đệ quy vô hạn / vòng khởi tạo — không có biến thể để
+/// chứng minh dừng. Đồ thị mức NÚT (bảo thủ: phương thức trait chưa cụ thể ⇒ cạnh tới mọi impl cùng tên). Mọi SCC có chu trình chứa một nút `□`/`■` ⇒ E0703.
+fn const_cycles(t: &TypesOutput, m: &MirOutput, bag: &mut Diagnostics) {
+    let bodies: Vec<&Body> = m
+        .bodies
+        .iter()
+        .filter(|b| matches!(b.kind, BodyKind::Fn | BodyKind::Const | BodyKind::Static))
+        .collect();
+    let by_node: BTreeMap<NodeId, usize> = bodies
+        .iter()
+        .enumerate()
+        .map(|(i, b)| (b.node, i))
+        .collect();
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); bodies.len()];
+    let mut self_loop = vec![false; bodies.len()];
+    for (i, b) in bodies.iter().enumerate() {
+        let mut targets: BTreeSet<NodeId> = BTreeSet::new();
+        let mut visit = |o: &gt_mir::Operand| match o {
+            gt_mir::Operand::Const(gt_mir::Const::Item { node, .. })
+            | gt_mir::Operand::Const(gt_mir::Const::FnItem { node, .. }) => {
+                targets.insert(*node);
+            }
+            _ => {}
+        };
+        let mut calls: Vec<&Callee> = Vec::new();
+        for bb in &b.blocks {
+            for st in &bb.statements {
+                if let gt_mir::StatementKind::Assign(_, rv) = &st.kind {
+                    use gt_mir::Rvalue as R;
+                    match rv {
+                        R::Use(o)
+                        | R::Repeat(o, _)
+                        | R::Cast(o, _)
+                        | R::CastFits(o, _)
+                        | R::UnaryOp(_, o) => visit(o),
+                        R::BinaryOp(_, a, c) | R::CheckedBinaryOp(_, a, c) => {
+                            visit(a);
+                            visit(c);
+                        }
+                        R::Aggregate(_, v) => v.iter().for_each(&mut visit),
+                        R::Ref(..) | R::Len(_) | R::Discriminant(_) => {}
+                    }
+                }
+            }
+            if let Some(tm) = &bb.terminator {
+                match &tm.kind {
+                    TerminatorKind::Call { callee, args, .. } => {
+                        args.iter().for_each(&mut visit);
+                        calls.push(callee);
+                    }
+                    TerminatorKind::SwitchInt { discr, .. } => visit(discr),
+                    TerminatorKind::Assert { cond, .. } => visit(cond),
+                    _ => {}
+                }
+            }
+        }
+        for c in calls {
+            match c {
+                Callee::Fn { node, .. } => {
+                    targets.insert(*node);
+                }
+                Callee::TraitMethod {
+                    trait_def,
+                    member,
+                    self_ty,
+                    generics,
+                } => {
+                    let resolved = (!self_ty.has_param() && !self_ty.has_infer())
+                        .then(|| {
+                            t.db.resolve_trait_method(*trait_def, *member, self_ty, generics)
+                        })
+                        .flatten();
+                    if let Some((n2, _)) = resolved {
+                        targets.insert(n2);
+                    } else {
+                        let name =
+                            t.db.traits
+                                .get(trait_def)
+                                .and_then(|td| td.members.get(*member))
+                                .map(|mm| mm.name.clone());
+                        for imp in &t.db.impls {
+                            if imp
+                                .trait_ref
+                                .as_ref()
+                                .is_some_and(|r| r.trait_def == *trait_def)
+                            {
+                                for mm in &imp.members {
+                                    if Some(&mm.name) == name.as_ref() {
+                                        targets.insert(mm.node);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Callee::Value(_) => {}
+            }
+        }
+        for n in targets {
+            if let Some(&j) = by_node.get(&n) {
+                if j == i {
+                    self_loop[i] = true;
+                }
+                adj[i].push(j);
+            }
+        }
+    }
+    let comp = sccs(bodies.len(), &adj);
+    let mut size: BTreeMap<usize, usize> = BTreeMap::new();
+    for c in &comp {
+        *size.entry(*c).or_insert(0) += 1;
+    }
+    for (i, b) in bodies.iter().enumerate() {
+        if matches!(b.kind, BodyKind::Fn) {
+            continue;
+        }
+        if size[&comp[i]] > 1 || self_loop[i] {
+            bag.push(mk(
+                t,
+                "E0703",
+                b.node,
+                b.span,
+                format!(
+                    "`{}` thuộc một chu trình khởi tạo/đọc (từ thân của nó tới được chính nó qua hàm hoặc `□`/`■` khác): không có biến thể để chứng minh dừng",
+                    b.key
+                ),
+            ));
+        }
+    }
+}
+
 /// Tarjan lặp: trả về số hiệu thành phần liên thông mạnh của từng đỉnh.
 fn sccs(n: usize, adj: &[Vec<usize>]) -> Vec<usize> {
     let mut index = vec![usize::MAX; n];
@@ -870,6 +1002,8 @@ pub fn check_termination(
             ));
         }
     }
+
+    const_cycles(t, m, &mut bag);
 
     // ---- thân KHÔNG phải hàm (`■`, `□`, `⊳`, `⊲`) ----
     // FB-C38 (Gemini G-03a): các thân này cũng được chạy thật. Chúng không có biến thể/`div` để chứng minh, nên chỉ chấp nhận vòng lặp

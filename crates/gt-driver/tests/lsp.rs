@@ -273,3 +273,56 @@ fn vscode_manifest_is_valid_and_references_existing_files() {
             .unwrap_or_else(|e| panic!("{rel}: {e}"));
     }
 }
+
+/// FB-G2-05/06 (Gemini R2): tên tệp trùng biến của `std` (`a.gt`) không được làm IDE báo "0 lỗi"; tên không phải định danh (`my-app.gt`) không được E9901;
+/// `rig.toml` có `edition = 2` ⇒ cú pháp edition 2 (`?`) không bị E0101 giả.
+#[test]
+fn lsp_file_names_and_edition_do_not_hide_diagnostics() {
+    let base = std::env::temp_dir().join(format!("gt_lsp_names_{}", std::process::id()));
+    let mut s = Server::start();
+    s.send(&json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}));
+    let _ = s.recv();
+    let bad = "ƒ main() → u32 ! ∅ { x: u32 ≔ true; 0u32 }\n";
+    let diag_codes = |v: &Value| -> Vec<String> {
+        v["params"]["diagnostics"]
+            .as_array()
+            .expect("mảng")
+            .iter()
+            .map(|d| d["code"].as_str().unwrap_or("").to_string())
+            .collect()
+    };
+    for name in ["a.gt", "my-app.gt", "123.gt"] {
+        let dir = base.join(name.replace('.', "_"));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let uri = format!("file://{}", dir.join(name).display());
+        let codes = diag_codes(&s.open(&uri, bad));
+        assert!(!codes.is_empty(), "{name}: IDE báo 0 lỗi trên mã sai");
+        assert!(
+            !codes.iter().any(|c| c == "E9901") || name == "a.gt",
+            "{name}: E9901 (BadModuleName?): {codes:?}"
+        );
+        if name != "a.gt" {
+            assert!(
+                codes.iter().any(|c| c == "E0301"),
+                "{name}: thiếu E0301: {codes:?}"
+            );
+        }
+    }
+    let dir = base.join("ed2");
+    std::fs::create_dir_all(&dir).expect("mkdir");
+    std::fs::write(
+        dir.join("rig.toml"),
+        "[package]\nname = \"ed2\"\nversion = \"0.1.0\"\nedition = 2\n",
+    )
+    .expect("rig.toml");
+    let uri = format!("file://{}", dir.join("p.gt").display());
+    let codes = diag_codes(&s.open(
+        &uri,
+        "ƒ f(x: u32) → u32 ! ∅ { x }\nƒ main() → u32 ! ∅ { 0u32 }\n",
+    ));
+    assert!(
+        codes.iter().all(|c| c != "E0101"),
+        "edition 2 bị E0101: {codes:?}"
+    );
+    let _ = std::fs::remove_dir_all(&base);
+}

@@ -78,7 +78,36 @@ fn uri_to_path(uri: &str) -> Option<PathBuf> {
         out.push(b[i]);
         i += 1;
     }
-    String::from_utf8(out).ok().map(PathBuf::from)
+    let mut path = String::from_utf8(out).ok()?;
+    // FB-G2-06c (Gemini R2): `file:///c:/Users/x.gt` ⇒ `/c:/Users/x.gt`; trên Windows bỏ dấu `/` đứng trước ký tự ổ đĩa
+    if cfg!(windows) {
+        let pb = path.as_bytes();
+        if pb.len() >= 3 && pb[0] == b'/' && pb[1].is_ascii_alphabetic() && pb[2] == b':' {
+            path.remove(0);
+        }
+    }
+    Some(PathBuf::from(path))
+}
+
+/// edition của dự án chứa tệp: `edition = N` trong `rig.toml` gần nhất ở thư mục tổ tiên (vắng ⇒ 1). FB-G2-06b (Gemini R2): trước đây LSP luôn dùng edition 1
+/// nên tệp edition 2 báo E0101 giả. Giá trị không đọc được ⇒ 1 (rig từ chối edition lạ ở `rig check`; LSP chỉ là bề mặt chẩn đoán).
+fn edition_for(path: &Path) -> u32 {
+    for d in path.ancestors().skip(1) {
+        let toml = d.join("rig.toml");
+        if let Ok(text) = std::fs::read_to_string(&toml) {
+            for line in text.lines() {
+                let l = line.split('#').next().unwrap_or("").trim();
+                if let Some(v) = l.strip_prefix("edition")
+                    && let Some(v) = v.trim_start().strip_prefix('=')
+                    && let Ok(n) = v.trim().parse::<u32>()
+                {
+                    return n;
+                }
+            }
+            return 1;
+        }
+    }
+    1
 }
 
 fn find_std() -> Option<PathBuf> {
@@ -95,10 +124,11 @@ fn find_std() -> Option<PathBuf> {
 }
 
 fn file_name(path: &Path) -> String {
-    path.file_name().map_or_else(
+    // FB-G2-06a (Gemini R2): tên tệp là tên module — qua cùng phép ánh xạ của `gritc check` (`my-app.gt`, `123.gt` không còn E9901 BadModuleName)
+    gt_resolve::module_file_name_for(&path.file_name().map_or_else(
         || "main.gt".to_string(),
         |n| n.to_string_lossy().into_owned(),
-    )
+    ))
 }
 
 /// Thêm mọi tệp `.gt` (theo tên, chưa có) của `dir` vào đầu vào.
@@ -132,7 +162,7 @@ fn add_dir(
 fn build_inputs(
     uri: &str,
     docs: &BTreeMap<String, String>,
-) -> Option<(String, String, Vec<SourceInput>)> {
+) -> Option<(String, String, Vec<SourceInput>, u32)> {
     let path = uri_to_path(uri)?;
     let me = file_name(&path);
     let mut inputs: Vec<SourceInput> = Vec::new();
@@ -161,29 +191,57 @@ fn build_inputs(
     if let Some(std_dir) = find_std() {
         add_dir(&std_dir, &mut inputs, &mut seen);
     }
-    Some((me, text, inputs))
+    Some((me, text, inputs, edition_for(&path)))
 }
 
 type RawDiag = (usize, usize, Level, String, String);
 
 /// Chẩn đoán THÔ của chính tài liệu. Lỗi nội bộ của `check` KHÔNG được nuốt: thành chẩn đoán E9901 (FAIL_OPEN_AUDIT G2.1.b).
-fn raw_diagnostics(me: &str, inputs: &[SourceInput]) -> Vec<RawDiag> {
-    match check(inputs, &Options::default()) {
-        Ok(res) => res
-            .report
-            .diagnostics
-            .iter()
-            .filter(|d| d.file == me)
-            .map(|d| {
-                (
-                    d.span.start as usize,
-                    d.span.end as usize,
-                    d.level,
-                    d.code.as_str().to_string(),
-                    d.message.clone(),
-                )
-            })
-            .collect(),
+fn raw_diagnostics(me: &str, inputs: &[SourceInput], edition: u32) -> Vec<RawDiag> {
+    let opts = Options {
+        edition,
+        ..Options::default()
+    };
+    match check(inputs, &opts) {
+        Ok(res) => {
+            let mut v: Vec<RawDiag> = res
+                .report
+                .diagnostics
+                .iter()
+                .filter(|d| d.file == me)
+                .map(|d| {
+                    (
+                        d.span.start as usize,
+                        d.span.end as usize,
+                        d.level,
+                        d.code.as_str().to_string(),
+                        d.message.clone(),
+                    )
+                })
+                .collect();
+            // FB-G2-05 (Gemini R2): lỗi ở tệp KHÁC (vd `std` đồng nạp) có thể dừng pass sớm ⇒ chẩn đoán của chính tài liệu biến mất và IDE báo "0 lỗi" trên mã sai.
+            // Không được im lặng: nêu rõ lỗi chặn đầu tiên ở tệp khác (fail-closed, mức Error).
+            if let Some(d) = res
+                .report
+                .diagnostics
+                .iter()
+                .find(|d| d.file != me && d.level == Level::Error)
+            {
+                v.push((
+                    0,
+                    0,
+                    Level::Error,
+                    "E9901".to_string(),
+                    format!(
+                        "chẩn đoán của tài liệu này CÓ THỂ THIẾU: lỗi {} ở tệp `{}` đã chặn kiểm: {}",
+                        d.code.as_str(),
+                        d.file,
+                        d.message
+                    ),
+                ));
+            }
+            v
+        }
         Err(e) => vec![(
             0,
             0,
@@ -196,10 +254,10 @@ fn raw_diagnostics(me: &str, inputs: &[SourceInput]) -> Vec<RawDiag> {
 
 /// Kiểm tài liệu `uri` (văn bản `docs[uri]`): trả các chẩn đoán LSP của CHÍNH tài liệu đó.
 fn diagnostics_for(uri: &str, docs: &BTreeMap<String, String>) -> Vec<Value> {
-    let Some((me, text, inputs)) = build_inputs(uri, docs) else {
+    let Some((me, text, inputs, edition)) = build_inputs(uri, docs) else {
         return Vec::new();
     };
-    raw_diagnostics(&me, &inputs)
+    raw_diagnostics(&me, &inputs, edition)
         .into_iter()
         .map(|(s, e, level, code, message)| {
             let (sl, sc) = position(&text, s);
@@ -261,13 +319,13 @@ fn ident_at(text: &str, off: usize) -> Option<(usize, usize)> {
 
 /// `textDocument/hover`: vị trí nằm trong một chẩn đoán ⇒ thông điệp + tài liệu `gritc explain <mã>`; ngược lại `null`. CHỈ HIỂN THỊ.
 fn hover_for(uri: &str, docs: &BTreeMap<String, String>, line: usize, col: usize) -> Value {
-    let Some((me, text, inputs)) = build_inputs(uri, docs) else {
+    let Some((me, text, inputs, edition)) = build_inputs(uri, docs) else {
         return Value::Null;
     };
     let Some(off) = offset_of(&text, line, col) else {
         return Value::Null;
     };
-    let hits: Vec<RawDiag> = raw_diagnostics(&me, &inputs)
+    let hits: Vec<RawDiag> = raw_diagnostics(&me, &inputs, edition)
         .into_iter()
         .filter(|(s, e, ..)| *s <= off && (off < *e || (*s == *e && off == *s)))
         .collect();
@@ -303,7 +361,10 @@ fn path_to_uri(p: &Path) -> String {
 }
 
 /// Chạy `gt-resolve` trên đầu vào (tên tệp qua cùng phép ánh xạ module của cli): (kết quả, tên module theo chỉ số đầu vào).
-fn resolve_inputs(inputs: &[SourceInput]) -> Option<(gt_resolve::ResolveOutput, Vec<String>)> {
+fn resolve_inputs(
+    inputs: &[SourceInput],
+    edition: u32,
+) -> Option<(gt_resolve::ResolveOutput, Vec<String>)> {
     let prelude = gt_resolve::Prelude::from_source(&crate::pipeline::prelude_text()).ok()?;
     let mapped: Vec<SourceInput> = inputs
         .iter()
@@ -316,7 +377,7 @@ fn resolve_inputs(inputs: &[SourceInput]) -> Option<(gt_resolve::ResolveOutput, 
         .iter()
         .map(|i| i.name.strip_suffix(".gt").unwrap_or(&i.name).to_string())
         .collect();
-    let out = gt_resolve::resolve_program(&mapped, &prelude).ok()?;
+    let out = gt_resolve::resolve_program_with_edition(&mapped, &prelude, edition).ok()?;
     Some((out, mods))
 }
 
@@ -328,7 +389,7 @@ fn range_json(text: &str, s: usize, e: usize) -> Value {
 
 /// `textDocument/definition`: định danh dưới con trỏ ⇒ mọi định nghĩa CẤP ITEM trùng tên trong chương trình (từ `gt-resolve`).
 fn definition_for(uri: &str, docs: &BTreeMap<String, String>, line: usize, col: usize) -> Value {
-    let Some((me, text, inputs)) = build_inputs(uri, docs) else {
+    let Some((me, text, inputs, edition)) = build_inputs(uri, docs) else {
         return Value::Null;
     };
     let Some(off) = offset_of(&text, line, col) else {
@@ -338,7 +399,7 @@ fn definition_for(uri: &str, docs: &BTreeMap<String, String>, line: usize, col: 
         return Value::Null;
     };
     let name = &text[lo..hi];
-    let Some((out, mods)) = resolve_inputs(&inputs) else {
+    let Some((out, mods)) = resolve_inputs(&inputs, edition) else {
         return Value::Null;
     };
     let dir = uri_to_path(uri).and_then(|p| p.parent().map(Path::to_path_buf));
@@ -384,10 +445,10 @@ fn definition_for(uri: &str, docs: &BTreeMap<String, String>, line: usize, col: 
 
 /// `textDocument/documentSymbol`: item của CHÍNH tài liệu (từ `gt-resolve`).
 fn symbols_for(uri: &str, docs: &BTreeMap<String, String>) -> Value {
-    let Some((me, text, inputs)) = build_inputs(uri, docs) else {
+    let Some((me, text, inputs, edition)) = build_inputs(uri, docs) else {
         return Value::Array(Vec::new());
     };
-    let Some((out, mods)) = resolve_inputs(&inputs) else {
+    let Some((out, mods)) = resolve_inputs(&inputs, edition) else {
         return Value::Array(Vec::new());
     };
     let my_mod = mods.first().cloned().unwrap_or_default();
@@ -516,7 +577,11 @@ pub fn run() -> i32 {
             }
             "textDocument/formatting" => {
                 let result = match docs.get(&uri) {
-                    Some(text) => match gt_fmt::format(&uri, text) {
+                    Some(text) => match gt_fmt::format_with_edition(
+                        &uri,
+                        text,
+                        uri_to_path(&uri).map_or(1, |p| edition_for(&p)),
+                    ) {
                         Ok(new) => {
                             let (el, ec) = position(text, text.len());
                             json!([{"range": {"start": {"line": 0, "character": 0}, "end": {"line": el, "character": ec}}, "newText": new}])

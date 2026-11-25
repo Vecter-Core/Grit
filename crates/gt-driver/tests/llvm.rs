@@ -345,6 +345,8 @@ fn built_exe_does_not_depend_on_llvm_dll() {
         "api-ms-win-crt",
         "advapi32.dll",
         "bcrypt.dll",
+        // FB-G2-07d (Gemini R2): `std` của Rust 1.98 trên Windows nạp `bcryptprimitives.dll` (ProcessPrng) — DLL hệ thống, không phải LLVM/CRT bên ngoài (CHƯA KIỂM trên Windows)
+        "bcryptprimitives.dll",
         "ucrtbase.dll",
         "msvcp",
         "api-ms-win-core",
