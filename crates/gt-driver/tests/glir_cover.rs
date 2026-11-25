@@ -35,30 +35,29 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
             .filter(|b| b.kind == gt_mir::BodyKind::Fn)
             .collect();
         total += fns.len();
-        let (m, bad) = gt_glirgen::lower_module(&art.types.db, &art.mir);
-        for (_, u) in bad {
-            *why.entry(u.0).or_default() += 1;
+        let lo = gt_glirgen::lower_module(&art.types, &art.mir);
+        for (_, _, u) in &lo.bad {
+            *why.entry(u.0.clone()).or_default() += 1;
         }
-        let errs = gt_glir::verify(&m);
+        let m = &lo.module;
+        let errs = gt_glir::verify(m);
         assert!(
             errs.is_empty(),
             "{}: {errs:?}\n{}",
             p.display(),
-            gt_glir::print(&m)
+            gt_glir::print(m)
         );
         for f in &m.funcs {
             lowered += 1;
-            let b = fns
-                .iter()
-                .find(|b| gt_glirgen::glir_name(&b.key) == f.name)
-                .expect("thân gốc");
+            let inst = &lo.funcs[&f.name];
+            let b = fns.iter().find(|b| b.node == inst.node).expect("thân gốc");
             let cover = gt_glirgen::check_abort_cover(b, f);
             assert!(cover.is_empty(), "{}: {cover:?}", b.key);
         }
-        let text = gt_glir::print(&m);
+        let text = gt_glir::print(m);
         let back = gt_glir::parse(&text)
             .unwrap_or_else(|e| panic!("{}: in ra không đọc lại được: {e}", p.display()));
-        assert_eq!(back, m, "{}: đọc(in) ≠ gốc", p.display());
+        assert_eq!(&back, m, "{}: đọc(in) ≠ gốc", p.display());
     }
     let mut by: Vec<_> = why.into_iter().collect();
     by.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
@@ -356,7 +355,7 @@ fn diff_src(
         return (0, 0, 0);
     };
     let db = &art.types.db;
-    let (module, _) = gt_glirgen::lower_module(db, &art.mir);
+    let module = gt_glirgen::lower_module(&art.types, &art.mir).module;
     for b in &art.mir.bodies {
         if b.kind != gt_mir::BodyKind::Fn
             || (main_only && !b.key.starts_with("main::"))

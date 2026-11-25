@@ -9,7 +9,8 @@ use gt_mir::{
     AssertKind, BinOp, Body, BodyKind, Const, Operand, Place, PlaceElem, Rvalue, StatementKind,
     TerminatorKind, UnOp,
 };
-use gt_types::{IntTy, Ty, TypeDb};
+use gt_types::{Instance, IntTy, Ty, TypeDb};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 /// Lý do (ngắn, ổn định) một thân chưa hạ được — dùng để đếm độ phủ.
@@ -22,12 +23,41 @@ fn un<T>(why: impl Into<String>) -> R<T> {
     Err(Unsupported(why.into()))
 }
 
-/// callee (nút) → (tên GLIR, kiểu trả về Grit) của các thân có chữ ký trong tập con (có thể gọi trực tiếp)
-pub type Sigs = BTreeMap<gt_ast::NodeId, (String, Ty)>;
+/// instance → (tên GLIR, kiểu trả về Grit ĐÃ THẾ) nếu chữ ký (đã thế) nằm trong tập con, `None` nếu không — bộ nhớ đệm, điền dần khi gặp lời gọi.
+pub type Sigs = BTreeMap<Instance, Option<(String, Ty)>>;
+
+/// Ngữ cảnh chung khi hạ cả tập thân.
+struct Ctx<'a> {
+    db: &'a TypeDb,
+    keys: &'a BTreeMap<gt_ast::NodeId, String>,
+    defs: &'a [gt_resolve::Def],
+    /// thân `Fn` theo nút
+    bodies: BTreeMap<gt_ast::NodeId, &'a Body>,
+    sigs: RefCell<Sigs>,
+}
+
+impl Ctx<'_> {
+    /// chữ ký của instance nếu có thân MIR và chữ ký nằm trong tập con
+    fn sig(&self, inst: &Instance) -> Option<(String, Ty)> {
+        if let Some(s) = self.sigs.borrow().get(inst) {
+            return s.clone();
+        }
+        let r = self.bodies.get(&inst.node).and_then(|b| {
+            (inst.args.is_empty() && (0..=b.arg_count).all(|i| in_subset(self.db, &b.locals[i].ty)))
+                .then(|| {
+                    (
+                        inst_name(&b.key, &inst.args, self.defs),
+                        b.locals[0].ty.clone(),
+                    )
+                })
+        });
+        self.sigs.borrow_mut().insert(inst.clone(), r.clone());
+        r
+    }
+}
 
 struct Lw<'a> {
-    sigs: &'a Sigs,
-    keys: &'a BTreeMap<gt_ast::NodeId, String>,
+    cx: &'a Ctx<'a>,
     db: &'a TypeDb,
     body: &'a Body,
     slots: BTreeMap<usize, G>,
@@ -40,6 +70,8 @@ struct Lw<'a> {
     aux_slots: Vec<(String, G)>,
     /// global (chuỗi hằng) mà thân này dùng
     globals: Vec<gt_glir::Global>,
+    /// instance mà thân này gọi trực tiếp
+    calls: Vec<Instance>,
 }
 
 fn is_int_or_bool(t: &Ty) -> bool {
@@ -942,7 +974,7 @@ impl Lw<'_> {
                 // intrinsic `len` của slice/`str`: đọc trường độ dài của con trỏ béo (không có thân MIR)
                 if let gt_mir::Callee::Fn { node, .. } = callee
                     && matches!(
-                        self.keys.get(node).map(String::as_str),
+                        self.cx.keys.get(node).map(String::as_str),
                         Some("$prelude::[T0]::len" | "$prelude::str::len")
                     )
                     && args.len() == 1
@@ -984,13 +1016,17 @@ impl Lw<'_> {
                 let Some(tg) = target else {
                     return un("Call không trở về");
                 };
-                let Some((name, rty)) = self.sigs.get(node) else {
+                let inst = Instance {
+                    node: *node,
+                    args: generics.clone(),
+                };
+                let Some((name, rty)) = self.cx.sig(&inst) else {
                     return un(format!(
                         "Call tới hàm ngoài tập con: {}",
-                        self.keys.get(node).map_or("?", |k| k.as_str())
+                        self.cx.keys.get(node).map_or("?", |k| k.as_str())
                     ));
                 };
-                let (name, rty) = (name.clone(), rty.clone());
+                self.calls.push(inst);
                 let mut vals = Vec::new();
                 for a in args {
                     let (v, t) = self.operand(a)?;
@@ -1026,7 +1062,19 @@ impl Lw<'_> {
 
 /// Hạ một thân `Fn` không generic. Trả hàm GLIR (chưa verify) hoặc lý do chưa hạ được.
 pub fn lower_body(db: &TypeDb, body: &Body) -> R<Func> {
-    let (f, globals) = lower_body_with(db, body, &Sigs::new(), &BTreeMap::new())?;
+    let keys = BTreeMap::new();
+    let cx = Ctx {
+        db,
+        keys: &keys,
+        defs: &[],
+        bodies: BTreeMap::new(),
+        sigs: RefCell::new(Sigs::new()),
+    };
+    let inst = Instance {
+        node: body.node,
+        args: Vec::new(),
+    };
+    let (f, globals, _) = lower_inst(&cx, body, &inst)?;
     if !globals.is_empty() {
         return un("thân dùng chuỗi hằng: cần lower_module");
     }
@@ -1056,32 +1104,62 @@ pub fn glir_name(key: &str) -> String {
     }
 }
 
+/// Tên hàm GLIR của một instance: không đối số kiểu ⇒ `glir_name(key)`; có ⇒ `glir_name(key)` + `.` + băm 64 bit của khoá CHUẨN
+/// (đúng phần băm của `gt_types::instance_name`, nên hai instance khác nhau không trùng tên).
+#[must_use]
+pub fn inst_name(key: &str, args: &[Ty], defs: &[gt_resolve::Def]) -> String {
+    if args.is_empty() {
+        return glir_name(key);
+    }
+    let (sym, _) = gt_types::instance_name(key, args, defs);
+    let hash = sym.rsplit('.').next().unwrap_or_default();
+    format!("{}.{hash}", glir_name(key))
+}
+
+/// Kết quả hạ cả tập thân.
+pub struct Lowered {
+    pub module: gt_glir::Module,
+    /// tên hàm GLIR → instance, cho MỌI hàm trong `module`
+    pub funcs: BTreeMap<String, Instance>,
+    /// instance không hạ được: (khoá thân, instance, lý do)
+    pub bad: Vec<(String, Instance, Unsupported)>,
+    /// khoá các thân `Fn` generic không có instance nào (không hạ)
+    pub no_instance: Vec<String>,
+}
+
 /// Hạ cả tập thân: hàm nào gọi (trực tiếp) hàm cùng tập con thì được hạ kèm lời gọi; hàm gọi tới hàm không hạ được bị loại (lặp tới điểm cố định).
 #[must_use]
-pub fn lower_module(
-    db: &TypeDb,
-    mir: &gt_mir::MirOutput,
-) -> (gt_glir::Module, Vec<(String, Unsupported)>) {
-    let bodies = &mir.bodies;
-    let mut sigs = Sigs::new();
-    for b in bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
-        let ok = (0..=b.arg_count).all(|i| in_subset(db, &b.locals[i].ty));
-        if ok {
-            sigs.insert(b.node, (glir_name(&b.key), b.locals[0].ty.clone()));
-        }
-    }
-    let mut ok: BTreeMap<String, Func> = BTreeMap::new();
-    let mut bad: Vec<(String, Unsupported)> = Vec::new();
+pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lowered {
+    let db = &t.db;
+    let fns: Vec<&Body> = mir
+        .bodies
+        .iter()
+        .filter(|b| b.kind == BodyKind::Fn)
+        .collect();
+    let cx = Ctx {
+        db,
+        keys: &mir.keys,
+        defs: &t.resolve.defs,
+        bodies: fns.iter().map(|b| (b.node, *b)).collect(),
+        sigs: RefCell::new(Sigs::new()),
+    };
+    let mut ok: BTreeMap<String, (Instance, Func)> = BTreeMap::new();
+    let mut bad: Vec<(String, Instance, Unsupported)> = Vec::new();
     let mut globals: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-    for b in bodies.iter().filter(|b| b.kind == BodyKind::Fn) {
-        match lower_body_with(db, b, &sigs, &mir.keys) {
-            Ok((f, gs)) => {
+    for b in &fns {
+        let inst = Instance {
+            node: b.node,
+            args: Vec::new(),
+        };
+        match lower_inst(&cx, b, &inst) {
+            Ok((f, gs, _)) => {
                 let conflict = gs
                     .iter()
                     .any(|g| globals.get(&g.name).is_some_and(|x| *x != g.bytes));
                 if conflict {
                     bad.push((
                         b.key.clone(),
+                        inst,
                         Unsupported("global trùng tên khác nội dung".into()),
                     ));
                     continue;
@@ -1089,56 +1167,64 @@ pub fn lower_module(
                 for g in gs {
                     globals.insert(g.name, g.bytes);
                 }
-                ok.insert(f.name.clone(), f);
+                ok.insert(f.name.clone(), (inst, f));
             }
-            Err(u) => bad.push((b.key.clone(), u)),
+            Err(u) => bad.push((b.key.clone(), inst, u)),
         }
     }
     loop {
         let names: std::collections::BTreeSet<String> = ok.keys().cloned().collect();
         let drop: Vec<String> = ok
             .values()
-            .filter(|f| {
+            .filter(|(_, f)| {
                 f.blocks
                     .iter()
                     .flat_map(|b| &b.insts)
                     .any(|i| matches!(i, Inst::Call { callee, .. } if !names.contains(callee)))
             })
-            .map(|f| f.name.clone())
+            .map(|(_, f)| f.name.clone())
             .collect();
         if drop.is_empty() {
             break;
         }
         for n in drop {
-            ok.remove(&n);
-            bad.push((n, Unsupported("callee không hạ được".into())));
+            if let Some((inst, _)) = ok.remove(&n) {
+                let key = cx.bodies.get(&inst.node).map_or(n, |b| b.key.clone());
+                bad.push((key, inst, Unsupported("callee không hạ được".into())));
+            }
         }
     }
-    (
-        gt_glir::Module {
+    let funcs = ok
+        .iter()
+        .map(|(n, (i, _))| (n.clone(), i.clone()))
+        .collect();
+    Lowered {
+        module: gt_glir::Module {
             globals: globals
                 .into_iter()
                 .map(|(name, bytes)| gt_glir::Global { name, bytes })
                 .collect(),
             decls: Vec::new(),
-            funcs: ok.into_values().collect(),
+            funcs: ok.into_values().map(|(_, f)| f).collect(),
         },
+        funcs,
         bad,
-    )
+        no_instance: Vec::new(),
+    }
 }
 
-fn lower_body_with(
-    db: &TypeDb,
+/// Hạ thân `body` theo instance `inst`: (hàm, global dùng tới, instance được gọi trực tiếp).
+fn lower_inst(
+    cx: &Ctx<'_>,
     body: &Body,
-    sigs: &Sigs,
-    keys: &BTreeMap<gt_ast::NodeId, String>,
-) -> R<(Func, Vec<gt_glir::Global>)> {
+    inst: &Instance,
+) -> R<(Func, Vec<gt_glir::Global>, Vec<Instance>)> {
+    let db = cx.db;
     if body.kind != BodyKind::Fn {
         return un("không phải thân Fn");
     }
     let mut lw = Lw {
-        sigs,
-        keys,
+        cx,
         db,
         body,
         slots: BTreeMap::new(),
@@ -1149,6 +1235,7 @@ fn lower_body_with(
         extra: 0,
         aux_slots: Vec::new(),
         globals: Vec::new(),
+        calls: Vec::new(),
     };
     // tham số: store vào slot ở khối vào
     let mut params = Vec::new();
@@ -1201,13 +1288,14 @@ fn lower_body_with(
     slots.sort_by(|a, b| a.0.cmp(&b.0));
     Ok((
         Func {
-            name: glir_name(&body.key),
+            name: inst_name(&body.key, &inst.args, cx.defs),
             params,
             ret,
             slots,
             blocks: lw.blocks,
         },
         lw.globals,
+        lw.calls,
     ))
 }
 
