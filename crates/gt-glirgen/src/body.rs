@@ -40,7 +40,7 @@ struct Lw<'a> {
 fn is_int_or_bool(t: &Ty) -> bool {
     match t {
         Ty::Int(it) => it.bits() <= 64,
-        Ty::Bool => true,
+        Ty::Bool | Ty::Char | Ty::Never => true,
         _ => false,
     }
 }
@@ -110,7 +110,7 @@ fn kind_name(t: &Ty) -> &'static str {
 }
 
 fn is_unit(t: &Ty) -> bool {
-    matches!(t, Ty::Tuple(v) if v.is_empty())
+    matches!(t, Ty::Tuple(v) if v.is_empty()) || matches!(t, Ty::Never)
 }
 
 impl Lw<'_> {
@@ -259,6 +259,7 @@ impl Lw<'_> {
                 Ok((Opd::Int(gint(*ty), v), Ty::Int(*ty)))
             }
             Operand::Const(Const::Bool(b)) => Ok((Opd::Int(G::I1, i128::from(*b)), Ty::Bool)),
+            Operand::Const(Const::Char(c)) => Ok((Opd::Int(G::I32, i128::from(*c)), Ty::Char)),
             // `()` không có biểu diễn: mọi chỗ ghi/truyền kiểu `()` đều bị bỏ qua (xem `store`, `Call`, `Aggregate`)
             Operand::Const(Const::Unit) => Ok((Opd::Int(G::I1, 0), Ty::Tuple(Vec::new()))),
             Operand::Const(_) => un("hằng không phải số nguyên/bool/()"),
@@ -373,7 +374,7 @@ impl Lw<'_> {
             }
             Rvalue::Cast(o, to) => {
                 let (v, from) = self.operand(o)?;
-                let (Ty::Int(_) | Ty::Bool, Ty::Int(_)) = (&from, to) else {
+                let (Ty::Int(_) | Ty::Bool | Ty::Char, Ty::Int(_)) = (&from, to) else {
                     return un("Cast ngoài int/bool→int");
                 };
                 if let Ty::Int(it) = to
@@ -588,6 +589,7 @@ impl Lw<'_> {
         let (g, signed) = match ta {
             Ty::Int(it) => (gint(*it), it.signed()),
             Ty::Bool => (G::I1, false),
+            Ty::Char => (G::I32, false),
             _ => return un("BinaryOp trên kiểu không nguyên"),
         };
         let pick = |s: CmpPred, u: CmpPred| if signed { s } else { u };
