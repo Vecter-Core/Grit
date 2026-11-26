@@ -290,10 +290,32 @@ fn owned_into_inner_and_spawn_wipe_their_heap_copies() {
     ];
     for (i, (main, pre, sum, wipes)) in cases.iter().enumerate() {
         let src = format!("{pre}{main}");
-        let outs = run(&src, &format!("heapwipe{i}"));
-        for (backend, got, w) in &outs {
-            assert_eq!(*got, Some(*sum), "ca {i} ({backend})\n{src}");
-            assert_eq!(*w, *wipes, "ca {i} ({backend}): số lần xoá\n{src}");
+        // `spawn` không có `join` (ngữ nghĩa M8): ở ca có `spawn`, luồng con có thể chưa chạy xong khi `main` thoát ⇒ số lần xoá quan sát được CHẠY ĐUA
+        // (đo 2/30 lần ở ca 1). Ca đó chạy lại tối đa 8 lần: KHÔNG lần nào được vượt số kỳ vọng, và ít nhất một lần phải đạt ĐỦ (tắt bản sửa ⇒ không bao giờ đủ).
+        let attempts = if main.contains("spawn(") { 8 } else { 1 };
+        let mut reached: std::collections::BTreeMap<String, bool> = Default::default();
+        for _ in 0..attempts {
+            for (backend, got, w) in &run(&src, &format!("heapwipe{i}")) {
+                assert_eq!(*got, Some(*sum), "ca {i} ({backend})\n{src}");
+                if attempts == 1 {
+                    assert_eq!(*w, *wipes, "ca {i} ({backend}): số lần xoá\n{src}");
+                } else {
+                    assert!(
+                        *w <= *wipes,
+                        "ca {i} ({backend}): xoá nhiều hơn kỳ vọng\n{src}"
+                    );
+                }
+                *reached.entry(backend.to_string()).or_insert(false) |= *w == *wipes;
+            }
+            if reached.values().all(|r| *r) {
+                break;
+            }
+        }
+        for (backend, ok) in &reached {
+            assert!(
+                *ok,
+                "ca {i} ({backend}): chưa lần nào đạt đủ {wipes} lần xoá\n{src}"
+            );
         }
     }
 }
