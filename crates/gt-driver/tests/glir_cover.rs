@@ -134,9 +134,10 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415; `Cell::new/get/set` — 2026-11-26: 3534/13418;
     // trần độ sâu `in_subset` 8 → 128 + ngân sách nút (tuple lồng sâu của `e0317_*`) — 2026-11-26: 3548/21610; `Vec::*` — 2026-11-26: 3563/21625;
     // `Text::*`, `str::slice/as_bytes`, `u8 as char` — 2026-11-26: 3568/21630; `Owned::*` + drop glue (trừ xoá Secret) — 2026-11-26: 3575/21638;
-    // `Secret::*` + `Wipe`/xoá `_0`/glue `Wipe` (ADR-P2-03) — 2026-11-26: 3581/21644
+    // `Secret::*` + `Wipe`/xoá `_0`/glue `Wipe` (ADR-P2-03) — 2026-11-26: 3581/21644; `f64` (fbin/funop/fcmp/sitofp/uitofp/fptosi/bitcast) —
+    // 2026-11-26: 3586/21649; `Atomic::*` (atomicload/store/rmw/cmpxchg) + `Mutex::new/with` (f hằng, gọi trực tiếp) — 2026-11-26: 3592/21656
     assert!(
-        lowered >= 3581 && inst_ok >= 21644,
+        lowered >= 3592 && inst_ok >= 21656,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -199,7 +200,7 @@ fn plain(db: &gt_types::TypeDb, t: &gt_types::Ty, d: u32) -> bool {
     d <= PLAIN_MAX_DEPTH
         && match t {
             Ty::Int(it) => it.bits() <= 64,
-            Ty::Bool => true,
+            Ty::Bool | Ty::Float(gt_types::FloatTy::F64) => true,
             Ty::Tuple(v) => v.iter().all(|x| plain(db, x, d + 1)),
             Ty::Array(e, n) => *n <= 8 && plain(db, e, d + 1),
             Ty::Adt(def, args) => match n_variants(db, def) {
@@ -252,6 +253,49 @@ fn mask(w: u32) -> u128 {
     }
 }
 
+/// So hai mẫu bit `f64` theo hợp đồng GLIR (ADR-P2-02 quyết định 2026-11-26): mẫu bit của NaN do phép tính sinh ra KHÔNG được bảo đảm ⇒ mọi NaN
+/// coi là bằng nhau (chuẩn hoá trước khi so); mọi giá trị khác (kể cả ±0, ±∞, số dưới chuẩn) so ĐÚNG từng bit.
+fn f64_bits_eq(a: u64, b: u64) -> bool {
+    let canon = |x: u64| {
+        if f64::from_bits(x).is_nan() {
+            0x7ff8_0000_0000_0000
+        } else {
+            x
+        }
+    };
+    canon(a) == canon(b)
+}
+
+/// Đầu vào `f64` thiên về biên: ±0, ±1, 0.1, 2^53±1, ±2^63 (biên `to_i64`), 2^63−1024 (số f64 lớn nhất < 2^63), ±∞, NaN (chuẩn, âm, có payload),
+/// số dưới chuẩn nhỏ nhất, MAX, MIN_POSITIVE, và mẫu bit ngẫu nhiên.
+fn gen_f64(rnd: &mut dyn FnMut() -> u64) -> u64 {
+    let pool: [u64; 22] = [
+        0.0f64.to_bits(),
+        (-0.0f64).to_bits(),
+        1.0f64.to_bits(),
+        (-1.0f64).to_bits(),
+        0.1f64.to_bits(),
+        2.5f64.to_bits(),
+        (-7.75f64).to_bits(),
+        9_007_199_254_740_992.0f64.to_bits(),
+        9_007_199_254_740_994.0f64.to_bits(),
+        9_223_372_036_854_775_808.0f64.to_bits(),
+        (-9_223_372_036_854_775_808.0f64).to_bits(),
+        9_223_372_036_854_774_784.0f64.to_bits(),
+        f64::INFINITY.to_bits(),
+        f64::NEG_INFINITY.to_bits(),
+        0x7ff8_0000_0000_0000,
+        0xfff8_0000_0000_0000,
+        0x7ff0_0000_0000_0001,
+        1,
+        f64::MAX.to_bits(),
+        f64::MIN_POSITIVE.to_bits(),
+        (1e300f64).to_bits(),
+        rnd(),
+    ];
+    pool[(rnd() % pool.len() as u64) as usize]
+}
+
 fn gen_val(
     db: &gt_types::TypeDb,
     t: &gt_types::Ty,
@@ -261,6 +305,7 @@ fn gen_val(
     use gt_types::Ty;
     match t {
         Ty::Bool => V::Bool(rnd() % 2 == 1),
+        Ty::Float(_) => V::Float(f64::from_bits(gen_f64(rnd))),
         Ty::Int(it) => {
             let (w, m) = (it.bits(), mask(it.bits()));
             let top = 1u128 << (w - 1);
@@ -337,6 +382,11 @@ fn encode(
     use gt_types::Ty;
     match (t, v) {
         (Ty::Bool, V::Bool(b)) => buf[base] = Some(u8::from(*b)),
+        (Ty::Float(_), V::Float(x)) => {
+            for (i, slot) in buf[base..base + 8].iter_mut().enumerate() {
+                *slot = Some((x.to_bits() >> (8 * i)) as u8);
+            }
+        }
         (Ty::Int(it), V::Int(x, _)) => {
             let n = (it.bits() / 8) as usize;
             for (i, slot) in buf[base..base + n].iter_mut().enumerate() {
@@ -388,6 +438,16 @@ fn decode_eq(
     use gt_types::Ty;
     match (t, v) {
         (Ty::Bool, V::Bool(b)) => bytes[base] == Some(u8::from(*b)),
+        (Ty::Float(_), V::Float(x)) => {
+            let mut g = 0u64;
+            for i in 0..8 {
+                match bytes[base + i] {
+                    Some(b) => g |= u64::from(b) << (8 * i),
+                    None => return false,
+                }
+            }
+            f64_bits_eq(g, x.to_bits())
+        }
         (Ty::Int(it), V::Int(x, _)) => {
             let n = (it.bits() / 8) as usize;
             (0..n).all(|i| bytes[base + i] == Some((((*x as u128) >> (8 * i)) & 0xff) as u8))
@@ -567,6 +627,10 @@ fn diff_src(
                 match t {
                     Ty::Tuple(ts) if ts.is_empty() => {}
                     Ty::Bool => gargs.push(Arg::Int(u128::from(matches!(v, V::Bool(true))))),
+                    Ty::Float(_) => {
+                        let V::Float(x) = &v else { unreachable!() };
+                        gargs.push(Arg::Int(u128::from(x.to_bits())));
+                    }
                     Ty::Int(it) => {
                         let V::Int(x, _) = &v else { unreachable!() };
                         gargs.push(Arg::Int((*x as u128) & mask(it.bits())));
@@ -631,6 +695,12 @@ fn diff_src(
                     assert_eq!(x, (y as u128) & mask(it.bits()), "{}", ctx())
                 }
                 (GO::Value(Some(x)), Ok(V::Bool(y))) => assert_eq!(x, u128::from(y), "{}", ctx()),
+                (GO::Value(Some(x)), Ok(V::Float(y))) => assert!(
+                    u64::try_from(x).is_ok_and(|x| f64_bits_eq(x, y.to_bits())),
+                    "{}: GLIR f64 {x:#x}, MIR {:#x} ({y:e})",
+                    ctx(),
+                    y.to_bits()
+                ),
                 (GO::Agg(bytes), Ok(v)) => assert!(
                     decode_eq(db, rty, &v, &bytes, 0),
                     "{}: GLIR trả {bytes:?}, MIR trả {v:?}",
@@ -1347,7 +1417,8 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_owned() {
 fn runtime_calls_without_a_model_are_never_silently_dropped() {
     let src = "\
 ƒ clock(c: &Cap<Clock>) → u64 ! {io} { c.now() }
-ƒ atom(x: u32) → u32 ! ∅ { a ≔ Atomic::new(x); a.load(AtomicOrdering::SeqCst) }
+ƒ wk(x: u32) ! ∅ { }
+ƒ sp(x: u32) ! ∅ { spawn(wk, x); }
 ƒ out(o: &Cap<Out>, x: u64) ! {io} { o.write_u64(x); }
 ƒ ok(x: u8) → u8 ! ∅ { x +% 1u8 }
 ƒ main() → i32 ! ∅ { 0 }
@@ -1370,7 +1441,8 @@ fn runtime_calls_without_a_model_are_never_silently_dropped() {
         .map(|b| b.key.clone())
         .collect();
     assert!(keys.iter().any(|k| k == "main::ok"), "{keys:?}");
-    for k in ["main::clock", "main::atom", "main::out"] {
+    // (`Atomic` có mô hình tuần tự từ 2026-11-26 — thay bằng `spawn`, vẫn DỪNG)
+    for k in ["main::clock", "main::sp", "main::out"] {
         assert!(!keys.iter().any(|x| x == k), "{k} không được hạ: {keys:?}");
     }
 }
@@ -1414,5 +1486,103 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_secrets() {
     assert!(
         bodies >= 13 && runs >= 1650 && aborts >= 50,
         "oracle Secret quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH dùng `f64` (ADR-P2-02 quyết định 2026-11-26: `fbin`/`funop`/`fcmp`, `sitofp`/`uitofp`/`fptosi`/`bitcast`, hằng theo mẫu bit): số học,
+/// so sánh có thứ tự với NaN/±0/±∞, `sqrt`, `is_nan`, `to_bits` (của ĐẦU VÀO hoặc của kết quả đã chặn NaN — mẫu bit NaN do phép tính sinh ra không được
+/// bảo đảm), `f64_from_bits`, `to_i64` ở biên ±2^63, ép số nguyên → f64 (kể cả `CastLossy` của i64/u64 ngoài ±2^53 ⇒ abort), f64 trong struct/mảng/
+/// `Option`/tham chiếu, vòng lặp tích luỹ. So kết quả f64 theo bit, mọi NaN coi là bằng nhau (`f64_bits_eq`).
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_floats() {
+    let src = "\
+▢ Q { a: f64, b: u8 }
+⊐ Copy for Q { }
+ƒ f_add(x: f64, y: f64) → f64 ! ∅ { x + y }
+ƒ f_ar(x: f64, y: f64) → f64 ! ∅ { (x * y - x) / (y + 1.5f64) }
+ƒ f_neg(x: f64, y: f64) → f64 ! ∅ { -(x - y) }
+ƒ f_cmp(x: f64, y: f64) → u8 ! ∅ { μr ≔ 0u8; ⎇ x < y { r ← r +% 1u8; } ⎇ x <= y { r ← r +% 2u8; } ⎇ x > y { r ← r +% 4u8; } ⎇ x >= y { r ← r +% 8u8; } r }
+ƒ f_nan(x: f64, y: f64) → bool ! ∅ { (x / y).is_nan() }
+ƒ f_sqrt(x: f64) → f64 ! ∅ { x.sqrt() }
+ƒ f_toi(x: f64) → i64 ! ∅ { ⌥ x.to_i64() { Some(v) ↦ v, None ↦ -1i64 } }
+ƒ f_toi2(x: f64, y: f64) → i64 ! ∅ { ⌥ (x * y).to_i64() { Some(v) ↦ v +% 1i64, None ↦ 77i64 } }
+ƒ f_bits(x: f64) → u64 ! ∅ { x.to_bits() }
+ƒ f_bits2(x: f64, y: f64) → u64 ! ∅ { z ≔ x * y; ⎇ z.is_nan() { 7u64 } ⇝ { z.to_bits() } }
+ƒ f_from(b: u64, y: f64) → f64 ! ∅ { core::f64_from_bits(b) + y }
+ƒ f_cast(a: i32, b: u32, c: u8) → f64 ! ∅ { (a as f64) + (b as f64) * (c as f64) }
+ƒ f_cast64(a: i64, b: u64) → f64 ! ∅ { (a as f64) - (b as f64) }
+ƒ f_cast_sz(a: usize, b: i16) → f64 ! ∅ { (a as f64) * (b as f64) }
+ƒ f_struct(x: f64, k: u8) → Q ! ∅ { Q { a: x * 0.5f64, b: k } }
+ƒ f_sarg(q: Q) → f64 ! ∅ { q.a + (q.b as f64) }
+ƒ f_loop(n: u8, x: f64) → f64 ! ∅ { μs ≔ 0.0f64; ⟳ i in 0u8..n { s ← s + x * (i as f64); } s }
+ƒ f_arr(x: f64, i: usize) → f64 ! ∅ { a ≔ [x, -x, 0.5f64]; a[i] }
+ƒ f_ref(p: &f64, y: f64) → f64 ! ∅ { *p * y }
+ƒ f_mut(p: &!f64, y: f64) ! ∅ { *p ← *p - y; }
+ƒ f_opt(x: f64, k: bool) → Option<f64> ! ∅ { ⎇ k { Some(x / 3.0f64) } ⇝ { None } }
+ƒ f_lit() → f64 ! ∅ { 0.1f64 + 0.2f64 + 1_000.000_1f64 }
+ƒ f_tup(x: f64, y: f64) → (f64, bool) ! ∅ { (x - y, x > y) }
+ƒ f_call(x: f64, y: f64) → f64 ! ∅ { f_add(x, y) * f_ar(y, x) }
+ƒ f_sl(s: &[f64], i: usize) → f64 ! ∅ { s[i] + 1.0f64 }
+ƒ f_c53(d: i8) → f64 ! ∅ { (9_007_199_254_740_992i64 +% (d as i64)) as f64 }
+ƒ f_c53n(d: i8) → f64 ! ∅ { (-9_007_199_254_740_992i64 +% (d as i64)) as f64 }
+ƒ f_c53u(d: i8) → f64 ! ∅ { (9_007_199_254_740_992u64 +% (d as u64)) as f64 }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0xF10A_7000_5EED_0005u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_F64 bodies={bodies} runs={runs} aborts={aborts}");
+    // 28 hàm `f_*` + `main` (`f_c53*`: biên ±2^53 của `CastLossy` i64/u64 → f64)
+    assert!(
+        bodies >= 29 && runs >= 4000 && aborts >= 300,
+        "oracle f64 quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH dùng `Atomic<T>` và `Mutex<T, L>::with` (ADR-P2-02 quyết định 2026-11-26: `atomicload/atomicstore/atomicrmw/cmpxchg` có thứ tự bộ
+/// nhớ GHI LẠI, thông dịch TUẦN TỰ — cùng mô hình một luồng với thông dịch MIR; `with` ⇒ `gritrt_mutex_lock` + gọi TRỰC TIẾP `f` + `unlock`, mô hình ô
+/// khoá 0/1): mọi thứ tự hợp lệ, `fetch_add/sub` bao quanh ở biên, `compare_exchange` thành công/thất bại (`Result`), Atomic qua `&`, `with` lồng trong
+/// vòng lặp và trả giá trị, `f` abort khi khoá đang giữ.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_atomics() {
+    let src = "\
+#level(\"10\")
+▢ Lo { }
+ƒ a_ld(x: u32) → u32 ! ∅ { a ≔ Atomic::new(x); a.load(AtomicOrdering::SeqCst) }
+ƒ a_add(x: u32, y: u32) → u32 ! ∅ { a ≔ Atomic::new(x); o ≔ a.fetch_add(y, AtomicOrdering::Relaxed); o +% a.load(AtomicOrdering::Acquire) }
+ƒ a_sub(x: i32, y: i32) → i32 ! ∅ { a ≔ Atomic::new(x); o ≔ a.fetch_sub(y, AtomicOrdering::AcqRel); a.load(AtomicOrdering::Relaxed) -% o }
+ƒ a_swap(x: u64, y: u64) → u64 ! ∅ { a ≔ Atomic::new(x); o ≔ a.swap(y, AtomicOrdering::Release); a.store(o +% 1u64, AtomicOrdering::Release); a.load(AtomicOrdering::SeqCst) }
+ƒ a_cas(x: u32, c: u32, n: u32) → u32 ! ∅ { a ≔ Atomic::new(x); ⌥ a.compare_exchange(c, n, AtomicOrdering::SeqCst, AtomicOrdering::Relaxed) { Ok(v) ↦ v +% a.load(AtomicOrdering::SeqCst), Err(v) ↦ 1000u32 +% v } }
+ƒ a_cas2(x: i64, k: bool) → i64 ! ∅ { a ≔ Atomic::new(x); c ≔ ⎇ k { x } ⇝ { x +% 1i64 }; r ≔ a.compare_exchange(c, 9i64, AtomicOrdering::AcqRel, AtomicOrdering::Acquire); ⌥ r { Ok(v) ↦ a.load(AtomicOrdering::SeqCst) +% v, Err(v) ↦ v } }
+ƒ bump(a: &Atomic<u32>, n: u8) ! ∅ { ⟳ i in 0u8..n { a.fetch_add(i as u32, AtomicOrdering::Relaxed); } }
+ƒ a_ref(x: u32, n: u8) → u32 ! ∅ { a ≔ Atomic::new(x); bump(&a, n); bump(&a, 2u8); a.load(AtomicOrdering::SeqCst) }
+ƒ a_ck(x: usize, y: usize) → usize ! ∅ { a ≔ Atomic::new(x); a.load(AtomicOrdering::SeqCst) + y }
+ƒ inc(v: &!u32, n: u32) → u32 ! ∅ { *v ← *v +% n; *v }
+ƒ chk(v: &!u8, n: u8) → u8 ! ∅ { *v ← *v + n; *v }
+ƒ nop(v: &!u16, n: ()) ! ∅ { *v ← *v +% 1u16; }
+ƒ m_one(x: u32, n: u32) → u32 ! {lock(Lo)} { m: Mutex<u32, Lo> ≔ Mutex::new(x); m.with(inc, n) }
+ƒ m_loop(x: u32, k: u8) → u32 ! {lock(Lo)} { m: Mutex<u32, Lo> ≔ Mutex::new(x); μs ≔ 0u32; ⟳ i in 0u8..k { s ← s +% m.with(inc, i as u32); } s }
+ƒ m_ck(x: u8, y: u8) → u8 ! {lock(Lo)} { m: Mutex<u8, Lo> ≔ Mutex::new(x); a ≔ m.with(chk, y); m.with(chk, 0u8) +% a }
+ƒ m_unit(x: u16) → u16 ! {lock(Lo)} { m: Mutex<u16, Lo> ≔ Mutex::new(x); m.with(nop, ()); m.with(nop, ()); x }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0xA70A_1C00_5EED_0006u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_ATOMIC bodies={bodies} runs={runs} aborts={aborts}");
+    // 12 hàm `a_*`/`m_*` + `inc`/`chk`/`nop` (tham số `&!`) + `main`; `bump` nhận `&Atomic` (ngoài `plain`) nên chỉ chạy qua `a_ref`
+    assert!(
+        bodies >= 16 && runs >= 1650 && aborts >= 100,
+        "oracle Atomic/Mutex quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }

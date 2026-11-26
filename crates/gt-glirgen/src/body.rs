@@ -6,12 +6,15 @@
 //! Thân generic hạ theo INSTANCE (một hàm GLIR cho mỗi `Instance{node,args}`; thân không generic = instance `args=[]`): `Lw::sub` thế tham số ở mọi
 //! chỗ đọc `Ty` của MIR (KHÔNG sao chép thân); chỗ sót vẫn fail-closed vì `lower_ty` từ chối `Ty::Param`.
 use crate::lower_ty;
-use gt_glir::{BinOp as GB, Block, CastOp, CmpPred, Func, Inst, Opd, Term, Ty as G};
+use gt_glir::{
+    AtomicOrd, BinOp as GB, Block, CastOp, CmpPred, FBinOp, FCmpPred, FUnOp, Func, Inst, Opd,
+    RmwOp, Term, Ty as G,
+};
 use gt_mir::{
     AssertKind, BinOp, Body, BodyKind, Const, Operand, Place, PlaceElem, Rvalue, StatementKind,
     TerminatorKind, UnOp,
 };
-use gt_types::{Instance, IntTy, Ty, TypeDb};
+use gt_types::{FloatTy, Instance, IntTy, Ty, TypeDb};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -129,6 +132,62 @@ fn is_secret(db: &TypeDb, t: &Ty) -> bool {
     matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Secret)))
 }
 
+fn is_lang(db: &TypeDb, t: &Ty, l: gt_types::Lang) -> bool {
+    matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(l)))
+}
+
+/// Chỉ số biến thể HẰNG của toán hạng `AtomicOrdering` (như `prescan`/`ordering_arg` của codegen): local không phép chiếu, gán ĐÚNG một lần trong thân
+/// bằng aggregate không trường của enum `AtomicOrdering`, không bị mượn `&!`, không là đích của lời gọi. Ngoài ra ⇒ `None` (không hạ: E0503 đòi tường minh).
+fn ord_const(db: &TypeDb, body: &Body, o: &Operand) -> Option<AtomicOrd> {
+    let (Operand::Copy(p) | Operand::Move(p)) = o else {
+        return None;
+    };
+    if !p.projection.is_empty() {
+        return None;
+    }
+    let ord_def = db.lang.get(&gt_types::Lang::AtomicOrdering).copied()?;
+    let (mut n, mut v) = (0usize, None);
+    for bd in &body.blocks {
+        for st in &bd.statements {
+            let StatementKind::Assign(q, rv) = &st.kind else {
+                continue;
+            };
+            if let Rvalue::Ref(_, gt_mir::BorrowKind::Unique, bp) = rv
+                && bp.local == p.local
+            {
+                n += 2;
+            }
+            if q.local == p.local {
+                n += if q.projection.is_empty() { 1 } else { 2 };
+                if let Rvalue::Aggregate(gt_mir::AggregateKind::Adt(d, k, _), ops) = rv
+                    && ops.is_empty()
+                    && *d == ord_def
+                    && q.projection.is_empty()
+                {
+                    v = Some(*k);
+                }
+            }
+        }
+        if let Some(t) = &bd.terminator
+            && let TerminatorKind::Call { dest, .. } = &t.kind
+            && dest.local == p.local
+        {
+            n += 2;
+        }
+    }
+    if n != 1 {
+        return None;
+    }
+    Some(match v? {
+        0 => AtomicOrd::Monotonic,
+        1 => AtomicOrd::Acquire,
+        2 => AtomicOrd::Release,
+        3 => AtomicOrd::AcqRel,
+        4 => AtomicOrd::SeqCst,
+        _ => return None,
+    })
+}
+
 /// `Cell<T>` (lang, `{v: T}`): chỉ đọc/ghi qua `Cell::new/get/set` (như `Intr::Cell*` của codegen: chèn/đọc/ghi trường 0)
 fn is_cell(db: &TypeDb, t: &Ty) -> bool {
     matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Cell)))
@@ -195,6 +254,7 @@ pub fn runtime_decl(name: &str) -> Option<gt_glir::Decl> {
         "gritrt_heap_alloc" => (vec![G::I64, G::I64], G::Ptr),
         "gritrt_heap_free" => (vec![G::Ptr, G::I64, G::I64], G::Void),
         "gritrt_secret_wipe" => (vec![G::Ptr, G::I64], G::Void),
+        "gritrt_mutex_lock" | "gritrt_mutex_unlock" => (vec![G::Ptr], G::Void),
         _ => return None,
     };
     Some(gt_glir::Decl {
@@ -243,7 +303,17 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32, budget: &mut u32) -> bool {
             if let Some(e) = owned_elem(db, t) {
                 return rec(&e);
             }
-            if is_cap(db, t) || is_cell(db, t) || is_secret(db, t) || plain_struct(db, def) {
+            // `Atomic<T>` = `{T}` với T số nguyên (như `atomic_slot` của codegen); `Mutex<T, L>` = `{T, i64 khoá}` (`lower_ty`)
+            if is_lang(db, t, gt_types::Lang::Atomic) {
+                return crate::variant_fields(db, *def, args, 0)
+                    .is_ok_and(|fs| matches!(fs.as_slice(), [Ty::Int(it)] if it.bits() <= 64));
+            }
+            if is_cap(db, t)
+                || is_cell(db, t)
+                || is_secret(db, t)
+                || is_lang(db, t, gt_types::Lang::Mutex)
+                || plain_struct(db, def)
+            {
                 return crate::variant_fields(db, *def, args, 0).is_ok_and(|fs| fs.iter().all(rec));
             }
             match db.adts.get(def).map(|a| &a.kind) {
@@ -253,8 +323,20 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32, budget: &mut u32) -> bool {
                 _ => false,
             }
         }
+        // `f64` (ADR-P2-02 quyết định 2026-11-26: opcode `fbin`/`funop`/`fcmp`, cast `sitofp`/`uitofp`/`fptosi`/`bitcast`)
+        Ty::Float(FloatTy::F64) => true,
         t => is_int_or_bool(t),
     }
+}
+
+/// Literal `f64` ⇒ mẫu bit: CÙNG quy tắc với codegen LLVM (`Const::Float`) và thông dịch MIR — bỏ `_`, bỏ hậu tố `f64`, `str::parse::<f64>` của Rust
+/// (làm tròn ĐÚNG về gần nhất). Đọc lỗi ⇒ không hạ (fail-closed).
+fn f64_literal(text: &str) -> Option<u64> {
+    let t = text.replace('_', "");
+    t.trim_end_matches("f64")
+        .parse::<f64>()
+        .ok()
+        .map(f64::to_bits)
 }
 
 fn gint(it: IntTy) -> G {
@@ -509,6 +591,13 @@ impl Lw<'_> {
                 Ok((Opd::Int(gint(*ty), v), Ty::Int(*ty)))
             }
             Operand::Const(Const::Bool(b)) => Ok((Opd::Int(G::I1, i128::from(*b)), Ty::Bool)),
+            Operand::Const(Const::Float {
+                text,
+                ty: FloatTy::F64,
+            }) => match f64_literal(text) {
+                Some(b) => Ok((Opd::F64(b), Ty::Float(FloatTy::F64))),
+                None => un("literal f64 không đọc được"),
+            },
             Operand::Const(Const::Char(c)) => Ok((Opd::Int(G::I32, i128::from(*c)), Ty::Char)),
             Operand::Const(Const::Str(text)) => {
                 // chuỗi hằng ⇒ global bất biến + con trỏ béo `{@global, len}` dựng trong slot phụ
@@ -591,6 +680,38 @@ impl Lw<'_> {
             ty: ty.clone(),
             a,
             b,
+        });
+        Opd::Val(d)
+    }
+    fn fbin(&mut self, op: FBinOp, a: Opd, b: Opd) -> Opd {
+        let d = self.t();
+        self.push(Inst::FBin {
+            d: d.clone(),
+            op,
+            ty: G::F64,
+            a,
+            b,
+        });
+        Opd::Val(d)
+    }
+    fn fcmp(&mut self, pred: FCmpPred, a: Opd, b: Opd) -> Opd {
+        let d = self.t();
+        self.push(Inst::FCmp {
+            d: d.clone(),
+            pred,
+            ty: G::F64,
+            a,
+            b,
+        });
+        Opd::Val(d)
+    }
+    fn fun(&mut self, op: FUnOp, v: Opd) -> Opd {
+        let d = self.t();
+        self.push(Inst::FUn {
+            d: d.clone(),
+            op,
+            ty: G::F64,
+            v,
         });
         Opd::Val(d)
     }
@@ -867,6 +988,25 @@ impl Lw<'_> {
                     _ => return un("Cell: thao tác/đối số lạ"),
                 }
             }
+            k if k.starts_with("$prelude::Atomic<") => {
+                let m = k.rsplit("::").next().unwrap_or_default();
+                self.atomic_op(m, generics, args, dest)?;
+            }
+            k if k.starts_with("$prelude::Mutex<") => {
+                let m = k.rsplit("::").next().unwrap_or_default();
+                self.mutex_op(m, args, dest)?;
+            }
+            k if k.starts_with("$prelude::f64::") || k.ends_with("core::f64_from_bits") => {
+                let m = k.rsplit("::").next().unwrap_or_default();
+                let mut vs = Vec::new();
+                for a in args {
+                    vs.push(self.operand(a)?);
+                }
+                if !generics.is_empty() {
+                    return un("f64: đối số kiểu lạ");
+                }
+                self.f64_op(m, &vs, dest)?;
+            }
             k if k.starts_with("$prelude::Text::")
                 || matches!(k, "$prelude::str::slice" | "$prelude::str::as_bytes") =>
             {
@@ -920,6 +1060,326 @@ impl Lw<'_> {
             _ => return Ok(false),
         }
         Ok(true)
+    }
+
+    /// `Atomic<T>::*` như `Intr::Atomic*` của codegen (T số nguyên ≤ 64 bit; thứ tự bộ nhớ phải là HẰNG — `ord_const`): `new` ghi trường 0;
+    /// `load/store` ⇒ `atomicload/atomicstore`; `swap/fetch_add/fetch_sub` ⇒ `atomicrmw xchg/add/sub` (trả cũ); `compare_exchange(cur, new, s, f)` ⇒
+    /// `cmpxchg` (trả cũ) + `Result<T,T>`: thẻ = cũ ≠ cur (Ok = 0, Err = 1), payload = cũ. Thứ tự không hợp lệ cho lệnh (load Release…) ⇒ không hạ.
+    fn atomic_op(&mut self, m: &str, generics: &[Ty], args: &[Operand], dest: &Place) -> R<()> {
+        let [t] = generics else {
+            return un("Atomic: sai số đối số kiểu");
+        };
+        let Ty::Int(it) = t else {
+            return un("Atomic<T>: T không phải số nguyên");
+        };
+        if it.bits() > 64 {
+            return un("Atomic 128 bit");
+        }
+        let g = gint(*it);
+        if m == "new" {
+            let [v] = args else {
+                return un("Atomic::new: sai số đối số");
+            };
+            let (v, _) = self.operand(v)?;
+            let (ptr, dty) = self.place(dest)?;
+            if !is_lang(self.db, &dty, gt_types::Lang::Atomic) {
+                return un("Atomic::new: đích không phải Atomic");
+            }
+            let f = self.vec_field(&G::Struct(vec![g.clone()]), &ptr, 0);
+            self.push(Inst::Store {
+                ty: g,
+                val: v,
+                ptr: f,
+            });
+            return Ok(());
+        }
+        let Some(recv) = args.first() else {
+            return un("Atomic: thiếu người nhận");
+        };
+        let (pa, ta) = self.operand(recv)?;
+        if !matches!(&ta, Ty::Ref(_, i) if is_lang(self.db, i, gt_types::Lang::Atomic)) {
+            return un("Atomic: người nhận không phải &Atomic");
+        }
+        let slot = self.vec_field(&G::Struct(vec![g.clone()]), &pa, 0);
+        let ord = |i: usize| ord_const(self.db, self.body, args.get(i)?);
+        let d = self.t();
+        match (m, args.len()) {
+            ("load", 2) => {
+                let o = ord(1).ok_or_else(|| Unsupported("Atomic: thứ tự không hằng".into()))?;
+                if matches!(o, AtomicOrd::Release | AtomicOrd::AcqRel) {
+                    return un("atomicload Release/AcqRel");
+                }
+                self.push(Inst::AtomicLoad {
+                    d: d.clone(),
+                    ord: o,
+                    ty: g,
+                    ptr: slot,
+                });
+                self.store(dest, Opd::Val(d), t)
+            }
+            ("store", 3) => {
+                let o = ord(2).ok_or_else(|| Unsupported("Atomic: thứ tự không hằng".into()))?;
+                if matches!(o, AtomicOrd::Acquire | AtomicOrd::AcqRel) {
+                    return un("atomicstore Acquire/AcqRel");
+                }
+                let (v, _) = self.operand(&args[1])?;
+                self.push(Inst::AtomicStore {
+                    ord: o,
+                    ty: g,
+                    val: v,
+                    ptr: slot,
+                });
+                Ok(())
+            }
+            ("swap" | "fetch_add" | "fetch_sub", 3) => {
+                let o = ord(2).ok_or_else(|| Unsupported("Atomic: thứ tự không hằng".into()))?;
+                let (v, _) = self.operand(&args[1])?;
+                let op = if m == "swap" {
+                    RmwOp::Xchg
+                } else if m == "fetch_add" {
+                    RmwOp::Add
+                } else {
+                    RmwOp::Sub
+                };
+                self.push(Inst::AtomicRmw {
+                    d: d.clone(),
+                    op,
+                    ord: o,
+                    ty: g,
+                    ptr: slot,
+                    val: v,
+                });
+                self.store(dest, Opd::Val(d), t)
+            }
+            ("compare_exchange", 5) => {
+                let (Some(s), Some(f)) = (ord(3), ord(4)) else {
+                    return un("Atomic: thứ tự không hằng");
+                };
+                if matches!(f, AtomicOrd::Release | AtomicOrd::AcqRel) {
+                    return un("cmpxchg: thứ tự thất bại Release/AcqRel");
+                }
+                let (cur, _) = self.operand(&args[1])?;
+                let (new, _) = self.operand(&args[2])?;
+                self.push(Inst::CmpXchg {
+                    d: d.clone(),
+                    succ: s,
+                    fail: f,
+                    ty: g.clone(),
+                    ptr: slot,
+                    cmp: cur.clone(),
+                    new,
+                });
+                let (ptr, dty) = self.place(dest)?;
+                // đích `Result<T, T>`: Ok(cũ) = biến thể 0 khi thành công, Err(cũ) = 1
+                let Ty::Adt(rd, rargs) = &dty else {
+                    return un("compare_exchange: đích không phải Result");
+                };
+                for v in 0..2 {
+                    let fs = crate::variant_fields(self.db, *rd, rargs, v).map_err(Unsupported)?;
+                    if fs.as_slice() != [t.clone()] {
+                        return un("compare_exchange: Result<T, T> lạ");
+                    }
+                }
+                let ge = gty(self.db, &dty)?;
+                let ne = self.cmp(CmpPred::Ne, &g, Opd::Val(d.clone()), cur);
+                let tag = self.cast(CastOp::ZExt, &G::I1, ne, &G::I64);
+                let tp = self.vec_field(&ge, &ptr, 0);
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: tag,
+                    ptr: tp,
+                });
+                let pay = self.vec_field(&ge, &ptr, 1);
+                let vp = self.vec_field(&G::Struct(vec![g.clone()]), &pay, 0);
+                self.push(Inst::Store {
+                    ty: g,
+                    val: Opd::Val(d),
+                    ptr: vp,
+                });
+                Ok(())
+            }
+            _ => un(format!("Atomic::{m}: thao tác/đối số lạ")),
+        }
+    }
+
+    /// `Mutex<T, L>::*` như `Intr::Mutex*` của codegen: `new(v)` ⇒ `{v, khoá = 0}`; `with(&m, f, a)` ⇒ `gritrt_mutex_lock(&khoá)`, gọi `f(&!m.v, a)`,
+    /// `gritrt_mutex_unlock(&khoá)`. GLIR KHÔNG có gọi gián tiếp: `f` phải là HẰNG hàm (`Const::FnItem`) ⇒ gọi TRỰC TIẾP instance của nó (codegen gọi
+    /// gián tiếp qua con trỏ hàm cùng đích); `f` là giá trị hàm động ⇒ không hạ (fail-closed).
+    fn mutex_op(&mut self, m: &str, args: &[Operand], dest: &Place) -> R<()> {
+        match (m, args) {
+            ("new", [v]) => {
+                let (v, tv) = self.operand(v)?;
+                let (ptr, dty) = self.place(dest)?;
+                if !is_lang(self.db, &dty, gt_types::Lang::Mutex) {
+                    return un("Mutex::new: đích không phải Mutex");
+                }
+                let gm = gty(self.db, &dty)?;
+                if !is_unit(&tv) {
+                    let gv = gty(self.db, &tv)?;
+                    let f0 = self.vec_field(&gm, &ptr, 0);
+                    self.push(Inst::Store {
+                        ty: gv,
+                        val: v,
+                        ptr: f0,
+                    });
+                }
+                let f1 = self.vec_field(&gm, &ptr, 1);
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: Opd::Int(G::I64, 0),
+                    ptr: f1,
+                });
+                Ok(())
+            }
+            (
+                "with",
+                [
+                    recv,
+                    Operand::Const(Const::FnItem { node, generics, .. }),
+                    a,
+                ],
+            ) => {
+                let (pm, tm) = self.operand(recv)?;
+                let Ty::Ref(_, mty) = &tm else {
+                    return un("Mutex::with: người nhận không phải &Mutex");
+                };
+                if !is_lang(self.db, mty, gt_types::Lang::Mutex) {
+                    return un("Mutex::with: người nhận không phải &Mutex");
+                }
+                let gm = gty(self.db, mty)?;
+                let inst = Instance {
+                    node: *node,
+                    args: generics.iter().map(|g| self.sub(g)).collect(),
+                };
+                let Some((name, rty)) = self.cx.sig(&inst) else {
+                    return un("Mutex::with: hàm ngoài tập con");
+                };
+                self.calls.push(inst);
+                let (av, ta) = self.operand(a)?;
+                let lock = self.vec_field(&gm, &pm, 1);
+                let val = self.vec_field(&gm, &pm, 0);
+                self.push(Inst::Call {
+                    d: None,
+                    ret: G::Void,
+                    callee: "gritrt_mutex_lock".into(),
+                    args: vec![lock.clone()],
+                });
+                let mut cargs = vec![val];
+                if !is_unit(&ta) {
+                    cargs.push(av);
+                }
+                let r = if is_unit(&rty) {
+                    self.push(Inst::Call {
+                        d: None,
+                        ret: G::Void,
+                        callee: name,
+                        args: cargs,
+                    });
+                    None
+                } else {
+                    let d = self.t();
+                    self.push(Inst::Call {
+                        d: Some(d.clone()),
+                        ret: gty(self.db, &rty)?,
+                        callee: name,
+                        args: cargs,
+                    });
+                    Some(Opd::Val(d))
+                };
+                self.push(Inst::Call {
+                    d: None,
+                    ret: G::Void,
+                    callee: "gritrt_mutex_unlock".into(),
+                    args: vec![lock],
+                });
+                if let Some(r) = r {
+                    self.store(dest, r, &rty)?;
+                }
+                Ok(())
+            }
+            _ => un(format!(
+                "Mutex::{m}: thao tác/đối số lạ (f phải là hằng hàm)"
+            )),
+        }
+    }
+
+    /// `f64::{sqrt, is_nan, to_bits, to_i64}` và `core::f64_from_bits` như `Intr::F64*` của codegen: `sqrt` ⇒ `funop fsqrt`; `is_nan` ⇒ `fcmp uno x, x`;
+    /// `to_bits`/`from_bits` ⇒ `bitcast`; `to_i64` ⇒ `Some(fptosi x)` CHỈ khi `−2^63 ≤ x < 2^63` (so sánh CÓ THỨ TỰ ⇒ NaN/±∞ ra `None`), không thì `None`.
+    fn f64_op(&mut self, m: &str, vs: &[(Opd, Ty)], dest: &Place) -> R<()> {
+        let f = Ty::Float(FloatTy::F64);
+        match (m, vs) {
+            ("sqrt", [(x, t)]) if *t == f => {
+                let r = self.fun(FUnOp::Sqrt, x.clone());
+                self.store(dest, r, &f)
+            }
+            ("is_nan", [(x, t)]) if *t == f => {
+                let r = self.fcmp(FCmpPred::Uno, x.clone(), x.clone());
+                self.store(dest, r, &Ty::Bool)
+            }
+            ("to_bits", [(x, t)]) if *t == f => {
+                let r = self.cast(CastOp::BitCast, &G::F64, x.clone(), &G::I64);
+                self.store(dest, r, &Ty::Int(IntTy::U64))
+            }
+            ("f64_from_bits", [(x, Ty::Int(IntTy::U64))]) => {
+                let r = self.cast(CastOp::BitCast, &G::I64, x.clone(), &G::F64);
+                self.store(dest, r, &f)
+            }
+            ("to_i64", [(x, t)]) if *t == f => {
+                let (ptr, dty) = self.place(dest)?;
+                // đích `Option<i64>`: biến thể 1 = `Some(i64)`
+                let Ty::Adt(od, oargs) = &dty else {
+                    return un("f64::to_i64: đích không phải Option");
+                };
+                let some = crate::variant_fields(self.db, *od, oargs, 1).map_err(Unsupported)?;
+                if some.as_slice() != [Ty::Int(IntTy::I64)] {
+                    return un("f64::to_i64: Some phải chứa đúng một i64");
+                }
+                let ge = gty(self.db, &dty)?;
+                let ge_ = self.fcmp(
+                    FCmpPred::Oge,
+                    x.clone(),
+                    Opd::F64((-9_223_372_036_854_775_808.0f64).to_bits()),
+                );
+                let lt = self.fcmp(
+                    FCmpPred::Olt,
+                    x.clone(),
+                    Opd::F64(9_223_372_036_854_775_808.0f64.to_bits()),
+                );
+                let inr = self.bin(GB::And, &G::I1, ge_, lt);
+                self.extra += 1;
+                let k = self.extra;
+                let (yes, no, end) = (
+                    format!("rt{k}.some"),
+                    format!("rt{k}.none"),
+                    format!("rt{k}.end"),
+                );
+                self.finish(Term::CondBr(inr, yes.clone(), no.clone()), Some(yes));
+                let tag = self.vec_field(&ge, &ptr, 0);
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: Opd::Int(G::I64, 1),
+                    ptr: tag,
+                });
+                let pay = self.vec_field(&ge, &ptr, 1);
+                let vp = self.vec_field(&G::Struct(vec![G::I64]), &pay, 0);
+                let iv = self.cast(CastOp::FPToSI, &G::F64, x.clone(), &G::I64);
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: iv,
+                    ptr: vp,
+                });
+                self.finish(Term::Br(end.clone()), Some(no));
+                let tag = self.vec_field(&ge, &ptr, 0);
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: Opd::Int(G::I64, 0),
+                    ptr: tag,
+                });
+                self.finish(Term::Br(end.clone()), Some(end));
+                Ok(())
+            }
+            _ => un(format!("f64::{m}: thao tác/đối số lạ")),
+        }
     }
 
     /// trường `idx` của `Vec` mà `p` trỏ tới (kiểu GLIR `gv` của Vec)
@@ -1985,6 +2445,7 @@ impl Lw<'_> {
                     (UnOp::Not, Ty::Bool) => self.bin(GB::Xor, &G::I1, v, Opd::Int(G::I1, 1)),
                     (UnOp::Not, Ty::Int(_)) => self.bin(GB::Xor, &g, v, Opd::Int(g.clone(), -1)),
                     (UnOp::Neg, Ty::Int(_)) => self.bin(GB::Sub, &g, Opd::Int(g.clone(), 0), v),
+                    (UnOp::Neg, Ty::Float(FloatTy::F64)) => self.fun(FUnOp::Neg, v),
                     _ => return un("UnaryOp trên kiểu lạ"),
                 };
                 self.store(dest, r, &ty)
@@ -1992,6 +2453,22 @@ impl Lw<'_> {
             Rvalue::Cast(o, to) => {
                 let to = &self.sub(to);
                 let (v, from) = self.operand(o)?;
+                // số nguyên → f64: `sitofp`/`uitofp` như codegen (mất chính xác ngoài |x| ≤ 2^53 đã chặn bởi `Assert CastLossy` của MIR); f64 → f64: giữ
+                match (&from, to) {
+                    (Ty::Int(fi), Ty::Float(FloatTy::F64)) if fi.bits() <= 64 => {
+                        let op = if fi.signed() {
+                            CastOp::SIToFP
+                        } else {
+                            CastOp::UIToFP
+                        };
+                        let r = self.cast(op, &gint(*fi), v, &G::F64);
+                        return self.store(dest, r, to);
+                    }
+                    (Ty::Float(FloatTy::F64), Ty::Float(FloatTy::F64)) => {
+                        return self.store(dest, v, to);
+                    }
+                    _ => {}
+                }
                 // `u8 as char` (như `cast` của codegen): mọi u8 là giá trị vô hướng hợp lệ ⇒ nới không dấu lên i32
                 if !matches!(
                     (&from, to),
@@ -2033,6 +2510,24 @@ impl Lw<'_> {
                 if matches!(from, Ty::Bool) || matches!((&from, to), (Ty::Int(IntTy::U8), Ty::Char))
                 {
                     return self.store(dest, one, &Ty::Bool);
+                }
+                // số nguyên → f64 CHÍNH XÁC ⇔ |x| ≤ 2^53 (như `cast_fits` của codegen): ≤ 32 bit luôn đúng; có dấu: (x + 2^53) ≤ 2^54 KHÔNG dấu
+                // (bao quanh 64 bit); không dấu: x ≤ 2^53
+                if let (Ty::Int(fi), Ty::Float(FloatTy::F64)) = (&from, to) {
+                    if fi.bits() > 64 {
+                        return un("CastFits 128 bit");
+                    }
+                    if fi.bits() <= 32 {
+                        return self.store(dest, one, &Ty::Bool);
+                    }
+                    let lim = 1i128 << 53;
+                    let ok = if fi.signed() {
+                        let sh = self.bin(GB::Add, &G::I64, v, Opd::Int(G::I64, lim));
+                        self.cmp(CmpPred::Ule, &G::I64, sh, Opd::Int(G::I64, lim * 2))
+                    } else {
+                        self.cmp(CmpPred::Ule, &G::I64, v, Opd::Int(G::I64, lim))
+                    };
+                    return self.store(dest, ok, &Ty::Bool);
                 }
                 let (Ty::Int(fi), Ty::Int(ti)) = (&from, to) else {
                     return un("CastFits ngoài int→int");
@@ -2290,6 +2785,29 @@ impl Lw<'_> {
     }
 
     fn binop(&mut self, op: BinOp, ta: &Ty, a: Opd, b: Opd) -> R<(Opd, Ty)> {
+        if *ta == Ty::Float(FloatTy::F64) {
+            // như codegen: `fadd/fsub/fmul/fdiv` (không cờ), so sánh có thứ tự `o*`, `!=` = `une`
+            let arith = |o| (Some(o), None);
+            let rel = |p| (None, Some(p));
+            let (ar, cp) = match op {
+                BinOp::Add => arith(FBinOp::Add),
+                BinOp::Sub => arith(FBinOp::Sub),
+                BinOp::Mul => arith(FBinOp::Mul),
+                BinOp::Div => arith(FBinOp::Div),
+                BinOp::Lt => rel(FCmpPred::Olt),
+                BinOp::Le => rel(FCmpPred::Ole),
+                BinOp::Gt => rel(FCmpPred::Ogt),
+                BinOp::Ge => rel(FCmpPred::Oge),
+                BinOp::Eq => rel(FCmpPred::Oeq),
+                BinOp::Ne => rel(FCmpPred::Une),
+                _ => return un("BinaryOp f64 lạ"),
+            };
+            return Ok(match (ar, cp) {
+                (Some(o), _) => (self.fbin(o, a, b), ta.clone()),
+                (None, Some(p)) => (self.fcmp(p, a, b), Ty::Bool),
+                (None, None) => return un("BinaryOp f64 lạ"),
+            });
+        }
         let (g, signed) = match ta {
             Ty::Int(it) => (gint(*it), it.signed()),
             Ty::Bool => (G::I1, false),
@@ -2409,6 +2927,9 @@ impl Lw<'_> {
             } => {
                 let (d, ty) = self.operand(discr)?;
                 let g = gty(self.db, &ty)?;
+                if !g.is_int() {
+                    return un("SwitchInt trên kiểu không nguyên");
+                }
                 for (k, (val, tgt)) in targets.iter().enumerate() {
                     let c = self.cmp(
                         CmpPred::Eq,
