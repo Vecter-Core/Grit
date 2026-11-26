@@ -1,4 +1,4 @@
-//! Hạ MỘT thân MIR (`BodyKind::Fn`, tập con vô hướng) sang hàm GLIR (ADR-P2-02 C3; thiết kế theo cố vấn Opus 2026-11-25).
+//! Hạ MỘT thân MIR (`BodyKind::Fn`, hoặc thân hợp đồng `Pre`/`Post` được gọi tới; tập con vô hướng) sang hàm GLIR (ADR-P2-02 C3; thiết kế theo cố vấn Opus 2026-11-25).
 //! Mỗi local MIR là một slot `$lN` có kiểu; mọi lần dùng là `load`, mọi lần ghi là `store` (khớp `alloca` của codegen LLVM; mem2reg để sau).
 //! `Assert` ⇒ `condbr` tới khối đích hoặc một khối riêng chỉ chứa `abort <loại>` (một khối cho MỖI Assert). Mọi thứ ngoài tập con ⇒ `Unsupported(lý do)`.
 //! Tập con: kiểu `Int`(≤ 64 bit)/`Bool`/`()`/tuple `(Int, Bool)`; `Use`, `BinaryOp`(số học bao quanh, so sánh, `BitAnd`, `Div/Rem`), `CheckedBinaryOp`(Add/Sub/Mul),
@@ -1358,7 +1358,13 @@ pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lower
         db,
         keys: &mir.keys,
         defs: &t.resolve.defs,
-        bodies: fns.iter().map(|b| (b.node, *b)).collect(),
+        // thân hợp đồng `⊳`/`⊲` (M7 chèn lời gọi tới chúng tại điểm gọi — FB-P2-03): hạ theo nhu cầu như hàm thường (codegen LLVM cũng vậy)
+        bodies: mir
+            .bodies
+            .iter()
+            .filter(|b| matches!(b.kind, BodyKind::Fn | BodyKind::Pre | BodyKind::Post))
+            .map(|b| (b.node, b))
+            .collect(),
         sigs: RefCell::new(Sigs::new()),
     };
     let mut ok: BTreeMap<String, (Instance, Func)> = BTreeMap::new();
@@ -1512,8 +1518,8 @@ fn lower_inst(
     inst: &Instance,
 ) -> R<(Func, Vec<gt_glir::Global>, Vec<Instance>)> {
     let db = cx.db;
-    if body.kind != BodyKind::Fn {
-        return un("không phải thân Fn");
+    if !matches!(body.kind, BodyKind::Fn | BodyKind::Pre | BodyKind::Post) {
+        return un("không phải thân Fn/hợp đồng");
     }
     let params = db.fn_params(body.sig_node);
     if params.len() != inst.args.len() {

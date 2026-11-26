@@ -33,15 +33,14 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
             continue;
         };
         let Some(art) = res.open_gate() else { continue };
-        let fns: Vec<&gt_mir::Body> = art
-            .mir
+        let mir = glir_input_mir(art);
+        let fns: Vec<&gt_mir::Body> = mir
             .bodies
             .iter()
             .filter(|b| b.kind == gt_mir::BodyKind::Fn)
             .collect();
         total += fns.len();
-        let has_body: std::collections::BTreeSet<_> =
-            art.mir.bodies.iter().map(|b| b.node).collect();
+        let has_body: std::collections::BTreeSet<_> = mir.bodies.iter().map(|b| b.node).collect();
         for b in &fns {
             let mut keys: Vec<String> = Vec::new();
             for bd in &b.blocks {
@@ -55,13 +54,7 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
                 }) = &bd.terminator
                     && !has_body.contains(node)
                 {
-                    keys.push(
-                        art.mir
-                            .keys
-                            .get(node)
-                            .cloned()
-                            .unwrap_or_else(|| "?".into()),
-                    );
+                    keys.push(mir.keys.get(node).cloned().unwrap_or_else(|| "?".into()));
                 }
             }
             let distinct: std::collections::BTreeSet<_> = keys.iter().cloned().collect();
@@ -72,7 +65,7 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
                 nobody.entry(k).or_default().1 += 1;
             }
         }
-        let lo = gt_glirgen::lower_module(&art.types, &art.mir);
+        let lo = gt_glirgen::lower_module(&art.types, &mir);
         for (_, _, u) in &lo.bad {
             *why.entry(u.0.clone()).or_default() += 1;
         }
@@ -105,7 +98,12 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
         for f in &m.funcs {
             inst_ok += 1;
             let inst = &lo.funcs[&f.name];
-            let b = fns.iter().find(|b| b.node == inst.node).expect("thân gốc");
+            // thân gốc: hàm hoặc thân hợp đồng `⊳`/`⊲` (FB-P2-03)
+            let b = mir
+                .bodies
+                .iter()
+                .find(|b| b.node == inst.node)
+                .expect("thân gốc");
             let cover = gt_glirgen::check_abort_cover(b, f);
             assert!(cover.is_empty(), "{}: {cover:?}", b.key);
         }
@@ -131,9 +129,10 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     for (k, (n, nb)) in &by {
         eprintln!("  callee không thân: {n:5} lời gọi trong {nb:4} thân  {k}");
     }
-    // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25; lời gọi runtime Arena — 2026-11-26
+    // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25; lời gọi runtime Arena — 2026-11-26 (3524/13385 đo trên MIR
+    // TRƯỚC M7); FB-P2-03 — 2026-11-26: đo lại trên MIR SAU M7 (đầu vào của codegen; thêm thân hợp đồng ⊳/⊲ làm instance): 3523/13404
     assert!(
-        lowered >= 3524 && inst_ok >= 13385,
+        lowered >= 3523 && inst_ok >= 13404,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -429,13 +428,13 @@ fn diff_src(
         return (0, 0, 0, 0);
     };
     let db = &art.types.db;
-    let lo = gt_glirgen::lower_module(&art.types, &art.mir);
+    let mir = glir_input_mir(art);
+    let lo = gt_glirgen::lower_module(&art.types, &mir);
     let module = &lo.module;
     // tối đa 4 instance generic cho MỖI thân (mẫu bùng nổ instance gần trần E0317 sinh hàng nghìn instance cùng thân)
     let mut per_body: BTreeMap<gt_ast::NodeId, usize> = BTreeMap::new();
     for (gname, inst) in &lo.funcs {
-        let Some(b) = art
-            .mir
+        let Some(b) = mir
             .bodies
             .iter()
             .find(|b| b.kind == gt_mir::BodyKind::Fn && b.node == inst.node)
@@ -474,7 +473,7 @@ fn diff_src(
         // không tham số ⇒ tất định: một lượt là đủ
         let iters = if ptys.is_empty() { 1 } else { iters };
         for _ in 0..iters {
-            let mut mi = Interp::new(&art.mir, 200_000).with_types(&art.types);
+            let mut mi = Interp::new(&mir, 200_000).with_types(&art.types);
             let mut margs: Vec<V> = Vec::new();
             let mut gargs: Vec<Arg> = Vec::new();
             // (kiểu pointee, tham chiếu MIR, số phần tử nếu là slice/str) của từng tham số tham chiếu, theo thứ tự
@@ -715,8 +714,8 @@ fn abort_cover_check_catches_a_dropped_abort_block() {
     )
     .expect("check");
     let art = res.open_gate().expect("cổng");
-    let b = art
-        .mir
+    let mir = glir_input_mir(art);
+    let b = mir
         .bodies
         .iter()
         .find(|b| b.key == "main::add")
@@ -942,11 +941,12 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arenas() {
     );
 }
 
-/// MIR làm đầu vào cho hạ GLIR (và cho thông dịch MIR của oracle). PHẢI là MIR mà codegen LLVM nhận (`native.rs`: `art.obl.bodies`).
+/// MIR làm đầu vào cho hạ GLIR (và cho thông dịch MIR của oracle). PHẢI là MIR mà codegen LLVM nhận (`native.rs`: `art.obl.bodies`) — FB-P2-03:
+/// thân SAU M7 (Assert tiền điều kiện đã chèn tại điểm gọi, Assert chứng minh được đã xoá), cùng khoá với `art.mir`.
 fn glir_input_mir(art: &gt_driver::Artifacts) -> gt_mir::MirOutput {
     gt_mir::MirOutput {
         report: art.mir.report.clone(),
-        bodies: art.mir.bodies.clone(),
+        bodies: art.obl.bodies.clone(),
         keys: art.mir.keys.clone(),
     }
 }
