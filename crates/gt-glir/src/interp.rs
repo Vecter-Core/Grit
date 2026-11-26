@@ -2,6 +2,7 @@
 //! Mỗi slot là một vùng byte có cỡ do `layout` (bố cục GLIR) quyết định; con trỏ là `(vùng, offset)` và mang NGUỒN GỐC (provenance) khi nằm trong bộ nhớ.
 //! Hành vi KHÔNG xác định trả `Ub` (KHÔNG phải `Abort`) để một bước hạ quên chốt chặn lộ ra: chia 0, `MIN/-1`, dịch ≥ độ rộng, đọc byte chưa ghi, con trỏ ngoài vùng,
 //! đọc con trỏ từ byte không phải mảnh con trỏ nguyên vẹn, gọi hàm ngoài module. Chương trình hạ đúng không bao giờ chạm `Ub`.
+//! Hàm `declare` (runtime) CHỈ chạy được khi có MÔ HÌNH tham chiếu ở [`runtime_model_sig`] VÀ khai báo của module trùng chữ ký mô hình; ngoài ra ⇒ `Ub`.
 use crate::layout::{field_offset, layout};
 use crate::{BinOp, CastOp, CmpPred, Func, Inst, Module, Opd, Term, Ty};
 use std::cell::RefCell;
@@ -112,7 +113,7 @@ impl St<'_> {
     }
     fn live(&self, a: usize) -> Result<(), String> {
         if self.freed.borrow().contains(&a) {
-            return Err("dùng slot của khung đã trả về (con trỏ treo)".into());
+            return Err("dùng vùng đã giải phóng (slot của khung đã trả về hoặc Arena đã reset: con trỏ treo)".into());
         }
         Ok(())
     }
@@ -307,11 +308,18 @@ pub fn run_module_refs(
         })
         .collect();
     let funcs = m.funcs.iter().map(|g| (g.name.as_str(), g)).collect();
+    let decls = m
+        .decls
+        .iter()
+        .map(|d| (d.name.as_str(), (d.params.clone(), d.ret.clone())))
+        .collect();
     let glob = Glob {
         gl,
         nro,
         funcs,
+        decls,
         freed: RefCell::new(BTreeSet::new()),
+        arenas: RefCell::new(Vec::new()),
     };
     let mut out = exec(f, &vals, &mut fuel, 0, &mut mem, &glob);
     if let Outcome::Ptr(a, _) = out
@@ -351,7 +359,83 @@ struct Glob<'m> {
     nro: usize,
     /// chỉ mục tên hàm → hàm (tra callee không tuyến tính theo số hàm của module)
     funcs: BTreeMap<&'m str, &'m Func>,
+    /// `declare` của module: tên → (kiểu tham số, kiểu trả)
+    decls: BTreeMap<&'m str, (Vec<Ty>, Ty)>,
     freed: RefCell<BTreeSet<usize>>,
+    /// mô hình Arena của runtime: tay cầm (chỉ số, như `gritrt_arena_new`) → các vùng đã cấp từ nó (chưa `reset`)
+    arenas: RefCell<Vec<Vec<usize>>>,
+}
+
+/// Chữ ký (tham số, trả về) của các hàm runtime CÓ mô hình tham chiếu trong thông dịch — đúng chữ ký codegen LLVM phát cho `gritrt_*` cùng tên
+/// (`runtime/gt-rt`). Hàm `declare` không có ở đây ⇒ gọi tới là `Ub`.
+#[must_use]
+pub fn runtime_model_sig(name: &str) -> Option<(Vec<Ty>, Ty)> {
+    Some(match name {
+        "gritrt_arena_new" => (Vec::new(), Ty::I32),
+        "gritrt_arena_alloc" => (vec![Ty::I32, Ty::I64, Ty::I64], Ty::Ptr),
+        "gritrt_arena_reset" => (vec![Ty::I32], Ty::Void),
+        _ => return None,
+    })
+}
+
+/// Mô hình tham chiếu của một hàm runtime (bộ nhớ Arena KHÔNG giới hạn, như thông dịch MIR; hết bộ nhớ thật ⇒ abort chỉ kiểm trên exe):
+/// `arena_new` ⇒ tay cầm mới (0, 1, … như runtime); `arena_alloc(h, size, align)` ⇒ vùng MỚI `size` byte chưa ghi (tay cầm lạ hoặc `align` không phải
+/// luỹ thừa 2 ≤ 4096 ⇒ `Ub`: runtime abort, bước hạ đúng không bao giờ gây ra); `arena_reset(h)` ⇒ mọi vùng cấp từ `h` thành ĐÃ GIẢI PHÓNG (truy cập sau ⇒ `Ub`).
+fn runtime_call(
+    name: &str,
+    vals: &[Val],
+    mem: &mut Vec<Vec<Byte>>,
+    glob: &Glob<'_>,
+) -> Result<Option<Val>, Outcome> {
+    let ub = |m: &str| Outcome::Ub(format!("@{name}: {m}"));
+    let (Some(want), Some(have)) = (runtime_model_sig(name), glob.decls.get(name)) else {
+        return Err(ub("gọi hàm ngoài module không có mô hình runtime"));
+    };
+    if want != *have {
+        return Err(ub("`declare` sai chữ ký so với runtime"));
+    }
+    let ints: Vec<u128> = vals
+        .iter()
+        .map(|v| match v {
+            Val::Int(x) => Ok(*x),
+            Val::Ptr(..) | Val::Agg(_) => Err(ub("đối số không phải số nguyên")),
+        })
+        .collect::<Result<_, _>>()?;
+    if ints.len() != want.0.len() {
+        return Err(ub("sai số đối số"));
+    }
+    let mut arenas = glob.arenas.borrow_mut();
+    let handle = |h: u128| -> Result<usize, Outcome> {
+        usize::try_from(h)
+            .ok()
+            .filter(|k| *k < arenas.len())
+            .ok_or_else(|| ub("tay cầm Arena không tồn tại"))
+    };
+    match name {
+        "gritrt_arena_new" => {
+            arenas.push(Vec::new());
+            Ok(Some(Val::Int((arenas.len() - 1) as u128)))
+        }
+        "gritrt_arena_alloc" => {
+            let k = handle(ints[0])?;
+            let (size, align) = (ints[1], ints[2]);
+            if !align.is_power_of_two() || align > 4096 {
+                return Err(ub("căn lề không hợp lệ"));
+            }
+            if size > u128::from(MAX_SLOT_BYTES) {
+                return Err(Outcome::OutOfFuel);
+            }
+            mem.push(vec![Byte::Uninit; size as usize]);
+            arenas[k].push(mem.len() - 1);
+            Ok(Some(Val::Ptr(mem.len() - 1, 0)))
+        }
+        "gritrt_arena_reset" => {
+            let k = handle(ints[0])?;
+            glob.freed.borrow_mut().extend(arenas[k].drain(..));
+            Ok(None)
+        }
+        _ => Err(ub("không có mô hình runtime")),
+    }
 }
 
 /// Chạy một khung; khi khung kết thúc (bất kể kết quả) các vùng slot của nó bị đánh dấu đã giải phóng (FB-G2-04).
@@ -457,7 +541,15 @@ fn exec_frame(
                     }
                 }
                 let Some(g) = glob.funcs.get(callee.as_str()).copied() else {
-                    return ub(format!("gọi @{callee} ngoài module"));
+                    match runtime_call(callee, &vals, st.mem, glob) {
+                        Ok(v) => {
+                            if let (Some(d), Some(v)) = (d, v) {
+                                st.env.insert(d.clone(), v);
+                            }
+                        }
+                        Err(o) => return o,
+                    }
+                    continue;
                 };
                 match exec(g, &vals, fuel, depth + 1, st.mem, glob) {
                     Outcome::Value(v) => {

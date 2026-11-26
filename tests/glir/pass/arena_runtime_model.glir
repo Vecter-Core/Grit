@@ -1,0 +1,25 @@
+// expect: pass
+// note: lời gọi runtime Arena (declare): hai arena, cấp, reset arena B không làm treo con trỏ của arena A; %k=1 ⇒ đọc con trỏ của B sau reset (Ub)
+glir 1
+declare @gritrt_arena_new() -> i32
+declare @gritrt_arena_alloc(i32, i64, i64) -> ptr
+declare @gritrt_arena_reset(i32) -> void
+fn @two(%k: i1) -> i32 {
+entry:
+  %a = call i32 @gritrt_arena_new()
+  %b = call i32 @gritrt_arena_new()
+  %p = call ptr @gritrt_arena_alloc(%a, i64 4, i64 4)
+  store i32 i32 40, %p
+  %q = call ptr @gritrt_arena_alloc(%b, i64 4, i64 4)
+  store i32 i32 2, %q
+  %x = load i32 %q
+  call void @gritrt_arena_reset(%b)
+  condbr %k, bad, ok
+ok:
+  %y = load i32 %p
+  %r = bin add i32 %y, %x
+  ret i32 %r
+bad:
+  %z = load i32 %q
+  ret i32 %z
+}

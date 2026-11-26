@@ -1126,6 +1126,12 @@ impl<'a> Interp<'a> {
                 V::Unit
             }));
         }
+        if key == "$prelude::Arena::alloc"
+            && let [_, v] = vals
+        {
+            // công cụ test (NGOÀI TCB): ô mới trong kho khung 0, sống suốt lần chạy (không mô phỏng `reset`: M6 bảo đảm không còn tham chiếu vào nội dung)
+            return Ok(Some(self.leak(v.clone())));
+        }
         if !(is("Cell") || is("Mutex") || is("Atomic")) {
             return Ok(None);
         }

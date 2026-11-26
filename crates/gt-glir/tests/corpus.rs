@@ -91,7 +91,7 @@ fn the_parser_never_panics_on_truncated_or_mangled_input() {
 /// Thông dịch theo byte: kết quả tính tay của các mẫu bộ nhớ (E2E: chạy `pass/*.glir` có tên cố định).
 #[test]
 fn byte_memory_interpreter_runs_hand_checked_samples() {
-    use gt_glir::interp::{Outcome, run};
+    use gt_glir::interp::{Outcome, run, run_module};
     let load = |name: &str| {
         gt_glir::parse(
             &std::fs::read_to_string(
@@ -113,6 +113,16 @@ fn byte_memory_interpreter_runs_hand_checked_samples() {
     assert!(matches!(run(&m.funcs[0], &[9], 1000), Outcome::Ub(_)));
     assert!(matches!(
         run(&m.funcs[0], &[u64::MAX as u128], 1000),
+        Outcome::Ub(_)
+    ));
+    // mô hình runtime Arena: 40 + 2; đọc vùng của arena đã reset ⇒ Ub; `declare` sai chữ ký so với runtime ⇒ Ub
+    let m = load("arena_runtime_model.glir");
+    assert_eq!(run_module(&m, "two", &[0], 1000), Outcome::Value(Some(42)));
+    assert!(matches!(run_module(&m, "two", &[1], 1000), Outcome::Ub(_)));
+    let mut bad = m.clone();
+    bad.decls[1].params[1] = gt_glir::Ty::I32;
+    assert!(matches!(
+        run_module(&bad, "two", &[0], 1000),
         Outcome::Ub(_)
     ));
 }

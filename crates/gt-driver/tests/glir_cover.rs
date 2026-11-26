@@ -131,9 +131,9 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     for (k, (n, nb)) in &by {
         eprintln!("  callee không thân: {n:5} lời gọi trong {nb:4} thân  {k}");
     }
-    // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25
+    // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25; lời gọi runtime Arena — 2026-11-26
     assert!(
-        lowered >= 3495 && inst_ok >= 13356,
+        lowered >= 3524 && inst_ok >= 13385,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -900,5 +900,44 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_generics() {
     assert!(
         generic >= 23 && runs >= 5000 && aborts >= 100,
         "oracle generic quá nhỏ: instances={insts} generic={generic} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH dùng `Arena` (lời gọi RUNTIME ⇒ `declare @gritrt_arena_*`; ADR-P2-02): cấp số/struct/enum/mảng/`()`, hai lần cấp cùng arena, `reset` rồi
+/// cấp lại, hai arena (reset arena KIA không được làm treo con trỏ của arena này), truyền `&Arena` qua hàm, cấp trong vòng lặp, tràn sau khi đọc qua con trỏ arena.
+/// GLIR chạy MÔ HÌNH runtime (`gt_glir::interp::runtime_model_sig`: vùng mới mỗi lần cấp, `reset` giải phóng ⇒ đọc sau là `Ub`) so với thông dịch MIR.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arenas() {
+    let src = "\
+▢ P { a: u8, b: i32 }
+⊔ E { A, B(u16), C(i32, bool) }
+⊐ Copy for E { }
+ƒ one(x: i32) → i32 ! {mem} { a ≔ Arena::new(); p ≔ a.alloc(x); *p +% 1i32 }
+ƒ two(x: i32, y: u8) → i32 ! {mem} { a ≔ Arena::new(); p ≔ a.alloc(x); q ≔ a.alloc(y); *p +% (*q as i32) }
+ƒ st(x: u8, y: i32) → i32 ! {mem} { a ≔ Arena::new(); p ≔ a.alloc(P { a: x, b: y }); p.b +% (p.a as i32) }
+ƒ rs(x: i32, y: i32) → i32 ! {mem} { μa ≔ Arena::new(); p ≔ a.alloc(x); v ≔ *p; a.reset(); q ≔ a.alloc(y); v +% *q }
+ƒ put(a: &Arena, x: i32) → i32 ! {mem} { p ≔ a.alloc(x); *p }
+ƒ via(x: i32) → i32 ! {mem} { a ≔ Arena::new(); put(&a, x) +% put(&a, 2i32) }
+ƒ two_ar(x: i32, y: i32) → i32 ! {mem} { a ≔ Arena::new(); μb ≔ Arena::new(); p ≔ a.alloc(x); b.reset(); q ≔ b.alloc(y); *p +% *q }
+ƒ en(x: u16, k: bool) → u16 ! {mem} { a ≔ Arena::new(); e ≔ ⎇ k { E::B(x) } ⇝ { E::A }; p ≔ a.alloc(e); ⌥ *p { E::B(v) ↦ v, E::A ↦ 1u16, E::C(z, w) ↦ 2u16 } }
+ƒ arr(x: u32, i: usize) → u32 ! {mem} { a ≔ Arena::new(); p ≔ a.alloc([x, 1u32, 2u32]); p[i] }
+ƒ lp(n: u8) → i32 ! {mem} { a ≔ Arena::new(); μs ≔ 0i32; ⟳ i in 0u8..n { p ≔ a.alloc(i as i32); s ← s +% *p; } s }
+ƒ ck(x: i32, y: i32) → i32 ! {mem} { a ≔ Arena::new(); p ≔ a.alloc(x); *p + y }
+ƒ unit_alloc(x: u8) → u8 ! {mem} { a ≔ Arena::new(); p ≔ a.alloc(()); x }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0xA7E4_A000_1234_5678u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_ARENA bodies={bodies} runs={runs} aborts={aborts}");
+    // MỌI hàm có chữ ký plain phải hạ được và được so (11 hàm dùng Arena + `main`; `put` nhận `&Arena` nên không chạy trực tiếp)
+    assert!(
+        bodies >= 12 && runs >= 1500 && aborts >= 50,
+        "oracle arena quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }

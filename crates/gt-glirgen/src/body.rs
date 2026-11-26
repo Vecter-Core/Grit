@@ -113,6 +113,29 @@ fn plain_struct(db: &TypeDb, def: &gt_resolve::DefId) -> bool {
         .is_some_and(|a| matches!(a.kind, gt_types::AdtKind::Struct(_)) && a.lang.is_none())
 }
 
+/// `Arena` (lang, `{x: i32}` = tay cầm runtime): chỉ được tạo/dùng qua lời gọi runtime (`Arena::new/alloc/reset`)
+fn is_arena(db: &TypeDb, t: &Ty) -> bool {
+    matches!(t, Ty::Adt(def, args) if args.is_empty()
+        && db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Arena)))
+}
+
+/// Khai báo của hàm runtime mà GLIR được phép gọi: tên và chữ ký ĐÚNG như codegen LLVM phát (`gt-codegen-llvm` `Intr::Arena*`; bảng `RUNTIME`
+/// của gt-guard). Tên ngoài bảng ⇒ `None` (không hạ).
+#[must_use]
+pub fn runtime_decl(name: &str) -> Option<gt_glir::Decl> {
+    let (params, ret) = match name {
+        "gritrt_arena_new" => (Vec::new(), G::I32),
+        "gritrt_arena_alloc" => (vec![G::I32, G::I64, G::I64], G::Ptr),
+        "gritrt_arena_reset" => (vec![G::I32], G::Void),
+        _ => return None,
+    };
+    Some(gt_glir::Decl {
+        name: name.to_string(),
+        params,
+        ret,
+    })
+}
+
 fn in_subset(db: &TypeDb, t: &Ty) -> bool {
     in_sub(db, t, 0)
 }
@@ -130,6 +153,9 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32) -> bool {
         },
         Ty::Array(e, n) => *n <= 4096 && in_sub(db, e, depth + 1),
         Ty::Adt(def, args) => {
+            if is_arena(db, t) {
+                return true;
+            }
             if plain_struct(db, def) {
                 return crate::variant_fields(db, *def, args, 0)
                     .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)));
@@ -494,6 +520,115 @@ impl Lw<'_> {
         });
         Opd::Val(d)
     }
+    /// tay cầm `i32` của Arena mà `p` (kiểu `&Arena`/`&!Arena`) trỏ tới
+    fn arena_handle(&mut self, p: Opd) -> Opd {
+        let f = self.t();
+        self.push(Inst::FieldPtr {
+            d: f.clone(),
+            ty: G::Struct(vec![G::I32]),
+            ptr: p,
+            idx: 0,
+        });
+        let h = self.t();
+        self.push(Inst::Load {
+            d: h.clone(),
+            ty: G::I32,
+            ptr: Opd::Val(f),
+        });
+        Opd::Val(h)
+    }
+
+    /// Lời gọi intrinsic runtime (callee KHÔNG có thân MIR) ⇒ `call @gritrt_*` tới một `declare` (đúng như codegen LLVM). `Ok(false)`: không phải intrinsic
+    /// được hỗ trợ. Đối số được tính THEO THỨ TỰ trước khi gọi (như `vals` của codegen).
+    fn runtime_call(
+        &mut self,
+        key: &str,
+        generics: &[Ty],
+        args: &[Operand],
+        dest: &Place,
+    ) -> R<bool> {
+        match key {
+            "$prelude::Arena::new" => {
+                if !args.is_empty() || !generics.is_empty() {
+                    return un("Arena::new: sai số đối số");
+                }
+                let h = self.t();
+                self.push(Inst::Call {
+                    d: Some(h.clone()),
+                    ret: G::I32,
+                    callee: "gritrt_arena_new".into(),
+                    args: Vec::new(),
+                });
+                let (ptr, dty) = self.place(dest)?;
+                if !is_arena(self.db, &dty) {
+                    return un("Arena::new: đích không phải Arena");
+                }
+                let f = self.t();
+                self.push(Inst::FieldPtr {
+                    d: f.clone(),
+                    ty: G::Struct(vec![G::I32]),
+                    ptr,
+                    idx: 0,
+                });
+                self.push(Inst::Store {
+                    ty: G::I32,
+                    val: Opd::Val(h),
+                    ptr: Opd::Val(f),
+                });
+            }
+            "$prelude::Arena::alloc" => {
+                let ([a, v], [t]) = (args, generics) else {
+                    return un("Arena::alloc: sai số đối số");
+                };
+                let (pa, ta) = self.operand(a)?;
+                if !matches!(&ta, Ty::Ref(_, i) if is_arena(self.db, i)) {
+                    return un("Arena::alloc: người nhận không phải &Arena");
+                }
+                let (pv, _) = self.operand(v)?;
+                let g = gty(self.db, t)?;
+                let l = gt_glir::layout::layout(&g);
+                let h = self.arena_handle(pa);
+                let p = self.t();
+                self.push(Inst::Call {
+                    d: Some(p.clone()),
+                    ret: G::Ptr,
+                    callee: "gritrt_arena_alloc".into(),
+                    args: vec![
+                        h,
+                        Opd::Int(G::I64, i128::from(l.size)),
+                        Opd::Int(G::I64, i128::from(l.align.max(1))),
+                    ],
+                });
+                if !is_unit(t) {
+                    self.push(Inst::Store {
+                        ty: g,
+                        val: pv,
+                        ptr: Opd::Val(p.clone()),
+                    });
+                }
+                self.store(dest, Opd::Val(p), &Ty::Ref(false, Box::new(t.clone())))?;
+            }
+            "$prelude::Arena::reset" => {
+                let [a] = args else {
+                    return un("Arena::reset: sai số đối số");
+                };
+                let (pa, ta) = self.operand(a)?;
+                if !matches!(&ta, Ty::Ref(true, i) if is_arena(self.db, i)) {
+                    return un("Arena::reset: người nhận không phải &!Arena");
+                }
+                let h = self.arena_handle(pa);
+                self.push(Inst::Call {
+                    d: None,
+                    ret: G::Void,
+                    callee: "gritrt_arena_reset".into(),
+                    args: vec![h],
+                });
+            }
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+
     fn block_name(b: usize) -> String {
         format!("bb{b}")
     }
@@ -1046,6 +1181,19 @@ impl Lw<'_> {
                     self.finish(Term::Br(Self::block_name(tg.index())), None);
                     return Ok(());
                 }
+                if let gt_mir::Callee::Fn { node, generics } = callee
+                    && !self.cx.bodies.contains_key(node)
+                    && let Some(key) = self.cx.keys.get(node)
+                {
+                    let Some(tg) = target else {
+                        return un("Call không trở về");
+                    };
+                    let gs: Vec<Ty> = generics.iter().map(|g| self.sub(g)).collect();
+                    if self.runtime_call(key, &gs, args, dest)? {
+                        self.finish(Term::Br(Self::block_name(tg.index())), None);
+                        return Ok(());
+                    }
+                }
                 let inst = match callee {
                     gt_mir::Callee::Fn { node, generics } => Instance {
                         node: *node,
@@ -1303,10 +1451,10 @@ pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lower
         let drop: Vec<String> = ok
             .values()
             .filter(|(_, f)| {
-                f.blocks
-                    .iter()
-                    .flat_map(|b| &b.insts)
-                    .any(|i| matches!(i, Inst::Call { callee, .. } if !names.contains(callee)))
+                f.blocks.iter().flat_map(|b| &b.insts).any(|i| {
+                    matches!(i, Inst::Call { callee, .. }
+                            if !names.contains(callee) && runtime_decl(callee).is_none())
+                })
             })
             .map(|(_, f)| f.name.clone())
             .collect();
@@ -1320,6 +1468,18 @@ pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lower
             }
         }
     }
+    // `declare` cho MỌI hàm runtime mà các hàm còn lại gọi (theo tên, tất định)
+    let decls: Vec<gt_glir::Decl> = ok
+        .values()
+        .flat_map(|(_, f)| f.blocks.iter().flat_map(|b| &b.insts))
+        .filter_map(|i| match i {
+            Inst::Call { callee, .. } if !ok.contains_key(callee) => Some(callee.clone()),
+            _ => None,
+        })
+        .collect::<std::collections::BTreeSet<_>>()
+        .iter()
+        .filter_map(|n| runtime_decl(n))
+        .collect();
     let seen_nodes: std::collections::BTreeSet<gt_ast::NodeId> =
         seen.iter().map(|i| i.node).collect();
     let funcs = ok
@@ -1332,7 +1492,7 @@ pub fn lower_module(t: &gt_types::TypesOutput, mir: &gt_mir::MirOutput) -> Lower
                 .into_iter()
                 .map(|(name, bytes)| gt_glir::Global { name, bytes })
                 .collect(),
-            decls: Vec::new(),
+            decls,
             funcs: ok.into_values().map(|(_, f)| f).collect(),
         },
         funcs,

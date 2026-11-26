@@ -119,4 +119,5 @@ fn lower_inner(db: &TypeDb, ty: &Ty, depth: u32) -> Result<G, String> {
 pub mod body;
 pub use body::{
     Lowered, Sigs, Unsupported, check_abort_cover, glir_name, inst_name, lower_body, lower_module,
+    runtime_decl,
 };
