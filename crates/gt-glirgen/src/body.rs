@@ -146,6 +146,22 @@ fn vec_elem(db: &TypeDb, t: &Ty) -> Option<Ty> {
     }
 }
 
+/// `Text<'a>` (lang, `{bytes: Vec<'a, u8>}`): kiểu trường `bytes` (chỉ tạo/dùng qua intrinsic `Text::*`, như `Intr::Text*` của codegen)
+fn text_vec(db: &TypeDb, t: &Ty) -> Option<Ty> {
+    let Ty::Adt(def, args) = t else { return None };
+    if db
+        .adts
+        .get(def)
+        .is_none_or(|a| a.lang != Some(gt_types::Lang::Text))
+    {
+        return None;
+    }
+    match crate::variant_fields(db, *def, args, 0).ok()?.as_slice() {
+        [v] if vec_elem(db, v) == Some(Ty::Int(IntTy::U8)) => Some(v.clone()),
+        _ => None,
+    }
+}
+
 /// Khai báo của hàm runtime mà GLIR được phép gọi: tên và chữ ký ĐÚNG như codegen LLVM phát (`gt-codegen-llvm` `Intr::Arena*`; bảng `RUNTIME`
 /// của gt-guard). Tên ngoài bảng ⇒ `None` (không hạ).
 #[must_use]
@@ -154,6 +170,7 @@ pub fn runtime_decl(name: &str) -> Option<gt_glir::Decl> {
         "gritrt_arena_new" => (Vec::new(), G::I32),
         "gritrt_arena_alloc" => (vec![G::I32, G::I64, G::I64], G::Ptr),
         "gritrt_arena_reset" => (vec![G::I32], G::Void),
+        "gritrt_utf8_valid" => (vec![G::Ptr, G::I64], G::I32),
         _ => return None,
     };
     Some(gt_glir::Decl {
@@ -195,6 +212,9 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32, budget: &mut u32) -> bool {
             }
             if let Some(e) = vec_elem(db, t) {
                 return rec(&e);
+            }
+            if let Some(v) = text_vec(db, t) {
+                return rec(&v);
             }
             if is_cap(db, t) || is_cell(db, t) || plain_struct(db, def) {
                 return crate::variant_fields(db, *def, args, 0).is_ok_and(|fs| fs.iter().all(rec));
@@ -820,6 +840,23 @@ impl Lw<'_> {
                     _ => return un("Cell: thao tác/đối số lạ"),
                 }
             }
+            k if k.starts_with("$prelude::Text::")
+                || matches!(k, "$prelude::str::slice" | "$prelude::str::as_bytes") =>
+            {
+                let m = k.rsplit("::").next().unwrap_or_default();
+                let mut vs = Vec::new();
+                for a in args {
+                    vs.push(self.operand(a)?);
+                }
+                if !generics.is_empty() {
+                    return un("Text/str: đối số kiểu lạ");
+                }
+                if k.starts_with("$prelude::str::") {
+                    self.str_op(m, &vs, dest)?;
+                } else {
+                    self.text_op(m, &vs, dest)?;
+                }
+            }
             k if k.starts_with("$prelude::Vec<") => {
                 let m = k.rsplit("::").next().unwrap_or_default();
                 let mut vs = Vec::new();
@@ -966,6 +1003,417 @@ impl Lw<'_> {
         });
     }
 
+    /// ghi `{arena, null, 0, 0}` vào Vec tại `ptr` (`Intr::VecNew`/`TextNew` của codegen: không cấp phát tới lần thêm đầu)
+    fn vec_init(&mut self, gv: &G, ptr: &Opd, arena: Opd) {
+        for (i, v) in [
+            (0, arena),
+            (1, Opd::Null),
+            (2, Opd::Int(G::I64, 0)),
+            (3, Opd::Int(G::I64, 0)),
+        ] {
+            let f = self.vec_field(gv, ptr, i);
+            self.push(Inst::Store {
+                ty: if i < 2 { G::Ptr } else { G::I64 },
+                val: v,
+                ptr: f,
+            });
+        }
+    }
+
+    /// `vec_extend` của codegen: thêm `n` byte từ `src` vào cuối `Vec<u8>` tại `base`: `len + n` tràn ⇒ abort `overflow`; `len + n > cap` ⇒ cấp khối
+    /// mới `max(16, max(cap·2 (tràn ⇒ overflow), len + n))`; sao chép `n` byte (VÒNG LẶP thay cho `memcpy`); `len ← len + n`.
+    fn vec_extend(&mut self, gv: &G, base: &Opd, src: Opd, n: Opd) {
+        let lp = self.vec_field(gv, base, 2);
+        let len = self.load_val(G::I64, lp.clone());
+        let cp = self.vec_field(gv, base, 3);
+        let cap = self.load_val(G::I64, cp);
+        let sum = self.bin(GB::Add, &G::I64, len.clone(), n.clone());
+        let ok = self.cmp(CmpPred::Uge, &G::I64, sum.clone(), len.clone());
+        self.guard(ok, "overflow");
+        let need = self.cmp(CmpPred::Ugt, &G::I64, sum.clone(), cap.clone());
+        self.extra += 1;
+        let k = self.extra;
+        let (grow, copy) = (format!("rt{k}.ext"), format!("rt{k}.extc"));
+        self.finish(Term::CondBr(need, grow.clone(), copy.clone()), Some(grow));
+        let (dbl, o) = self.umul_ovf(cap, Opd::Int(G::I64, 2));
+        let ok = self.bin(GB::Xor, &G::I1, o, Opd::Int(G::I1, 1));
+        self.guard(ok, "overflow");
+        let lt = self.cmp(CmpPred::Ult, &G::I64, dbl.clone(), sum.clone());
+        let m1 = self.t();
+        self.push(Inst::Select {
+            d: m1.clone(),
+            ty: G::I64,
+            c: lt,
+            a: sum.clone(),
+            b: dbl,
+        });
+        let lt16 = self.cmp(
+            CmpPred::Ult,
+            &G::I64,
+            Opd::Val(m1.clone()),
+            Opd::Int(G::I64, 16),
+        );
+        let nc = self.t();
+        self.push(Inst::Select {
+            d: nc.clone(),
+            ty: G::I64,
+            c: lt16,
+            a: Opd::Int(G::I64, 16),
+            b: Opd::Val(m1),
+        });
+        self.vec_grow_to(gv, base, Opd::Val(nc), &G::I8, false);
+        self.finish(Term::Br(copy.clone()), Some(copy));
+        let pp = self.vec_field(gv, base, 1);
+        let cur = self.load_val(G::Ptr, pp);
+        // for i in 0..n { cur[len + i] ← src[i] }
+        let ctr = format!("vx{k}");
+        self.aux_slots.push((ctr.clone(), G::I64));
+        self.push(Inst::Store {
+            ty: G::I64,
+            val: Opd::Int(G::I64, 0),
+            ptr: Opd::Slot(ctr.clone()),
+        });
+        let (head, body, exit) = (
+            format!("rt{k}.xh"),
+            format!("rt{k}.xb"),
+            format!("rt{k}.xx"),
+        );
+        self.finish(Term::Br(head.clone()), Some(head.clone()));
+        let i = self.load_val(G::I64, Opd::Slot(ctr.clone()));
+        let c = self.cmp(CmpPred::Ult, &G::I64, i.clone(), n);
+        self.finish(Term::CondBr(c, body.clone(), exit.clone()), Some(body));
+        let s = self.t();
+        self.push(Inst::IndexPtr {
+            d: s.clone(),
+            elem: G::I8,
+            ptr: src,
+            idx: i.clone(),
+        });
+        let v = self.load_val(G::I8, Opd::Val(s));
+        let at = self.bin(GB::Add, &G::I64, len, i.clone());
+        let d = self.t();
+        self.push(Inst::IndexPtr {
+            d: d.clone(),
+            elem: G::I8,
+            ptr: cur,
+            idx: at,
+        });
+        self.push(Inst::Store {
+            ty: G::I8,
+            val: v,
+            ptr: Opd::Val(d),
+        });
+        let i1 = self.bin(GB::Add, &G::I64, i, Opd::Int(G::I64, 1));
+        self.push(Inst::Store {
+            ty: G::I64,
+            val: i1,
+            ptr: Opd::Slot(ctr),
+        });
+        self.finish(Term::Br(head), Some(exit));
+        self.push(Inst::Store {
+            ty: G::I64,
+            val: sum,
+            ptr: lp,
+        });
+    }
+
+    /// `(ptr, len)` của con trỏ béo `v` (giá trị `{ptr, i64}`), qua một slot phụ
+    fn split_fat(&mut self, v: Opd) -> (Opd, Opd) {
+        let fat = G::Struct(vec![G::Ptr, G::I64]);
+        self.extra += 1;
+        let sname = format!("fat{}", self.extra);
+        self.aux_slots.push((sname.clone(), fat.clone()));
+        self.push(Inst::Store {
+            ty: fat.clone(),
+            val: v,
+            ptr: Opd::Slot(sname.clone()),
+        });
+        let f0 = self.vec_field(&fat, &Opd::Slot(sname.clone()), 0);
+        let p = self.load_val(G::Ptr, f0);
+        let f1 = self.vec_field(&fat, &Opd::Slot(sname), 1);
+        let n = self.load_val(G::I64, f1);
+        (p, n)
+    }
+
+    /// ghi con trỏ béo `{p, n}` vào chỗ `dest` (kiểu `&str`/`&[u8]`)
+    fn store_fat(&mut self, dest: &Place, p: Opd, n: Opd) -> R<()> {
+        let (dptr, dty) = self.place(dest)?;
+        if !matches!(&dty, Ty::Ref(_, s) if matches!(**s, Ty::Str | Ty::Slice(_))) {
+            return un("đích không phải con trỏ béo");
+        }
+        let fat = gty(self.db, &dty)?;
+        let f0 = self.vec_field(&fat, &dptr, 0);
+        self.push(Inst::Store {
+            ty: G::Ptr,
+            val: p,
+            ptr: f0,
+        });
+        let f1 = self.vec_field(&fat, &dptr, 1);
+        self.push(Inst::Store {
+            ty: G::I64,
+            val: n,
+            ptr: f1,
+        });
+        Ok(())
+    }
+
+    /// `utf8_valid` của codegen: `gritrt_utf8_valid(p, n) ≠ 0` (i1)
+    fn utf8_valid(&mut self, p: Opd, n: Opd) -> Opd {
+        let r = self.t();
+        self.push(Inst::Call {
+            d: Some(r.clone()),
+            ret: G::I32,
+            callee: "gritrt_utf8_valid".into(),
+            args: vec![p, n],
+        });
+        self.cmp(CmpPred::Ne, &G::I32, Opd::Val(r), Opd::Int(G::I32, 0))
+    }
+
+    /// `Text::*` như `Intr::Text*` của codegen: Text = `{Vec<u8>}`; `new` ⇒ Vec rỗng; `push_str`/`push_utf8` (hợp lệ) ⇒ `vec_extend`;
+    /// `push_char` ⇒ mã hoá UTF-8 1–4 byte vào bộ đệm `[4 × i8]` rồi `vec_extend`; `from_utf8` ⇒ `Some(Text{…})`/`None` theo `gritrt_utf8_valid`;
+    /// `len`/`as_str`/`as_bytes` đọc trường của Vec.
+    fn text_op(&mut self, m: &str, vs: &[(Opd, Ty)], dest: &Place) -> R<()> {
+        match (m, vs) {
+            ("new", [(a, ta)]) => {
+                if !matches!(ta, Ty::Ref(_, i) if is_arena(self.db, i)) {
+                    return un("Text::new: đối số không phải &Arena");
+                }
+                let (ptr, dty) = self.place(dest)?;
+                let Some(vt) = text_vec(self.db, &dty) else {
+                    return un("Text::new: đích không phải Text");
+                };
+                let (gt, gv) = (gty(self.db, &dty)?, gty(self.db, &vt)?);
+                let vp = self.vec_field(&gt, &ptr, 0);
+                self.vec_init(&gv, &vp, a.clone());
+            }
+            ("from_utf8", [(a, ta), (b, Ty::Ref(_, bs))])
+                if **bs == Ty::Slice(Box::new(Ty::Int(IntTy::U8))) =>
+            {
+                if !matches!(ta, Ty::Ref(_, i) if is_arena(self.db, i)) {
+                    return un("Text::from_utf8: đối số không phải &Arena");
+                }
+                let (ptr, dty) = self.place(dest)?;
+                // đích `Option<Text>`: biến thể 1 = `Some(Text)`
+                let Ty::Adt(od, oargs) = &dty else {
+                    return un("Text::from_utf8: đích không phải Option");
+                };
+                let some = crate::variant_fields(self.db, *od, oargs, 1).map_err(Unsupported)?;
+                let [tt] = some.as_slice() else {
+                    return un("Text::from_utf8: Some phải có đúng một trường");
+                };
+                let Some(vt) = text_vec(self.db, tt) else {
+                    return un("Text::from_utf8: Some không chứa Text");
+                };
+                let (ge, gt, gv) = (gty(self.db, &dty)?, gty(self.db, tt)?, gty(self.db, &vt)?);
+                let (p, n) = self.split_fat(b.clone());
+                let valid = self.utf8_valid(p.clone(), n.clone());
+                self.extra += 1;
+                let k = self.extra;
+                let (yes, no, end) = (
+                    format!("rt{k}.some"),
+                    format!("rt{k}.none"),
+                    format!("rt{k}.end"),
+                );
+                self.finish(Term::CondBr(valid, yes.clone(), no.clone()), Some(yes));
+                let tag = self.vec_field(&ge, &ptr, 0);
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: Opd::Int(G::I64, 1),
+                    ptr: tag,
+                });
+                let pay = self.vec_field(&ge, &ptr, 1);
+                let tp = self.vec_field(&G::Struct(vec![gt.clone()]), &pay, 0);
+                let vp = self.vec_field(&gt, &tp, 0);
+                self.vec_init(&gv, &vp, a.clone());
+                self.vec_extend(&gv, &vp, p, n);
+                self.finish(Term::Br(end.clone()), Some(no));
+                let tag = self.vec_field(&ge, &ptr, 0);
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: Opd::Int(G::I64, 0),
+                    ptr: tag,
+                });
+                self.finish(Term::Br(end.clone()), Some(end));
+            }
+            (_, [(base, Ty::Ref(_, inner)), rest @ ..]) => {
+                let Some(vt) = text_vec(self.db, inner) else {
+                    return un("Text: người nhận không phải Text");
+                };
+                let (gt, gv) = (gty(self.db, inner)?, gty(self.db, &vt)?);
+                let vp = self.vec_field(&gt, base, 0);
+                match (m, rest) {
+                    ("len", []) => {
+                        let lp = self.vec_field(&gv, &vp, 2);
+                        let len = self.load_val(G::I64, lp);
+                        self.store(dest, len, &Ty::Int(IntTy::Usize))?;
+                    }
+                    ("as_str" | "as_bytes", []) => {
+                        let pp = self.vec_field(&gv, &vp, 1);
+                        let p = self.load_val(G::Ptr, pp);
+                        let lp = self.vec_field(&gv, &vp, 2);
+                        let len = self.load_val(G::I64, lp);
+                        self.store_fat(dest, p, len)?;
+                    }
+                    ("push_str", [(s, Ty::Ref(_, st))]) if **st == Ty::Str => {
+                        let (p, n) = self.split_fat(s.clone());
+                        self.vec_extend(&gv, &vp, p, n);
+                    }
+                    ("push_utf8", [(s, Ty::Ref(_, st))])
+                        if **st == Ty::Slice(Box::new(Ty::Int(IntTy::U8))) =>
+                    {
+                        let (p, n) = self.split_fat(s.clone());
+                        let valid = self.utf8_valid(p.clone(), n.clone());
+                        self.extra += 1;
+                        let k = self.extra;
+                        let (yes, done) = (format!("rt{k}.u8y"), format!("rt{k}.u8d"));
+                        self.finish(
+                            Term::CondBr(valid.clone(), yes.clone(), done.clone()),
+                            Some(yes),
+                        );
+                        self.vec_extend(&gv, &vp, p, n);
+                        self.finish(Term::Br(done.clone()), Some(done));
+                        self.store(dest, valid, &Ty::Bool)?;
+                    }
+                    ("push_char", [(c, Ty::Char)]) => {
+                        let (buf, n) = self.utf8_encode(c.clone());
+                        self.vec_extend(&gv, &vp, buf, n);
+                    }
+                    _ => return un(format!("Text::{m}: thao tác/đối số lạ")),
+                }
+            }
+            _ => return un(format!("Text::{m}: thao tác/đối số lạ")),
+        }
+        Ok(())
+    }
+
+    /// `text_push_char` của codegen: mã hoá `c` (i32, giá trị vô hướng hợp lệ) thành 1–4 byte UTF-8 trong slot phụ `[4 × i8]` bằng `select`
+    /// (không nhánh); trả `(con trỏ bộ đệm, số byte: i64)`.
+    fn utf8_encode(&mut self, c: Opd) -> (Opd, Opd) {
+        let g = G::I32;
+        let k = |v: i128| Opd::Int(G::I32, v);
+        let l1 = self.cmp(CmpPred::Ult, &g, c.clone(), k(0x80));
+        let l2 = self.cmp(CmpPred::Ult, &g, c.clone(), k(0x800));
+        let l3 = self.cmp(CmpPred::Ult, &g, c.clone(), k(0x1_0000));
+        let sel = |lw: &mut Self, cnd: Opd, a: Opd, b: Opd| -> Opd {
+            let d = lw.t();
+            lw.push(Inst::Select {
+                d: d.clone(),
+                ty: G::I32,
+                c: cnd,
+                a,
+                b,
+            });
+            Opd::Val(d)
+        };
+        let n4 = sel(self, l3.clone(), k(3), k(4));
+        let n3 = sel(self, l2.clone(), k(2), n4);
+        let nn = sel(self, l1.clone(), k(1), n3);
+        let hdr = |lw: &mut Self, s: i128, m: i128| -> Opd {
+            let x = lw.bin(GB::LShr, &G::I32, c.clone(), k(s));
+            lw.bin(GB::Or, &G::I32, x, k(m))
+        };
+        let h2 = hdr(self, 6, 0xC0);
+        let h3 = hdr(self, 12, 0xE0);
+        let h4 = hdr(self, 18, 0xF0);
+        let t34 = sel(self, l3, h3, h4);
+        let t = sel(self, l2, h2, t34);
+        let b0 = sel(self, l1, c.clone(), t);
+        let cont = |lw: &mut Self, s: i128| -> Opd {
+            let x = if s == 0 {
+                c.clone()
+            } else {
+                lw.bin(GB::LShr, &G::I32, c.clone(), k(s))
+            };
+            let x = lw.bin(GB::And, &G::I32, x, k(0x3F));
+            lw.bin(GB::Or, &G::I32, x, k(0x80))
+        };
+        let (c0, c6, c12) = (cont(self, 0), cont(self, 6), cont(self, 12));
+        let e2 = self.cmp(CmpPred::Eq, &g, nn.clone(), k(2));
+        let e3 = self.cmp(CmpPred::Eq, &g, nn.clone(), k(3));
+        let b1b = sel(self, e3.clone(), c6.clone(), c12);
+        let b1 = sel(self, e2, c0.clone(), b1b);
+        let b2 = sel(self, e3, c0.clone(), c6);
+        let buf_ty = G::Array(Box::new(G::I8), 4);
+        self.extra += 1;
+        let buf = format!("u8buf{}", self.extra);
+        self.aux_slots.push((buf.clone(), buf_ty));
+        for (i, v) in [b0, b1, b2, c0].into_iter().enumerate() {
+            let p = self.t();
+            self.push(Inst::IndexPtr {
+                d: p.clone(),
+                elem: G::I8,
+                ptr: Opd::Slot(buf.clone()),
+                idx: Opd::Int(G::I64, i as i128),
+            });
+            let tb = self.cast(CastOp::Trunc, &G::I32, v, &G::I8);
+            self.push(Inst::Store {
+                ty: G::I8,
+                val: tb,
+                ptr: Opd::Val(p),
+            });
+        }
+        let n64 = self.cast(CastOp::ZExt, &G::I32, nn, &G::I64);
+        (Opd::Slot(buf), n64)
+    }
+
+    /// `str::slice` (`str_slice` của codegen): `from ≤ to ≤ len` và hai đầu ở BIÊN KÝ TỰ (`idx = len` hoặc byte tại `idx` không phải byte nối
+    /// `10xxxxxx`); sai ⇒ abort `slice_range` (4 chốt như codegen). `str::as_bytes` ⇒ cùng con trỏ béo.
+    fn str_op(&mut self, m: &str, vs: &[(Opd, Ty)], dest: &Place) -> R<()> {
+        match (m, vs) {
+            ("as_bytes", [(s, Ty::Ref(_, st))]) if **st == Ty::Str => {
+                let (p, n) = self.split_fat(s.clone());
+                self.store_fat(dest, p, n)
+            }
+            (
+                "slice",
+                [
+                    (s, Ty::Ref(_, st)),
+                    (from, Ty::Int(IntTy::Usize)),
+                    (to, Ty::Int(IntTy::Usize)),
+                ],
+            ) if **st == Ty::Str => {
+                let (p, n) = self.split_fat(s.clone());
+                let c1 = self.cmp(CmpPred::Ule, &G::I64, from.clone(), to.clone());
+                self.guard(c1, "slice_range");
+                let c2 = self.cmp(CmpPred::Ule, &G::I64, to.clone(), n.clone());
+                self.guard(c2, "slice_range");
+                for idx in [from, to] {
+                    let at_end = self.cmp(CmpPred::Eq, &G::I64, idx.clone(), n.clone());
+                    self.extra += 1;
+                    let k = self.extra;
+                    let (chk, join, bad) = (
+                        format!("rt{k}.bchk"),
+                        format!("rt{k}.bok"),
+                        format!("rt{k}.abort"),
+                    );
+                    self.finish(Term::CondBr(at_end, join.clone(), chk.clone()), Some(chk));
+                    let bp = self.t();
+                    self.push(Inst::IndexPtr {
+                        d: bp.clone(),
+                        elem: G::I8,
+                        ptr: p.clone(),
+                        idx: idx.clone(),
+                    });
+                    let byte = self.load_val(G::I8, Opd::Val(bp));
+                    let masked = self.bin(GB::And, &G::I8, byte, Opd::Int(G::I8, 0xC0));
+                    let ok = self.cmp(CmpPred::Ne, &G::I8, masked, Opd::Int(G::I8, 0x80));
+                    self.finish(Term::CondBr(ok, join.clone(), bad.clone()), Some(bad));
+                    self.finish(Term::Abort("slice_range".into()), Some(join));
+                }
+                let np = self.t();
+                self.push(Inst::IndexPtr {
+                    d: np.clone(),
+                    elem: G::I8,
+                    ptr: p,
+                    idx: from.clone(),
+                });
+                let nl = self.bin(GB::Sub, &G::I64, to.clone(), from.clone());
+                self.store_fat(dest, Opd::Val(np), nl)
+            }
+            _ => un(format!("str::{m}: thao tác/đối số lạ")),
+        }
+    }
+
     /// `Vec<T>::*` như `Intr::Vec*` của codegen: `new` ⇒ `{arena, null, 0, 0}`; `len`/`as_slice`/`as_mut_slice` đọc trường; `truncate` ⇒
     /// `len ← min(n, len)`; `reserve(n)` ⇒ `n > cap` thì cấp đúng `n`; `push` ⇒ `len = cap` thì `cap·2` (tràn ⇒ abort `overflow`, tối thiểu 4) rồi ghi.
     fn vec_op(&mut self, m: &str, vs: &[(Opd, Ty)], dest: &Place) -> R<()> {
@@ -978,19 +1426,7 @@ impl Lw<'_> {
                 return un("Vec::new: đích không phải Vec");
             }
             let gv = gty(self.db, &dty)?;
-            for (i, v) in [
-                (0, a.clone()),
-                (1, Opd::Null),
-                (2, Opd::Int(G::I64, 0)),
-                (3, Opd::Int(G::I64, 0)),
-            ] {
-                let f = self.vec_field(&gv, &ptr, i);
-                self.push(Inst::Store {
-                    ty: if i < 2 { G::Ptr } else { G::I64 },
-                    val: v,
-                    ptr: f,
-                });
-            }
+            self.vec_init(&gv, &ptr, a.clone());
             return Ok(());
         }
         let [(base, Ty::Ref(_, inner)), rest @ ..] = vs else {
@@ -1205,9 +1641,13 @@ impl Lw<'_> {
             Rvalue::Cast(o, to) => {
                 let to = &self.sub(to);
                 let (v, from) = self.operand(o)?;
-                let (Ty::Int(_) | Ty::Bool | Ty::Char, Ty::Int(_)) = (&from, to) else {
-                    return un("Cast ngoài int/bool→int");
-                };
+                // `u8 as char` (như `cast` của codegen): mọi u8 là giá trị vô hướng hợp lệ ⇒ nới không dấu lên i32
+                if !matches!(
+                    (&from, to),
+                    (Ty::Int(_) | Ty::Bool | Ty::Char, Ty::Int(_)) | (Ty::Int(IntTy::U8), Ty::Char)
+                ) {
+                    return un("Cast ngoài int/bool→int, u8→char");
+                }
                 if let Ty::Int(it) = to
                     && it.bits() > 64
                 {

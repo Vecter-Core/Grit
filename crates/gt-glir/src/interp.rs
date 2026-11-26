@@ -381,6 +381,7 @@ pub fn runtime_model_sig(name: &str) -> Option<(Vec<Ty>, Ty)> {
         "gritrt_arena_new" => (Vec::new(), Ty::I32),
         "gritrt_arena_alloc" => (vec![Ty::I32, Ty::I64, Ty::I64], Ty::Ptr),
         "gritrt_arena_reset" => (vec![Ty::I32], Ty::Void),
+        "gritrt_utf8_valid" => (vec![Ty::Ptr, Ty::I64], Ty::I32),
         _ => return None,
     })
 }
@@ -400,6 +401,33 @@ fn runtime_call(
     };
     if want != *have {
         return Err(ub("`declare` sai chữ ký so với runtime"));
+    }
+    if name == "gritrt_utf8_valid" {
+        // `gritrt_utf8_valid(p, n)`: n = 0 ⇒ 1 (không đọc p, kể cả null); ngược lại 1 ⇔ n byte tại p là UTF-8 hợp lệ (RFC 3629, như
+        // `std::str::from_utf8` của runtime). Byte chưa ghi/mảnh con trỏ/ngoài vùng/vùng đã giải phóng ⇒ `Ub`.
+        let [Val::Ptr(a, off), Val::Int(n)] = vals else {
+            return Err(ub("đối số phải là (ptr, i64)"));
+        };
+        if *n == 0 {
+            return Ok(Some(Val::Int(1)));
+        }
+        if *a >= mem.len() || glob.freed.borrow().contains(a) {
+            return Err(ub("đọc qua con trỏ null/treo"));
+        }
+        let end = u64::try_from(*n).ok().and_then(|n| off.checked_add(n));
+        let Some(bs) = end.and_then(|e| mem[*a].get(*off as usize..e as usize)) else {
+            return Err(ub("đọc ngoài vùng"));
+        };
+        let bytes: Vec<u8> = bs
+            .iter()
+            .map(|b| match b {
+                Byte::B(x) => Ok(*x),
+                _ => Err(ub("đọc byte chưa ghi/mảnh con trỏ")),
+            })
+            .collect::<Result<_, _>>()?;
+        return Ok(Some(Val::Int(u128::from(
+            std::str::from_utf8(&bytes).is_ok(),
+        ))));
     }
     let ints: Vec<u128> = vals
         .iter()

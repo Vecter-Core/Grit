@@ -132,9 +132,10 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25; lời gọi runtime Arena — 2026-11-26 (3524/13385 đo trên MIR
     // TRƯỚC M7); FB-P2-03 — 2026-11-26: đo lại trên MIR SAU M7 (đầu vào của codegen; thêm thân hợp đồng ⊳/⊲ làm instance): 3523/13404;
     // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415; `Cell::new/get/set` — 2026-11-26: 3534/13418;
-    // trần độ sâu `in_subset` 8 → 128 + ngân sách nút (tuple lồng sâu của `e0317_*`) — 2026-11-26: 3548/21610; `Vec::*` — 2026-11-26: 3563/21625
+    // trần độ sâu `in_subset` 8 → 128 + ngân sách nút (tuple lồng sâu của `e0317_*`) — 2026-11-26: 3548/21610; `Vec::*` — 2026-11-26: 3563/21625;
+    // `Text::*`, `str::slice/as_bytes`, `u8 as char` — 2026-11-26: 3568/21630
     assert!(
-        lowered >= 3563 && inst_ok >= 21625,
+        lowered >= 3568 && inst_ok >= 21630,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -1200,5 +1201,42 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_vecs() {
     assert!(
         bodies >= 17 && runs >= 1800 && aborts >= 350,
         "oracle Vec quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH dùng `Text`/`str::slice`/`str::as_bytes` (intrinsic không thân MIR; hạ như `Intr::Text*`/`StrSlice` của codegen: Text = `{Vec<u8>}`,
+/// `vec_extend` tăng trưởng tối thiểu 16, `push_char` mã hoá UTF-8 1–4 byte bằng `select`, `push_utf8`/`from_utf8` qua `gritrt_utf8_valid` (mô hình runtime
+/// của GLIR interp), `slice` 4 chốt `slice_range` gồm BIÊN KÝ TỰ): chuỗi tham số nhiều byte, kiểm biên, tràn `u8` khi cộng.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_texts() {
+    let src = "\
+ƒ t_new_len() → usize ! {mem} { a ≔ Arena::new(); t ≔ Text::new(&a); t.len() }
+ƒ t_push(s: &str) → usize ! {mem} { a ≔ Arena::new(); μt ≔ Text::new(&a); t.push_str(s); t.push_str(s); t.len() }
+ƒ t_byte(s: &str, i: usize) → u8 ! {mem} { a ≔ Arena::new(); μt ≔ Text::new(&a); t.push_str(s); t.push_str(\"xy\"); b ≔ t.as_bytes(); b[i] }
+ƒ t_char(k: u8, i: usize) → u8 ! {mem} { a ≔ Arena::new(); μt ≔ Text::new(&a); ⌥ k % 5u8 { 0u8 ↦ t.push_char('a'), 1u8 ↦ t.push_char('é'), 2u8 ↦ t.push_char('日'), 3u8 ↦ t.push_char('😀'), _ ↦ t.push_char((k % 128u8) as char) } t.push_char('ß'); b ≔ t.as_bytes(); b[i] +% (t.len() as u8) }
+ƒ t_cnum(k: u8) → usize ! {mem} { a ≔ Arena::new(); μt ≔ Text::new(&a); t.push_char(k as char); t.len() }
+ƒ t_slice(s: &str, x: usize, y: usize) → usize ! ∅ { u ≔ s.slice(x, y); u.len() }
+ƒ t_slice_byte(s: &str, x: usize, y: usize, i: usize) → u8 ! ∅ { u ≔ s.slice(x, y); b ≔ u.as_bytes(); b[i] }
+ƒ t_utf8(x: u8, y: u8) → usize ! {mem} { a ≔ Arena::new(); μt ≔ Text::new(&a); t.push_str(\"q\"); arr ≔ [x, y]; ok ≔ t.push_utf8(&arr); ⎇ ok { t.len() } ⇝ { 999usize +% t.len() } }
+ƒ t_from(x: u8, y: u8, z: u8) → usize ! {mem} { a ≔ Arena::new(); arr ≔ [x, y, z]; ⌥ Text::from_utf8(&a, &arr) { Some(t) ↦ t.len() +% (t.as_bytes()[0usize] as usize), None ↦ 77usize } }
+ƒ t_as_str(s: &str, x: usize) → usize ! {mem} { a ≔ Arena::new(); μt ≔ Text::new(&a); t.push_str(s); v ≔ t.as_str(); w ≔ v.slice(x, v.len()); w.len() }
+ƒ t_grow(n: u8, i: usize) → u8 ! {mem} { a ≔ Arena::new(); μt ≔ Text::new(&a); ⟳ k in 0u8..n { t.push_str(\"abc\"); t.push_char('é'); } b ≔ t.as_bytes(); b[i] }
+ƒ t_lit() → usize ! {mem} { a ≔ Arena::new(); μt ≔ Text::new(&a); t.push_str(\"héllo\"); t.push_char('ß'); t.len() }
+ƒ t_bytes_of(s: &str, i: usize) → u8 ! ∅ { b ≔ s.as_bytes(); b[i] }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0x7E47_0000_5EED_0002u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_TEXT bodies={bodies} runs={runs} aborts={aborts}");
+    // 13 hàm + `main`
+    assert!(
+        bodies >= 14 && runs >= 1200 && aborts >= 600,
+        "oracle Text quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
