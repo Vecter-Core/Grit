@@ -528,6 +528,9 @@ fn diff_src(
     let mir = glir_input_mir(art);
     let lo = gt_glirgen::lower_module(&art.types, &mir);
     let module = &lo.module;
+    // module hạ được phải qua VERIFIER (như `every_lowered` làm với corpus): lệnh sai kiểu mà thông dịch tình cờ chạy được vẫn là lỗi hạ
+    let verr = gt_glir::verify(module);
+    assert!(verr.is_empty(), "verifier GLIR: {verr:?}");
     // tối đa 4 instance generic cho MỖI thân (mẫu bùng nổ instance gần trần E0317 sinh hàng nghìn instance cùng thân)
     let mut per_body: BTreeMap<gt_ast::NodeId, usize> = BTreeMap::new();
     for (gname, inst) in &lo.funcs {
@@ -1392,6 +1395,7 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_owned() {
 ƒ o10(al: &Cap<Alloc>, x: u8, n: u8) → u8 ! {mem} { μs ≔ 0u8; ⟳ i in 0u8..n { o ≔ Owned::new(al, x +% i); s ← s +% *o.get(); } s }
 ƒ o11(al: &Cap<Alloc>, x: u16) → u16 ! {mem} { a ≔ [Owned::new(al, x), Owned::new(al, 2u16)]; *a[1usize].get() +% *a[0usize].get() }
 ƒ o12(al: &Cap<Alloc>, x: u8) → u8 ! {mem} { o ≔ Owned::new(al, ()); x }
+ƒ o99(al: &Cap<Alloc>, x: u8) → u8 ! {mem} { o ≔ Owned::new(al, ()); o.into_inner(); x }
 ƒ o13(al: &Cap<Alloc>, x: u8, k: u8) → u8 ! {mem} { w ≔ ⌥ k % 3u8 { 0u8 ↦ W::X(Owned::new(al, x)), 1u8 ↦ W::Y(7u16, Owned::new(al, 9u32)), _ ↦ W::Z }; o ≔ ⎇ k > 100u8 { Some(Owned::new(al, x)) } ⇝ { None }; x +% k }
 ƒ main() → i32 ! ∅ { 0 }
 ";
@@ -1404,9 +1408,9 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_owned() {
     };
     let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
     eprintln!("GLIR_DIFF_OWNED bodies={bodies} runs={runs} aborts={aborts}");
-    // 13 hàm `oN` + `D::drop` + `main` (`o9in` nhận `&Cell` nên chỉ chạy qua `o9`)
+    // 14 hàm `oN` + `D::drop` + `main` (`o9in` nhận `&Cell` nên chỉ chạy qua `o9`; `o99`: `Owned<()>` + `into_inner`, tên xếp cuối để không xáo dòng ngẫu nhiên của các hàm cũ)
     assert!(
-        bodies >= 15 && runs >= 1900 && aborts >= 50,
+        bodies >= 16 && runs >= 1900 && aborts >= 50,
         "oracle Owned quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
@@ -1471,6 +1475,12 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_secrets() {
 ƒ s11(al: &Cap<Alloc>, x: u32) → u32 ! {mem} { o ≔ Owned::new(al, Secret::new(x)); x }
 ƒ mk(x: u16) → Secret<u16> ! ∅ { Secret::new(x) }
 ƒ s12(x: u16, n: u8) → u16 ! ∅ { μt ≔ 0u16; ⟳ i in 0u8..n { s ≔ mk(x +% (i as u16)); t ← t +% s.declassify(); } t }
+▢ B<T> { v: T }
+ƒ mv<T>(x: T) → T ! ∅ { y ≔ x; y }
+ƒ s13(x: u64) → u64 ! ∅ { s ≔ mv(Secret::new(x)); a ≔ mv(x); s.declassify() +% a }
+ƒ s14(x: u32) → u32 ! ∅ { b ≔ B { v: x }; c ≔ mv(b); c.v }
+ƒ s15(x: u8) → u8 ! ∅ { s ≔ Secret::new(()); t ≔ s.declassify(); x }
+ƒ s16(al: &Cap<Alloc>, x: u32, k: bool) → u32 ! {mem} { s ≔ Secret::new(Owned::new(al, x)); ⎇ k { x } ⇝ { x +% 1u32 } }
 ƒ main() → i32 ! ∅ { 0 }
 ";
     let mut seed = 0x5EC7_E700_5EED_0004u64;
@@ -1482,9 +1492,11 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_secrets() {
     };
     let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
     eprintln!("GLIR_DIFF_SECRET bodies={bodies} runs={runs} aborts={aborts}");
-    // 12 hàm `sN` + `main` (`keep`/`mk` có Secret trong chữ ký nên chỉ chạy qua người gọi)
+    // 16 hàm `sN` + `main` (`keep`/`mk`/`mv` có Secret/T trong chữ ký nên chỉ chạy qua người gọi). Đột biến tự động 2026-11-26
+    // (`docs/MUT_GLIR_TOS.jsonl`) sống ⇒ thêm `s13`/`s14` (instance generic: chỉ instance chứa Secret được xoá sau move), `s15` (`Secret<()>`),
+    // `s16` (`Secret<Owned<T>>`: glue của `v` chạy TRƯỚC khi xoá — không chạy ⇒ rò khối heap)
     assert!(
-        bodies >= 13 && runs >= 1650 && aborts >= 50,
+        bodies >= 17 && runs >= 1650 && aborts >= 50,
         "oracle Secret quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
