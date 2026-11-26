@@ -162,6 +162,22 @@ fn text_vec(db: &TypeDb, t: &Ty) -> Option<Ty> {
     }
 }
 
+/// `Owned<T>` (lang, `{ptr: *μ T}`): kiểu `T` (chỉ tạo/dùng qua intrinsic `Owned::*` và drop glue `Free`, như codegen)
+fn owned_elem(db: &TypeDb, t: &Ty) -> Option<Ty> {
+    let Ty::Adt(def, args) = t else { return None };
+    if db
+        .adts
+        .get(def)
+        .is_none_or(|a| a.lang != Some(gt_types::Lang::Owned))
+    {
+        return None;
+    }
+    match crate::variant_fields(db, *def, args, 0).ok()?.as_slice() {
+        [Ty::RawPtr(_, e)] => Some((**e).clone()),
+        _ => None,
+    }
+}
+
 /// Khai báo của hàm runtime mà GLIR được phép gọi: tên và chữ ký ĐÚNG như codegen LLVM phát (`gt-codegen-llvm` `Intr::Arena*`; bảng `RUNTIME`
 /// của gt-guard). Tên ngoài bảng ⇒ `None` (không hạ).
 #[must_use]
@@ -171,6 +187,9 @@ pub fn runtime_decl(name: &str) -> Option<gt_glir::Decl> {
         "gritrt_arena_alloc" => (vec![G::I32, G::I64, G::I64], G::Ptr),
         "gritrt_arena_reset" => (vec![G::I32], G::Void),
         "gritrt_utf8_valid" => (vec![G::Ptr, G::I64], G::I32),
+        "gritrt_heap_alloc" => (vec![G::I64, G::I64], G::Ptr),
+        "gritrt_heap_free" => (vec![G::Ptr, G::I64, G::I64], G::Void),
+        "gritrt_secret_wipe" => (vec![G::Ptr, G::I64], G::Void),
         _ => return None,
     };
     Some(gt_glir::Decl {
@@ -215,6 +234,9 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32, budget: &mut u32) -> bool {
             }
             if let Some(v) = text_vec(db, t) {
                 return rec(&v);
+            }
+            if let Some(e) = owned_elem(db, t) {
+                return rec(&e);
             }
             if is_cap(db, t) || is_cell(db, t) || plain_struct(db, def) {
                 return crate::variant_fields(db, *def, args, 0).is_ok_and(|fs| fs.iter().all(rec));
@@ -857,6 +879,17 @@ impl Lw<'_> {
                     self.text_op(m, &vs, dest)?;
                 }
             }
+            k if k.starts_with("$prelude::Owned<") => {
+                let m = k.rsplit("::").next().unwrap_or_default();
+                let mut vs = Vec::new();
+                for a in args {
+                    vs.push(self.operand(a)?);
+                }
+                let [t] = generics else {
+                    return un("Owned: sai số đối số kiểu");
+                };
+                self.owned_op(m, t, &vs, dest)?;
+            }
             k if k.starts_with("$prelude::Vec<") => {
                 let m = k.rsplit("::").next().unwrap_or_default();
                 let mut vs = Vec::new();
@@ -1411,6 +1444,239 @@ impl Lw<'_> {
                 self.store_fat(dest, Opd::Val(np), nl)
             }
             _ => un(format!("str::{m}: thao tác/đối số lạ")),
+        }
+    }
+
+    /// `gritrt_heap_alloc/free(…, size_of T, align_of T)` (bố cục GLIR của `T`, như `heap_alloc`/`heap_free` của codegen)
+    fn heap_call(&mut self, name: &str, p: Option<Opd>, t: &Ty) -> R<Option<Opd>> {
+        let l = gt_glir::layout::layout(&gty(self.db, t)?);
+        let mut args: Vec<Opd> = p.into_iter().collect();
+        args.extend([
+            Opd::Int(G::I64, i128::from(l.size)),
+            Opd::Int(G::I64, i128::from(l.align.max(1))),
+        ]);
+        if name == "gritrt_heap_alloc" {
+            let d = self.t();
+            self.push(Inst::Call {
+                d: Some(d.clone()),
+                ret: G::Ptr,
+                callee: name.into(),
+                args,
+            });
+            return Ok(Some(Opd::Val(d)));
+        }
+        self.push(Inst::Call {
+            d: None,
+            ret: G::Void,
+            callee: name.into(),
+            args,
+        });
+        Ok(None)
+    }
+
+    /// `gritrt_secret_wipe(p, size_of ty)` (như `secret_wipe` của codegen; ADR-P2-03)
+    fn secret_wipe(&mut self, p: Opd, ty: &Ty) -> R<()> {
+        let l = gt_glir::layout::layout(&gty(self.db, ty)?);
+        self.push(Inst::Call {
+            d: None,
+            ret: G::Void,
+            callee: "gritrt_secret_wipe".into(),
+            args: vec![p, Opd::Int(G::I64, i128::from(l.size))],
+        });
+        Ok(())
+    }
+
+    /// `Owned<T>::*` như `Intr::Owned*` của codegen: `new(cap, v)` ⇒ `p = gritrt_heap_alloc(size, align)`, `*p ← v`, `Owned{p}`; `get`/`get_mut` ⇒
+    /// trường `ptr`; `into_inner(self)` ⇒ nạp `*p`, (T chứa Secret ⇒ `gritrt_secret_wipe(p, size)`), `gritrt_heap_free(p, size, align)`.
+    fn owned_op(&mut self, m: &str, t: &Ty, vs: &[(Opd, Ty)], dest: &Place) -> R<()> {
+        let gt = gty(self.db, t)?;
+        match (m, vs) {
+            ("new", [(_, tc), (v, tv)]) => {
+                if !matches!(tc, Ty::Ref(_, i) if is_cap(self.db, i)) || tv != t {
+                    return un("Owned::new: đối số lạ");
+                }
+                let Some(p) = self.heap_call("gritrt_heap_alloc", None, t)? else {
+                    return un("Owned::new: heap_alloc");
+                };
+                if !is_unit(t) {
+                    self.push(Inst::Store {
+                        ty: gt,
+                        val: v.clone(),
+                        ptr: p.clone(),
+                    });
+                }
+                let (ptr, dty) = self.place(dest)?;
+                if owned_elem(self.db, &dty).as_ref() != Some(t) {
+                    return un("Owned::new: đích không phải Owned<T>");
+                }
+                let go = gty(self.db, &dty)?;
+                let f = self.vec_field(&go, &ptr, 0);
+                self.push(Inst::Store {
+                    ty: G::Ptr,
+                    val: p,
+                    ptr: f,
+                });
+            }
+            ("get" | "get_mut", [(p, Ty::Ref(_, inner))])
+                if owned_elem(self.db, inner).as_ref() == Some(t) =>
+            {
+                let go = gty(self.db, inner)?;
+                let f = self.vec_field(&go, p, 0);
+                let hp = self.load_val(G::Ptr, f);
+                self.store(dest, hp, &Ty::Ref(m == "get_mut", Box::new(t.clone())))?;
+            }
+            ("into_inner", [(o, to)]) if owned_elem(self.db, to).as_ref() == Some(t) => {
+                let go = gty(self.db, to)?;
+                self.extra += 1;
+                let sname = format!("own{}", self.extra);
+                self.aux_slots.push((sname.clone(), go.clone()));
+                self.push(Inst::Store {
+                    ty: go.clone(),
+                    val: o.clone(),
+                    ptr: Opd::Slot(sname.clone()),
+                });
+                let f = self.vec_field(&go, &Opd::Slot(sname), 0);
+                let hp = self.load_val(G::Ptr, f);
+                let v = if is_unit(t) {
+                    None
+                } else {
+                    Some(self.load_val(gt, hp.clone()))
+                };
+                if self.db.secret_used && self.db.contains_secret(t) {
+                    self.secret_wipe(hp.clone(), t)?;
+                }
+                self.heap_call("gritrt_heap_free", Some(hp), t)?;
+                if let Some(v) = v {
+                    self.store(dest, v, t)?;
+                }
+            }
+            _ => return un(format!("Owned::{m}: thao tác/đối số lạ")),
+        }
+        Ok(())
+    }
+
+    /// Drop glue tại `ptr` (kiểu `ty`) — đúng `drop_glue_at` của codegen: `Call` ⇒ gọi `drop` người dùng (instance không đối số) rồi glue bên trong;
+    /// `Free` ⇒ glue của `T` tại khối heap rồi `gritrt_heap_free`; `Wipe` ⇒ glue của trường `v` rồi `gritrt_secret_wipe` cả Secret; `Fields`/`Variants`
+    /// (theo tag)/`Array` (vòng lặp) ⇒ đệ quy.
+    fn drop_glue_at(&mut self, ptr: Opd, ty: &Ty, g: &gt_types::Glue) -> R<()> {
+        use gt_types::Glue;
+        match g {
+            Glue::Nothing => Ok(()),
+            Glue::Call(node, inner) => {
+                let inst = Instance {
+                    node: *node,
+                    args: Vec::new(),
+                };
+                let Some((name, rty)) = self.cx.sig(&inst) else {
+                    return un("drop: `drop` người dùng ngoài tập con");
+                };
+                if !is_unit(&rty) {
+                    return un("drop: `drop` trả giá trị");
+                }
+                self.calls.push(inst);
+                self.push(Inst::Call {
+                    d: None,
+                    ret: G::Void,
+                    callee: name,
+                    args: vec![ptr.clone()],
+                });
+                self.drop_glue_at(ptr, ty, inner)
+            }
+            Glue::Free(t, inner) => {
+                if owned_elem(self.db, ty).as_ref() != Some(t) {
+                    return un("drop glue: Free trên kiểu không phải Owned<T>");
+                }
+                let go = gty(self.db, ty)?;
+                let f = self.vec_field(&go, &ptr, 0);
+                let hp = self.load_val(G::Ptr, f);
+                self.drop_glue_at(hp.clone(), t, inner)?;
+                self.heap_call("gritrt_heap_free", Some(hp), t)?;
+                Ok(())
+            }
+            Glue::Wipe(_) => un("drop glue: Secret (xoá) chưa hạ"),
+            Glue::Fields(fs) => {
+                let gs = gty(self.db, ty)?;
+                for (i, fty, fg) in fs {
+                    let fp = self.vec_field(&gs, &ptr, *i);
+                    self.drop_glue_at(fp, fty, fg)?;
+                }
+                Ok(())
+            }
+            Glue::Variants(vs) => {
+                let Ty::Adt(def, args) = ty else {
+                    return un("drop glue: biến thể trên kiểu không phải enum");
+                };
+                let ge = gty(self.db, ty)?;
+                let tp = self.vec_field(&ge, &ptr, 0);
+                let tag = self.load_val(G::I64, tp);
+                self.extra += 1;
+                let k = self.extra;
+                let cont = format!("rt{k}.dcont");
+                for (n, (vi, fs)) in vs.iter().enumerate() {
+                    let (arm, next) = (format!("rt{k}.dv{n}"), format!("rt{k}.dn{n}"));
+                    let c = self.cmp(
+                        CmpPred::Eq,
+                        &G::I64,
+                        tag.clone(),
+                        Opd::Int(G::I64, i128::from(*vi)),
+                    );
+                    self.finish(Term::CondBr(c, arm.clone(), next.clone()), Some(arm));
+                    let pay = self.vec_field(&ge, &ptr, 1);
+                    let vfs = crate::variant_fields(self.db, *def, args, *vi as usize)
+                        .map_err(Unsupported)?;
+                    let vst =
+                        G::Struct(vfs.iter().map(|t| gty(self.db, t)).collect::<R<Vec<_>>>()?);
+                    for (i, fty, fg) in fs {
+                        let fp = self.vec_field(&vst, &pay, *i);
+                        self.drop_glue_at(fp, fty, fg)?;
+                    }
+                    self.finish(Term::Br(cont.clone()), Some(next));
+                }
+                self.finish(Term::Br(cont.clone()), Some(cont));
+                Ok(())
+            }
+            Glue::Array(n, ety, eg) => {
+                let ge = gty(self.db, ety)?;
+                self.extra += 1;
+                let k = self.extra;
+                let ctr = format!("di{k}");
+                self.aux_slots.push((ctr.clone(), G::I64));
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: Opd::Int(G::I64, 0),
+                    ptr: Opd::Slot(ctr.clone()),
+                });
+                let (head, body, exit) = (
+                    format!("rt{k}.dah"),
+                    format!("rt{k}.dab"),
+                    format!("rt{k}.dax"),
+                );
+                self.finish(Term::Br(head.clone()), Some(head.clone()));
+                let i = self.load_val(G::I64, Opd::Slot(ctr.clone()));
+                let c = self.cmp(
+                    CmpPred::Ult,
+                    &G::I64,
+                    i.clone(),
+                    Opd::Int(G::I64, i128::from(*n)),
+                );
+                self.finish(Term::CondBr(c, body.clone(), exit.clone()), Some(body));
+                let ep = self.t();
+                self.push(Inst::IndexPtr {
+                    d: ep.clone(),
+                    elem: ge,
+                    ptr,
+                    idx: i.clone(),
+                });
+                self.drop_glue_at(Opd::Val(ep), ety, eg)?;
+                let i1 = self.bin(GB::Add, &G::I64, i, Opd::Int(G::I64, 1));
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: i1,
+                    ptr: Opd::Slot(ctr),
+                });
+                self.finish(Term::Br(head), Some(exit));
+                Ok(())
+            }
         }
     }
 
@@ -2217,12 +2483,22 @@ impl Lw<'_> {
                 if ty.has_param() || ty.has_infer() {
                     return un("Drop trên kiểu chưa thế");
                 }
-                match self.db.drop_glue(&ty) {
-                    Ok(g) if g.is_nothing() => {
-                        self.finish(Term::Br(Self::block_name(target.index())), None)
+                let g = self
+                    .db
+                    .drop_glue(&ty)
+                    .map_err(|e| Unsupported(format!("drop glue: {e}")))?;
+                if !g.is_nothing() {
+                    // như codegen: glue có việc chỉ trên thân ĐÃ elaboration (cờ drop nằm trong MIR)
+                    if !self.body.drops_elaborated {
+                        return un("Drop có glue trên thân chưa elaboration");
                     }
-                    _ => return un("Drop có glue"),
+                    let (ptr, pty2) = self.place(place)?;
+                    if pty2 != ty {
+                        return un("Drop: kiểu chỗ lệch");
+                    }
+                    self.drop_glue_at(ptr, &ty, &g)?;
                 }
+                self.finish(Term::Br(Self::block_name(target.index())), None)
             }
         }
         Ok(())

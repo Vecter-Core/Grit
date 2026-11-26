@@ -133,9 +133,9 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     // TRƯỚC M7); FB-P2-03 — 2026-11-26: đo lại trên MIR SAU M7 (đầu vào của codegen; thêm thân hợp đồng ⊳/⊲ làm instance): 3523/13404;
     // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415; `Cell::new/get/set` — 2026-11-26: 3534/13418;
     // trần độ sâu `in_subset` 8 → 128 + ngân sách nút (tuple lồng sâu của `e0317_*`) — 2026-11-26: 3548/21610; `Vec::*` — 2026-11-26: 3563/21625;
-    // `Text::*`, `str::slice/as_bytes`, `u8 as char` — 2026-11-26: 3568/21630
+    // `Text::*`, `str::slice/as_bytes`, `u8 as char` — 2026-11-26: 3568/21630; `Owned::*` + drop glue (trừ xoá Secret) — 2026-11-26: 3575/21638
     assert!(
-        lowered >= 3568 && inst_ok >= 21630,
+        lowered >= 3575 && inst_ok >= 21638,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -211,6 +211,36 @@ fn plain(db: &gt_types::TypeDb, t: &gt_types::Ty, d: u32) -> bool {
             },
             _ => false,
         }
+}
+
+fn is_cap(db: &gt_types::TypeDb, t: &gt_types::Ty) -> bool {
+    matches!(t, gt_types::Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Cap)))
+}
+
+/// `&Cap<X>` (X là struct số nguyên của prelude): tham số bằng chứng quyền, oracle truyền giá trị ZERO
+fn cap_ref(db: &gt_types::TypeDb, t: &gt_types::Ty) -> bool {
+    matches!(t, gt_types::Ty::Ref(false, i) if is_cap(db, i))
+}
+
+/// giá trị ZERO (thông dịch MIR) của kiểu struct/tuple số nguyên (giá trị `Cap` do `root_*` tạo)
+fn zero_val(db: &gt_types::TypeDb, t: &gt_types::Ty) -> gt_mir::interp::V {
+    use gt_mir::interp::V;
+    use gt_types::Ty;
+    match t {
+        Ty::Int(it) => V::Int(0, *it),
+        Ty::Bool => V::Bool(false),
+        Ty::Tuple(v) if v.is_empty() => V::Unit,
+        Ty::Tuple(v) => V::Tuple(v.iter().map(|x| zero_val(db, x)).collect()),
+        Ty::Adt(def, args) => V::Adt(
+            0,
+            adt_variant_fields(db, def, args, 0)
+                .expect("struct")
+                .iter()
+                .map(|x| zero_val(db, x))
+                .collect(),
+        ),
+        _ => panic!("zero_val: kiểu lạ {t:?}"),
+    }
 }
 
 fn mask(w: u32) -> u128 {
@@ -464,7 +494,7 @@ fn diff_src(
         };
         let ptys: Vec<Ty> = (1..=b.arg_count).map(|i| sub(&b.locals[i].ty)).collect();
         let rty = &sub(&b.locals[0].ty);
-        if !ptys.iter().all(|t| plain(db, t, 0) || matches!(t, Ty::Ref(_, i) if (plain(db, i, 0) && !matches!(**i, Ty::Tuple(ref v) if v.is_empty())) || matches!(&**i, Ty::Str) || matches!(&**i, Ty::Slice(e) if plain(db, e, 0)))) || !plain(db, rty, 0) {
+        if !ptys.iter().all(|t| plain(db, t, 0) || cap_ref(db, t) || matches!(t, Ty::Ref(_, i) if (plain(db, i, 0) && !matches!(**i, Ty::Tuple(ref v) if v.is_empty())) || matches!(&**i, Ty::Str) || matches!(&**i, Ty::Slice(e) if plain(db, e, 0)))) || !plain(db, rty, 0) {
             continue;
         }
         if !inst.args.is_empty() {
@@ -485,6 +515,16 @@ fn diff_src(
             // (kiểu pointee, tham chiếu MIR, số phần tử nếu là slice/str) của từng tham số tham chiếu, theo thứ tự
             let mut refs: Vec<(Ty, V, Option<usize>)> = Vec::new();
             for t in &ptys {
+                if cap_ref(db, t) {
+                    // `&Cap<X>`: giá trị bằng chứng ZERO (như `root_*`/`Intr::RootCap`), không đổi sau lời gọi (không so)
+                    let Ty::Ref(_, inner) = t else { unreachable!() };
+                    let n = gt_glir::layout::layout(&glir_ty_of(db, inner)).size as usize;
+                    gargs.push(Arg::Ref(vec![Some(0); n]));
+                    let r = mi.alloc_ref(zero_val(db, inner));
+                    refs.push(((**inner).clone(), r.clone(), None));
+                    margs.push(r);
+                    continue;
+                }
                 if let Ty::Ref(_, inner) = t {
                     match &**inner {
                         Ty::Str => {
@@ -539,7 +579,8 @@ fn diff_src(
                 }
                 margs.push(v);
             }
-            let (g, fin) = gt_glir::interp::run_module_refs(module, gname, &gargs, 200_000);
+            let (g, fin, gstats) =
+                gt_glir::interp::run_module_stats(module, gname, &gargs, 200_000);
             let m = mi.call_instance(&b.key, inst.args.clone(), margs.clone());
             let m = match m {
                 MO::Value(v) => Ok(v),
@@ -565,6 +606,15 @@ fn diff_src(
                 )
             };
             let finished = matches!(g, GO::Value(_) | GO::Agg(_));
+            // mô hình runtime: số lần xoá Secret (ADR-P2-03) và số khối heap của `Owned` còn sống (rò rỉ) phải KHỚP thông dịch MIR
+            if !matches!(g, GO::OutOfFuel | GO::Ub(_)) {
+                assert_eq!(
+                    (gstats.secret_wipes, gstats.heap_live),
+                    (mi.secret_wipes(), mi.heap_live()),
+                    "{}: (số lần xoá Secret, khối heap còn sống) GLIR ≠ MIR",
+                    ctx()
+                );
+            }
             match (g, m) {
                 (GO::OutOfFuel, _) => {}
                 (GO::Ub(u), m) => panic!(
@@ -590,6 +640,9 @@ fn diff_src(
             // trạng thái sau lời gọi của vùng mà `&T`/`&!T` trỏ tới phải khớp (chỉ khi không abort giữa chừng)
             if finished {
                 for ((inner, r, cnt), bytes) in refs.iter().zip(&fin) {
+                    if is_cap(db, inner) {
+                        continue;
+                    }
                     let fv = mi.read_ref(r).expect("vùng tham chiếu còn đó");
                     let ok = match (cnt, &fv) {
                         (None, _) => decode_eq(db, inner, &fv, bytes, 0),
@@ -1238,5 +1291,51 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_texts() {
     assert!(
         bodies >= 14 && runs >= 1200 && aborts >= 600,
         "oracle Text quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH dùng `Owned<T>` + drop glue (hạ như `Intr::Owned*`/`drop_glue_at` của codegen: `gritrt_heap_alloc/free(size, align)`, glue `Free`
+/// sau glue của `T`, `drop` người dùng (`Call`), `Fields`/`Variants`/`Array`): `into_inner` trên một nhánh (cờ drop), `Owned<Owned<T>>`, `Option<Owned>`,
+/// mảng `Owned`, `drop` người dùng ghi qua `&Cell` (thứ tự/hiệu ứng glue quan sát được), cấp trong vòng lặp. Oracle so cả số khối heap còn sống (rò rỉ /
+/// trả hai lần ⇒ `Ub` của mô hình GLIR) với `heap_live` của thông dịch MIR; tham số `&Cap<Alloc>` là giá trị zero.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_owned() {
+    let src = "\
+▢ P { a: u8, b: i32 }
+⊔ E { A, B(u16) }
+⊔ W { X(Owned<u8>), Y(u16, Owned<u32>), Z }
+▢ D { n: u8 }
+⊐ Drop for D { ƒ drop(&!self) ! ∅ { } }
+▢ H<'a> { c: &'a Cell<u32>, k: u32 }
+⊐ <'a> Drop for H<'a> { ƒ drop(&!self) ! ∅ { self.c.set(self.c.get() +% self.k); } }
+ƒ o1(al: &Cap<Alloc>, x: u64) → u64 ! {mem} { o ≔ Owned::new(al, x); *o.get() }
+ƒ o2(al: &Cap<Alloc>, x: u32, y: u32) → u32 ! {mem} { μp ≔ Owned::new(al, x); w ≔ p.get_mut(); *w ← *w +% y; p.into_inner() }
+ƒ o3(al: &Cap<Alloc>, a: u8, b: i32) → i32 ! {mem} { o ≔ Owned::new(al, P { a: a, b: b }); q ≔ o.get(); q.b +% (q.a as i32) }
+ƒ o4(al: &Cap<Alloc>, x: u16, k: bool) → u16 ! {mem} { e ≔ ⎇ k { E::B(x) } ⇝ { E::A }; o ≔ Some(Owned::new(al, e)); ⌥ o { Some(p) ↦ ⌥ *p.get() { E::B(v) ↦ v, E::A ↦ 3u16 }, None ↦ 0u16 } }
+ƒ o5(al: &Cap<Alloc>, x: u8, y: u8) → u8 ! {mem} { o ≔ Owned::new(al, x); *o.get() + y }
+ƒ o6(al: &Cap<Alloc>, x: u32) → u32 ! {mem} { o ≔ Owned::new(al, Owned::new(al, x)); *o.get().get() }
+ƒ o7(al: &Cap<Alloc>, x: u32, k: bool) → u32 ! {mem} { o ≔ Owned::new(al, x); ⎇ k { o.into_inner() } ⇝ { 1u32 } }
+ƒ o8(al: &Cap<Alloc>, x: u8) → u8 ! {mem} { o ≔ Owned::new(al, D { n: x }); o.get().n }
+ƒ o9in(al: &Cap<Alloc>, c: &Cell<u32>, k: u32) ! {mem} { o ≔ Owned::new(al, H { c: c, k: k }); h ≔ H { c: c, k: 1u32 }; }
+ƒ o9(al: &Cap<Alloc>, x: u32, k: u32) → u32 ! {mem} { c ≔ Cell::new(x); o9in(al, &c, k); c.get() }
+ƒ o10(al: &Cap<Alloc>, x: u8, n: u8) → u8 ! {mem} { μs ≔ 0u8; ⟳ i in 0u8..n { o ≔ Owned::new(al, x +% i); s ← s +% *o.get(); } s }
+ƒ o11(al: &Cap<Alloc>, x: u16) → u16 ! {mem} { a ≔ [Owned::new(al, x), Owned::new(al, 2u16)]; *a[1usize].get() +% *a[0usize].get() }
+ƒ o12(al: &Cap<Alloc>, x: u8) → u8 ! {mem} { o ≔ Owned::new(al, ()); x }
+ƒ o13(al: &Cap<Alloc>, x: u8, k: u8) → u8 ! {mem} { w ≔ ⌥ k % 3u8 { 0u8 ↦ W::X(Owned::new(al, x)), 1u8 ↦ W::Y(7u16, Owned::new(al, 9u32)), _ ↦ W::Z }; o ≔ ⎇ k > 100u8 { Some(Owned::new(al, x)) } ⇝ { None }; x +% k }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0x0E4E_D000_5EED_0003u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_OWNED bodies={bodies} runs={runs} aborts={aborts}");
+    // 13 hàm `oN` + `D::drop` + `main` (`o9in` nhận `&Cell` nên chỉ chạy qua `o9`)
+    assert!(
+        bodies >= 15 && runs >= 1900 && aborts >= 50,
+        "oracle Owned quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }

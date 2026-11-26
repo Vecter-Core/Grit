@@ -278,10 +278,35 @@ pub fn run_module_refs(
     m: &Module,
     name: &str,
     args: &[Arg],
-    mut fuel: u64,
+    fuel: u64,
 ) -> (Outcome, Vec<Vec<Option<u8>>>) {
+    let (o, fin, _) = run_module_stats(m, name, args, fuel);
+    (o, fin)
+}
+
+/// Số liệu mô hình runtime của một lần chạy (để đối chiếu với thông dịch MIR: `secret_wipes()`, `heap_live()`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Stats {
+    /// số lần gọi `gritrt_secret_wipe`
+    pub secret_wipes: u64,
+    /// số khối `gritrt_heap_alloc` chưa `gritrt_heap_free` khi kết thúc
+    pub heap_live: usize,
+}
+
+/// Như `run_module_refs`, thêm [`Stats`].
+#[must_use]
+pub fn run_module_stats(
+    m: &Module,
+    name: &str,
+    args: &[Arg],
+    mut fuel: u64,
+) -> (Outcome, Vec<Vec<Option<u8>>>, Stats) {
     let Some(f) = m.funcs.iter().find(|f| f.name == name) else {
-        return (Outcome::Ub(format!("không có hàm @{name}")), Vec::new());
+        return (
+            Outcome::Ub(format!("không có hàm @{name}")),
+            Vec::new(),
+            Stats::default(),
+        );
     };
     let mut mem: Vec<Vec<Byte>> = Vec::new();
     // các global chiếm các vùng đầu (chỉ đọc)
@@ -327,6 +352,8 @@ pub fn run_module_refs(
         decls,
         freed: RefCell::new(BTreeSet::new()),
         arenas: RefCell::new(Vec::new()),
+        heap: RefCell::new(BTreeMap::new()),
+        wipes: RefCell::new(0),
     };
     let mut out = exec(f, &vals, &mut fuel, 0, &mut mem, &glob);
     if let Outcome::Ptr(a, _) = out
@@ -357,7 +384,11 @@ pub fn run_module_refs(
                 .collect()
         })
         .collect();
-    (out, fin)
+    let stats = Stats {
+        secret_wipes: *glob.wipes.borrow(),
+        heap_live: glob.heap.borrow().len(),
+    };
+    (out, fin, stats)
 }
 
 /// Môi trường chung của một lần chạy: tên global → vùng và số vùng chỉ-đọc đứng đầu.
@@ -371,6 +402,10 @@ struct Glob<'m> {
     freed: RefCell<BTreeSet<usize>>,
     /// mô hình Arena của runtime: tay cầm (chỉ số, như `gritrt_arena_new`) → các vùng đã cấp từ nó (chưa `reset`)
     arenas: RefCell<Vec<Vec<usize>>>,
+    /// mô hình heap của runtime (`gritrt_heap_alloc`): vùng của khối còn sống → (cỡ, căn lề) khi cấp
+    heap: RefCell<BTreeMap<usize, (u128, u128)>>,
+    /// số lần `gritrt_secret_wipe`
+    wipes: RefCell<u64>,
 }
 
 /// Chữ ký (tham số, trả về) của các hàm runtime CÓ mô hình tham chiếu trong thông dịch — đúng chữ ký codegen LLVM phát cho `gritrt_*` cùng tên
@@ -382,6 +417,9 @@ pub fn runtime_model_sig(name: &str) -> Option<(Vec<Ty>, Ty)> {
         "gritrt_arena_alloc" => (vec![Ty::I32, Ty::I64, Ty::I64], Ty::Ptr),
         "gritrt_arena_reset" => (vec![Ty::I32], Ty::Void),
         "gritrt_utf8_valid" => (vec![Ty::Ptr, Ty::I64], Ty::I32),
+        "gritrt_heap_alloc" => (vec![Ty::I64, Ty::I64], Ty::Ptr),
+        "gritrt_heap_free" => (vec![Ty::Ptr, Ty::I64, Ty::I64], Ty::Void),
+        "gritrt_secret_wipe" => (vec![Ty::Ptr, Ty::I64], Ty::Void),
         _ => return None,
     })
 }
@@ -429,6 +467,38 @@ fn runtime_call(
             std::str::from_utf8(&bytes).is_ok(),
         ))));
     }
+    match (name, vals) {
+        // `gritrt_heap_free(p, size, align)`: `p` phải là ĐẦU một khối heap còn sống cấp với ĐÚNG (size, align) (runtime trả cho allocator với
+        // `Layout` đó — sai là UB của Rust); khối thành đã giải phóng (truy cập/trả lần hai sau ⇒ `Ub`)
+        ("gritrt_heap_free", [Val::Ptr(a, off), Val::Int(size), Val::Int(align)]) => {
+            let mut heap = glob.heap.borrow_mut();
+            if *off != 0 || heap.get(a) != Some(&(*size, *align)) {
+                return Err(ub(
+                    "trả khối không phải đầu khối heap còn sống cùng (cỡ, căn lề)",
+                ));
+            }
+            heap.remove(a);
+            glob.freed.borrow_mut().insert(*a);
+            return Ok(None);
+        }
+        // `gritrt_secret_wipe(p, n)`: ghi 0 lên n byte tại p (vùng còn sống, ghi được, trong biên) và ĐẾM (như `secret_wipes` của thông dịch MIR)
+        ("gritrt_secret_wipe", [Val::Ptr(a, off), Val::Int(n)]) => {
+            if *a >= mem.len() || *a < glob.nro || glob.freed.borrow().contains(a) {
+                return Err(ub("xoá qua con trỏ null/treo/chỉ-đọc"));
+            }
+            let end = u64::try_from(*n).ok().and_then(|n| off.checked_add(n));
+            let Some(bs) = end.and_then(|e| mem[*a].get_mut(*off as usize..e as usize)) else {
+                return Err(ub("xoá ngoài vùng"));
+            };
+            bs.fill(Byte::B(0));
+            *glob.wipes.borrow_mut() += 1;
+            return Ok(None);
+        }
+        ("gritrt_heap_free" | "gritrt_secret_wipe", _) => {
+            return Err(ub("đối số sai dạng"));
+        }
+        _ => {}
+    }
     let ints: Vec<u128> = vals
         .iter()
         .map(|v| match v {
@@ -462,6 +532,18 @@ fn runtime_call(
             }
             mem.push(vec![Byte::Uninit; size as usize]);
             arenas[k].push(mem.len() - 1);
+            Ok(Some(Val::Ptr(mem.len() - 1, 0)))
+        }
+        "gritrt_heap_alloc" => {
+            let (size, align) = (ints[0], ints[1]);
+            if !align.is_power_of_two() || align > 4096 {
+                return Err(ub("căn lề không hợp lệ"));
+            }
+            if size > u128::from(MAX_SLOT_BYTES) {
+                return Err(Outcome::OutOfFuel);
+            }
+            mem.push(vec![Byte::Uninit; size as usize]);
+            glob.heap.borrow_mut().insert(mem.len() - 1, (size, align));
             Ok(Some(Val::Ptr(mem.len() - 1, 0)))
         }
         "gritrt_arena_reset" => {
