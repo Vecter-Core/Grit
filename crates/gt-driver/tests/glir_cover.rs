@@ -941,3 +941,48 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_arenas() {
         "oracle arena quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
+
+/// MIR làm đầu vào cho hạ GLIR (và cho thông dịch MIR của oracle). PHẢI là MIR mà codegen LLVM nhận (`native.rs`: `art.obl.bodies`).
+fn glir_input_mir(art: &gt_driver::Artifacts) -> gt_mir::MirOutput {
+    gt_mir::MirOutput {
+        report: art.mir.report.clone(),
+        bodies: art.mir.bodies.clone(),
+        keys: art.mir.keys.clone(),
+    }
+}
+
+/// FB-P2-03: tiền điều kiện `⊳` không chứng minh được ⇒ M7 chèn `Assert(precondition)` tại điểm gọi (N0901) vào thân SAU M7 — thứ codegen LLVM
+/// hạ. GLIR phải có khối `Abort(precondition)` tương ứng (kiểm (d) đối chiếu với thân SAU M7).
+#[test]
+fn glir_is_lowered_from_the_post_m7_mir_that_codegen_consumes() {
+    let src = "ƒ g(x: u32) → u32 ! ∅ ⊳ x < 10u32 { x }\nƒ f(x: u32) → u32 ! ∅ { g(x) }\nƒ main() → i32 ! ∅ { 0 }\n";
+    let res = check(
+        &[SourceInput {
+            name: "main.gt".to_string(),
+            text: src.to_string(),
+        }],
+        &Options::default(),
+    )
+    .expect("check");
+    let art = res.open_gate().expect("cổng");
+    let mir = glir_input_mir(art);
+    let lo = gt_glirgen::lower_module(&art.types, &mir);
+    let ob = art
+        .obl
+        .bodies
+        .iter()
+        .find(|b| b.key == "main::f")
+        .expect("thân f sau M7");
+    let f = lo
+        .module
+        .funcs
+        .iter()
+        .find(|g| lo.funcs[&g.name].node == ob.node)
+        .expect("f hạ được");
+    let cover = gt_glirgen::check_abort_cover(ob, f);
+    assert!(
+        cover.is_empty(),
+        "GLIR thiếu chốt mà codegen có: {cover:?}\n{}",
+        gt_glir::print(&lo.module)
+    );
+}
