@@ -131,9 +131,10 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     }
     // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25; lời gọi runtime Arena — 2026-11-26 (3524/13385 đo trên MIR
     // TRƯỚC M7); FB-P2-03 — 2026-11-26: đo lại trên MIR SAU M7 (đầu vào của codegen; thêm thân hợp đồng ⊳/⊲ làm instance): 3523/13404;
-    // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415; `Cell::new/get/set` — 2026-11-26: 3534/13418
+    // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415; `Cell::new/get/set` — 2026-11-26: 3534/13418;
+    // trần độ sâu `in_subset` 8 → 128 + ngân sách nút (tuple lồng sâu của `e0317_*`) — 2026-11-26: 3548/21610
     assert!(
-        lowered >= 3534 && inst_ok >= 13418,
+        lowered >= 3548 && inst_ok >= 21610,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -188,9 +189,12 @@ fn n_variants(db: &gt_types::TypeDb, def: &gt_resolve::DefId) -> Option<usize> {
     }
 }
 
+/// Độ sâu kiểu tối đa mà oracle sinh đầu vào (≥ độ sâu tuple lồng của mẫu `e0317_*` và oracle tuple sâu).
+const PLAIN_MAX_DEPTH: u32 = 16;
+
 fn plain(db: &gt_types::TypeDb, t: &gt_types::Ty, d: u32) -> bool {
     use gt_types::Ty;
-    d <= 6
+    d <= PLAIN_MAX_DEPTH
         && match t {
             Ty::Int(it) => it.bits() <= 64,
             Ty::Bool => true,
@@ -1050,5 +1054,108 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_cells() {
     assert!(
         bodies >= 7 && runs >= 900 && aborts >= 10,
         "oracle Cell quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH có tuple LỒNG SÂU (ADR-P2-02; trần độ sâu 8 cũ của `in_subset` từng chặn 7936 instance của mẫu `e0317_*`): tham số/kết quả tuple
+/// lồng 7/9/12/14 mức, dựng bằng hàm generic `nest` (instance sâu tới 14), đọc trường sâu, phép có kiểm (abort `overflow`) trên trường sâu, sao chép qua `id`.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_deep_tuples() {
+    // T_0 = u8, T_n = (T_{n-1}, u16)
+    let ty = |n: usize| (0..n).fold("u8".to_string(), |t, _| format!("({t}, u16)"));
+    let mut src = String::from(
+        "ƒ nest<T: Copy>(x: T, k: u16) → (T, u16) ! ∅ { (x, k +% 1u16) }\n\
+         ƒ id<T: Copy>(x: T) → T ! ∅ { x }\n",
+    );
+    for n in [7usize, 9, 12, 14] {
+        let t = ty(n);
+        // dựng T_n từ (a, k) qua n lần `nest`
+        let mut build = String::from("t0 ≔ a; ");
+        for i in 1..=n {
+            build.push_str(&format!("t{i} ≔ nest(t{}, k); ", i - 1));
+        }
+        // trường sâu nhất (u8) và trường u16 ở mức 1
+        let deep_u8 = format!("x{}", ".0".repeat(n));
+        let deep_u16 = format!("x{}.1", ".0".repeat(n - 1));
+        src.push_str(&format!(
+            "ƒ mk{n}(a: u8, k: u16) → {t} ! ∅ {{ {build}t{n} }}\n"
+        ));
+        src.push_str(&format!("ƒ cp{n}(x: {t}) → {t} ! ∅ {{ id(x) }}\n"));
+        src.push_str(&format!(
+            "ƒ rd{n}(x: {t}) → u16 ! ∅ {{ ({deep_u8} as u16) +% {deep_u16} +% x.1 }}\n"
+        ));
+        src.push_str(&format!(
+            "ƒ ck{n}(x: {t}, y: u8) → u8 ! ∅ {{ {deep_u8} + y }}\n"
+        ));
+        src.push_str(&format!(
+            "ƒ rt{n}(a: u8, k: u16) → u16 ! ∅ {{ x ≔ mk{n}(a, k); y ≔ cp{n}(x); rd{n}(y) }}\n"
+        ));
+    }
+    src.push_str("ƒ main() → i32 ! ∅ { 0 }\n");
+    let mut seed = 0xDEE9_7095_1E00_0042u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, generic) =
+        diff_src(&src, &mut rnd, true, &mut Default::default(), 100);
+    eprintln!("GLIR_DIFF_DEEP bodies={bodies} generic={generic} runs={runs} aborts={aborts}");
+    // 4 độ sâu × 5 hàm + `main` + 8 instance generic (`nest`/`id`, tối đa 4 mỗi thân); mọi hàm phải hạ được và được so
+    assert!(
+        bodies >= 29 && generic >= 8 && runs >= 2800 && aborts >= 140,
+        "oracle tuple sâu quá nhỏ: bodies={bodies} generic={generic} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Kiểm tập con của bước hạ phải DỪNG trên kiểu lớn theo hàm mũ và kiểu có chu trình qua tham chiếu (ngân sách nút `SUBSET_MAX_NODES`; trần độ sâu đã
+/// nới 8 → 128 nên KHÔNG có ngân sách thì `▢ S30 { a: S29, b: S29 }` duyệt 2^31 nút ⇒ treo) và fail-closed (hàm nhận `&S30` không hạ), hàm khác vẫn
+/// hạ. Treo quá 60 giây ⇒ đỏ.
+#[test]
+fn lowering_terminates_on_exponential_and_cyclic_types() {
+    let mut src = String::from(
+        "▢ N<'a> { v: u8, l: &'a N<'a>, r: &'a N<'a> }\n\
+         ƒ f(n: &N) → u8 ! ∅ { n.v }\n\
+         ƒ g(n: &N) → u8 ! ∅ { f(n.l) +% f(n.r) }\n\
+         ƒ h(x: u8) → u8 ! ∅ { x +% 1u8 }\n\
+         ƒ main() → i32 ! ∅ { 0 }\n\
+         ▢ S0 { a: u8 }\n",
+    );
+    for i in 1..=30 {
+        src.push_str(&format!("▢ S{i} {{ a: S{}, b: S{} }}\n", i - 1, i - 1));
+    }
+    src.push_str(&format!(
+        "ƒ w(s: &S30) → u8 ! ∅ {{ s.b{} }}\n",
+        ".a".repeat(30)
+    ));
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let res = check(
+            &[SourceInput {
+                name: "main.gt".to_string(),
+                text: src,
+            }],
+            &Options::default(),
+        )
+        .expect("check");
+        let art = res.open_gate().expect("cổng");
+        let mir = glir_input_mir(art);
+        let lo = gt_glirgen::lower_module(&art.types, &mir);
+        let keys: Vec<String> = lo
+            .funcs
+            .values()
+            .filter_map(|i| mir.bodies.iter().find(|b| b.node == i.node))
+            .map(|b| b.key.clone())
+            .collect();
+        let _ = tx.send(keys);
+    });
+    let keys = rx
+        .recv_timeout(std::time::Duration::from_secs(60))
+        .expect("hạ GLIR không dừng trên kiểu lớn theo hàm mũ / có chu trình qua tham chiếu");
+    assert!(keys.iter().any(|k| k == "main::h"), "{keys:?}");
+    assert!(
+        !keys.iter().any(|k| k == "main::f" || k == "main::w"),
+        "{keys:?}"
     );
 }

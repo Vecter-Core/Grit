@@ -146,38 +146,42 @@ pub fn runtime_decl(name: &str) -> Option<gt_glir::Decl> {
     })
 }
 
+/// Trần độ sâu đệ quy của `in_sub` (bảo vệ ngăn xếp): ≥ `MAX_INSTANCE_DEPTH` của đơn hình hoá cộng phần lồng của trường ADT — instance hợp lệ
+/// sâu tới 64 mức (mẫu `e0317_*`: tuple lồng 12 mức) không bị từ chối chỉ vì độ sâu.
+const SUBSET_MAX_DEPTH: u32 = 2 * gt_types::MAX_INSTANCE_DEPTH;
+/// Ngân sách số nút kiểu mà MỘT lần kiểm `in_subset` được duyệt: chặn bùng nổ hàm mũ (ADT rộng lồng nhau `S{a: S', b: S'}`…) và chu trình qua
+/// tham chiếu (`▢ N { next: &N }` — duyệt vô hạn ⇒ hết ngân sách ⇒ ngoài tập con, fail-closed như trần độ sâu 8 cũ).
+const SUBSET_MAX_NODES: u32 = 4096;
+
 fn in_subset(db: &TypeDb, t: &Ty) -> bool {
-    in_sub(db, t, 0)
+    let mut budget = SUBSET_MAX_NODES;
+    in_sub(db, t, 0, &mut budget)
 }
 
-fn in_sub(db: &TypeDb, t: &Ty, depth: u32) -> bool {
-    if depth > 8 {
+fn in_sub(db: &TypeDb, t: &Ty, depth: u32, budget: &mut u32) -> bool {
+    if depth > SUBSET_MAX_DEPTH || *budget == 0 {
         return false;
     }
+    *budget -= 1;
+    let mut rec = |x: &Ty| in_sub(db, x, depth + 1, budget);
     match t {
-        Ty::Tuple(v) => v.iter().all(|x| in_sub(db, x, depth + 1)),
+        Ty::Tuple(v) => v.iter().all(rec),
         Ty::Ref(_, inner) => match &**inner {
             Ty::Str => true,
-            Ty::Slice(e) => in_sub(db, e, depth + 1),
-            i => in_sub(db, i, depth + 1),
+            Ty::Slice(e) => rec(e),
+            i => rec(i),
         },
-        Ty::Array(e, n) => *n <= 4096 && in_sub(db, e, depth + 1),
+        Ty::Array(e, n) => *n <= 4096 && rec(e),
         Ty::Adt(def, args) => {
             if is_arena(db, t) {
                 return true;
             }
-            if is_cap(db, t) || is_cell(db, t) {
-                return crate::variant_fields(db, *def, args, 0)
-                    .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)));
-            }
-            if plain_struct(db, def) {
-                return crate::variant_fields(db, *def, args, 0)
-                    .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)));
+            if is_cap(db, t) || is_cell(db, t) || plain_struct(db, def) {
+                return crate::variant_fields(db, *def, args, 0).is_ok_and(|fs| fs.iter().all(rec));
             }
             match db.adts.get(def).map(|a| &a.kind) {
                 Some(gt_types::AdtKind::Enum(vs)) => (0..vs.len()).all(|v| {
-                    crate::variant_fields(db, *def, args, v)
-                        .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)))
+                    crate::variant_fields(db, *def, args, v).is_ok_and(|fs| fs.iter().all(&mut rec))
                 }),
                 _ => false,
             }
