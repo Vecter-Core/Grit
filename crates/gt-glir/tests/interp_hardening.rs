@@ -117,3 +117,44 @@ entry:
     assert_eq!(run_module(&m, "big", &[], 100), Outcome::OutOfFuel);
     assert!(matches!(run_module(&m, "main", &[], 100), Outcome::Ub(_)));
 }
+
+/// Đột biến tự động (`tools/mut.py`, Vec 2026-11-26) sống: hạ `Vec` cấp khối với căn lề 1 cho phần tử `i32`. `load`/`store` LỆCH căn lề là UB của
+/// LLVM (codegen gắn căn lề ABI) ⇒ thông dịch GLIR phải báo `Ub`: vùng cấp với căn lề nhỏ hơn kiểu, hoặc offset không là bội căn lề của kiểu.
+#[test]
+fn misaligned_load_or_store_is_ub() {
+    let m = module(
+        "glir 1
+declare @gritrt_arena_new() -> i32
+declare @gritrt_arena_alloc(i32, i64, i64) -> ptr
+fn @f(%al: i64, %off: i64) -> i32 {
+entry:
+  %h = call i32 @gritrt_arena_new()
+  %p = call ptr @gritrt_arena_alloc(%h, i64 16, %al)
+  %q = indexptr i8 %p, %off
+  store i32 i32 7, %q
+  %v = load i32 %q
+  ret i32 %v
+}
+fn @s() -> i32 {
+slot $a: [2 x i32]
+entry:
+  %q = indexptr i8 $a, i64 2
+  %v = load i16 %q
+  %w = cast zext i16 %v to i32
+  ret i32 %w
+}
+",
+    );
+    assert_eq!(run_module(&m, "f", &[4, 4], 1000), Outcome::Value(Some(7)));
+    assert_eq!(run_module(&m, "f", &[8, 0], 1000), Outcome::Value(Some(7)));
+    for (al, off) in [(1, 0), (2, 0), (4, 2), (8, 1)] {
+        let o = run_module(&m, "f", &[al, off], 1000);
+        assert!(matches!(o, Outcome::Ub(_)), "căn {al}, offset {off}: {o:?}");
+    }
+    // slot `[2 x i32]` căn 4: đọc i16 tại offset 2 (căn đúng cho i16) chỉ lỗi vì byte chưa ghi — không phải vì căn lề
+    let o = run_module(&m, "s", &[], 1000);
+    assert!(
+        matches!(&o, Outcome::Ub(u) if !u.contains("căn lề")),
+        "{o:?}"
+    );
+}

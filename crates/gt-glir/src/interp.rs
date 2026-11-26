@@ -85,6 +85,8 @@ struct St<'a> {
     nro: usize,
     /// vùng slot của các khung đã trả về (FB-G2-04): mọi truy cập/tính địa chỉ qua chúng là `Ub` (con trỏ treo vào ngăn xếp)
     freed: &'a RefCell<BTreeSet<usize>>,
+    /// căn lề (byte) BẢO ĐẢM của đầu mỗi vùng (xem `Glob::aligns`)
+    aligns: &'a RefCell<BTreeMap<usize, u64>>,
 }
 
 impl St<'_> {
@@ -132,9 +134,24 @@ impl St<'_> {
         }
         Ok(off as usize..(off + n) as usize)
     }
+    /// `load`/`store` kiểu `t` tại `(a, off)` phải căn lề theo `t` (như `align` ABI mà codegen gắn cho load/store LLVM; lệch là UB của LLVM): vùng
+    /// bảo đảm căn lề ≥ căn lề của `t` và `off` là bội của nó. Bắt bước hạ cấp vùng với căn lề quá nhỏ (vd `gritrt_arena_alloc(…, align 1)` cho `i32`).
+    fn aligned(&self, a: usize, off: u64, t: &Ty) -> Result<(), String> {
+        let need = layout(t).align.max(1);
+        let Some(have) = self.aligns.borrow().get(&a).copied() else {
+            return Err("vùng không rõ căn lề".into());
+        };
+        if have < need || !off.is_multiple_of(need) {
+            return Err(format!(
+                "truy cập lệch căn lề: cần {need}, vùng căn {have}, offset {off}"
+            ));
+        }
+        Ok(())
+    }
     fn read(&self, a: usize, off: u64, t: &Ty) -> Result<Vec<Byte>, String> {
         let n = layout(t).size;
         let r = self.range(a, off, n)?;
+        self.aligned(a, off, t)?;
         Ok(self.mem[a][r].to_vec())
     }
     fn write(&mut self, a: usize, off: u64, bytes: &[Byte]) -> Result<(), String> {
@@ -311,8 +328,11 @@ pub fn run_module_stats(
     let mut mem: Vec<Vec<Byte>> = Vec::new();
     // các global chiếm các vùng đầu (chỉ đọc)
     let mut gl: BTreeMap<String, usize> = BTreeMap::new();
+    // căn lề bảo đảm của đầu từng vùng: global 1 (chuỗi byte), vùng đối số do người gọi cấp 16 (căn lề tối đa của bố cục GLIR)
+    let mut aligns: BTreeMap<usize, u64> = BTreeMap::new();
     for g in &m.globals {
         gl.insert(g.name.clone(), mem.len());
+        aligns.insert(mem.len(), 1);
         mem.push(g.bytes.iter().map(|b| Byte::B(*b)).collect());
     }
     let nro = mem.len();
@@ -328,6 +348,7 @@ pub fn run_module_stats(
                 mem.push(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect());
                 let a = mem.len() - 1;
                 refs.push(a);
+                aligns.insert(a, 16);
                 let mut fat: Vec<Byte> = (0..8u8).map(|k| Byte::P(a, 0, k)).collect();
                 fat.extend(int_bytes(u128::from(*len), 8));
                 Val::Agg(fat)
@@ -335,6 +356,7 @@ pub fn run_module_stats(
             Arg::Ref(bs) => {
                 mem.push(bs.iter().map(|b| b.map_or(Byte::Uninit, Byte::B)).collect());
                 refs.push(mem.len() - 1);
+                aligns.insert(mem.len() - 1, 16);
                 Val::Ptr(mem.len() - 1, 0)
             }
         })
@@ -354,6 +376,7 @@ pub fn run_module_stats(
         arenas: RefCell::new(Vec::new()),
         heap: RefCell::new(BTreeMap::new()),
         wipes: RefCell::new(0),
+        aligns: RefCell::new(aligns),
     };
     let mut out = exec(f, &vals, &mut fuel, 0, &mut mem, &glob);
     if let Outcome::Ptr(a, _) = out
@@ -406,6 +429,8 @@ struct Glob<'m> {
     heap: RefCell<BTreeMap<usize, (u128, u128)>>,
     /// số lần `gritrt_secret_wipe`
     wipes: RefCell<u64>,
+    /// vùng → căn lề BẢO ĐẢM của đầu vùng (slot: căn lề kiểu; global: 1; `gritrt_arena_alloc`/`gritrt_heap_alloc`: căn lề yêu cầu; vùng đối số: 16)
+    aligns: RefCell<BTreeMap<usize, u64>>,
 }
 
 /// Chữ ký (tham số, trả về) của các hàm runtime CÓ mô hình tham chiếu trong thông dịch — đúng chữ ký codegen LLVM phát cho `gritrt_*` cùng tên
@@ -532,6 +557,7 @@ fn runtime_call(
             }
             mem.push(vec![Byte::Uninit; size as usize]);
             arenas[k].push(mem.len() - 1);
+            glob.aligns.borrow_mut().insert(mem.len() - 1, align as u64);
             Ok(Some(Val::Ptr(mem.len() - 1, 0)))
         }
         "gritrt_heap_alloc" => {
@@ -544,6 +570,7 @@ fn runtime_call(
             }
             mem.push(vec![Byte::Uninit; size as usize]);
             glob.heap.borrow_mut().insert(mem.len() - 1, (size, align));
+            glob.aligns.borrow_mut().insert(mem.len() - 1, align as u64);
             Ok(Some(Val::Ptr(mem.len() - 1, 0)))
         }
         "gritrt_arena_reset" => {
@@ -588,6 +615,7 @@ fn exec_frame(
         gl: &glob.gl,
         nro: glob.nro,
         freed: &glob.freed,
+        aligns: &glob.aligns,
     };
     if args.len() != f.params.len() {
         return Outcome::Ub("sai số đối số".into());
@@ -610,6 +638,9 @@ fn exec_frame(
         }
         st.slot.insert(n.clone(), st.mem.len());
         st.mem.push(vec![Byte::Uninit; size as usize]);
+        st.aligns
+            .borrow_mut()
+            .insert(st.mem.len() - 1, layout(t).align.max(1));
     }
     let ub = |m: String| Outcome::Ub(m);
     let mut cur = 0usize;
@@ -764,6 +795,7 @@ fn exec_frame(
                             _ => return Err("store: kiểu/giá trị không khớp".into()),
                         };
                         st.write(a, off, &bytes)?;
+                        st.aligned(a, off, ty)?;
                     }
                     Inst::FieldPtr { d, ty, ptr, idx } => {
                         let (a, off) = st.ptr(ptr)?;

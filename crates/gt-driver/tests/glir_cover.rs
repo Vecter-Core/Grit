@@ -1339,3 +1339,37 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_owned() {
         "oracle Owned quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
+
+/// Đột biến tự động (`tools/mut.py`, Vec 2026-11-26) sống: `runtime_call` trả "đã hạ" cho MỌI callee không thân MIR (kể cả nhóm DỪNG chờ kiến trúc:
+/// I/O, `Atomic`, `spawn`) ⇒ lời gọi bị BỎ IM LẶNG. Ngưỡng phủ chỉ là cận dưới nên không bắt được; test này đòi các hàm đó KHÔNG hạ (fail-closed).
+#[test]
+fn runtime_calls_without_a_model_are_never_silently_dropped() {
+    let src = "\
+ƒ clock(c: &Cap<Clock>) → u64 ! {io} { c.now() }
+ƒ atom(x: u32) → u32 ! ∅ { a ≔ Atomic::new(x); a.load(AtomicOrdering::SeqCst) }
+ƒ out(o: &Cap<Out>, x: u64) ! {io} { o.write_u64(x); }
+ƒ ok(x: u8) → u8 ! ∅ { x +% 1u8 }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let res = check(
+        &[SourceInput {
+            name: "main.gt".to_string(),
+            text: src.to_string(),
+        }],
+        &Options::default(),
+    )
+    .expect("check");
+    let art = res.open_gate().expect("cổng");
+    let mir = glir_input_mir(art);
+    let lo = gt_glirgen::lower_module(&art.types, &mir);
+    let keys: Vec<String> = lo
+        .funcs
+        .values()
+        .filter_map(|i| mir.bodies.iter().find(|b| b.node == i.node))
+        .map(|b| b.key.clone())
+        .collect();
+    assert!(keys.iter().any(|k| k == "main::ok"), "{keys:?}");
+    for k in ["main::clock", "main::atom", "main::out"] {
+        assert!(!keys.iter().any(|x| x == k), "{k} không được hạ: {keys:?}");
+    }
+}
