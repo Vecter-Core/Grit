@@ -119,6 +119,11 @@ fn is_arena(db: &TypeDb, t: &Ty) -> bool {
         && db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Arena)))
 }
 
+/// `Cap<T>` (lang): giá trị chỉ là bằng chứng quyền (D29); `root_*` tạo giá trị ZERO (như `Intr::RootCap` của codegen)
+fn is_cap(db: &TypeDb, t: &Ty) -> bool {
+    matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Cap)))
+}
+
 /// Khai báo của hàm runtime mà GLIR được phép gọi: tên và chữ ký ĐÚNG như codegen LLVM phát (`gt-codegen-llvm` `Intr::Arena*`; bảng `RUNTIME`
 /// của gt-guard). Tên ngoài bảng ⇒ `None` (không hạ).
 #[must_use]
@@ -155,6 +160,10 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32) -> bool {
         Ty::Adt(def, args) => {
             if is_arena(db, t) {
                 return true;
+            }
+            if is_cap(db, t) {
+                return crate::variant_fields(db, *def, args, 0)
+                    .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)));
             }
             if plain_struct(db, def) {
                 return crate::variant_fields(db, *def, args, 0)
@@ -548,9 +557,17 @@ impl Lw<'_> {
         dest: &Place,
     ) -> R<bool> {
         match key {
-            "$prelude::Arena::new" => {
-                if !args.is_empty() || !generics.is_empty() {
+            "$prelude::Arena::new" | "$prelude::Cap<Alloc>::arena" => {
+                // `Cap<Alloc>::arena(&self)` = `Arena::new()` (codegen `Intr::ArenaNew`): người nhận chỉ được tính (bằng chứng quyền), không dùng
+                let want = usize::from(key != "$prelude::Arena::new");
+                if args.len() != want || !generics.is_empty() {
                     return un("Arena::new: sai số đối số");
+                }
+                if let Some(c) = args.first() {
+                    let (_, tc) = self.operand(c)?;
+                    if !matches!(&tc, Ty::Ref(_, i) if is_cap(self.db, i)) {
+                        return un("Cap<Alloc>::arena: người nhận không phải &Cap");
+                    }
                 }
                 let h = self.t();
                 self.push(Inst::Call {
@@ -624,9 +641,108 @@ impl Lw<'_> {
                     args: vec![h],
                 });
             }
+            k if k.starts_with("$prelude::root_") => {
+                if !args.is_empty() || !generics.is_empty() {
+                    return un("root_*: sai số đối số");
+                }
+                let (ptr, dty) = self.place(dest)?;
+                if !is_cap(self.db, &dty) {
+                    return un("root_*: đích không phải Cap");
+                }
+                let g = gty(self.db, &dty)?;
+                self.store_zero(ptr, &g)?;
+            }
+            k if matches!(
+                k.strip_prefix("$prelude::"),
+                Some("band" | "bor" | "bxor" | "bnot" | "shl" | "shr" | "rotl" | "rotr")
+            ) =>
+            {
+                let name = &k["$prelude::".len()..];
+                let mut vs = Vec::new();
+                for a in args {
+                    let (v, t) = self.operand(a)?;
+                    if t != Ty::Int(IntTy::U32) {
+                        return un("phép bit prelude trên kiểu không phải u32");
+                    }
+                    vs.push(v);
+                }
+                if !generics.is_empty() || vs.len() != if name == "bnot" { 1 } else { 2 } {
+                    return un("phép bit prelude: sai số đối số");
+                }
+                let a = vs[0].clone();
+                let g = G::I32;
+                let r = match name {
+                    "bnot" => self.bin(GB::Xor, &g, a, Opd::Int(G::I32, -1)),
+                    "band" => self.bin(GB::And, &g, a, vs[1].clone()),
+                    "bor" => self.bin(GB::Or, &g, a, vs[1].clone()),
+                    "bxor" => self.bin(GB::Xor, &g, a, vs[1].clone()),
+                    _ => {
+                        // chốt riêng của codegen (`bit_op`: `n < 32` ⇒ abort `precondition`), ngoài Assert ⊳ ở chỗ gọi
+                        let n = vs[1].clone();
+                        let ok = self.cmp(CmpPred::Ult, &g, n.clone(), Opd::Int(G::I32, 32));
+                        self.extra += 1;
+                        let (good, bad) = (
+                            format!("rt{}.ok", self.extra),
+                            format!("rt{}.abort", self.extra),
+                        );
+                        self.finish(Term::CondBr(ok, good.clone(), bad.clone()), Some(bad));
+                        self.finish(Term::Abort("precondition".into()), Some(good));
+                        match name {
+                            "shl" => self.bin(GB::Shl, &g, a, n),
+                            "shr" => self.bin(GB::LShr, &g, a, n),
+                            _ => {
+                                // xoay = (a ≪ n) | (a ≫ ((32 − n) & 31)) (rotl), đối xứng cho rotr; n = 0 ⇒ a | a = a (không dịch ≥ 32)
+                                let m = self.bin(GB::Sub, &g, Opd::Int(G::I32, 32), n.clone());
+                                let m = self.bin(GB::And, &g, m, Opd::Int(G::I32, 31));
+                                let (x, y) = if name == "rotl" {
+                                    (
+                                        self.bin(GB::Shl, &g, a.clone(), n),
+                                        self.bin(GB::LShr, &g, a, m),
+                                    )
+                                } else {
+                                    (
+                                        self.bin(GB::LShr, &g, a.clone(), n),
+                                        self.bin(GB::Shl, &g, a, m),
+                                    )
+                                };
+                                self.bin(GB::Or, &g, x, y)
+                            }
+                        }
+                    }
+                };
+                self.store(dest, r, &Ty::Int(IntTy::U32))?;
+            }
             _ => return Ok(false),
         }
         Ok(true)
+    }
+
+    /// ghi 0 vào mọi lá số nguyên của `g` tại `ptr` (giá trị `Cap` zero); kiểu khác ⇒ không hạ
+    fn store_zero(&mut self, ptr: Opd, g: &G) -> R<()> {
+        match g {
+            G::Struct(fs) => {
+                for (i, f) in fs.iter().enumerate() {
+                    let d = self.t();
+                    self.push(Inst::FieldPtr {
+                        d: d.clone(),
+                        ty: g.clone(),
+                        ptr: ptr.clone(),
+                        idx: i as u32,
+                    });
+                    self.store_zero(Opd::Val(d), f)?;
+                }
+                Ok(())
+            }
+            t if t.is_int() => {
+                self.push(Inst::Store {
+                    ty: t.clone(),
+                    val: Opd::Int(t.clone(), 0),
+                    ptr,
+                });
+                Ok(())
+            }
+            _ => un("giá trị zero của kiểu không phải struct số nguyên"),
+        }
     }
 
     fn block_name(b: usize) -> String {

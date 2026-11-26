@@ -1118,9 +1118,13 @@ impl<'a> Interp<'a> {
             );
             return Ok(Some(self.leak(bytes)));
         }
-        if key == "$prelude::Arena::new" || key == "$prelude::Arena::reset" {
-            // Arena của thông dịch: tay cầm 0, không giới hạn bộ nhớ; `reset` không làm gì (M6 đã bảo đảm không còn tham chiếu vào nội dung)
-            return Ok(Some(if m == "new" {
+        if key == "$prelude::Arena::new"
+            || key == "$prelude::Arena::reset"
+            || key == "$prelude::Cap<Alloc>::arena"
+        {
+            // Arena của thông dịch: tay cầm 0, không giới hạn bộ nhớ; `reset` không làm gì (M6 đã bảo đảm không còn tham chiếu vào nội dung).
+            // `Cap<Alloc>::arena` = `Arena::new` (như codegen `Intr::ArenaNew`)
+            return Ok(Some(if m != "reset" {
                 V::Adt(0, vec![V::Int(0, IntTy::I32)])
             } else {
                 V::Unit

@@ -130,9 +130,10 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
         eprintln!("  callee không thân: {n:5} lời gọi trong {nb:4} thân  {k}");
     }
     // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25; lời gọi runtime Arena — 2026-11-26 (3524/13385 đo trên MIR
-    // TRƯỚC M7); FB-P2-03 — 2026-11-26: đo lại trên MIR SAU M7 (đầu vào của codegen; thêm thân hợp đồng ⊳/⊲ làm instance): 3523/13404
+    // TRƯỚC M7); FB-P2-03 — 2026-11-26: đo lại trên MIR SAU M7 (đầu vào của codegen; thêm thân hợp đồng ⊳/⊲ làm instance): 3523/13404;
+    // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415
     assert!(
-        lowered >= 3523 && inst_ok >= 13404,
+        lowered >= 3531 && inst_ok >= 13415,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -984,5 +985,38 @@ fn glir_is_lowered_from_the_post_m7_mir_that_codegen_consumes() {
         cover.is_empty(),
         "GLIR thiếu chốt mà codegen có: {cover:?}\n{}",
         gt_glir::print(&lo.module)
+    );
+}
+
+/// Chương trình SINH dùng intrinsic KHÔNG có thân MIR ngoài Arena: phép bit u32 của prelude (`band/bor/bxor/bnot/shl/shr/rotl/rotr`; hạ TẠI CHỖ như `bit_op`
+/// của codegen, gồm chốt `n < 32` ⇒ abort `precondition`, xoay không dịch ≥ 32 khi n = 0), `root_alloc` (giá trị `Cap` zero) và `Cap<Alloc>::arena` (= `Arena::new`).
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_intrinsics() {
+    let src = "\
+ƒ a_and(x: u32, y: u32) → u32 ! ∅ { band(x, y) }
+ƒ a_or(x: u32, y: u32) → u32 ! ∅ { bor(x, y) }
+ƒ a_xor(x: u32, y: u32) → u32 ! ∅ { bxor(x, y) }
+ƒ a_not(x: u32) → u32 ! ∅ { bnot(x) }
+ƒ a_shl(x: u32, n: u32) → u32 ! ∅ { shl(x, n) }
+ƒ a_shr(x: u32, n: u32) → u32 ! ∅ { shr(x, n) }
+ƒ a_rotl(x: u32, n: u32) → u32 ! ∅ { rotl(x, n) }
+ƒ a_rotr(x: u32, n: u32) → u32 ! ∅ { rotr(x, n) }
+ƒ a_mix(x: u32, n: u8) → u32 ! ∅ { k ≔ (n % 32u8) as u32; bxor(rotl(x, k), shr(x, k)) }
+ƒ use_cap(c: &Cap<Alloc>, x: i32) → i32 ! {mem} { ar ≔ c.arena(); p ≔ ar.alloc(x); *p }
+ƒ main() → i32 ! {mem} { al ≔ root_alloc(); ar ≔ al.arena(); p ≔ ar.alloc(41i32); *p +% use_cap(&al, 1i32) }
+";
+    let mut seed = 0xB175_0FF5_E7C0_FFEEu64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 200);
+    eprintln!("GLIR_DIFF_INTR bodies={bodies} runs={runs} aborts={aborts}");
+    // 9 hàm phép bit + `main` (root_alloc, Cap<Alloc>::arena); `use_cap` nhận `&Cap` nên chỉ chạy qua `main`
+    assert!(
+        bodies >= 10 && runs >= 1800 && aborts >= 100,
+        "oracle intrinsic quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
