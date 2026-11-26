@@ -124,6 +124,11 @@ fn is_cap(db: &TypeDb, t: &Ty) -> bool {
     matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Cap)))
 }
 
+/// `Cell<T>` (lang, `{v: T}`): chỉ đọc/ghi qua `Cell::new/get/set` (như `Intr::Cell*` của codegen: chèn/đọc/ghi trường 0)
+fn is_cell(db: &TypeDb, t: &Ty) -> bool {
+    matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Cell)))
+}
+
 /// Khai báo của hàm runtime mà GLIR được phép gọi: tên và chữ ký ĐÚNG như codegen LLVM phát (`gt-codegen-llvm` `Intr::Arena*`; bảng `RUNTIME`
 /// của gt-guard). Tên ngoài bảng ⇒ `None` (không hạ).
 #[must_use]
@@ -161,7 +166,7 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32) -> bool {
             if is_arena(db, t) {
                 return true;
             }
-            if is_cap(db, t) {
+            if is_cap(db, t) || is_cell(db, t) {
                 return crate::variant_fields(db, *def, args, 0)
                     .is_ok_and(|fs| fs.iter().all(|x| in_sub(db, x, depth + 1)));
             }
@@ -711,6 +716,85 @@ impl Lw<'_> {
                     }
                 };
                 self.store(dest, r, &Ty::Int(IntTy::U32))?;
+            }
+            k if k.starts_with("$prelude::Cell<") => {
+                let m = k.rsplit("::").next().unwrap_or_default();
+                let mut vs = Vec::new();
+                for a in args {
+                    vs.push(self.operand(a)?);
+                }
+                match (m, vs.as_slice()) {
+                    ("new", [(v, tv)]) => {
+                        let (ptr, dty) = self.place(dest)?;
+                        if !is_cell(self.db, &dty) {
+                            return un("Cell::new: đích không phải Cell");
+                        }
+                        let gc = gty(self.db, &dty)?;
+                        if gc != G::Struct(vec![gty(self.db, tv)?]) {
+                            return un("Cell::new: kiểu giá trị khác trường của Cell");
+                        }
+                        if !is_unit(tv) {
+                            let f = self.t();
+                            self.push(Inst::FieldPtr {
+                                d: f.clone(),
+                                ty: gc,
+                                ptr,
+                                idx: 0,
+                            });
+                            let gv = gty(self.db, tv)?;
+                            self.push(Inst::Store {
+                                ty: gv,
+                                val: v.clone(),
+                                ptr: Opd::Val(f),
+                            });
+                        }
+                    }
+                    ("get" | "set", [(p, Ty::Ref(_, inner)), rest @ ..])
+                        if is_cell(self.db, inner) =>
+                    {
+                        let Ty::Adt(def, cargs) = &**inner else {
+                            return un("Cell: người nhận lạ");
+                        };
+                        let [tv] = crate::variant_fields(self.db, *def, cargs, 0)
+                            .map_err(Unsupported)?
+                            .try_into()
+                            .map_err(|_| Unsupported("Cell phải có đúng một trường".into()))?;
+                        let gc = gty(self.db, inner)?;
+                        let gv = gty(self.db, &tv)?;
+                        let f = self.t();
+                        self.push(Inst::FieldPtr {
+                            d: f.clone(),
+                            ty: gc,
+                            ptr: p.clone(),
+                            idx: 0,
+                        });
+                        match (m, rest) {
+                            ("get", []) => {
+                                if is_unit(&tv) {
+                                    return Ok(true);
+                                }
+                                let d = self.t();
+                                self.push(Inst::Load {
+                                    d: d.clone(),
+                                    ty: gv,
+                                    ptr: Opd::Val(f),
+                                });
+                                self.store(dest, Opd::Val(d), &tv)?;
+                            }
+                            ("set", [(v, t2)]) if gty(self.db, t2)? == gv => {
+                                if !is_unit(&tv) {
+                                    self.push(Inst::Store {
+                                        ty: gv,
+                                        val: v.clone(),
+                                        ptr: Opd::Val(f),
+                                    });
+                                }
+                            }
+                            _ => return un("Cell::get/set: sai đối số"),
+                        }
+                    }
+                    _ => return un("Cell: thao tác/đối số lạ"),
+                }
             }
             _ => return Ok(false),
         }

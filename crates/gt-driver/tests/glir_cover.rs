@@ -131,9 +131,9 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     }
     // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25; lời gọi runtime Arena — 2026-11-26 (3524/13385 đo trên MIR
     // TRƯỚC M7); FB-P2-03 — 2026-11-26: đo lại trên MIR SAU M7 (đầu vào của codegen; thêm thân hợp đồng ⊳/⊲ làm instance): 3523/13404;
-    // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415
+    // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415; `Cell::new/get/set` — 2026-11-26: 3534/13418
     assert!(
-        lowered >= 3531 && inst_ok >= 13415,
+        lowered >= 3534 && inst_ok >= 13418,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -1018,5 +1018,37 @@ fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_intrinsics() {
     assert!(
         bodies >= 10 && runs >= 1800 && aborts >= 100,
         "oracle intrinsic quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
+}
+
+/// Chương trình SINH dùng `Cell<T>` (intrinsic không thân MIR; hạ tại chỗ như `Intr::Cell*` của codegen: trường 0 của `{v: T}`): số, bool, tuple, struct,
+/// ghi qua `&Cell` trong hàm khác, tràn sau `get`.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_cells() {
+    let src = "\
+▢ P { a: u8, b: i32 }
+⊐ Copy for P { }
+ƒ c1(x: i32, y: i32) → i32 ! ∅ { c ≔ Cell::new(x); a ≔ c.get(); c.set(y); a +% c.get() }
+ƒ bump(c: &Cell<u8>) ! ∅ { c.set(c.get() +% 1u8); }
+ƒ c2(x: u8) → u8 ! ∅ { c ≔ Cell::new(x); bump(&c); bump(&c); c.get() }
+ƒ c3(x: u8, y: u16) → u16 ! ∅ { c ≔ Cell::new((x, y)); t ≔ c.get(); c.set((t.0 +% 1u8, t.1)); u ≔ c.get(); (u.0 as u16) +% u.1 }
+ƒ c4(x: u32) → u32 ! ∅ { c ≔ Cell::new(x); c.get() + 1u32 }
+ƒ c5(x: u8, y: i32) → i32 ! ∅ { c ≔ Cell::new(P { a: x, b: y }); p ≔ c.get(); c.set(P { a: 0u8, b: p.b +% 1i32 }); c.get().b +% (p.a as i32) }
+ƒ c6(x: bool) → bool ! ∅ { c ≔ Cell::new(x); c.set(¬c.get()); c.get() }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0xCE11_CE11_0000_1111u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_CELL bodies={bodies} runs={runs} aborts={aborts}");
+    // 6 hàm dùng Cell + `main` (`bump` nhận `&Cell` nên chỉ chạy qua `c2`)
+    assert!(
+        bodies >= 7 && runs >= 900 && aborts >= 10,
+        "oracle Cell quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }
