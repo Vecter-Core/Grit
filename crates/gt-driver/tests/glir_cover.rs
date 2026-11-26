@@ -19,6 +19,8 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     let (mut inst_ok, mut inst_total) = (0usize, 0usize);
     let mut why: BTreeMap<String, usize> = BTreeMap::new();
     let mut why_body: BTreeMap<String, usize> = BTreeMap::new();
+    // khảo sát: lời gọi (trực tiếp) tới callee KHÔNG có thân MIR (intrinsic/runtime), theo khoá: (số lời gọi, số thân chứa)
+    let mut nobody: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     for p in files {
         let src = std::fs::read_to_string(&p).expect("đọc");
         let Ok(res) = check(
@@ -38,6 +40,38 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
             .filter(|b| b.kind == gt_mir::BodyKind::Fn)
             .collect();
         total += fns.len();
+        let has_body: std::collections::BTreeSet<_> =
+            art.mir.bodies.iter().map(|b| b.node).collect();
+        for b in &fns {
+            let mut keys: Vec<String> = Vec::new();
+            for bd in &b.blocks {
+                if let Some(gt_mir::Terminator {
+                    kind:
+                        gt_mir::TerminatorKind::Call {
+                            callee: gt_mir::Callee::Fn { node, .. },
+                            ..
+                        },
+                    ..
+                }) = &bd.terminator
+                    && !has_body.contains(node)
+                {
+                    keys.push(
+                        art.mir
+                            .keys
+                            .get(node)
+                            .cloned()
+                            .unwrap_or_else(|| "?".into()),
+                    );
+                }
+            }
+            let distinct: std::collections::BTreeSet<_> = keys.iter().cloned().collect();
+            for k in keys {
+                nobody.entry(k).or_default().0 += 1;
+            }
+            for k in distinct {
+                nobody.entry(k).or_default().1 += 1;
+            }
+        }
         let lo = gt_glirgen::lower_module(&art.types, &art.mir);
         for (_, _, u) in &lo.bad {
             *why.entry(u.0.clone()).or_default() += 1;
@@ -83,14 +117,19 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     eprintln!("GLIR_COVER bodies lowered={lowered} total={total}");
     let mut by: Vec<_> = why_body.into_iter().collect();
     by.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
-    for (w, n) in by.iter().take(15) {
+    for (w, n) in by.iter().take(200) {
         eprintln!("  thân chưa hạ: {n:5}  {w}");
     }
     eprintln!("GLIR_COVER instances lowered={inst_ok} total={inst_total}");
     let mut by: Vec<_> = why.into_iter().collect();
     by.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
-    for (w, n) in by.iter().take(15) {
+    for (w, n) in by.iter().take(200) {
         eprintln!("  instance chưa hạ: {n:5}  {w}");
+    }
+    let mut by: Vec<_> = nobody.into_iter().collect();
+    by.sort_by_key(|(k, (n, _))| (std::cmp::Reverse(*n), k.clone()));
+    for (k, (n, nb)) in &by {
+        eprintln!("  callee không thân: {n:5} lời gọi trong {nb:4} thân  {k}");
     }
     // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25
     assert!(
