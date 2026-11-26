@@ -1,0 +1,7 @@
+// expect: fail G0001
+// note: hằng f64 chỉ viết theo mẫu bit `0x` + 16 chữ số hex (không thập phân: tránh phụ thuộc bộ đọc số)
+glir 1
+fn @f() -> f64 {
+entry:
+  ret f64 f64 1.5
+}

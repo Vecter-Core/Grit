@@ -1,5 +1,5 @@
 //! Đọc văn bản GLIR (định dạng của `print`). Lỗi ⇒ `Err("dòng N: …")`; không panic với mọi đầu vào.
-use crate::print::{BINOPS, CASTS, PREDS};
+use crate::print::{BINOPS, CASTS, FBINOPS, FPREDS, FUNOPS, ORDS, PREDS, RMWOPS};
 use crate::{Block, Decl, Func, Inst, Module, Opd, Term, Ty};
 
 type R<T> = Result<T, String>;
@@ -82,6 +82,22 @@ fn parse_opd(s: &str) -> R<Opd> {
         return Ok(Opd::Null);
     }
     let (t, r) = parse_ty(s, 0)?;
+    if t == Ty::F64 {
+        // `f64 0x` + ĐÚNG 16 chữ số hex thường (dạng duy nhất mà `print` sinh ⇒ in(đọc(x)) = x)
+        let h = r
+            .trim()
+            .strip_prefix("0x")
+            .filter(|h| h.len() == 16 && h.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f')))
+            .ok_or_else(|| {
+                format!(
+                    "hằng f64 phải là `0x` + 16 chữ số hex thường, có `{}`",
+                    r.trim()
+                )
+            })?;
+        return u64::from_str_radix(h, 16)
+            .map(Opd::F64)
+            .map_err(|_| format!("hằng f64 sai `{h}`"));
+    }
     if !t.is_int() {
         return Err("hằng phải có kiểu số nguyên".into());
     }
@@ -169,6 +185,100 @@ fn parse_inst(line: &str) -> R<Inst> {
                 ty: t,
                 a: parse_opd(a)?,
                 b: parse_opd(b)?,
+            })
+        }
+        "fbin" | "fcmp" => {
+            let (o, r) = rest.split_once(' ').ok_or("thiếu toán tử/vị từ")?;
+            let (t, r) = ty_then(r)?;
+            let [a, b] = split_top(r)[..] else {
+                return Err(format!("{op} cần 2 toán hạng"));
+            };
+            let (d, a, b) = (need(d)?, parse_opd(a)?, parse_opd(b)?);
+            Ok(if op == "fbin" {
+                Inst::FBin {
+                    d,
+                    op: lookup(&FBINOPS, o)?,
+                    ty: t,
+                    a,
+                    b,
+                }
+            } else {
+                Inst::FCmp {
+                    d,
+                    pred: lookup(&FPREDS, o)?,
+                    ty: t,
+                    a,
+                    b,
+                }
+            })
+        }
+        "atomicload" => {
+            let (o, r) = rest.split_once(' ').ok_or("atomicload thiếu thứ tự")?;
+            let (t, r) = ty_then(r)?;
+            Ok(Inst::AtomicLoad {
+                d: need(d)?,
+                ord: lookup(&ORDS, o)?,
+                ty: t,
+                ptr: parse_opd(r)?,
+            })
+        }
+        "atomicstore" => {
+            if d.is_some() {
+                return Err("`atomicstore` không định nghĩa giá trị (`%d =` thừa)".into());
+            }
+            let (o, r) = rest.split_once(' ').ok_or("atomicstore thiếu thứ tự")?;
+            let (t, r) = ty_then(r)?;
+            let [v, p] = split_top(r)[..] else {
+                return Err("atomicstore cần 2 toán hạng".into());
+            };
+            Ok(Inst::AtomicStore {
+                ord: lookup(&ORDS, o)?,
+                ty: t,
+                val: parse_opd(v)?,
+                ptr: parse_opd(p)?,
+            })
+        }
+        "atomicrmw" => {
+            let (o, r) = rest.split_once(' ').ok_or("atomicrmw thiếu phép")?;
+            let (od, r) = r.split_once(' ').ok_or("atomicrmw thiếu thứ tự")?;
+            let (t, r) = ty_then(r)?;
+            let [p, v] = split_top(r)[..] else {
+                return Err("atomicrmw cần 2 toán hạng".into());
+            };
+            Ok(Inst::AtomicRmw {
+                d: need(d)?,
+                op: lookup(&RMWOPS, o)?,
+                ord: lookup(&ORDS, od)?,
+                ty: t,
+                ptr: parse_opd(p)?,
+                val: parse_opd(v)?,
+            })
+        }
+        "cmpxchg" => {
+            let (s1, r) = rest.split_once(' ').ok_or("cmpxchg thiếu thứ tự")?;
+            let (s2, r) = r.split_once(' ').ok_or("cmpxchg thiếu thứ tự thất bại")?;
+            let (t, r) = ty_then(r)?;
+            let [p, c, n] = split_top(r)[..] else {
+                return Err("cmpxchg cần 3 toán hạng".into());
+            };
+            Ok(Inst::CmpXchg {
+                d: need(d)?,
+                succ: lookup(&ORDS, s1)?,
+                fail: lookup(&ORDS, s2)?,
+                ty: t,
+                ptr: parse_opd(p)?,
+                cmp: parse_opd(c)?,
+                new: parse_opd(n)?,
+            })
+        }
+        "funop" => {
+            let (o, r) = rest.split_once(' ').ok_or("funop thiếu toán tử")?;
+            let (t, r) = ty_then(r)?;
+            Ok(Inst::FUn {
+                d: need(d)?,
+                op: lookup(&FUNOPS, o)?,
+                ty: t,
+                v: parse_opd(r)?,
             })
         }
         "select" => {

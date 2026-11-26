@@ -1,0 +1,50 @@
+// expect: pass
+// note: lệnh nguyên tử (thứ tự ghi lại, thông dịch tuần tự) + mô hình khoá `gritrt_mutex_lock/unlock` (ô 8 byte: 0 mở, 1 giữ)
+// @at(%x, %y): a = x; o = fetch_add(a, y); cas(a, o+y → 7) thành công ⇒ a = 7; swap(a, 5) trả 7; kết quả o + 7 + load(a)=5
+// @lk(%k): k = 0 ⇒ khoá/mở đúng cặp (1); k = 1 ⇒ khoá hai lần (Ub: khoá chết tuần tự); k = 2 ⇒ mở khi chưa khoá (Ub)
+glir 1
+declare @gritrt_mutex_lock(ptr) -> void
+declare @gritrt_mutex_unlock(ptr) -> void
+fn @at(%x: i32, %y: i32) -> i32 {
+slot $a: {i32}
+entry:
+  %p = fieldptr {i32} $a, 0
+  atomicstore monotonic i32 %x, %p
+  %o = atomicrmw add seq_cst i32 %p, %y
+  %e = bin add i32 %o, %y
+  %c = cmpxchg acq_rel acquire i32 %p, %e, i32 7
+  %ok = icmp eq i32 %c, %e
+  condbr %ok, yes, no
+yes:
+  %s = atomicrmw xchg release i32 %p, i32 5
+  %l = atomicload acquire i32 %p
+  %r1 = bin add i32 %o, %s
+  %r = bin add i32 %r1, %l
+  ret i32 %r
+no:
+  ret i32 i32 -1
+}
+fn @lk(%k: i8) -> i32 {
+slot $m: {i32, i64}
+entry:
+  %l = fieldptr {i32, i64} $m, 1
+  store i64 i64 0, %l
+  %c2 = icmp eq i8 %k, i8 2
+  condbr %c2, bad_unlock, lock
+bad_unlock:
+  call void @gritrt_mutex_unlock(%l)
+  ret i32 i32 0
+lock:
+  call void @gritrt_mutex_lock(%l)
+  %c1 = icmp eq i8 %k, i8 1
+  condbr %c1, again, done
+again:
+  call void @gritrt_mutex_lock(%l)
+  ret i32 i32 0
+done:
+  call void @gritrt_mutex_unlock(%l)
+  %v = load i64 %l
+  %r = cast trunc i64 %v to i32
+  %r2 = bin add i32 %r, i32 1
+  ret i32 %r2
+}

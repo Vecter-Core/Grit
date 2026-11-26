@@ -1,8 +1,8 @@
 //! Verifier GLIR (Rust thuần, không phụ thuộc LLVM). Trả danh sách lỗi `Gxxxx: …` (rỗng ⇒ hợp lệ). Mã:
-//! G01xx cấu trúc khối · G02xx định nghĩa/dùng SSA, slot · G03xx kiểu · G04xx phi.
+//! G01xx cấu trúc khối · G02xx định nghĩa/dùng SSA, slot · G03xx kiểu · G04xx phi. G0310: thứ tự bộ nhớ không hợp lệ cho lệnh nguyên tử.
 //! FB-G2-04 (Gemini G2-04): G0106 cạnh vào khối vào; G0107 trùng tên `declare`/`fn`; G0302 `%x = call void`; G0308 `void` ở chỗ giá trị,
 //! hằng không nguyên; G0309 kiểu có cỡ tràn `u64` hoặc > `isize::MAX`.
-use crate::{Func, Inst, Module, Opd, Term, Ty};
+use crate::{AtomicOrd, Func, Inst, Module, Opd, Term, Ty};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// (ngữ cảnh, toán hạng, khối, chỉ số lệnh, khối tiền nhiệm của phi) → kiểu toán hạng
@@ -32,6 +32,12 @@ fn inst_def(i: &Inst) -> Option<&str> {
     match i {
         Inst::Bin { d, .. }
         | Inst::ICmp { d, .. }
+        | Inst::FBin { d, .. }
+        | Inst::FUn { d, .. }
+        | Inst::FCmp { d, .. }
+        | Inst::AtomicLoad { d, .. }
+        | Inst::AtomicRmw { d, .. }
+        | Inst::CmpXchg { d, .. }
         | Inst::Select { d, .. }
         | Inst::Cast { d, .. }
         | Inst::Load { d, .. }
@@ -39,21 +45,26 @@ fn inst_def(i: &Inst) -> Option<&str> {
         | Inst::IndexPtr { d, .. }
         | Inst::Phi { d, .. } => Some(d),
         Inst::Call { d, .. } => d.as_deref(),
-        Inst::Store { .. } => None,
+        Inst::Store { .. } | Inst::AtomicStore { .. } => None,
     }
 }
 
 fn ret_ty(i: &Inst) -> Option<Ty> {
     match i {
         Inst::Bin { ty, .. }
+        | Inst::FBin { ty, .. }
+        | Inst::FUn { ty, .. }
+        | Inst::AtomicLoad { ty, .. }
+        | Inst::AtomicRmw { ty, .. }
+        | Inst::CmpXchg { ty, .. }
         | Inst::Select { ty, .. }
         | Inst::Load { ty, .. }
         | Inst::Phi { ty, .. } => Some(ty.clone()),
-        Inst::ICmp { .. } => Some(Ty::I1),
+        Inst::ICmp { .. } | Inst::FCmp { .. } => Some(Ty::I1),
         Inst::Cast { to, .. } => Some(to.clone()),
         Inst::FieldPtr { .. } | Inst::IndexPtr { .. } => Some(Ty::Ptr),
         Inst::Call { ret, .. } => Some(ret.clone()),
-        Inst::Store { .. } => None,
+        Inst::Store { .. } | Inst::AtomicStore { .. } => None,
     }
 }
 
@@ -77,6 +88,13 @@ fn inst_value_tys(i: &Inst) -> Vec<&Ty> {
     match i {
         Inst::Bin { ty, .. }
         | Inst::ICmp { ty, .. }
+        | Inst::FBin { ty, .. }
+        | Inst::FUn { ty, .. }
+        | Inst::FCmp { ty, .. }
+        | Inst::AtomicLoad { ty, .. }
+        | Inst::AtomicStore { ty, .. }
+        | Inst::AtomicRmw { ty, .. }
+        | Inst::CmpXchg { ty, .. }
         | Inst::Select { ty, .. }
         | Inst::Load { ty, .. }
         | Inst::Store { ty, .. }
@@ -93,7 +111,15 @@ fn inst_value_tys(i: &Inst) -> Vec<&Ty> {
 
 fn inst_opds(i: &Inst) -> Vec<&Opd> {
     match i {
-        Inst::Bin { a, b, .. } | Inst::ICmp { a, b, .. } => vec![a, b],
+        Inst::Bin { a, b, .. }
+        | Inst::ICmp { a, b, .. }
+        | Inst::FBin { a, b, .. }
+        | Inst::FCmp { a, b, .. } => vec![a, b],
+        Inst::FUn { v, .. } => vec![v],
+        Inst::AtomicLoad { ptr, .. } => vec![ptr],
+        Inst::AtomicStore { val, ptr, .. } => vec![val, ptr],
+        Inst::AtomicRmw { ptr, val, .. } => vec![ptr, val],
+        Inst::CmpXchg { ptr, cmp, new, .. } => vec![ptr, cmp, new],
         Inst::Select { c, a, b, .. } => vec![c, a, b],
         Inst::Cast { v, .. } => vec![v],
         Inst::Load { ptr, .. } => vec![ptr],
@@ -268,6 +294,7 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
         |cx: &mut Cx, o: &Opd, bi: usize, ii: isize, phi_pred: Option<usize>| -> Option<Ty> {
             match o {
                 Opd::Int(t, _) => Some(t.clone()),
+                Opd::F64(_) => Some(Ty::F64),
                 Opd::Null => Some(Ty::Ptr),
                 Opd::Global(g) => {
                     if cx.m.globals.iter().any(|x| x.name == *g) {
@@ -375,6 +402,13 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
     cx.errs
 }
 
+/// kiểu của lệnh nguyên tử: số nguyên 8..64 bit
+fn atomic_ty(cx: &mut Cx, t: &Ty) {
+    if !matches!(t, Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64) {
+        cx.err("G0304", format!("lệnh nguyên tử trên kiểu {t:?}"));
+    }
+}
+
 fn check_inst(
     cx: &mut Cx,
     i: &Inst,
@@ -406,6 +440,56 @@ fn check_inst(
             expect(cx, a, ty);
             expect(cx, b, ty);
         }
+        Inst::FBin { ty, a, b, .. } | Inst::FCmp { ty, a, b, .. } => {
+            if *ty != Ty::F64 {
+                cx.err("G0304", format!("phép số thực trên kiểu {ty:?}"));
+            }
+            expect(cx, a, ty);
+            expect(cx, b, ty);
+        }
+        Inst::FUn { ty, v, .. } => {
+            if *ty != Ty::F64 {
+                cx.err("G0304", format!("phép số thực trên kiểu {ty:?}"));
+            }
+            expect(cx, v, ty);
+        }
+        // nguyên tử (ADR-P2-02 quyết định 2026-11-26): chỉ số nguyên ≥ 8 bit (như `atomic_slot` của codegen); thứ tự hợp lệ như LLVM
+        Inst::AtomicLoad { ord, ty, ptr, .. } => {
+            atomic_ty(cx, ty);
+            if matches!(ord, AtomicOrd::Release | AtomicOrd::AcqRel) {
+                cx.err("G0310", format!("atomicload với thứ tự {ord:?}"));
+            }
+            expect(cx, ptr, &Ty::Ptr);
+        }
+        Inst::AtomicStore { ord, ty, val, ptr } => {
+            atomic_ty(cx, ty);
+            if matches!(ord, AtomicOrd::Acquire | AtomicOrd::AcqRel) {
+                cx.err("G0310", format!("atomicstore với thứ tự {ord:?}"));
+            }
+            expect(cx, val, ty);
+            expect(cx, ptr, &Ty::Ptr);
+        }
+        Inst::AtomicRmw { ty, ptr, val, .. } => {
+            atomic_ty(cx, ty);
+            expect(cx, ptr, &Ty::Ptr);
+            expect(cx, val, ty);
+        }
+        Inst::CmpXchg {
+            fail,
+            ty,
+            ptr,
+            cmp,
+            new,
+            ..
+        } => {
+            atomic_ty(cx, ty);
+            if matches!(fail, AtomicOrd::Release | AtomicOrd::AcqRel) {
+                cx.err("G0310", format!("cmpxchg: thứ tự thất bại {fail:?}"));
+            }
+            expect(cx, ptr, &Ty::Ptr);
+            expect(cx, cmp, ty);
+            expect(cx, new, ty);
+        }
         Inst::Select { ty, c, a, b, .. } => {
             expect(cx, c, &Ty::I1);
             expect(cx, a, ty);
@@ -415,17 +499,18 @@ fn check_inst(
             op, from, v, to, ..
         } => {
             expect(cx, v, from);
-            match (from.bits(), to.bits()) {
-                (Some(x), Some(y)) => {
-                    let ok = match op {
-                        crate::CastOp::Trunc => y < x,
-                        crate::CastOp::ZExt | crate::CastOp::SExt => y > x,
-                    };
-                    if !ok {
-                        cx.err("G0305", format!("cast {from:?}→{to:?} sai hướng độ rộng"));
-                    }
-                }
-                _ => cx.err("G0305", "cast chỉ trên số nguyên".into()),
+            use crate::CastOp as C;
+            let (fi, ti) = (from.bits(), to.bits());
+            let ok = match op {
+                C::Trunc => matches!((fi, ti), (Some(x), Some(y)) if y < x),
+                C::ZExt | C::SExt => matches!((fi, ti), (Some(x), Some(y)) if y > x),
+                // số nguyên (không phải `i1`: bool → f64 không có trong Grit) ↔ f64
+                C::SIToFP | C::UIToFP => fi.is_some_and(|x| x > 1) && *to == Ty::F64,
+                C::FPToSI => *from == Ty::F64 && ti.is_some_and(|y| y > 1),
+                C::BitCast => matches!((from, to), (Ty::I64, Ty::F64) | (Ty::F64, Ty::I64)),
+            };
+            if !ok {
+                cx.err("G0305", format!("cast {op:?} {from:?}→{to:?} không hợp lệ"));
             }
         }
         Inst::Load { ptr, .. } => expect(cx, ptr, &Ty::Ptr),

@@ -1,0 +1,8 @@
+// expect: fail G0305
+// note: fptosi nhận f64
+glir 1
+fn @f(%a: i64) -> i32 {
+entry:
+  %r = cast fptosi i64 %a to i32
+  ret i32 %r
+}

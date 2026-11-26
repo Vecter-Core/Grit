@@ -4,7 +4,9 @@
 //! đọc con trỏ từ byte không phải mảnh con trỏ nguyên vẹn, gọi hàm ngoài module. Chương trình hạ đúng không bao giờ chạm `Ub`.
 //! Hàm `declare` (runtime) CHỈ chạy được khi có MÔ HÌNH tham chiếu ở [`runtime_model_sig`] VÀ khai báo của module trùng chữ ký mô hình; ngoài ra ⇒ `Ub`.
 use crate::layout::{field_offset, layout};
-use crate::{BinOp, CastOp, CmpPred, Func, Inst, Module, Opd, Term, Ty};
+use crate::{
+    BinOp, CastOp, CmpPred, FBinOp, FCmpPred, FUnOp, Func, Inst, Module, Opd, RmwOp, Term, Ty,
+};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -48,9 +50,15 @@ pub enum Byte {
     P(usize, u64, u8),
 }
 
+/// NaN CHUẨN HOÁ (quiet, dấu +, payload 0): mẫu bit của MỌI NaN do `fbin`/`funop fsqrt` sinh ra trong thông dịch. Hợp đồng GLIR không bảo đảm mẫu bit
+/// NaN của phép tính (LLVM cũng không), nên thông dịch chọn MỘT mẫu cố định ⇒ tất định, không phụ thuộc phần cứng chủ.
+pub const CANONICAL_NAN: u64 = 0x7ff8_0000_0000_0000;
+
 #[derive(Clone, Debug)]
 enum Val {
     Int(u128),
+    /// `f64` (mẫu bit IEEE-754 binary64) — tách khỏi `Int` để dùng nhầm số nguyên/số thực là `Ub`
+    F(u64),
     Ptr(usize, u64),
     /// giá trị tổng hợp (struct/mảng) dưới dạng byte, kể cả byte chưa ghi
     Agg(Vec<Byte>),
@@ -100,6 +108,7 @@ impl St<'_> {
             Opd::Slot(s) => Ok(Val::Ptr(*self.slot.get(s).ok_or("slot lạ")?, 0)),
             Opd::Global(g) => Ok(Val::Ptr(*self.gl.get(g).ok_or("global lạ")?, 0)),
             Opd::Null => Ok(Val::Ptr(NULL_REGION, 0)),
+            Opd::F64(b) => Ok(Val::F(*b)),
             Opd::Int(t, n) => Ok(Val::Int(
                 (*n as u128) & mask(t.bits().ok_or("hằng không nguyên")?),
             )),
@@ -108,13 +117,19 @@ impl St<'_> {
     fn int(&self, o: &Opd) -> Result<u128, String> {
         match self.opd(o)? {
             Val::Int(v) => Ok(v),
-            Val::Ptr(..) | Val::Agg(_) => Err("cần số nguyên".into()),
+            Val::Ptr(..) | Val::Agg(_) | Val::F(_) => Err("cần số nguyên".into()),
+        }
+    }
+    fn flt(&self, o: &Opd) -> Result<f64, String> {
+        match self.opd(o)? {
+            Val::F(b) => Ok(f64::from_bits(b)),
+            Val::Int(_) | Val::Ptr(..) | Val::Agg(_) => Err("cần f64".into()),
         }
     }
     fn ptr(&self, o: &Opd) -> Result<(usize, u64), String> {
         match self.opd(o)? {
             Val::Ptr(a, off) => Ok((a, off)),
-            Val::Int(_) | Val::Agg(_) => Err("cần con trỏ".into()),
+            Val::Int(_) | Val::Agg(_) | Val::F(_) => Err("cần con trỏ".into()),
         }
     }
     fn live(&self, a: usize) -> Result<(), String> {
@@ -153,6 +168,17 @@ impl St<'_> {
         let r = self.range(a, off, n)?;
         self.aligned(a, off, t)?;
         Ok(self.mem[a][r].to_vec())
+    }
+    /// đọc số nguyên kiểu `t` tại `p` (căn lề, trong vùng, byte đã ghi) — dùng cho lệnh nguyên tử
+    fn load_int(&self, p: &Opd, t: &Ty) -> Result<u128, String> {
+        let (a, off) = self.ptr(p)?;
+        let w = t.bits().ok_or("lệnh nguyên tử trên kiểu không nguyên")?;
+        decode_int(&self.read(a, off, t)?, w)
+    }
+    fn store_int(&mut self, p: &Opd, t: &Ty, v: u128) -> Result<(), String> {
+        let (a, off) = self.ptr(p)?;
+        self.aligned(a, off, t)?;
+        self.write(a, off, &int_bytes(v, layout(t).size))
     }
     fn write(&mut self, a: usize, off: u64, bytes: &[Byte]) -> Result<(), String> {
         if a < self.nro {
@@ -247,6 +273,47 @@ fn binop(op: BinOp, w: u32, a: u128, b: u128) -> Result<u128, String> {
             }
         }
     })
+}
+
+/// kết quả số thực của một phép tính: NaN ⇒ [`CANONICAL_NAN`]; số khác giữ nguyên (Rust `f64` = IEEE-754 binary64, làm tròn hoà về chẵn)
+fn fres(x: f64) -> Val {
+    Val::F(if x.is_nan() {
+        CANONICAL_NAN
+    } else {
+        x.to_bits()
+    })
+}
+
+fn fbinop(op: FBinOp, a: f64, b: f64) -> Val {
+    fres(match op {
+        FBinOp::Add => a + b,
+        FBinOp::Sub => a - b,
+        FBinOp::Mul => a * b,
+        FBinOp::Div => a / b,
+    })
+}
+
+fn fcmp(p: FCmpPred, a: f64, b: f64) -> bool {
+    let uno = a.is_nan() || b.is_nan();
+    match p {
+        FCmpPred::Oeq => !uno && a == b,
+        FCmpPred::Olt => !uno && a < b,
+        FCmpPred::Ole => !uno && a <= b,
+        FCmpPred::Ogt => !uno && a > b,
+        FCmpPred::Oge => !uno && a >= b,
+        FCmpPred::Une => uno || a != b,
+        FCmpPred::Uno => uno,
+    }
+}
+
+/// `fptosi` sang `w` bit: cắt về 0; NaN/±∞/ngoài miền có dấu `w` bit ⇒ `Err` (`Ub`: `poison` ở LLVM)
+fn fptosi(x: f64, w: u32) -> Result<u128, String> {
+    let t = x.trunc();
+    let lim = 2f64.powi(w as i32 - 1);
+    if !t.is_finite() || t < -lim || t >= lim {
+        return Err(format!("fptosi: {x:e} ngoài miền i{w}"));
+    }
+    Ok((t as i128 as u128) & mask(w))
 }
 
 fn cmp(p: CmpPred, w: u32, a: u128, b: u128) -> bool {
@@ -445,6 +512,7 @@ pub fn runtime_model_sig(name: &str) -> Option<(Vec<Ty>, Ty)> {
         "gritrt_heap_alloc" => (vec![Ty::I64, Ty::I64], Ty::Ptr),
         "gritrt_heap_free" => (vec![Ty::Ptr, Ty::I64, Ty::I64], Ty::Void),
         "gritrt_secret_wipe" => (vec![Ty::Ptr, Ty::I64], Ty::Void),
+        "gritrt_mutex_lock" | "gritrt_mutex_unlock" => (vec![Ty::Ptr], Ty::Void),
         _ => return None,
     })
 }
@@ -519,7 +587,40 @@ fn runtime_call(
             *glob.wipes.borrow_mut() += 1;
             return Ok(None);
         }
-        ("gritrt_heap_free" | "gritrt_secret_wipe", _) => {
+        // `gritrt_mutex_lock/unlock(p)`: ô khoá 8 byte căn lề 8 (như runtime Linux: 0 = mở, 1 = giữ). Mô hình TUẦN TỰ một luồng: khoá ô đang giữ
+        // = tự khoá chết (E0502 cấm), mở ô đang mở = sai cặp ⇒ `Ub`; ô chưa ghi/ngoài vùng/treo/chỉ-đọc/lệch căn lề ⇒ `Ub`
+        ("gritrt_mutex_lock" | "gritrt_mutex_unlock", [Val::Ptr(a, off)]) => {
+            let (want, set) = if name == "gritrt_mutex_lock" {
+                (0, 1)
+            } else {
+                (1, 0)
+            };
+            if *a >= mem.len() || *a < glob.nro || glob.freed.borrow().contains(a) {
+                return Err(ub("ô khoá null/treo/chỉ-đọc"));
+            }
+            let al = glob.aligns.borrow().get(a).copied();
+            if al.is_none_or(|al| al < 8) || !off.is_multiple_of(8) {
+                return Err(ub("ô khoá lệch căn lề 8"));
+            }
+            let Some(cell) = off
+                .checked_add(8)
+                .and_then(|e| mem[*a].get_mut(*off as usize..e as usize))
+            else {
+                return Err(ub("ô khoá ngoài vùng"));
+            };
+            match decode_int(cell, 64) {
+                Ok(v) if v == want => {
+                    cell.copy_from_slice(&int_bytes(set, 8));
+                    return Ok(None);
+                }
+                Ok(_) => return Err(ub("khoá đang giữ (khoá chết) hoặc mở khoá chưa giữ")),
+                Err(e) => return Err(ub(&e)),
+            }
+        }
+        (
+            "gritrt_heap_free" | "gritrt_secret_wipe" | "gritrt_mutex_lock" | "gritrt_mutex_unlock",
+            _,
+        ) => {
             return Err(ub("đối số sai dạng"));
         }
         _ => {}
@@ -528,7 +629,7 @@ fn runtime_call(
         .iter()
         .map(|v| match v {
             Val::Int(x) => Ok(*x),
-            Val::Ptr(..) | Val::Agg(_) => Err(ub("đối số không phải số nguyên")),
+            Val::Ptr(..) | Val::Agg(_) | Val::F(_) => Err(ub("đối số không phải số nguyên")),
         })
         .collect::<Result<_, _>>()?;
     if ints.len() != want.0.len() {
@@ -623,6 +724,9 @@ fn exec_frame(
     for ((n, t), a) in f.params.iter().zip(args) {
         let v = match (t, a) {
             (t, Val::Int(x)) if t.is_int() => Val::Int(x & mask(t.bits().unwrap_or(128))),
+            // `f64`: người gọi ngoài truyền mẫu bit (`Arg::Int`), lời gọi trong module truyền `Val::F`
+            (Ty::F64, Val::Int(x)) if *x <= u128::from(u64::MAX) => Val::F(*x as u64),
+            (Ty::F64, Val::F(x)) => Val::F(*x),
             (Ty::Struct(_) | Ty::Array(..), Val::Agg(bs)) if bs.len() as u64 == layout(t).size => {
                 Val::Agg(bs.clone())
             }
@@ -702,7 +806,12 @@ fn exec_frame(
                 match exec(g, &vals, fuel, depth + 1, st.mem, glob) {
                     Outcome::Value(v) => {
                         if let (Some(d), Some(v)) = (d, v) {
-                            st.env.insert(d.clone(), Val::Int(v));
+                            let v = if g.ret == Ty::F64 {
+                                Val::F(v as u64)
+                            } else {
+                                Val::Int(v)
+                            };
+                            st.env.insert(d.clone(), v);
                         }
                     }
                     Outcome::Ptr(a, o) => {
@@ -748,6 +857,64 @@ fn exec_frame(
                         };
                         st.env.insert(d.clone(), Val::Int(u128::from(v)));
                     }
+                    // lệnh nguyên tử: thông dịch TUẦN TỰ (một luồng) ⇒ như load/store thường; thứ tự bộ nhớ không ảnh hưởng kết quả
+                    Inst::AtomicLoad { d, ty, ptr, .. } => {
+                        let v = st.load_int(ptr, ty)?;
+                        st.env.insert(d.clone(), Val::Int(v));
+                    }
+                    Inst::AtomicStore { ty, val, ptr, .. } => {
+                        let v = st.int(val)?;
+                        st.store_int(ptr, ty, v)?;
+                    }
+                    Inst::AtomicRmw {
+                        d,
+                        op,
+                        ty,
+                        ptr,
+                        val,
+                        ..
+                    } => {
+                        let w = ty.bits().ok_or("atomicrmw không nguyên")?;
+                        let (old, x) = (st.load_int(ptr, ty)?, st.int(val)?);
+                        let new = match op {
+                            RmwOp::Xchg => x,
+                            RmwOp::Add => old.wrapping_add(x) & mask(w),
+                            RmwOp::Sub => old.wrapping_sub(x) & mask(w),
+                        };
+                        st.store_int(ptr, ty, new)?;
+                        st.env.insert(d.clone(), Val::Int(old));
+                    }
+                    Inst::CmpXchg {
+                        d,
+                        ty,
+                        ptr,
+                        cmp,
+                        new,
+                        ..
+                    } => {
+                        let (old, c, n) = (st.load_int(ptr, ty)?, st.int(cmp)?, st.int(new)?);
+                        if old == c {
+                            st.store_int(ptr, ty, n)?;
+                        }
+                        st.env.insert(d.clone(), Val::Int(old));
+                    }
+                    Inst::FBin { d, op, a, b, .. } => {
+                        let v = fbinop(*op, st.flt(a)?, st.flt(b)?);
+                        st.env.insert(d.clone(), v);
+                    }
+                    Inst::FUn { d, op, v, .. } => {
+                        let x = st.flt(v)?;
+                        let r = match op {
+                            // lật ĐÚNG bit dấu (kể cả NaN: không chuẩn hoá)
+                            FUnOp::Neg => Val::F(x.to_bits() ^ (1u64 << 63)),
+                            FUnOp::Sqrt => fres(x.sqrt()),
+                        };
+                        st.env.insert(d.clone(), r);
+                    }
+                    Inst::FCmp { d, pred, a, b, .. } => {
+                        let v = fcmp(*pred, st.flt(a)?, st.flt(b)?);
+                        st.env.insert(d.clone(), Val::Int(u128::from(v)));
+                    }
                     Inst::Select { d, c, a, b, .. } => {
                         let v = if st.int(c)? & 1 == 1 {
                             st.opd(a)?
@@ -757,14 +924,34 @@ fn exec_frame(
                         st.env.insert(d.clone(), v);
                     }
                     Inst::Cast { d, op, from, v, to } => {
-                        let (wf, wt) = (from.bits().ok_or("cast")?, to.bits().ok_or("cast")?);
-                        let x = st.int(v)? & mask(wf);
-                        let r = match op {
-                            CastOp::Trunc => x & mask(wt),
-                            CastOp::ZExt => x,
-                            CastOp::SExt => (sext(x, wf) as u128) & mask(wt),
+                        // nguồn số nguyên: mẫu bit cắt theo độ rộng nguồn (`from` không nguyên ⇒ lỗi)
+                        let src = |st: &St| -> Result<(u128, u32), String> {
+                            let wf = from.bits().ok_or("cast: nguồn không nguyên")?;
+                            Ok((st.int(v)? & mask(wf), wf))
                         };
-                        st.env.insert(d.clone(), Val::Int(r));
+                        let wt = || to.bits().ok_or("cast: đích không nguyên");
+                        let r = match op {
+                            CastOp::Trunc => Val::Int(src(&st)?.0 & mask(wt()?)),
+                            CastOp::ZExt => Val::Int(src(&st)?.0),
+                            CastOp::SExt => {
+                                let (x, wf) = src(&st)?;
+                                Val::Int((sext(x, wf) as u128) & mask(wt()?))
+                            }
+                            // `i128 as f64`/`u128 as f64` của Rust: làm tròn hoà về chẵn (như `sitofp`/`uitofp`)
+                            CastOp::SIToFP => {
+                                let (x, wf) = src(&st)?;
+                                fres(sext(x, wf) as f64)
+                            }
+                            CastOp::UIToFP => fres(src(&st)?.0 as f64),
+                            CastOp::FPToSI => Val::Int(fptosi(st.flt(v)?, wt()?)?),
+                            CastOp::BitCast if *from == Ty::F64 => {
+                                Val::Int(u128::from(st.flt(v)?.to_bits()))
+                            }
+                            CastOp::BitCast => {
+                                Val::F(u64::try_from(src(&st)?.0).map_err(|_| "bitcast: > 64 bit")?)
+                            }
+                        };
+                        st.env.insert(d.clone(), r);
                     }
                     Inst::Load { d, ty, ptr } => {
                         let (a, off) = st.ptr(ptr)?;
@@ -775,6 +962,7 @@ fn exec_frame(
                                 Val::Ptr(pa, po)
                             }
                             t if t.is_int() => Val::Int(decode_int(&bs, t.bits().unwrap_or(128))?),
+                            Ty::F64 => Val::F(decode_int(&bs, 64)? as u64),
                             Ty::Struct(_) | Ty::Array(..) => Val::Agg(bs),
                             _ => return Err("load kiểu không hỗ trợ".into()),
                         };
@@ -787,6 +975,7 @@ fn exec_frame(
                                 (0..8u8).map(|k| Byte::P(pa, po, k)).collect()
                             }
                             (t, Val::Int(v)) if t.is_int() => int_bytes(v, layout(t).size),
+                            (Ty::F64, Val::F(b)) => int_bytes(u128::from(b), 8),
                             (Ty::Struct(_) | Ty::Array(..), Val::Agg(bs))
                                 if bs.len() as u64 == layout(ty).size =>
                             {
@@ -866,6 +1055,12 @@ fn exec_frame(
                     return match st.opd(v) {
                         Ok(Val::Agg(bs)) => Outcome::Bytes(bs),
                         Ok(_) => ub("ret tổng hợp không phải giá trị tổng hợp".into()),
+                        Err(e) => ub(e),
+                    };
+                }
+                if *t == Ty::F64 {
+                    return match st.flt(v) {
+                        Ok(x) => Outcome::Value(Some(u128::from(x.to_bits()))),
                         Err(e) => ub(e),
                     };
                 }

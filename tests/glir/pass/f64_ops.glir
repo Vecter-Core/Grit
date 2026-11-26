@@ -1,0 +1,59 @@
+// expect: pass
+// note: f64 (ADR-P2-02 quyết định 2026-11-26): hằng theo mẫu bit, fbin/funop/fcmp, sitofp/uitofp/fptosi/bitcast, load/store f64, phi f64
+// @mix(%a: i64, %b: i32): x = a as f64; y = (x * 1.5 + 0.25) / 2; nếu y > 0 ⇒ fptosi(sqrt(y)) ngược lại fptosi(-y) (chỉ trong miền)
+glir 1
+fn @mix(%a: i64, %b: i32) -> i64 {
+slot $s: f64
+entry:
+  %x = cast sitofp i64 %a to f64
+  %m = fbin fmul f64 %x, f64 0x3ff8000000000000
+  %p = fbin fadd f64 %m, f64 0x3fd0000000000000
+  %y = fbin fdiv f64 %p, f64 0x4000000000000000
+  store f64 %y, $s
+  %z = load f64 $s
+  %pos = fcmp ogt f64 %z, f64 0x0000000000000000
+  condbr %pos, root, neg
+root:
+  %r = funop fsqrt f64 %z
+  br out
+neg:
+  %n = funop fneg f64 %z
+  br out
+out:
+  %v = phi f64 [%r, root], [%n, neg]
+  %u = cast uitofp i32 %b to f64
+  %w = fbin fsub f64 %v, %u
+  %lo = fcmp oge f64 %w, f64 0xc3e0000000000000
+  %hi = fcmp olt f64 %w, f64 0x43e0000000000000
+  %in = bin and i1 %lo, %hi
+  condbr %in, conv, nan
+conv:
+  %i = cast fptosi f64 %w to i64
+  ret i64 %i
+nan:
+  %bits = cast bitcast f64 %w to i64
+  ret i64 %bits
+}
+fn @nan(%x: f64) -> i1 {
+entry:
+  %q = fbin fsub f64 %x, %x
+  %u = fcmp uno f64 %q, %q
+  %e = fcmp une f64 %x, %x
+  %r = bin and i1 %u, %e
+  ret i1 %r
+}
+fn @neg(%x: f64) -> f64 {
+entry:
+  %n = funop fneg f64 %x
+  ret f64 %n
+}
+fn @div(%x: f64, %y: f64) -> f64 {
+entry:
+  %d = fbin fdiv f64 %x, %y
+  ret f64 %d
+}
+fn @toi(%x: f64) -> i8 {
+entry:
+  %i = cast fptosi f64 %x to i8
+  ret i8 %i
+}

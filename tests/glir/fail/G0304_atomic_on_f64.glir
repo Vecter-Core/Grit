@@ -1,0 +1,8 @@
+// expect: fail G0304
+// note: lệnh nguyên tử chỉ trên số nguyên 8..64 bit
+glir 1
+fn @f(%p: ptr) -> f64 {
+entry:
+  %v = atomicrmw add seq_cst f64 %p, f64 0x3ff0000000000000
+  ret f64 %v
+}

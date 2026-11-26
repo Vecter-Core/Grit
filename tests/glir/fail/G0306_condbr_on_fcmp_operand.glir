@@ -1,0 +1,11 @@
+// expect: fail G0306
+// note: condbr cần i1, không phải f64
+glir 1
+fn @f(%x: f64) -> i32 {
+entry:
+  condbr %x, a, b
+a:
+  ret i32 i32 1
+b:
+  ret i32 i32 0
+}

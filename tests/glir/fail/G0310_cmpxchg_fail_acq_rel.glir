@@ -1,0 +1,8 @@
+// expect: fail G0310
+// note: thứ tự thất bại của cmpxchg không được là release/acq_rel
+glir 1
+fn @f(%p: ptr) -> i32 {
+entry:
+  %v = cmpxchg seq_cst acq_rel i32 %p, i32 0, i32 1
+  ret i32 %v
+}

@@ -1,5 +1,8 @@
 //! In GLIR ra văn bản chuẩn (tất định). `print(parse(print(m))) == print(m)`.
-use crate::{BinOp, Block, CastOp, CmpPred, Decl, Func, Inst, Module, Opd, Term, Ty};
+use crate::{
+    AtomicOrd, BinOp, Block, CastOp, CmpPred, Decl, FBinOp, FCmpPred, FUnOp, Func, Inst, Module,
+    Opd, RmwOp, Term, Ty,
+};
 use std::fmt::Write;
 
 #[must_use]
@@ -26,6 +29,7 @@ fn opd(o: &Opd) -> String {
         Opd::Global(g) => format!("@{g}"),
         Opd::Null => "null".into(),
         Opd::Int(t, n) => format!("{} {n}", ty(t)),
+        Opd::F64(b) => format!("f64 0x{b:016x}"),
     }
 }
 
@@ -56,10 +60,42 @@ pub(crate) const PREDS: [(CmpPred, &str); 10] = [
     (CmpPred::Sgt, "sgt"),
     (CmpPred::Sge, "sge"),
 ];
-pub(crate) const CASTS: [(CastOp, &str); 3] = [
+pub(crate) const CASTS: [(CastOp, &str); 7] = [
     (CastOp::ZExt, "zext"),
     (CastOp::SExt, "sext"),
     (CastOp::Trunc, "trunc"),
+    (CastOp::SIToFP, "sitofp"),
+    (CastOp::UIToFP, "uitofp"),
+    (CastOp::FPToSI, "fptosi"),
+    (CastOp::BitCast, "bitcast"),
+];
+pub(crate) const FBINOPS: [(FBinOp, &str); 4] = [
+    (FBinOp::Add, "fadd"),
+    (FBinOp::Sub, "fsub"),
+    (FBinOp::Mul, "fmul"),
+    (FBinOp::Div, "fdiv"),
+];
+pub(crate) const ORDS: [(AtomicOrd, &str); 5] = [
+    (AtomicOrd::Monotonic, "monotonic"),
+    (AtomicOrd::Acquire, "acquire"),
+    (AtomicOrd::Release, "release"),
+    (AtomicOrd::AcqRel, "acq_rel"),
+    (AtomicOrd::SeqCst, "seq_cst"),
+];
+pub(crate) const RMWOPS: [(RmwOp, &str); 3] = [
+    (RmwOp::Xchg, "xchg"),
+    (RmwOp::Add, "add"),
+    (RmwOp::Sub, "sub"),
+];
+pub(crate) const FUNOPS: [(FUnOp, &str); 2] = [(FUnOp::Neg, "fneg"), (FUnOp::Sqrt, "fsqrt")];
+pub(crate) const FPREDS: [(FCmpPred, &str); 7] = [
+    (FCmpPred::Oeq, "oeq"),
+    (FCmpPred::Olt, "olt"),
+    (FCmpPred::Ole, "ole"),
+    (FCmpPred::Ogt, "ogt"),
+    (FCmpPred::Oge, "oge"),
+    (FCmpPred::Une, "une"),
+    (FCmpPred::Uno, "uno"),
 ];
 
 fn name<T: Copy + PartialEq>(tbl: &[(T, &'static str)], v: T) -> &'static str {
@@ -87,6 +123,81 @@ fn inst(i: &Inst) -> String {
             ty(t),
             opd(a),
             opd(b)
+        ),
+        Inst::FBin { d, op, ty: t, a, b } => format!(
+            "%{d} = fbin {} {} {}, {}",
+            name(&FBINOPS, *op),
+            ty(t),
+            opd(a),
+            opd(b)
+        ),
+        Inst::FUn { d, op, ty: t, v } => {
+            format!("%{d} = funop {} {} {}", name(&FUNOPS, *op), ty(t), opd(v))
+        }
+        Inst::FCmp {
+            d,
+            pred,
+            ty: t,
+            a,
+            b,
+        } => format!(
+            "%{d} = fcmp {} {} {}, {}",
+            name(&FPREDS, *pred),
+            ty(t),
+            opd(a),
+            opd(b)
+        ),
+        Inst::AtomicLoad { d, ord, ty: t, ptr } => {
+            format!(
+                "%{d} = atomicload {} {} {}",
+                name(&ORDS, *ord),
+                ty(t),
+                opd(ptr)
+            )
+        }
+        Inst::AtomicStore {
+            ord,
+            ty: t,
+            val,
+            ptr,
+        } => format!(
+            "atomicstore {} {} {}, {}",
+            name(&ORDS, *ord),
+            ty(t),
+            opd(val),
+            opd(ptr)
+        ),
+        Inst::AtomicRmw {
+            d,
+            op,
+            ord,
+            ty: t,
+            ptr,
+            val,
+        } => format!(
+            "%{d} = atomicrmw {} {} {} {}, {}",
+            name(&RMWOPS, *op),
+            name(&ORDS, *ord),
+            ty(t),
+            opd(ptr),
+            opd(val)
+        ),
+        Inst::CmpXchg {
+            d,
+            succ,
+            fail,
+            ty: t,
+            ptr,
+            cmp,
+            new,
+        } => format!(
+            "%{d} = cmpxchg {} {} {} {}, {}, {}",
+            name(&ORDS, *succ),
+            name(&ORDS, *fail),
+            ty(t),
+            opd(ptr),
+            opd(cmp),
+            opd(new)
         ),
         Inst::Select { d, ty: t, c, a, b } => {
             format!("%{d} = select {} {}, {}, {}", ty(t), opd(c), opd(a), opd(b))

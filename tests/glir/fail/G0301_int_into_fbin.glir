@@ -1,0 +1,8 @@
+// expect: fail G0301
+// note: toán hạng số nguyên cho phép số thực (không có chuyển kiểu ngầm)
+glir 1
+fn @f(%a: i64) -> f64 {
+entry:
+  %r = fbin fmul f64 %a, f64 0x3ff0000000000000
+  ret f64 %r
+}

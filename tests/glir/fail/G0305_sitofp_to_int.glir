@@ -1,0 +1,9 @@
+// expect: fail G0305
+// note: sitofp phải ra f64; bitcast chỉ i64 ↔ f64
+glir 1
+fn @f(%a: i32) -> i64 {
+entry:
+  %r = cast sitofp i32 %a to i64
+  %b = cast bitcast i32 %a to f64
+  ret i64 %r
+}

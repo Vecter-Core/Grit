@@ -132,6 +132,100 @@ fn byte_memory_interpreter_runs_hand_checked_samples() {
     ));
 }
 
+/// `f64` (ADR-P2-02 quyết định 2026-11-26): kết quả tính tay của `pass/f64_ops.glir` — IEEE-754 làm tròn hoà về chẵn; NaN do phép tính sinh ra
+/// được CHUẨN HOÁ (`CANONICAL_NAN`), `fneg` chỉ lật bit dấu (giữ payload NaN); `fptosi` ngoài miền/NaN ⇒ `Ub` (bước hạ phải chặn trước).
+#[test]
+fn f64_semantics_on_hand_checked_samples() {
+    use gt_glir::interp::{CANONICAL_NAN, Outcome, run_module};
+    let m = gt_glir::parse(
+        &std::fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/glir/pass/f64_ops.glir"),
+        )
+        .expect("đọc"),
+    )
+    .expect("parse");
+    let v = |f: &str, args: &[u128]| run_module(&m, f, args, 1000);
+    let b = |x: f64| u128::from(x.to_bits());
+    // y = (a·1.5 + 0.25)/2; y > 0 ⇒ ⌊√y − b⌋, ngược lại ⌊−y − b⌋ (cắt về 0)
+    assert_eq!(v("mix", &[10, 0]), Outcome::Value(Some(2)));
+    assert_eq!(v("mix", &[200, 0]), Outcome::Value(Some(12)));
+    assert_eq!(
+        v("mix", &[(-10i64) as u64 as u128, 3]),
+        Outcome::Value(Some(4))
+    );
+    // 7.375 − 10 = −2.625 ⇒ −2
+    assert_eq!(
+        v("mix", &[(-10i64) as u64 as u128, 10]),
+        Outcome::Value(Some((-2i64) as u64 as u128))
+    );
+    // NaN: chỉ `fsub x, x` với x = ±∞/NaN; `une x, x` ⇔ x NaN
+    assert_eq!(v("nan", &[b(1.0)]), Outcome::Value(Some(0)));
+    assert_eq!(v("nan", &[b(f64::INFINITY)]), Outcome::Value(Some(0)));
+    assert_eq!(v("nan", &[0x7ff8_0000_0000_0001]), Outcome::Value(Some(1)));
+    // `fneg`: lật ĐÚNG bit dấu, kể cả NaN có payload; −0.0
+    assert_eq!(
+        v("neg", &[0x7ff8_0000_0000_0001]),
+        Outcome::Value(Some(0xfff8_0000_0000_0001))
+    );
+    assert_eq!(v("neg", &[b(0.0)]), Outcome::Value(Some(1 << 63)));
+    // chia: 1/0 = +∞, 1/−0 = −∞, 0/0 và NaN-có-payload/1 ⇒ NaN chuẩn hoá; 1/3 làm tròn hoà về chẵn
+    assert_eq!(
+        v("div", &[b(1.0), b(0.0)]),
+        Outcome::Value(Some(b(f64::INFINITY)))
+    );
+    assert_eq!(
+        v("div", &[b(1.0), b(-0.0)]),
+        Outcome::Value(Some(b(f64::NEG_INFINITY)))
+    );
+    assert_eq!(
+        v("div", &[b(0.0), b(0.0)]),
+        Outcome::Value(Some(u128::from(CANONICAL_NAN)))
+    );
+    assert_eq!(
+        v("div", &[0xfff8_0000_0000_0005, b(1.0)]),
+        Outcome::Value(Some(u128::from(CANONICAL_NAN)))
+    );
+    assert_eq!(
+        v("div", &[b(1.0), b(3.0)]),
+        Outcome::Value(Some(0x3fd5_5555_5555_5555))
+    );
+    // fptosi i8: cắt về 0 trong miền; 128, −129, NaN, ∞ ⇒ Ub
+    assert_eq!(v("toi", &[b(127.9)]), Outcome::Value(Some(127)));
+    assert_eq!(v("toi", &[b(-128.5)]), Outcome::Value(Some(0x80)));
+    assert_eq!(v("toi", &[b(-0.9)]), Outcome::Value(Some(0)));
+    for x in [128.0, -129.0, f64::NAN, f64::INFINITY] {
+        assert!(matches!(v("toi", &[b(x)]), Outcome::Ub(_)), "{x}");
+    }
+    // tham số f64 lớn hơn 64 bit ⇒ Ub (không cắt im lặng)
+    assert!(matches!(v("neg", &[1u128 << 64]), Outcome::Ub(_)));
+}
+
+/// Lệnh nguyên tử + mô hình khoá (ADR-P2-02 quyết định 2026-11-26): kết quả tính tay của `pass/atomic_mutex.glir`; khoá hai lần/mở khi chưa khoá ⇒ `Ub`.
+#[test]
+fn atomics_and_mutex_model_on_hand_checked_samples() {
+    use gt_glir::interp::{Outcome, run_module};
+    let m = gt_glir::parse(
+        &std::fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/glir/pass/atomic_mutex.glir"),
+        )
+        .expect("đọc"),
+    )
+    .expect("parse");
+    // x=10, y=3: o=10, a=13, cas(13→7) ok, swap trả 7, load 5 ⇒ 10+7+5
+    assert_eq!(
+        run_module(&m, "at", &[10, 3], 1000),
+        Outcome::Value(Some(22))
+    );
+    // bao quanh i32: x = 0x7fffffff, y = 1 ⇒ o = 0x7fffffff, 0x7fffffff + 7 + 5 (mod 2^32)
+    assert_eq!(
+        run_module(&m, "at", &[0x7fff_ffff, 1], 1000),
+        Outcome::Value(Some(0x8000_000b))
+    );
+    assert_eq!(run_module(&m, "lk", &[0], 1000), Outcome::Value(Some(1)));
+    assert!(matches!(run_module(&m, "lk", &[1], 1000), Outcome::Ub(_)));
+    assert!(matches!(run_module(&m, "lk", &[2], 1000), Outcome::Ub(_)));
+}
+
 /// Global chỉ-đọc: đọc byte đầu của "héllo" = 0x68 ('h'); GHI vào global ⇒ `Ub`.
 #[test]
 fn globals_are_readable_and_read_only() {

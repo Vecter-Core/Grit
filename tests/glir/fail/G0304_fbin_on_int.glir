@@ -1,0 +1,8 @@
+// expect: fail G0304
+// note: phép số thực trên kiểu nguyên
+glir 1
+fn @f(%a: i64) -> i64 {
+entry:
+  %r = fbin fadd i64 %a, %a
+  ret i64 %r
+}
