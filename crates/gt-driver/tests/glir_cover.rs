@@ -133,9 +133,10 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     // TRƯỚC M7); FB-P2-03 — 2026-11-26: đo lại trên MIR SAU M7 (đầu vào của codegen; thêm thân hợp đồng ⊳/⊲ làm instance): 3523/13404;
     // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415; `Cell::new/get/set` — 2026-11-26: 3534/13418;
     // trần độ sâu `in_subset` 8 → 128 + ngân sách nút (tuple lồng sâu của `e0317_*`) — 2026-11-26: 3548/21610; `Vec::*` — 2026-11-26: 3563/21625;
-    // `Text::*`, `str::slice/as_bytes`, `u8 as char` — 2026-11-26: 3568/21630; `Owned::*` + drop glue (trừ xoá Secret) — 2026-11-26: 3575/21638
+    // `Text::*`, `str::slice/as_bytes`, `u8 as char` — 2026-11-26: 3568/21630; `Owned::*` + drop glue (trừ xoá Secret) — 2026-11-26: 3575/21638;
+    // `Secret::*` + `Wipe`/xoá `_0`/glue `Wipe` (ADR-P2-03) — 2026-11-26: 3581/21644
     assert!(
-        lowered >= 3575 && inst_ok >= 21638,
+        lowered >= 3581 && inst_ok >= 21644,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -1372,4 +1373,46 @@ fn runtime_calls_without_a_model_are_never_silently_dropped() {
     for k in ["main::clock", "main::atom", "main::out"] {
         assert!(!keys.iter().any(|x| x == k), "{k} không được hạ: {keys:?}");
     }
+}
+
+/// Chương trình SINH dùng `Secret<T>` (ADR-P2-03; hạ như codegen: `Secret::new/declassify` tại chỗ, `Wipe` sau move ⇒ `gritrt_secret_wipe` khi kiểu sau
+/// khi thế chứa Secret, `_0` chứa Secret bị xoá sau khi nạp ở `Return`, drop glue `Wipe` (glue của `v` rồi xoá cả Secret), `Owned::into_inner` của
+/// `Owned<Secret<T>>` xoá khối heap trước khi trả): Secret qua hàm, trong enum/tuple/mảng/`Option`/`Owned`, trên một nhánh (cờ drop), trong vòng lặp.
+/// Oracle so SỐ LẦN XOÁ (mô hình `gritrt_secret_wipe` của GLIR interp, đếm) với `secret_wipes()` của thông dịch MIR, cùng giá trị/abort/rò rỉ heap.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_secrets() {
+    let src = "\
+▢ K { a: u32, b: u8 }
+⊐ Copy for K { }
+⊔ M { S(Secret<u16>), P(u16) }
+ƒ keep(s: Secret<u64>) → Secret<u64> ! ∅ { s }
+ƒ s1(x: u64) → u64 ! ∅ { s ≔ Secret::new(x); t ≔ keep(s); t.declassify() }
+ƒ s2(x: u64) → u8 ! ∅ { s ≔ Secret::new(x); t ≔ keep(s); 1u8 }
+ƒ s3(x: u32, b: u8) → u32 ! ∅ { s ≔ Secret::new(K { a: x, b: b }); k ≔ s.declassify(); k.a +% (k.b as u32) }
+ƒ s4(x: u16, c: bool) → u16 ! ∅ { m ≔ ⎇ c { M::S(Secret::new(x)) } ⇝ { M::P(x) }; ⌥ m { M::S(s) ↦ s.declassify(), M::P(v) ↦ v +% 1u16 } }
+ƒ s5(x: u16, c: bool) → u16 ! ∅ { m ≔ ⎇ c { M::S(Secret::new(x)) } ⇝ { M::P(x) }; x }
+ƒ s6(x: u8, y: u8) → u8 ! ∅ { s ≔ Secret::new(x); v ≔ s.declassify(); v + y }
+ƒ s7(x: u32) → u32 ! ∅ { o ≔ Some(Secret::new(x)); t ≔ (Secret::new(1u8), x); t.1 }
+ƒ s8(x: u64, c: bool) → u64 ! ∅ { s ≔ Secret::new(x); ⎇ c { keep(s).declassify() } ⇝ { 5u64 } }
+ƒ s9(x: u16) → u16 ! ∅ { a ≔ [Secret::new(x), Secret::new(2u16)]; x +% 3u16 }
+ƒ s10(al: &Cap<Alloc>, x: u32) → u32 ! {mem} { o ≔ Owned::new(al, Secret::new(x)); s ≔ o.into_inner(); s.declassify() }
+ƒ s11(al: &Cap<Alloc>, x: u32) → u32 ! {mem} { o ≔ Owned::new(al, Secret::new(x)); x }
+ƒ mk(x: u16) → Secret<u16> ! ∅ { Secret::new(x) }
+ƒ s12(x: u16, n: u8) → u16 ! ∅ { μt ≔ 0u16; ⟳ i in 0u8..n { s ≔ mk(x +% (i as u16)); t ← t +% s.declassify(); } t }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0x5EC7_E700_5EED_0004u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 150);
+    eprintln!("GLIR_DIFF_SECRET bodies={bodies} runs={runs} aborts={aborts}");
+    // 12 hàm `sN` + `main` (`keep`/`mk` có Secret trong chữ ký nên chỉ chạy qua người gọi)
+    assert!(
+        bodies >= 13 && runs >= 1650 && aborts >= 50,
+        "oracle Secret quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
+    );
 }

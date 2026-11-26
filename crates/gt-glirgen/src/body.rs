@@ -124,6 +124,11 @@ fn is_cap(db: &TypeDb, t: &Ty) -> bool {
     matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Cap)))
 }
 
+/// `Secret<T>` (lang, `{v: T}`): chỉ tạo/mở qua `Secret::new/declassify`; xoá (D13) qua `Wipe`, `Return` và drop glue `Wipe`
+fn is_secret(db: &TypeDb, t: &Ty) -> bool {
+    matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Secret)))
+}
+
 /// `Cell<T>` (lang, `{v: T}`): chỉ đọc/ghi qua `Cell::new/get/set` (như `Intr::Cell*` của codegen: chèn/đọc/ghi trường 0)
 fn is_cell(db: &TypeDb, t: &Ty) -> bool {
     matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Cell)))
@@ -238,7 +243,7 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32, budget: &mut u32) -> bool {
             if let Some(e) = owned_elem(db, t) {
                 return rec(&e);
             }
-            if is_cap(db, t) || is_cell(db, t) || plain_struct(db, def) {
+            if is_cap(db, t) || is_cell(db, t) || is_secret(db, t) || plain_struct(db, def) {
                 return crate::variant_fields(db, *def, args, 0).is_ok_and(|fs| fs.iter().all(rec));
             }
             match db.adts.get(def).map(|a| &a.kind) {
@@ -878,6 +883,17 @@ impl Lw<'_> {
                 } else {
                     self.text_op(m, &vs, dest)?;
                 }
+            }
+            k if k.starts_with("$prelude::Secret<") => {
+                let m = k.rsplit("::").next().unwrap_or_default();
+                let mut vs = Vec::new();
+                for a in args {
+                    vs.push(self.operand(a)?);
+                }
+                let [t] = generics else {
+                    return un("Secret: sai số đối số kiểu");
+                };
+                self.secret_op(m, t, &vs, dest)?;
             }
             k if k.starts_with("$prelude::Owned<") => {
                 let m = k.rsplit("::").next().unwrap_or_default();
@@ -1555,6 +1571,61 @@ impl Lw<'_> {
         Ok(())
     }
 
+    /// `StatementKind::Wipe` (ADR-P2-03, như codegen): xoá chỗ nguồn sau move — CHỈ khi kiểu SAU KHI THẾ chứa Secret (`gritrt_secret_wipe`)
+    fn wipe_place(&mut self, p: &Place) -> R<()> {
+        let Some(pty) = gt_mir::types::place_ty(self.body, p) else {
+            return un("Wipe: không biết kiểu chỗ");
+        };
+        let ty = self.sub(&pty);
+        if !self.db.contains_secret(&ty) {
+            return Ok(());
+        }
+        let (ptr, _) = self.place(p)?;
+        self.secret_wipe(ptr, &ty)
+    }
+
+    /// `Secret<T>::new/declassify` như `Intr::Secret*` của codegen: `new(v)` ⇒ `Secret{v}`; `declassify(self)` ⇒ trường 0 (người nhận theo giá trị;
+    /// chỗ nguồn bị xoá bởi `Wipe` mà MIR đã chèn sau move, không phải ở đây)
+    fn secret_op(&mut self, m: &str, t: &Ty, vs: &[(Opd, Ty)], dest: &Place) -> R<()> {
+        match (m, vs) {
+            ("new", [(v, tv)]) if tv == t => {
+                let (ptr, dty) = self.place(dest)?;
+                if !is_secret(self.db, &dty) {
+                    return un("Secret::new: đích không phải Secret");
+                }
+                if !is_unit(t) {
+                    let gs = gty(self.db, &dty)?;
+                    let f = self.vec_field(&gs, &ptr, 0);
+                    let gt = gty(self.db, t)?;
+                    self.push(Inst::Store {
+                        ty: gt,
+                        val: v.clone(),
+                        ptr: f,
+                    });
+                }
+            }
+            ("declassify", [(s, ts)]) if is_secret(self.db, ts) => {
+                if is_unit(t) {
+                    return Ok(());
+                }
+                let gs = gty(self.db, ts)?;
+                self.extra += 1;
+                let sname = format!("sec{}", self.extra);
+                self.aux_slots.push((sname.clone(), gs.clone()));
+                self.push(Inst::Store {
+                    ty: gs.clone(),
+                    val: s.clone(),
+                    ptr: Opd::Slot(sname.clone()),
+                });
+                let f = self.vec_field(&gs, &Opd::Slot(sname), 0);
+                let v = self.load_val(gty(self.db, t)?, f);
+                self.store(dest, v, t)?;
+            }
+            _ => return un(format!("Secret::{m}: thao tác/đối số lạ")),
+        }
+        Ok(())
+    }
+
     /// Drop glue tại `ptr` (kiểu `ty`) — đúng `drop_glue_at` của codegen: `Call` ⇒ gọi `drop` người dùng (instance không đối số) rồi glue bên trong;
     /// `Free` ⇒ glue của `T` tại khối heap rồi `gritrt_heap_free`; `Wipe` ⇒ glue của trường `v` rồi `gritrt_secret_wipe` cả Secret; `Fields`/`Variants`
     /// (theo tag)/`Array` (vòng lặp) ⇒ đệ quy.
@@ -1593,7 +1664,21 @@ impl Lw<'_> {
                 self.heap_call("gritrt_heap_free", Some(hp), t)?;
                 Ok(())
             }
-            Glue::Wipe(_) => un("drop glue: Secret (xoá) chưa hạ"),
+            Glue::Wipe(inner) => {
+                // `Secret<T> { v }`: glue của `v` (trường 0) rồi xoá cả Secret
+                let Ty::Adt(_, args) = ty else {
+                    return un("drop glue: Wipe trên kiểu không phải Secret");
+                };
+                if !inner.is_nothing() {
+                    let Some(t) = args.first() else {
+                        return un("drop glue: Secret thiếu đối số kiểu");
+                    };
+                    let gs = gty(self.db, ty)?;
+                    let vp = self.vec_field(&gs, &ptr, 0);
+                    self.drop_glue_at(vp, t, inner)?;
+                }
+                self.secret_wipe(ptr, ty)
+            }
             Glue::Fields(fs) => {
                 let gs = gty(self.db, ty)?;
                 for (i, fty, fg) in fs {
@@ -2308,6 +2393,11 @@ impl Lw<'_> {
                 } else {
                     let (v, ty) = self.load(&Place::local(gt_mir::Local(0)))?;
                     let g = gty(self.db, &ty)?;
+                    // ADR-P2-03 (như codegen): `_0` chứa Secret — giá trị đã nạp; xoá bản trong ô nhớ trước khi trả về
+                    if self.db.secret_used && self.db.contains_secret(&ty) {
+                        let s = self.slot(0)?;
+                        self.secret_wipe(Opd::Slot(s), &ty)?;
+                    }
                     self.finish(Term::Ret(Some((g, v))), None);
                 }
             }
@@ -2807,7 +2897,7 @@ fn lower_inst(
                 | StatementKind::StorageDead(_)
                 | StatementKind::FakeRead(..)
                 | StatementKind::Nop => {}
-                StatementKind::Wipe(_) => return un("Wipe"),
+                StatementKind::Wipe(p) => lw.wipe_place(p)?,
             }
         }
         let Some(t) = &bd.terminator else {
