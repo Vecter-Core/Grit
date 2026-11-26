@@ -119,6 +119,11 @@ fn byte_memory_interpreter_runs_hand_checked_samples() {
     let m = load("arena_runtime_model.glir");
     assert_eq!(run_module(&m, "two", &[0], 1000), Outcome::Value(Some(42)));
     assert!(matches!(run_module(&m, "two", &[1], 1000), Outcome::Ub(_)));
+    // `null`: so bằng, `indexptr null, 0` giữ null ⇒ 1; đọc qua null hoặc dời null khác 0 ⇒ Ub
+    let n = load("null_pointer.glir");
+    assert_eq!(run_module(&n, "nul", &[0], 1000), Outcome::Value(Some(1)));
+    assert!(matches!(run_module(&n, "nul", &[1], 1000), Outcome::Ub(_)));
+    assert!(matches!(run_module(&n, "nul", &[2], 1000), Outcome::Ub(_)));
     let mut bad = m.clone();
     bad.decls[1].params[1] = gt_glir::Ty::I32;
     assert!(matches!(

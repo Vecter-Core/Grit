@@ -24,6 +24,7 @@ fn opd(o: &Opd) -> String {
         Opd::Val(v) => format!("%{v}"),
         Opd::Slot(s) => format!("${s}"),
         Opd::Global(g) => format!("@{g}"),
+        Opd::Null => "null".into(),
         Opd::Int(t, n) => format!("{} {n}", ty(t)),
     }
 }

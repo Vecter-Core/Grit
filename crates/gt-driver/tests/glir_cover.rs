@@ -132,9 +132,9 @@ fn every_lowered_body_passes_the_glir_verifier_and_coverage_is_measured() {
     // ngưỡng dưới (chỉ được nâng): thân generic theo instance, ADR-P2-02 — 2026-11-25; lời gọi runtime Arena — 2026-11-26 (3524/13385 đo trên MIR
     // TRƯỚC M7); FB-P2-03 — 2026-11-26: đo lại trên MIR SAU M7 (đầu vào của codegen; thêm thân hợp đồng ⊳/⊲ làm instance): 3523/13404;
     // `root_*`, `Cap<Alloc>::arena`, phép bit u32 prelude — 2026-11-26: 3531/13415; `Cell::new/get/set` — 2026-11-26: 3534/13418;
-    // trần độ sâu `in_subset` 8 → 128 + ngân sách nút (tuple lồng sâu của `e0317_*`) — 2026-11-26: 3548/21610
+    // trần độ sâu `in_subset` 8 → 128 + ngân sách nút (tuple lồng sâu của `e0317_*`) — 2026-11-26: 3548/21610; `Vec::*` — 2026-11-26: 3563/21625
     assert!(
-        lowered >= 3548 && inst_ok >= 21610,
+        lowered >= 3563 && inst_ok >= 21625,
         "độ phủ GLIR giảm: thân {lowered}/{total}, instance {inst_ok}/{inst_total}"
     );
 }
@@ -1157,5 +1157,48 @@ fn lowering_terminates_on_exponential_and_cyclic_types() {
     assert!(
         !keys.iter().any(|k| k == "main::f" || k == "main::w"),
         "{keys:?}"
+    );
+}
+
+/// Chương trình SINH dùng `Vec<T>` (intrinsic không thân MIR; hạ như `Intr::Vec*` của codegen: `{arena, null, 0, 0}`, tăng trưởng gấp đôi tối thiểu 4 qua
+/// `gritrt_arena_alloc` + sao chép từng phần tử, chốt tràn `overflow`): số/struct có đệm/enum/`()`, tăng trưởng qua nhiều lần cấp, `truncate` rồi `push`, `reserve`,
+/// `as_mut_slice` ghi, hai Vec chung Arena, Vec rỗng (`{null, 0}` + lát con rỗng), `&!Vec` qua hàm, kiểm biên và tràn sau khi đọc.
+#[test]
+fn glir_interpreter_agrees_with_the_mir_interpreter_on_generated_vecs() {
+    let src = "\
+▢ P { a: u8, b: i32 }
+⊐ Copy for P { }
+ƒ v1(x: u32, y: u32) → u32 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); v.push(x); v.push(y); s ≔ v.as_slice(); s[0usize] +% s[1usize] }
+ƒ v_len(n: u8) → usize ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ i in 0u8..n { v.push(i); } v.len() }
+ƒ v_sum(n: u8) → u32 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ i in 0u8..n { v.push((i as u32) *% 3u32); } s ≔ v.as_slice(); μt ≔ 0u32; ⟳ j in 0usize..s.len() { t ← t +% s[j]; } t }
+ƒ v_get(n: u8, i: usize) → u16 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ k in 0u8..n { v.push((k as u16) +% 7u16); } s ≔ v.as_slice(); s[i] }
+ƒ v_trunc(n: u8, k: usize) → usize ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ i in 0u8..n { v.push(i as u64); } v.truncate(k); v.len() }
+ƒ v_trunc_get(n: u8, k: usize, i: usize) → u64 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ j in 0u8..n { v.push(j as u64); } v.truncate(k); v.push(99u64); s ≔ v.as_slice(); s[i] }
+ƒ v_rsv(n: u8, k: u8) → u32 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); v.reserve((k % 40u8) as usize); ⟳ i in 0u8..n { v.push(i as u32); } s ≔ v.as_slice(); μt ≔ 0u32; ⟳ j in 0usize..s.len() { t ← t +% s[j]; } t +% (v.len() as u32) }
+ƒ v_rsv2(n: u8, k: u8) → u32 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ i in 0u8..(n % 20u8) { v.push(i as u32); } v.reserve((k % 40u8) as usize); v.push(7u32); s ≔ v.as_slice(); μt ≔ 0u32; ⟳ j in 0usize..s.len() { t ← t +% s[j]; } t }
+ƒ v_st(n: u8, b: i32) → i32 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ i in 0u8..n { v.push(P { a: i, b: b +% (i as i32) }); } s ≔ v.as_slice(); μt ≔ 0i32; ⟳ j in 0usize..s.len() { t ← t +% s[j].b +% (s[j].a as i32); } t }
+ƒ v_en(n: u8, i: usize) → u16 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ k in 0u8..n { ⎇ k % 2u8 == 0u8 { v.push(Some(k as u16)); } ⇝ { v.push(None); } } s ≔ v.as_slice(); ⌥ s[i] { Some(x) ↦ x, None ↦ 500u16 } }
+ƒ v_mut(n: u8, i: usize, x: u32) → u32 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ k in 0u8..n { v.push(k as u32); } m ≔ v.as_mut_slice(); m[i] ← x; s ≔ v.as_slice(); s[i] +% (v.len() as u32) }
+ƒ v_unit(n: u8) → usize ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); ⟳ i in 0u8..n { v.push(()); } v.len() }
+ƒ v_two(n: u8) → u32 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); μw ≔ Vec::new(&a); ⟳ i in 0u8..n { v.push(i as u32); w.push((i as u32) +% 100u32); } s ≔ v.as_slice(); t ≔ w.as_slice(); μr ≔ 0u32; ⟳ j in 0usize..s.len() { r ← r +% s[j] +% t[j]; } r }
+ƒ v_ck(x: u8, y: u8) → u8 ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); v.push(x); s ≔ v.as_slice(); s[0usize] + y }
+ƒ v_empty() → usize ! {mem} { μa ≔ Arena::new(); v: Vec<u8> ≔ Vec::new(&a); s ≔ v.as_slice(); t ≔ &s[0usize..0usize]; s.len() +% t.len() }
+ƒ fill(v: &!Vec<u16>, n: u8) ! {mem} { ⟳ i in 0u8..n { v.push(i as u16); } }
+ƒ v_via(n: u8) → usize ! {mem} { μa ≔ Arena::new(); μv ≔ Vec::new(&a); fill(&!v, n); fill(&!v, 3u8); v.len() }
+ƒ main() → i32 ! ∅ { 0 }
+";
+    let mut seed = 0x7EC7_0000_5EED_0001u64;
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let (bodies, runs, aborts, _) = diff_src(src, &mut rnd, true, &mut Default::default(), 120);
+    eprintln!("GLIR_DIFF_VEC bodies={bodies} runs={runs} aborts={aborts}");
+    // 16 hàm dùng Vec + `main` (`fill` nhận `&!Vec` nên chỉ chạy qua `v_via`)
+    assert!(
+        bodies >= 17 && runs >= 1800 && aborts >= 350,
+        "oracle Vec quá nhỏ: bodies={bodies} runs={runs} aborts={aborts}"
     );
 }

@@ -1,0 +1,8 @@
+// expect: fail G0301
+// note: `null` có kiểu ptr, không dùng làm toán hạng số nguyên
+glir 1
+fn @f(%a: i64) -> i64 {
+entry:
+  %r = bin add i64 %a, null
+  ret i64 %r
+}

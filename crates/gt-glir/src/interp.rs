@@ -8,6 +8,9 @@ use crate::{BinOp, CastOp, CmpPred, Func, Inst, Module, Opd, Term, Ty};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
+/// "Vùng" của con trỏ null (`Opd::Null`): không phải chỉ mục vùng nào ⇒ mọi truy cập/tính địa chỉ khác 0 qua nó là `Ub`.
+const NULL_REGION: usize = usize::MAX;
+
 /// Cỡ tối đa (byte) của MỘT slot mà thông dịch chịu cấp; lớn hơn ⇒ `OutOfFuel` (giới hạn tài nguyên của oracle, không phải phán quyết).
 pub const MAX_SLOT_BYTES: u64 = 1 << 22;
 
@@ -94,6 +97,7 @@ impl St<'_> {
                 .ok_or_else(|| format!("%{v} chưa có giá trị")),
             Opd::Slot(s) => Ok(Val::Ptr(*self.slot.get(s).ok_or("slot lạ")?, 0)),
             Opd::Global(g) => Ok(Val::Ptr(*self.gl.get(g).ok_or("global lạ")?, 0)),
+            Opd::Null => Ok(Val::Ptr(NULL_REGION, 0)),
             Opd::Int(t, n) => Ok(Val::Int(
                 (*n as u128) & mask(t.bits().ok_or("hằng không nguyên")?),
             )),
@@ -112,6 +116,9 @@ impl St<'_> {
         }
     }
     fn live(&self, a: usize) -> Result<(), String> {
+        if a >= self.mem.len() {
+            return Err("truy cập qua con trỏ null".into());
+        }
         if self.freed.borrow().contains(&a) {
             return Err("dùng vùng đã giải phóng (slot của khung đã trả về hoặc Arena đã reset: con trỏ treo)".into());
         }
@@ -663,9 +670,14 @@ fn exec_frame(
                     }
                     Inst::IndexPtr { d, elem, ptr, idx } => {
                         let (a, off) = st.ptr(ptr)?;
-                        st.live(a)?;
                         let i = sext(st.int(idx)?, 64);
                         let n = i128::from(layout(elem).size) * i;
+                        // `gep inbounds null, 0` là hợp lệ ở LLVM (con trỏ của slice rỗng `{null, 0}` từ `Vec`): độ dời 0 giữ null
+                        if a == NULL_REGION && n == 0 {
+                            st.env.insert(d.clone(), Val::Ptr(a, off));
+                            return Ok(());
+                        }
+                        st.live(a)?;
                         let no = i128::from(off) + n;
                         if no < 0 || no > st.mem[a].len() as i128 {
                             return Err("indexptr ra ngoài vùng".into());

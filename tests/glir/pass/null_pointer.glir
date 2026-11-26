@@ -1,0 +1,29 @@
+// expect: pass
+// note: hằng `null` (Vec rỗng `{null, 0}` của codegen): so sánh bằng với null, `indexptr null, 0` giữ null; %k=1 ⇒ đọc qua null (Ub); %k=2 ⇒ indexptr null, 1 (Ub)
+glir 1
+fn @nul(%k: i8) -> i32 {
+slot $v: {ptr, i64}
+entry:
+  %f0 = fieldptr {ptr, i64} $v, 0
+  store ptr null, %f0
+  %p = load ptr %f0
+  %z = indexptr i32 %p, i64 0
+  %e = icmp eq ptr %z, null
+  condbr %e, isnull, notnull
+isnull:
+  %c1 = icmp eq i8 %k, i8 1
+  condbr %c1, deref, other
+deref:
+  %x = load i32 %z
+  ret i32 %x
+other:
+  %c2 = icmp eq i8 %k, i8 2
+  condbr %c2, step, done
+step:
+  %s = indexptr i32 %p, i64 1
+  ret i32 i32 2
+done:
+  ret i32 i32 1
+notnull:
+  ret i32 i32 0
+}

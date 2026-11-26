@@ -52,6 +52,9 @@ pub enum Opd {
     Int(Ty, i128),
     /// địa chỉ (ptr) của một global bất biến (chuỗi hằng…)
     Global(String),
+    /// con trỏ null (`ptr null` của LLVM): giá trị `ptr` không trỏ vào vùng nào — mọi truy cập qua nó là `Ub` trong thông dịch. Dùng cho
+    /// `Vec::new` (`ptr` = null tới lần cấp đầu, như codegen `Intr::VecNew`).
+    Null,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

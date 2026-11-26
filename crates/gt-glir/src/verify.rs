@@ -268,6 +268,7 @@ fn verify_fn(m: &Module, f: &Func) -> Vec<String> {
         |cx: &mut Cx, o: &Opd, bi: usize, ii: isize, phi_pred: Option<usize>| -> Option<Ty> {
             match o {
                 Opd::Int(t, _) => Some(t.clone()),
+                Opd::Null => Some(Ty::Ptr),
                 Opd::Global(g) => {
                     if cx.m.globals.iter().any(|x| x.name == *g) {
                         Some(Ty::Ptr)

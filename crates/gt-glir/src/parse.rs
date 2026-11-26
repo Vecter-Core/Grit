@@ -78,6 +78,9 @@ fn parse_opd(s: &str) -> R<Opd> {
     if let Some(v) = s.strip_prefix('@') {
         return Ok(Opd::Global(ident(v)?));
     }
+    if s == "null" {
+        return Ok(Opd::Null);
+    }
     let (t, r) = parse_ty(s, 0)?;
     if !t.is_int() {
         return Err("hằng phải có kiểu số nguyên".into());

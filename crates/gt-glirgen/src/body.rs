@@ -129,6 +129,23 @@ fn is_cell(db: &TypeDb, t: &Ty) -> bool {
     matches!(t, Ty::Adt(def, _) if db.adts.get(def).is_some_and(|a| a.lang == Some(gt_types::Lang::Cell)))
 }
 
+/// `Vec<'a, T>` (lang, `{arena: &Arena, ptr: *μ T, len: usize, cap: usize}`): kiểu phần tử `T` (đọc từ trường `ptr` — không phụ thuộc cách
+/// đối số lifetime nằm trong `args`); chỉ được tạo/dùng qua intrinsic `Vec::*` (như `Intr::Vec*` của codegen).
+fn vec_elem(db: &TypeDb, t: &Ty) -> Option<Ty> {
+    let Ty::Adt(def, args) = t else { return None };
+    if db
+        .adts
+        .get(def)
+        .is_none_or(|a| a.lang != Some(gt_types::Lang::Vec))
+    {
+        return None;
+    }
+    match crate::variant_fields(db, *def, args, 0).ok()?.as_slice() {
+        [_, Ty::RawPtr(_, e), _, _] => Some((**e).clone()),
+        _ => None,
+    }
+}
+
 /// Khai báo của hàm runtime mà GLIR được phép gọi: tên và chữ ký ĐÚNG như codegen LLVM phát (`gt-codegen-llvm` `Intr::Arena*`; bảng `RUNTIME`
 /// của gt-guard). Tên ngoài bảng ⇒ `None` (không hạ).
 #[must_use]
@@ -175,6 +192,9 @@ fn in_sub(db: &TypeDb, t: &Ty, depth: u32, budget: &mut u32) -> bool {
         Ty::Adt(def, args) => {
             if is_arena(db, t) {
                 return true;
+            }
+            if let Some(e) = vec_elem(db, t) {
+                return rec(&e);
             }
             if is_cap(db, t) || is_cell(db, t) || plain_struct(db, def) {
                 return crate::variant_fields(db, *def, args, 0).is_ok_and(|fs| fs.iter().all(rec));
@@ -800,9 +820,296 @@ impl Lw<'_> {
                     _ => return un("Cell: thao tác/đối số lạ"),
                 }
             }
+            k if k.starts_with("$prelude::Vec<") => {
+                let m = k.rsplit("::").next().unwrap_or_default();
+                let mut vs = Vec::new();
+                for a in args {
+                    vs.push(self.operand(a)?);
+                }
+                if generics.len() != 1 {
+                    return un("Vec: sai số đối số kiểu");
+                }
+                self.vec_op(m, &vs, dest)?;
+            }
             _ => return Ok(false),
         }
         Ok(true)
+    }
+
+    /// trường `idx` của `Vec` mà `p` trỏ tới (kiểu GLIR `gv` của Vec)
+    fn vec_field(&mut self, gv: &G, p: &Opd, idx: u32) -> Opd {
+        let d = self.t();
+        self.push(Inst::FieldPtr {
+            d: d.clone(),
+            ty: gv.clone(),
+            ptr: p.clone(),
+            idx,
+        });
+        Opd::Val(d)
+    }
+
+    fn load_val(&mut self, ty: G, ptr: Opd) -> Opd {
+        let d = self.t();
+        self.push(Inst::Load {
+            d: d.clone(),
+            ty,
+            ptr,
+        });
+        Opd::Val(d)
+    }
+
+    /// `ok` sai ⇒ khối riêng `abort <kind>` (chốt của codegen ngoài `Assert` của MIR, vd `guard(…, OVERFLOW)` của `Vec::push`)
+    fn guard(&mut self, ok: Opd, kind: &str) {
+        self.extra += 1;
+        let (good, bad) = (
+            format!("rt{}.ok", self.extra),
+            format!("rt{}.abort", self.extra),
+        );
+        self.finish(Term::CondBr(ok, good.clone(), bad.clone()), Some(bad));
+        self.finish(Term::Abort(kind.into()), Some(good));
+    }
+
+    /// `(a·b mod 2^64, tràn u64)` bằng nhân 128 bit (thay cho `llvm.umul.with.overflow.i64` của codegen)
+    fn umul_ovf(&mut self, a: Opd, b: Opd) -> (Opd, Opd) {
+        let wa = self.cast(CastOp::ZExt, &G::I64, a, &G::I128);
+        let wb = self.cast(CastOp::ZExt, &G::I64, b, &G::I128);
+        let wm = self.bin(GB::Mul, &G::I128, wa, wb);
+        let r = self.cast(CastOp::Trunc, &G::I128, wm.clone(), &G::I64);
+        let back = self.cast(CastOp::ZExt, &G::I64, r.clone(), &G::I128);
+        let o = self.cmp(CmpPred::Ne, &G::I128, back, wm);
+        (r, o)
+    }
+
+    /// `vec_grow_to` của codegen: cấp khối MỚI `ncap·size` byte trong Arena của Vec (tràn ⇒ abort `overflow`), sao chép `len` phần tử cũ
+    /// (VÒNG LẶP từng phần tử thay cho `memcpy`), rồi `ptr ← mới`, `cap ← ncap`.
+    fn vec_grow_to(&mut self, gv: &G, base: &Opd, ncap: Opd, ge: &G, unit: bool) {
+        let l = gt_glir::layout::layout(ge);
+        let lp = self.vec_field(gv, base, 2);
+        let len = self.load_val(G::I64, lp);
+        let (bytes, o) = self.umul_ovf(ncap.clone(), Opd::Int(G::I64, i128::from(l.size)));
+        let ok = self.bin(GB::Xor, &G::I1, o, Opd::Int(G::I1, 1));
+        self.guard(ok, "overflow");
+        let ap = self.vec_field(gv, base, 0);
+        let ar = self.load_val(G::Ptr, ap);
+        let h = self.arena_handle(ar);
+        let np = self.t();
+        self.push(Inst::Call {
+            d: Some(np.clone()),
+            ret: G::Ptr,
+            callee: "gritrt_arena_alloc".into(),
+            args: vec![h, bytes, Opd::Int(G::I64, i128::from(l.align.max(1)))],
+        });
+        let np = Opd::Val(np);
+        let pp = self.vec_field(gv, base, 1);
+        let old = self.load_val(G::Ptr, pp.clone());
+        if !unit {
+            // for i in 0..len { np[i] ← old[i] }
+            self.extra += 1;
+            let n = self.extra;
+            let ctr = format!("vi{n}");
+            self.aux_slots.push((ctr.clone(), G::I64));
+            self.push(Inst::Store {
+                ty: G::I64,
+                val: Opd::Int(G::I64, 0),
+                ptr: Opd::Slot(ctr.clone()),
+            });
+            let (head, body, exit) = (
+                format!("rt{n}.cp"),
+                format!("rt{n}.cpb"),
+                format!("rt{n}.cpx"),
+            );
+            self.finish(Term::Br(head.clone()), Some(head.clone()));
+            let i = self.load_val(G::I64, Opd::Slot(ctr.clone()));
+            let c = self.cmp(CmpPred::Ult, &G::I64, i.clone(), len);
+            self.finish(
+                Term::CondBr(c, body, exit.clone()),
+                Some(format!("rt{n}.cpb")),
+            );
+            let src = self.t();
+            self.push(Inst::IndexPtr {
+                d: src.clone(),
+                elem: ge.clone(),
+                ptr: old,
+                idx: i.clone(),
+            });
+            let v = self.load_val(ge.clone(), Opd::Val(src));
+            let dst = self.t();
+            self.push(Inst::IndexPtr {
+                d: dst.clone(),
+                elem: ge.clone(),
+                ptr: np.clone(),
+                idx: i.clone(),
+            });
+            self.push(Inst::Store {
+                ty: ge.clone(),
+                val: v,
+                ptr: Opd::Val(dst),
+            });
+            let i1 = self.bin(GB::Add, &G::I64, i, Opd::Int(G::I64, 1));
+            self.push(Inst::Store {
+                ty: G::I64,
+                val: i1,
+                ptr: Opd::Slot(ctr),
+            });
+            self.finish(Term::Br(head), Some(exit));
+        }
+        self.push(Inst::Store {
+            ty: G::Ptr,
+            val: np,
+            ptr: pp,
+        });
+        let cp = self.vec_field(gv, base, 3);
+        self.push(Inst::Store {
+            ty: G::I64,
+            val: ncap,
+            ptr: cp,
+        });
+    }
+
+    /// `Vec<T>::*` như `Intr::Vec*` của codegen: `new` ⇒ `{arena, null, 0, 0}`; `len`/`as_slice`/`as_mut_slice` đọc trường; `truncate` ⇒
+    /// `len ← min(n, len)`; `reserve(n)` ⇒ `n > cap` thì cấp đúng `n`; `push` ⇒ `len = cap` thì `cap·2` (tràn ⇒ abort `overflow`, tối thiểu 4) rồi ghi.
+    fn vec_op(&mut self, m: &str, vs: &[(Opd, Ty)], dest: &Place) -> R<()> {
+        if let ("new", [(a, ta)]) = (m, vs) {
+            if !matches!(ta, Ty::Ref(_, i) if is_arena(self.db, i)) {
+                return un("Vec::new: đối số không phải &Arena");
+            }
+            let (ptr, dty) = self.place(dest)?;
+            if vec_elem(self.db, &dty).is_none() {
+                return un("Vec::new: đích không phải Vec");
+            }
+            let gv = gty(self.db, &dty)?;
+            for (i, v) in [
+                (0, a.clone()),
+                (1, Opd::Null),
+                (2, Opd::Int(G::I64, 0)),
+                (3, Opd::Int(G::I64, 0)),
+            ] {
+                let f = self.vec_field(&gv, &ptr, i);
+                self.push(Inst::Store {
+                    ty: if i < 2 { G::Ptr } else { G::I64 },
+                    val: v,
+                    ptr: f,
+                });
+            }
+            return Ok(());
+        }
+        let [(base, Ty::Ref(_, inner)), rest @ ..] = vs else {
+            return un("Vec: người nhận không phải tham chiếu");
+        };
+        let Some(elem) = vec_elem(self.db, inner) else {
+            return un("Vec: người nhận không phải Vec");
+        };
+        let gv = gty(self.db, inner)?;
+        let ge = gty(self.db, &elem)?;
+        let unit = is_unit(&elem);
+        match (m, rest) {
+            ("len", []) => {
+                let lp = self.vec_field(&gv, base, 2);
+                let len = self.load_val(G::I64, lp);
+                self.store(dest, len, &Ty::Int(IntTy::Usize))?;
+            }
+            ("as_slice" | "as_mut_slice", []) => {
+                let pp = self.vec_field(&gv, base, 1);
+                let p = self.load_val(G::Ptr, pp);
+                let lp = self.vec_field(&gv, base, 2);
+                let len = self.load_val(G::I64, lp);
+                let (dptr, dty) = self.place(dest)?;
+                if !matches!(&dty, Ty::Ref(_, s) if **s == Ty::Slice(Box::new(elem.clone()))) {
+                    return un("Vec::as_slice: đích không phải &[T]");
+                }
+                let fat = gty(self.db, &dty)?;
+                for (i, (t, v)) in [(G::Ptr, p), (G::I64, len)].into_iter().enumerate() {
+                    let f = self.vec_field(&fat, &dptr, i as u32);
+                    self.push(Inst::Store {
+                        ty: t,
+                        val: v,
+                        ptr: f,
+                    });
+                }
+            }
+            ("truncate", [(n, Ty::Int(IntTy::Usize))]) => {
+                let lp = self.vec_field(&gv, base, 2);
+                let len = self.load_val(G::I64, lp.clone());
+                let c = self.cmp(CmpPred::Ult, &G::I64, n.clone(), len.clone());
+                let d = self.t();
+                self.push(Inst::Select {
+                    d: d.clone(),
+                    ty: G::I64,
+                    c,
+                    a: n.clone(),
+                    b: len,
+                });
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: Opd::Val(d),
+                    ptr: lp,
+                });
+            }
+            ("reserve", [(n, Ty::Int(IntTy::Usize))]) => {
+                let cp = self.vec_field(&gv, base, 3);
+                let cap = self.load_val(G::I64, cp);
+                let need = self.cmp(CmpPred::Ugt, &G::I64, n.clone(), cap);
+                self.extra += 1;
+                let (grow, done) = (
+                    format!("rt{}.rsv", self.extra),
+                    format!("rt{}.rsvd", self.extra),
+                );
+                self.finish(Term::CondBr(need, grow.clone(), done.clone()), Some(grow));
+                self.vec_grow_to(&gv, base, n.clone(), &ge, unit);
+                self.finish(Term::Br(done.clone()), Some(done));
+            }
+            ("push", [(x, tx)]) if gty(self.db, tx)? == ge => {
+                let lp = self.vec_field(&gv, base, 2);
+                let len = self.load_val(G::I64, lp.clone());
+                let cp = self.vec_field(&gv, base, 3);
+                let cap = self.load_val(G::I64, cp);
+                let full = self.cmp(CmpPred::Eq, &G::I64, len.clone(), cap.clone());
+                self.extra += 1;
+                let (grow, store) = (
+                    format!("rt{}.grow", self.extra),
+                    format!("rt{}.store", self.extra),
+                );
+                self.finish(Term::CondBr(full, grow.clone(), store.clone()), Some(grow));
+                let (dbl, o) = self.umul_ovf(cap, Opd::Int(G::I64, 2));
+                let ok = self.bin(GB::Xor, &G::I1, o, Opd::Int(G::I1, 1));
+                self.guard(ok, "overflow");
+                let small = self.cmp(CmpPred::Ult, &G::I64, dbl.clone(), Opd::Int(G::I64, 4));
+                let nc = self.t();
+                self.push(Inst::Select {
+                    d: nc.clone(),
+                    ty: G::I64,
+                    c: small,
+                    a: Opd::Int(G::I64, 4),
+                    b: dbl,
+                });
+                self.vec_grow_to(&gv, base, Opd::Val(nc), &ge, unit);
+                self.finish(Term::Br(store.clone()), Some(store));
+                if !unit {
+                    let pp = self.vec_field(&gv, base, 1);
+                    let cur = self.load_val(G::Ptr, pp);
+                    let slot = self.t();
+                    self.push(Inst::IndexPtr {
+                        d: slot.clone(),
+                        elem: ge.clone(),
+                        ptr: cur,
+                        idx: len.clone(),
+                    });
+                    self.push(Inst::Store {
+                        ty: ge,
+                        val: x.clone(),
+                        ptr: Opd::Val(slot),
+                    });
+                }
+                let nl = self.bin(GB::Add, &G::I64, len, Opd::Int(G::I64, 1));
+                self.push(Inst::Store {
+                    ty: G::I64,
+                    val: nl,
+                    ptr: lp,
+                });
+            }
+            _ => return un(format!("Vec::{m}: thao tác/đối số lạ")),
+        }
+        Ok(())
     }
 
     /// ghi 0 vào mọi lá số nguyên của `g` tại `ptr` (giá trị `Cap` zero); kiểu khác ⇒ không hạ
