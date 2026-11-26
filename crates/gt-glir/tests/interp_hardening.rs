@@ -296,3 +296,53 @@ fn runtime_models_reject_misuse_and_accept_their_boundaries() {
     ub("nohandle", &[]);
     ub("arity", &[]);
 }
+
+/// Đột biến tự động (R2, 2026-11-26) sống ở mô hình `gritrt_mutex_lock/unlock` (mới, đợt 3): chốt ô khoá null/chỉ-đọc/đã trả/lệch căn lề chưa có ca âm.
+#[test]
+fn mutex_model_rejects_bad_lock_cells() {
+    let m = module(
+        "glir 1
+global @g = 0000000000000000
+declare @gritrt_mutex_lock(ptr) -> void
+declare @gritrt_heap_alloc(i64, i64) -> ptr
+declare @gritrt_heap_free(ptr, i64, i64) -> void
+fn @ok() -> i32 {
+slot $l: i64
+entry:
+  store i64 i64 0, $l
+  call void @gritrt_mutex_lock($l)
+  ret i32 i32 1
+}
+fn @glob() -> i32 {
+entry:
+  call void @gritrt_mutex_lock(@g)
+  ret i32 i32 1
+}
+fn @nul() -> i32 {
+entry:
+  call void @gritrt_mutex_lock(null)
+  ret i32 i32 1
+}
+fn @freed() -> i32 {
+entry:
+  %p = call ptr @gritrt_heap_alloc(i64 8, i64 8)
+  store i64 i64 0, %p
+  call void @gritrt_heap_free(%p, i64 8, i64 8)
+  call void @gritrt_mutex_lock(%p)
+  ret i32 i32 1
+}
+fn @skew() -> i32 {
+slot $l: [2 x i64]
+entry:
+  %p = indexptr i8 $l, i64 4
+  call void @gritrt_mutex_lock(%p)
+  ret i32 i32 1
+}
+",
+    );
+    assert_eq!(run_module(&m, "ok", &[], 1000), Outcome::Value(Some(1)));
+    for f in ["glob", "nul", "freed", "skew"] {
+        let o = run_module(&m, f, &[], 1000);
+        assert!(matches!(o, Outcome::Ub(_)), "@{f}: {o:?}");
+    }
+}
