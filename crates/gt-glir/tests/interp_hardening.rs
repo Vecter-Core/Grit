@@ -158,3 +158,141 @@ entry:
         "{o:?}"
     );
 }
+
+/// Đột biến tự động (`tools/mut.py`, mô hình runtime của thông dịch GLIR, 2026-11-26, `docs/MUT_GLIR_TOS.jsonl`) sống: các chốt `Ub` của mô hình
+/// `gritrt_*` chưa từng bị chạm (bước hạ đúng không gây ra chúng) ⇒ đột biến bỏ chốt vẫn qua. Mỗi chốt là tuyến phòng thủ bắt bước hạ SAI, nên phải có
+/// ca âm: GLIR viết tay (không qua verifier khi cố ý sai số đối số) gọi runtime sai cách ⇒ `Ub` (không panic), và biên hợp lệ ⇒ chạy được.
+const RT: &str = "glir 1
+global @g = 41
+declare @gritrt_arena_new() -> i32
+declare @gritrt_arena_alloc(i32, i64, i64) -> ptr
+declare @gritrt_arena_reset(i32) -> void
+declare @gritrt_utf8_valid(ptr, i64) -> i32
+declare @gritrt_heap_alloc(i64, i64) -> ptr
+declare @gritrt_heap_free(ptr, i64, i64) -> void
+declare @gritrt_secret_wipe(ptr, i64) -> void
+fn @utf8null() -> i32 {
+entry:
+  %r = call i32 @gritrt_utf8_valid(null, i64 0)
+  ret i32 %r
+}
+fn @utf8nullread() -> i32 {
+entry:
+  %r = call i32 @gritrt_utf8_valid(null, i64 1)
+  ret i32 %r
+}
+fn @utf8reset() -> i32 {
+entry:
+  %h = call i32 @gritrt_arena_new()
+  %p = call ptr @gritrt_arena_alloc(%h, i64 4, i64 1)
+  store i8 i8 97, %p
+  call void @gritrt_arena_reset(%h)
+  %r = call i32 @gritrt_utf8_valid(%p, i64 1)
+  ret i32 %r
+}
+fn @free(%off: i64, %size: i64, %align: i64, %twice: i1) -> i32 {
+entry:
+  %p = call ptr @gritrt_heap_alloc(i64 8, i64 8)
+  %q = indexptr i8 %p, %off
+  call void @gritrt_heap_free(%q, %size, %align)
+  condbr %twice, again, done
+again:
+  call void @gritrt_heap_free(%q, %size, %align)
+  ret i32 i32 2
+done:
+  ret i32 i32 1
+}
+fn @wipeslot() -> i32 {
+slot $s: i32
+entry:
+  store i32 i32 7, $s
+  call void @gritrt_secret_wipe($s, i64 4)
+  %v = load i32 $s
+  ret i32 %v
+}
+fn @wipeglobal() -> i32 {
+entry:
+  call void @gritrt_secret_wipe(@g, i64 1)
+  ret i32 i32 0
+}
+fn @wipenull() -> i32 {
+entry:
+  call void @gritrt_secret_wipe(null, i64 0)
+  ret i32 i32 0
+}
+fn @wipefreed() -> i32 {
+entry:
+  %p = call ptr @gritrt_heap_alloc(i64 4, i64 4)
+  call void @gritrt_heap_free(%p, i64 4, i64 4)
+  call void @gritrt_secret_wipe(%p, i64 4)
+  ret i32 i32 0
+}
+fn @arena(%size: i64, %align: i64) -> i32 {
+entry:
+  %h = call i32 @gritrt_arena_new()
+  %p = call ptr @gritrt_arena_alloc(%h, %size, %align)
+  ret i32 i32 1
+}
+fn @heap(%size: i64, %align: i64) -> i32 {
+entry:
+  %p = call ptr @gritrt_heap_alloc(%size, %align)
+  call void @gritrt_heap_free(%p, %size, %align)
+  ret i32 i32 1
+}
+fn @nohandle() -> i32 {
+entry:
+  %p = call ptr @gritrt_arena_alloc(i32 0, i64 4, i64 4)
+  ret i32 i32 1
+}
+fn @arity() -> i32 {
+entry:
+  %h = call i32 @gritrt_arena_new()
+  %p = call ptr @gritrt_arena_alloc(%h, i64 4)
+  ret i32 i32 1
+}
+";
+
+#[test]
+fn runtime_models_reject_misuse_and_accept_their_boundaries() {
+    use gt_glir::interp::MAX_SLOT_BYTES;
+    // `@arity` gọi sai số đối số (verifier từ chối) ⇒ dựng không qua `module()`
+    let m = gt_glir::parse(RT).expect("parse");
+    let errs = gt_glir::verify(&m);
+    assert!(
+        errs.len() == 1 && errs[0].contains("@arity"),
+        "chỉ `@arity` được sai: {errs:?}"
+    );
+    let run = |f: &str, a: &[u128]| run_module(&m, f, a, 1000);
+    let ub = |f: &str, a: &[u128]| {
+        let o = run(f, a);
+        assert!(matches!(o, Outcome::Ub(_)), "@{f}{a:?}: {o:?}");
+    };
+    // utf8_valid: n = 0 không đọc (kể cả null) ⇒ 1; n > 0 qua null hoặc vùng Arena đã reset ⇒ Ub
+    assert_eq!(run("utf8null", &[]), Outcome::Value(Some(1)));
+    ub("utf8nullread", &[]);
+    ub("utf8reset", &[]);
+    // heap_free: đúng (đầu khối, cỡ, căn lề) ⇒ chạy; lệch đầu khối, sai cỡ/căn lề, trả hai lần ⇒ Ub
+    assert_eq!(run("free", &[0, 8, 8, 0]), Outcome::Value(Some(1)));
+    ub("free", &[4, 8, 8, 0]);
+    ub("free", &[0, 4, 8, 0]);
+    ub("free", &[0, 8, 4, 0]);
+    ub("free", &[0, 8, 8, 1]);
+    // secret_wipe: vùng ghi được ĐẦU TIÊN (ngay sau global) ⇒ chạy, ghi 0; global chỉ-đọc, null, khối đã trả ⇒ Ub
+    assert_eq!(run("wipeslot", &[]), Outcome::Value(Some(0)));
+    ub("wipeglobal", &[]);
+    ub("wipenull", &[]);
+    ub("wipefreed", &[]);
+    // căn lề: luỹ thừa 2 tới 4096 ⇒ chạy; 3, 0, 8192 ⇒ Ub. Cỡ: đúng trần `MAX_SLOT_BYTES` ⇒ chạy; vượt ⇒ OutOfFuel (giới hạn oracle)
+    for f in ["arena", "heap"] {
+        assert_eq!(run(f, &[16, 4096]), Outcome::Value(Some(1)), "@{f}");
+        for al in [3, 0, 8192] {
+            ub(f, &[16, al]);
+        }
+        let max = u128::from(MAX_SLOT_BYTES);
+        assert_eq!(run(f, &[max, 8]), Outcome::Value(Some(1)), "@{f} cỡ trần");
+        assert_eq!(run(f, &[max + 1, 8]), Outcome::OutOfFuel, "@{f} vượt trần");
+    }
+    // tay cầm Arena chưa cấp (0 khi chưa có `arena_new`) và sai số đối số ⇒ Ub (không panic)
+    ub("nohandle", &[]);
+    ub("arity", &[]);
+}
