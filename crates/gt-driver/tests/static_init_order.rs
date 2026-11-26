@@ -63,7 +63,12 @@ fn a_dependency_cycle_between_initialisers_is_rejected_not_run_fb_c21() {
         "■ A: u32 ≔ f();\n■ B: u32 ≔ 1u32 + A;\nƒ f() → u32 ! ∅ { B }\nƒ main() → u32 ! ∅ { A }\n";
     for p in PROFILES {
         let (code, out) = run("cycle", src, p);
-        assert_eq!(code, Some(3), "[{p}] phải bị từ chối (mã 3)\n{out}");
-        assert!(out.contains("vòng"), "[{p}] thiếu lý do\n{out}");
+        // FB-G2-01: từ 2026-11-26 `gt-term` chặn chu trình khởi tạo ngay ở `check` (E0703, mã 1); trước đó chỉ LLVM từ chối (mã 3, "vòng phụ thuộc").
+        // Cả hai đều là TỪ CHỐI, không sinh binary và không chạy.
+        assert_eq!(code, Some(1), "[{p}] phải bị từ chối ở check (mã 1)\n{out}");
+        assert!(
+            out.contains("E0703") && out.contains("chu trình"),
+            "[{p}] thiếu lý do\n{out}"
+        );
     }
 }
